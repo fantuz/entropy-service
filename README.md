@@ -19,7 +19,8 @@ With this simple yet very performant software, Users can setup their own cryptog
 - CLI options
 - OS Variables to enable/disable TLS, h2, and other base concepts
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
-- ...
+- CUDA-awarness and integration if interesting or found to be relevant.
+- 
 
 ### GO build and run
 In the base directory, simply run:
