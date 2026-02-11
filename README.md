@@ -1,7 +1,6 @@
 # entropy-service
 
 GO-based software intended to let users fetch randomness via simple API(s).
-
 Behind my setup, enrtopy is provided by a real QRNG, Quantum Random Number Generator, made by ID Quantique in Geneva. The software can be easily adapted to feed entropy from different sources, even Linux PRNG or an USB Chaos Key, for example.
 
 With this simple yet very performant software, Users can setup their own cryptographic randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, amd sounds (later feature to be added soon).
@@ -15,3 +14,19 @@ This PoC demonstrates the usage of different GO programming techniques, includin
 - entropy counters (buffer, pressure, reseed interval, reseed bits etc)
 - running multiple routines in a context-safe manner, correctly implementing and supporting OS-signalling
 - ...
+
+What is (yet) missing:
+- CLI options
+- OS Variables to enable/disable TLS, h2, and other base concepts
+- ...
+
+Build
+In the base directory, simply run:
+go vet
+go fmt
+go build
+NB:GO may hint and ask for several libraries, present in the imports. Will try to summarize those here, soon.
+
+Run
+THe below simple invocation command will spinup two listeners, on all available interfaces, the unsecured HTTP on port 8080, the HTTPS one on 8443.
+./entropy-service &
