@@ -46,7 +46,7 @@ or alternatively
 The whole project is just a showcase and PoC using very very old PCI-not-Express motherboard, an old-unsuppoorted QRNG card by ID Quantique (as support ended with Kernel 4, I had to migrate some calls to make it compile on Kernel(s) 5 and 6. PC is equipped with a very old Core Duo 2, having only two cores, about 3Ghz and a bus limited to 3Gbit (I believe is the old PCI bandwidth).
 
 ### Performances
-Nonetheless this software was easily able to respond up to 27'000 requests per second (with payload of 1KB), and also reaching an impressive bandwidth of 38MB/s (payload 256KB) on that very same hardware dating circa 2012.
+Nonetheless this software was easily able to respond up to 29'500 requests per second (with payload of 1KB), and also reaching an impressive bandwidth of 380MB/s (payload 256KB) on that very same hardware dating circa 2012.
 
 
 
