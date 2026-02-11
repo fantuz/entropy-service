@@ -532,55 +532,12 @@ var bufPool = sync.Pool{
 	},
 }
 
-/*
-func startHTTP(ctx context.Context, addr string, handler http.Handler) {
-	//ln, err := net.Listen("tcp", addr)
-	tln, err := newTunedListener(addr, 4<<20)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
-	}
-
-	go func() {
-		log.Println("HTTP listening on", addr)
-		if err := srv.Serve(tln); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP serve error: %v", err)
-		}
-	}()
-
-	return srv
-}
-*/
-
-/*
-func startHTTP(addr string, handler http.Handler) (*http.Server, error) {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-
-	tln := newTunedListener(ln)
-
-	srv := &http.Server{
-		Handler: handler,
-	}
-
-	go func() {
-		if err := srv.Serve(tln); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP serve error: %v", err)
-		}
-	}()
-
-	return srv, nil
-}
-*/
-
+// func startHTTP(ctx context.Context, addr string, handler http.Handler)
+// func startHTTP(addr string, handler http.Handler) (*http.Server, error)
 func startHTTP(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error) {
 	//ln, err := net.Listen("tcp", addr)
+	//if err != nil { return nil, err }
+	//tln := newTunedListener(ln)
 	ln, err := newTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -601,6 +558,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 
 	// Serve loop
 	go func() {
+		//log.Println("HTTP listening on", addr)
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTP serve error: %v", err)
 		}
@@ -816,6 +774,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	// Run permanent reseed loop
 	go reseedLoop(ctx, drbg)
 
 	mux.HandleFunc("/random", randomBytesHandler(drbg)) // now reads DRBG from context
@@ -826,6 +785,10 @@ func main() {
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
+	//go startHTTP(ctx, ":8080", mux) (httpSrv)
+	//go startHTTPS(ctx, ":8443", mux)
+
+	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr := startHTTP(ctx, ":8080", mux, masterDRBG)
 	if httpErr != nil {
 		log.Fatal(httpErr)
@@ -835,13 +798,7 @@ func main() {
 
 	/*
 		mux := http.NewServeMux()
-
-		// Run permanent reseed loop
 		go reseedLoop(ctx, drbg)
-
-		// start HTTP & HTTPS servers on the same mux
-		//go startHTTP(ctx, ":8080", mux) (httpSrv)
-		//go startHTTPS(ctx, ":8443", mux)
 
 		httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg)
 		if httpsErr != nil {
@@ -852,20 +809,15 @@ func main() {
 	<-ctx.Done()
 	log.Println("shutdown signal received")
 
-	//select {}
-	//waitForSignal {}
+	//select {}, waitForSignal {}
 
 	// Block and wait for shutdown
 	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
-
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	//if httpSrv != nil
 	if httpErr != nil {
 		_ = httpSrv.Shutdown(shutdownCtx)
-		//_ = startHTTP.Shutdown(shutdownCtx)
 	}
 
 	/*

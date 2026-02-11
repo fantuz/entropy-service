@@ -4,6 +4,7 @@ import (
 	"golang.org/x/crypto/chacha20"
 	"crypto/cipher"
 	"crypto/sha512"
+	"crypto/sha256"
 	"strconv"
 	"sync"
 	"time"
@@ -66,16 +67,28 @@ func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
 
 // NewDRBG creates a new DRBG instance from a seed
 func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
+	/*
+	if len(seed) < 32 {
+		panic("seed too short")
+	}
+	*/
 	h := sha512.Sum512(seed)
-	n := sha512.Sum512(noncee)
+	n := sha256.Sum256(noncee)
+	//n := sha256.Sum256(noncee)
+
+	//if _, err := crypto/rand.Read(nonce); err != nil
+	if len(seed) < 12 {
+		panic("failed to generate nonce")
+	}
 
 	var key [32]byte
 	var nonce [12]byte
+	//nonce := make([]byte, 12)
 	copy(key[:], h[:32])
-	copy(nonce[:], n[32:44])
 	//copy(nonce[:], h[32:44])
+	copy(noncee[:], n[:32])
 
-	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
+	c, err := chacha20.NewUnauthenticatedCipher(key[:], noncee[:])
 	if err != nil {
 		return nil, err
 	}
