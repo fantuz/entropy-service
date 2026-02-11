@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"entropy-service/rng"
@@ -8,8 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	//"net"
-	"context"
+	"net"
 	//"golang.org/x/net/http2"
 	"log"
 	"net/http"
@@ -371,6 +371,8 @@ func randomHandler(d *rng.DRBG) http.HandlerFunc {
 	}
 }
 
+// AAA
+/*
 func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		d.WriteHeaders(w)
@@ -398,6 +400,50 @@ func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 		w.Write(buf)
 	}
 }
+*/
+
+func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Derive 32 bytes from master
+		seed, _ := d.Derive(32)
+		nonce, _ := d.Derive(12)
+
+		// Create per-request DRBG
+		// broken by the per-request model, need to amend NewDRBG input parameters
+		child, _ := rng.NewDRBG(seed, nonce)
+
+		size := 4096
+		if q := r.URL.Query().Get("bytes"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+				size = v
+			}
+		}
+
+		buf := make([]byte, size)
+		child.Read(buf)
+
+		atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+		atomic.AddUint64(&httpRequests, +1)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write(buf)
+	}
+}
+
+/*
+func randomBytesHandler(w http.ResponseWriter, r *http.Request) {
+	connDRBG := r.Context().Value("conn_drbg").(*rng.DRBG)
+
+	buf := make([]byte, size)
+	connDRBG.Read(buf)
+
+	atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+	atomic.AddUint64(&httpRequests, +1)
+	w.Header().Set("Content-Type", "application/octet-stream")
+
+	w.Write(buf)
+}
+*/
 
 // func metricsHandler(drbg *DRBG) http.HandlerFunc
 func metricsHandler(d *rng.DRBG) http.HandlerFunc {
@@ -533,6 +579,50 @@ func startHTTP(addr string, handler http.Handler) (*http.Server, error) {
 }
 */
 
+func startHTTP(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error) {
+	//ln, err := net.Listen("tcp", addr)
+	ln, err := newTunedListener(addr, 4<<20)
+	if err != nil {
+		return nil, err
+	}
+
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: handler,
+		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
+			// derive per-connection DRBG from master
+			seed, _ := master.Derive(32)
+			nonce, _ := master.Derive(12) // 32 is too much
+			childDRBG, _ := rng.NewDRBG(seed, nonce)
+			// attach to context for handlers
+			return context.WithValue(cctx, "conn_drbg", childDRBG)
+		},
+	}
+
+	// Serve loop
+	go func() {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+			log.Printf("HTTP serve error: %v", err)
+		}
+	}()
+
+	// Context-driven graceful shutdown
+	go func() {
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancel()
+
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+
+	return srv, nil
+}
+
+/*
 func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Server, error) {
 	//ln, err := net.Listen("tcp", addr)
 	ln, err := newTunedListener(addr, 4<<20)
@@ -543,8 +633,20 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Se
 	//tln := newTunedListener(ln)
 	//tln := tunedListener(ln)
 
+	// AAA
 	srv := &http.Server{
 		Handler: handler,
+	}
+
+	srv := &http.Server{
+		Handler: handler,
+		ConnContext: func(ctx context.Context, c net.Conn) context.Context {
+			connDRBG, err := rng.NewConnectionDRBG(DRBG)
+			if err != nil {
+				return ctx
+			}
+			return context.WithValue(ctx, "conn_drbg", connDRBG)
+		},
 	}
 
 	// Serve loop
@@ -570,6 +672,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Se
 
 	return srv, nil
 }
+*/
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config) (*http.Server, error) {
 
@@ -587,12 +690,12 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 	}
 
 	/*
-	http2.ConfigureServer(srv, &http2.Server{
-		MaxConcurrentStreams: 1024,
-		//InitialWindowSize:    1 << 20,
-		//InitialConnWindowSize: 4 << 20,
-		MaxReadFrameSize:     1 << 20,
-	})
+		http2.ConfigureServer(srv, &http2.Server{
+			MaxConcurrentStreams: 1024,
+			//InitialWindowSize:    1 << 20,
+			//InitialConnWindowSize: 4 << 20,
+			MaxReadFrameSize:     1 << 20,
+		})
 	*/
 
 	// Serve loop
@@ -681,13 +784,15 @@ func main() {
 	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
 
 	// Initialize seed space (in bytes here)
-	seed, err := fetchEntropy(4096) //64
+	seed, err := fetchEntropy(64)  // 64*8 = 512
+	nonce, err := fetchEntropy(12) // 12*8 = 96
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Initialize DRBG as usual
-	drbg, err := rng.NewDRBG(seed)
+	// this is to be patched, just testing multiple instances of DRBG (per-connection)
+	drbg, err := rng.NewDRBG(seed, nonce)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -703,11 +808,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	tlsCfg := newTLSConfig("cert.pem", "key.pem")
 	tlsCfg.Certificates = []tls.Certificate{cert}
 
+	masterDRBG, _ := rng.NewDRBG(seed, nonce)
+
 	mux := http.NewServeMux()
 
+	go reseedLoop(ctx, drbg)
+
+	mux.HandleFunc("/random", randomBytesHandler(drbg)) // now reads DRBG from context
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/random", randomBytesHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
@@ -715,24 +826,28 @@ func main() {
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
-	// Run permanent reseed loop
-	go reseedLoop(ctx, drbg)
-
-	// start HTTP & HTTPS servers on the same mux
-	//go startHTTP(ctx, ":8080", mux) (httpSrv)
-	//go startHTTPS(ctx, ":8443", mux)
-	//httpSrv := startHTTP(ctx, ":8080", mux)
-	//httpsSrv := startHTTPS(ctx, ":8443", mux)
-
-	httpSrv, httpErr := startHTTP(ctx, ":8080", mux)
+	httpSrv, httpErr := startHTTP(ctx, ":8080", mux, masterDRBG)
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	}
 
-	httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg)
-	if httpsErr != nil {
-		log.Fatal(httpsErr)
-	}
+	log.Println("HTTP server running on :8080")
+
+	/*
+		mux := http.NewServeMux()
+
+		// Run permanent reseed loop
+		go reseedLoop(ctx, drbg)
+
+		// start HTTP & HTTPS servers on the same mux
+		//go startHTTP(ctx, ":8080", mux) (httpSrv)
+		//go startHTTPS(ctx, ":8443", mux)
+
+		httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg)
+		if httpsErr != nil {
+			log.Fatal(httpsErr)
+		}
+	*/
 
 	<-ctx.Done()
 	log.Println("shutdown signal received")
@@ -741,6 +856,9 @@ func main() {
 	//waitForSignal {}
 
 	// Block and wait for shutdown
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -750,9 +868,11 @@ func main() {
 		//_ = startHTTP.Shutdown(shutdownCtx)
 	}
 
-	if httpsSrv != nil {
-		_ = httpsSrv.Shutdown(shutdownCtx)
-	}
+	/*
+		if httpsSrv != nil {
+			_ = httpsSrv.Shutdown(shutdownCtx)
+		}
+	*/
 
 	log.Println("shutdown complete")
 

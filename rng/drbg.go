@@ -1,14 +1,14 @@
 package rng
 
 import (
+	"golang.org/x/crypto/chacha20"
 	"crypto/cipher"
 	"crypto/sha512"
 	"strconv"
 	"sync"
 	"time"
-	//"io"
-	"golang.org/x/crypto/chacha20"
 	"net/http"
+	//"io"
 )
 
 // DRBG represents a deterministic random byte generator with observability metadata
@@ -65,13 +65,15 @@ func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
 }
 
 // NewDRBG creates a new DRBG instance from a seed
-func NewDRBG(seed []byte) (*DRBG, error) {
+func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
 	h := sha512.Sum512(seed)
+	n := sha512.Sum512(noncee)
 
 	var key [32]byte
 	var nonce [12]byte
 	copy(key[:], h[:32])
-	copy(nonce[:], h[32:44])
+	copy(nonce[:], n[32:44])
+	//copy(nonce[:], h[32:44])
 
 	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
 	if err != nil {
@@ -84,6 +86,19 @@ func NewDRBG(seed []byte) (*DRBG, error) {
 		cipher:   c,
 		reseeded: time.Now(),
 	}, nil
+}
+
+// pooled DRBG, per-connection
+func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
+	seed, err := d.Derive(32) // 256-bit seed
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, 12)
+	copy(nonce, seed[:12])
+
+	return NewDRBG(seed, nonce)
 }
 
 // Reseed mixes new entropy into the DRBG
@@ -208,6 +223,28 @@ func (d *DRBG) ReadInto(dst []byte) {
 func (d *DRBG) Write(p []byte) (int, error) {
     d.ReadInto(p)
     return len(p), nil
+}
+
+// for later fix, 
+/*
+func (d *DRBG) Read(p []byte) (int, error) {
+    // fill p
+    return len(p), nil
+}
+func (d *DRBG) Derive(seedSize int) ([]byte, error) {
+	seed := make([]byte, seedSize)
+	_, err := d.Read(seed)
+	if err != nil {
+		return nil, err
+	}
+	return seed, nil
+}
+*/
+
+func (d *DRBG) Derive(seedSize int) ([]byte, error) {
+	seed := make([]byte, seedSize)
+	d.Read(seed)
+	return seed, nil
 }
 
 /*
