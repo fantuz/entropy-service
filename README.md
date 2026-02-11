@@ -2,10 +2,10 @@
 
 ### Theoretical purposes
 GO-based software intended to let users fetch randomness via simple API(s).
-Behind my setup, enrtopy is provided by a real QRNG, Quantum Random Number Generator, made by ID Quantique in Geneva. The software can be easily adapted to feed entropy from different sources, even Linux PRNG or an USB Chaos Key, for example.
+Behind my setup, entropy is provided by a real QRNG, Quantum Random Number Generator, made by ID Quantique in Geneva. This entropy is then fed into a DRBG module which "amplifies" output of QRNG, using either ChaCha20 or AES-CRT functions. The software can be easily adapted to source entropy from various and different sources, even Linux PRNG itself (for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless.
 
 ### Practical implementations
-With this simple yet very performant software, Users can setup their own cryptographic randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, amd sounds (later feature to be added soon).
+With this simple yet very performant software, users can setup their own cryptographically-strong randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, and even sounds (later feature to be added soon).
 
 ### GO programming techniques and logics implemented, including:
 - socket management
@@ -17,6 +17,7 @@ With this simple yet very performant software, Users can setup their own cryptog
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey, or better/safer/more modern entropy source)
 - h2 readyness, now commented. Whole implementation is 3 lines away, but commented out as debug in HTTP/2 is way harder than HTTP/1.1
 - OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
+- random imgage generation, heatmaps
 - ...
 
 ### What is (yet) missing:
@@ -25,6 +26,7 @@ With this simple yet very performant software, Users can setup their own cryptog
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - per-connection DRBG
+- random sound generator
 - ...
 
 ### GO build and run
