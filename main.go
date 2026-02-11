@@ -139,6 +139,17 @@ type QRNGBuffer struct {
 	stop      chan struct{}
 }
 
+// maps to older fetchEntropy
+var qrngBuffer *QRNGBuffer
+
+func initQRNGBuffer() {
+	// For example, 64 KB buffer. 2MB for testing purposes
+	qrngBuffer = NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
+
+	// Attach it to DRBG
+	//drbg.SetEntropyBuffer(qrngBuffer)
+}
+
 // NewQRNGBuffer creates a buffered QRNG reader
 func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 	q := &QRNGBuffer{
@@ -217,17 +228,6 @@ func (q *QRNGBuffer) fillLoop() {
 		q.buf = append(q.buf, tmp[:total]...)
 		q.mu.Unlock()
 	}
-}
-
-// maps to older fetchEntropy
-var qrngBuffer *QRNGBuffer
-
-func initQRNGBuffer() {
-	// For example, 64 KB buffer. 2MB for testing purposes
-	qrngBuffer = NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
-
-	// Attach it to DRBG
-	//drbg.SetEntropyBuffer(qrngBuffer)
 }
 
 // fetchEntropy reads n bytes from the buffered QRNG
@@ -742,14 +742,13 @@ func main() {
 	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
 
 	// Initialize seed space (in bytes here)
-	seed, err := fetchEntropy(64)  // 64*8 = 512
-	nonce, err := fetchEntropy(12) // 12*8 = 96
+	seed, err := fetchEntropy(64) // 64*8 = 512 bits
 	if err != nil {
 		log.Fatal(err)
 	}
+	nonce, err := fetchEntropy(12) // 12*8 = 96 bits
 
-	// Initialize DRBG as usual
-	// this is to be patched, just testing multiple instances of DRBG (per-connection)
+	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
 	drbg, err := rng.NewDRBG(seed, nonce)
 	if err != nil {
 		log.Fatal(err)
@@ -772,14 +771,14 @@ func main() {
 
 	masterDRBG, _ := rng.NewDRBG(seed, nonce)
 
+	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
 	// Run permanent reseed loop
 	go reseedLoop(ctx, drbg)
 
-	mux.HandleFunc("/random", randomBytesHandler(drbg)) // now reads DRBG from context
+	mux.HandleFunc("/v1/random", randomBytesHandler(drbg)) // now reads DRBG from context
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
-	mux.HandleFunc("/v1/random", randomBytesHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
 	mux.HandleFunc("/health", healthHandler(drbg))
@@ -794,25 +793,26 @@ func main() {
 		log.Fatal(httpErr)
 	}
 
+	/*
+		httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg)
+		if httpsErr != nil { log.Fatal(httpsErr) }
+	*/
+
 	log.Println("HTTP server running on :8080")
+	log.Println("HTTPs server running on :8443")
 
 	/*
 		mux := http.NewServeMux()
 		go reseedLoop(ctx, drbg)
-
-		httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg)
-		if httpsErr != nil {
-			log.Fatal(httpsErr)
-		}
 	*/
 
 	<-ctx.Done()
 	log.Println("shutdown signal received")
 
-	//select {}, waitForSignal {}
+	// here was select, and waitForSignal. no more.
 
 	// Block and wait for shutdown
-	//ctx, cancel := context.WithCancel(context.Background())
+	//shutdownCtx, cancel := context.WithCancel(context.Background())
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -820,11 +820,7 @@ func main() {
 		_ = httpSrv.Shutdown(shutdownCtx)
 	}
 
-	/*
-		if httpsSrv != nil {
-			_ = httpsSrv.Shutdown(shutdownCtx)
-		}
-	*/
+	/* if httpsSrv != nil { _ = httpsSrv.Shutdown(shutdownCtx) } */
 
 	log.Println("shutdown complete")
 
