@@ -32,7 +32,7 @@ go build
 NB: GO may hint and complain about the lack of several imported libraries from main.go. Will try to summarize those here to save your time, soon.
 
 THe below simple invocation command will spinup two listeners, on all available interfaces, the unsecured HTTP on port 8080, the HTTPS one on 8443.
-```./entropy-service &```
+```./entropy-service```
 or alternatively
 ```go run entropy-service```
 
