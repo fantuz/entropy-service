@@ -17,12 +17,14 @@ With this simple yet very performant software, Users can setup their own cryptog
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey, or better/safer/more modern entropy source)
 - h2 readyness, now commented. Whole implementation is 3 lines away, but commented out as debug in HTTP/2 is way harder than HTTP/1.1
 - OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
-- ..
+- ...
 
 ### What is (yet) missing:
 - CLI options, for example to enable different /dev/Xrandom sources, different reseed interval, different buffer sizes and so on
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
+- ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
+- per-connection DRBG
 - ...
 
 ### GO build and run
