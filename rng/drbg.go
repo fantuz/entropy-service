@@ -71,22 +71,22 @@ func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
 	if len(seed) < 32 {
 		panic("seed too short")
 	}
+	if len(noncee) < 12 {
+		panic("failed to generate nonce")
+	}
 	*/
 	h := sha512.Sum512(seed)
 	n := sha256.Sum256(noncee)
-	//n := sha256.Sum256(noncee)
 
 	//if _, err := crypto/rand.Read(nonce); err != nil
-	if len(seed) < 12 {
-		panic("failed to generate nonce")
-	}
 
 	var key [32]byte
 	var nonce [12]byte
 	//nonce := make([]byte, 12)
+	//crypto/rand.Read(nonce)  // or derive deterministically from conn id
 	copy(key[:], h[:32])
 	//copy(nonce[:], h[32:44])
-	copy(noncee[:], n[:32])
+	copy(noncee[:], n[:12])
 
 	c, err := chacha20.NewUnauthenticatedCipher(key[:], noncee[:])
 	if err != nil {
