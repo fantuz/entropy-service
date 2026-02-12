@@ -534,7 +534,9 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 	//if err != nil { return nil, err }
 	//tln := newTunedListener(ln)
 	ln, err := newTunedListener(addr, 4<<20)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	srv := &http.Server{
 		Addr:    addr,
@@ -590,15 +592,17 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Se
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *rng.DRBG) (*http.Server, error) {
 	ln, err := newTunedListener(addr, 4<<20)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
 	tlsConfig.Certificates = []tls.Certificate{cert}
 	tlsLn := tls.NewListener(ln, tlsConfig)
 
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+		Addr:      addr,
+		Handler:   handler,
 		TLSConfig: tlsConfig,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
 			// derive per-connection DRBG from master
@@ -611,11 +615,11 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 	}
 
 	/*
-	if os.Getenv("TLS") == "1" {
-		tlsCfg := newTLSConfig("cert.pem", "key.pem")
-		tlsCfg.Certificates = []tls.Certificate{cert}
-		ln = tls.NewListener(ln, tlsCfg)
-	}
+		if os.Getenv("TLS") == "1" {
+			tlsCfg := newTLSConfig("cert.pem", "key.pem")
+			tlsCfg.Certificates = []tls.Certificate{cert}
+			ln = tls.NewListener(ln, tlsCfg)
+		}
 	*/
 
 	// remove comment to enable HTTP/2
@@ -712,10 +716,14 @@ func main() {
 
 	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr := startHTTP(ctx, ":8080", mux, masterDRBG)
-	if httpErr != nil { log.Fatal(httpErr) }
+	if httpErr != nil {
+		log.Fatal(httpErr)
+	}
 
-	httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg,masterDRBG)
-	if httpsErr != nil { log.Fatal(httpsErr) }
+	httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg, masterDRBG)
+	if httpsErr != nil {
+		log.Fatal(httpsErr)
+	}
 
 	log.Println("HTTP server running on :8080")
 	log.Println("HTTPs server running on :8443")
@@ -730,8 +738,12 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if httpErr != nil { _ = httpSrv.Shutdown(shutdownCtx) }
-	if httpsSrv != nil { _ = httpsSrv.Shutdown(shutdownCtx) }
+	if httpErr != nil {
+		_ = httpSrv.Shutdown(shutdownCtx)
+	}
+	if httpsSrv != nil {
+		_ = httpsSrv.Shutdown(shutdownCtx)
+	}
 
 	log.Println("shutdown complete")
 

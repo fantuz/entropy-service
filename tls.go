@@ -8,7 +8,9 @@ import (
 // newTLSConfig builds a TLS 1.3–only config suitable for high-throughput APIs
 func newTLSConfig(certFile, keyFile string) *tls.Config {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil { log.Fatalf("failed to load TLS certificate: %v", err) }
+	if err != nil {
+		log.Fatalf("failed to load TLS certificate: %v", err)
+	}
 
 	return &tls.Config{
 		MinVersion: tls.VersionTLS13,
