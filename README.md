@@ -1,11 +1,11 @@
 # entropy-service
 
-### Intended purposes, project goals
+### Intended usage
 entropy-service is a GO-based software intended to let users fetch an amount randomness via simple API(s). Useful in daily cryptographic operations, where the randomness source may be "staving" or tampered-with.
+In my demo setup, real-time entropy is provided by a real QRNG (Quantum Random Number Generator) card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of QRNG using either ChaCha20 or AES-CRT functions.
 
-In my demo setup, entropy is provided by a real QRNG (Quantum Random Number Generator) card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of QRNG using either ChaCha20 or AES-CRT functions.
-
-The software can be easily adapted to fetch entropy from various and different sources, even Linux PRNG itself (for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless, every character device will a valid choice, ranging from barcode reader to any webcam or mouse.
+### Project goals
+The software can be easily adapted to fetch entropy from etherogeneous sources, as the Linux PRNG itself (for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam or mouse, your imagination is the limit !
 
 ### Practical implementations
 With this simple yet very performant software, users can setup their own cryptographically-strong randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, and even sounds (later feature to be added soon).
