@@ -29,6 +29,7 @@ With this simple yet very performant software, users can setup their own cryptog
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator
+- replace ChaCha20 with AES-CRT 
 
 ### Supported/tested hardware
 ```
@@ -37,7 +38,7 @@ With this simple yet very performant software, users can setup their own cryptog
  - pretty much any character device under Linux, including kernel RNG
 ```
 
-### GO build and run
+### Build & run
 In the base directory, simply run:
 ```
 $ sudo apt-get install golang
