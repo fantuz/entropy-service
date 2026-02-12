@@ -66,10 +66,12 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 
 ### Performances
 Under extensive tests on a 10+ years old hardware, the software was able to respond up to:
-- HTTP\
-70'000 requests per second (payload 64B) or a throughput up to 1 GB/s (payload 512KB)
-- HTTPS\
-50'000 requests per second (payload 64B) or a throughput up to 600 MB/s (payload 512KB)
+- **HTTP**\
+70'000 requests per second (payload 64B)\
+up to 1 GB/s (payload 512KB)
+- **HTTPS**\
+50'000 requests per second (payload 64B)\
+up to 600 MB/s (payload 512KB)
 
 ```
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=1048576
