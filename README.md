@@ -10,7 +10,7 @@ The software can be easily adapted to fetch entropy from etherogeneous sources, 
 ### Practical implementations
 With this simple yet very performant software, users can setup their own cryptographically-strong randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, and even sounds (later feature to be added soon).
 
-### GO programming techniques and logics implemented, including:
+### Architecture and logic
 - socket management
 - per-connection DRBG
 - thread-safe and thread-aware structs
@@ -23,7 +23,7 @@ With this simple yet very performant software, users can setup their own cryptog
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
 
-### What is (yet) missing:
+### What is yet to come
 - CLI options, for example to enable different /dev/Xrandom sources, different reseed interval, different buffer sizes and so on
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
