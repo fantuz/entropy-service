@@ -62,7 +62,12 @@ This way, you just started both HTTP & HTTPS listeners on all available interfac
 The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
 
 ### Performances
-Software was proven able to respond up to 70'000 requests per second (with payload of 64B), or reaching an impressive bandwidth of 1GB/s (payload 512KB) on a 10+ years old hardware.
+Under extensive tests on a 10+ years old hardware, the software was able to respond up to:
+- 70'000 requests per second (with payload of 64B) in HTTP
+- 50'000 requests per second (with payload of 64B) in HTTPS
+- reaching an impressive bandwidth of 1 GB/s (with a payload of 512KB)
+- reaching an impressive bandwidth of 600 MB/s (with a payload of 512KB)
+
 ```
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=1048576
 Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=1048576
