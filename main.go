@@ -155,9 +155,9 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 
 	// Start background fill
 	go q.fillLoop()
-	atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity))-1)
-	//incBuffer()
-	incTestB(q.capacity)
+	//atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity))-1)
+	incBuffer()
+	//incTestB(q.capacity)
 	return q
 }
 
@@ -211,7 +211,9 @@ func (q *QRNGBuffer) fillLoop() {
 		total := 0
 		for total < free {
 			m, err := f.Read(tmp[total:])
-			if err != nil { break }
+			if err != nil {
+				break
+			}
 			total += m
 			incTestA(m)
 		}
@@ -539,7 +541,9 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 			// derive per-connection DRBG from master
 			//childDRBG, _ := rng.NewDRBG(seed)
 			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
-			if cerr != nil { return ctx }
+			if cerr != nil {
+				return ctx
+			}
 
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
@@ -650,13 +654,17 @@ func main() {
 
 	// Initialize seed space (in bytes here)
 	seed, serr := fetchEntropy(64) // 64*8 = 512 bits
-	if serr != nil { log.Fatal(serr) }
+	if serr != nil {
+		log.Fatal(serr)
+	}
 	//nonce, nerr := fetchEntropy(12) // 12*8 = 96 bits
 	//if nerr != nil { log.Fatal(nerr) }
 
 	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
 	drbg, derr := rng.NewDRBG(seed)
-	if derr != nil { log.Fatal(derr) }
+	if derr != nil {
+		log.Fatal(derr)
+	}
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
 	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", 2000*time.Millisecond, 256, qrngBuf)

@@ -5,12 +5,12 @@ import (
 )
 
 var (
-	rngBytesGenerated	uint64
-	rngReseeds		uint64
-	rngBytesBuffered	uint64
-	httpRequests		uint64
-	rngBytesTestA		uint64
-	rngBytesTestB		uint64
+	rngBytesGenerated uint64
+	rngReseeds        uint64
+	rngBytesBuffered  uint64
+	httpRequests      uint64
+	rngBytesTestA     uint64
+	rngBytesTestB     uint64
 )
 
 func incRNGBytes(n int) {
