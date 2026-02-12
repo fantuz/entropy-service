@@ -409,10 +409,10 @@ func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		// Derive 32 bytes from master
 		seed, _ := d.Derive(32)
-		nonce, _ := d.Derive(12)
+		//nonce, _ := d.Derive(12)
 
 		// Create per-request DRBG
-		child, _ := rng.NewDRBG(seed, nonce)
+		child, _ := rng.NewDRBG(seed)
 		//connDRBG := r.Context().Value("conn_drbg").(*rng.DRBG)
 
 		size := 4096
@@ -530,15 +530,13 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 		Addr:    addr,
 		Handler: handler,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			// derive per-connection DRBG from master
 			//seed, _ := master.Derive(32)
-			//nonce, _ := master.Derive(12) // 32 is too much
+			//nonce, _ := master.Derive(12)
 
-			//childDRBG, _ := rng.NewDRBG(seed, nonce)
-			childDRBG, _ := rng.NewConnectionDRBG(master) // (DRBG)
-			if err != nil {
-				return ctx
-			}
+			// derive per-connection DRBG from master
+			//childDRBG, _ := rng.NewDRBG(seed)
+			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
+			if cerr != nil { return ctx }
 
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
@@ -593,8 +591,9 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
 			// derive per-connection DRBG from master
 			seed, _ := master.Derive(32)
-			nonce, _ := master.Derive(12) // 32 is too much
-			childDRBG, _ := rng.NewDRBG(seed, nonce)
+			//nonce, _ := master.Derive(12)
+			childDRBG, _ := rng.NewDRBG(seed)
+			//childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
 		},
@@ -648,19 +647,13 @@ func main() {
 
 	// Initialize seed space (in bytes here)
 	seed, serr := fetchEntropy(64) // 64*8 = 512 bits
-	if serr != nil {
-		log.Fatal(serr)
-	}
-	nonce, nerr := fetchEntropy(12) // 12*8 = 96 bits
-	if nerr != nil {
-		log.Fatal(nerr)
-	}
+	if serr != nil { log.Fatal(serr) }
+	//nonce, nerr := fetchEntropy(12) // 12*8 = 96 bits
+	//if nerr != nil { log.Fatal(nerr) }
 
 	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
-	drbg, derr := rng.NewDRBG(seed, nonce)
-	if derr != nil {
-		log.Fatal(derr)
-	}
+	drbg, derr := rng.NewDRBG(seed)
+	if derr != nil { log.Fatal(derr) }
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
 	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", 2000*time.Millisecond, 256, qrngBuf)
@@ -677,7 +670,7 @@ func main() {
 	}
 	tlsCfg.Certificates = []tls.Certificate{cert}
 
-	masterDRBG, _ := rng.NewDRBG(seed, nonce)
+	masterDRBG, _ := rng.NewDRBG(seed)
 
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()

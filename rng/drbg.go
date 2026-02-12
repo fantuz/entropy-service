@@ -4,7 +4,7 @@ import (
 	"golang.org/x/crypto/chacha20"
 	"crypto/cipher"
 	"crypto/sha512"
-	"crypto/sha256"
+	//"crypto/sha256"
 	"strconv"
 	"sync"
 	"time"
@@ -66,29 +66,24 @@ func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
 }
 
 // NewDRBG creates a new DRBG instance from a seed
-func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
-	/*
-	if len(seed) < 32 {
-		panic("seed too short")
-	}
-	if len(noncee) < 12 {
-		panic("failed to generate nonce")
-	}
-	*/
+//func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
+func NewDRBG(seed []byte) (*DRBG, error) {
+	if len(seed) < 32 { panic("seed too short") }
+	//if len(noncee) < 12 { panic("failed to generate nonce") }
 	h := sha512.Sum512(seed)
-	n := sha256.Sum256(noncee)
+	//n := sha256.Sum256(noncee)
 
 	//if _, err := crypto/rand.Read(nonce); err != nil
 
 	var key [32]byte
 	var nonce [12]byte
 	//nonce := make([]byte, 12)
-	//crypto/rand.Read(nonce)  // or derive deterministically from conn id
+	// idea:  derive deterministically from conn id
 	copy(key[:], h[:32])
-	//copy(nonce[:], h[32:44])
-	copy(noncee[:], n[:12])
+	copy(nonce[:], h[32:44])
+	//copy(nonce[:], n[:12])
 
-	c, err := chacha20.NewUnauthenticatedCipher(key[:], noncee[:])
+	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
 	if err != nil { return nil, err }
 
 	return &DRBG{
@@ -104,10 +99,11 @@ func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
 	seed, err := d.Derive(32) // 256-bit seed
 	if err != nil { return nil, err }
 
-	nonce := make([]byte, 12) // 96-bit nonce
-	copy(nonce, seed[:12])
+	//nonce := make([]byte, 12) // 96-bit nonce
+	//copy(nonce, seed[:12])
 
-	return NewDRBG(seed, nonce)
+	//return NewDRBG(seed, nonce)
+	return NewDRBG(seed)
 }
 
 // Reseed mixes new entropy into the DRBG
