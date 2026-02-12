@@ -9,6 +9,7 @@ With this simple yet very performant software, users can setup their own cryptog
 
 ### GO programming techniques and logics implemented, including:
 - socket management
+- per-connection DRBG
 - HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
 - thread-safe and thread-aware structs
 - observable metrics and counters (entropy source availability, entropy buffer, pressure, reseed interval, reseed bits etc)
@@ -24,9 +25,15 @@ With this simple yet very performant software, users can setup their own cryptog
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
-- per-connection DRBG
 - random sound generator
 - ...
+
+### Supported/tested hardware
+```
+ - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
+ - Quantis PCI by ID Quantique
+ - pretty much any character device under Linux, including kernel RNG
+```
 
 ### GO build and run
 In the base directory, simply run:
