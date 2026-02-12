@@ -89,9 +89,7 @@ func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
 	copy(noncee[:], n[:12])
 
 	c, err := chacha20.NewUnauthenticatedCipher(key[:], noncee[:])
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return nil, err }
 
 	return &DRBG{
 		key:      key,
@@ -101,14 +99,12 @@ func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
 	}, nil
 }
 
-// pooled DRBG, per-connection
+// DRBG per-connection seed
 func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
 	seed, err := d.Derive(32) // 256-bit seed
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return nil, err }
 
-	nonce := make([]byte, 12)
+	nonce := make([]byte, 12) // 96-bit nonce
 	copy(nonce, seed[:12])
 
 	return NewDRBG(seed, nonce)

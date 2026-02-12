@@ -531,11 +531,11 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 		Handler: handler,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
 			// derive per-connection DRBG from master
-			seed, _ := master.Derive(32)
-			nonce, _ := master.Derive(12) // 32 is too much
+			//seed, _ := master.Derive(32)
+			//nonce, _ := master.Derive(12) // 32 is too much
 
-			//childDRBG, _ := rng.NewConnectionDRBG(DRBG)
-			childDRBG, _ := rng.NewDRBG(seed, nonce)
+			//childDRBG, _ := rng.NewDRBG(seed, nonce)
+			childDRBG, _ := rng.NewConnectionDRBG(master) // (DRBG)
 			if err != nil {
 				return ctx
 			}
