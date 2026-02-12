@@ -155,9 +155,8 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 
 	// Start background fill
 	go q.fillLoop()
-	//atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity))-1)
-	incBuffer()
-	//incTestB(q.capacity)
+	atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity)))
+	//incBuffer()
 	return q
 }
 
@@ -180,6 +179,7 @@ func (q *QRNGBuffer) Get(n int) ([]byte, error) {
 
 	out := q.buf[:n]
 	q.buf = q.buf[n:]
+	incTestB(len(q.buf))
 	return out, nil
 }
 
@@ -231,6 +231,7 @@ func fetchEntropy(n int) ([]byte, error) {
 		initQRNGBuffer()
 	}
 	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
+	incTestA(n)
 	return qrngBuffer.Get(n)
 }
 
@@ -367,31 +368,13 @@ func randomHandler(d *rng.DRBG) http.HandlerFunc {
 
 /*
 func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		d.WriteHeaders(w)
-		size := 4096
-		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
-				size = v
-			}
-		}
-
-		buf := make([]byte, size)
 		//buf := bufPool.Get().([]byte)
 		//defer bufPool.Put(buf)
 		//data := d.ReadInto(buf[:size]) //n
-
 		//io.Reader(buf)
-		d.Read(buf)
-		atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-		atomic.AddUint64(&httpRequests, +1)
-		w.Header().Set("Content-Type", "application/octet-stream")
-
 		//d.WriteTo(w, size)
 		//w.Write(data)
 		//io.Copy(w, buf)
-		w.Write(buf)
-	}
 }
 */
 
@@ -502,7 +485,7 @@ func healthHandler(d *rng.DRBG) http.HandlerFunc {
 			ReseedAgeMs:          d.ReseedAge().Milliseconds(),
 			ReseedIntervalMs:     meta.ReseedIntervalMs,
 			ReseedSizeBits:       meta.ReseedSizeBits,
-			EntropyBufferedBytes: meta.EntropyBufferedBytes / 1024,
+			EntropyBufferedBytes: meta.EntropyBufferedBytes,
 			EntropyBufferedPCT:   meta.EntropyFillPct,
 		}
 
