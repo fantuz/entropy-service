@@ -13,8 +13,8 @@ With this simple yet very performant software, users can setup their own cryptog
 - thread-safe and thread-aware structs
 - running multiple routines in a context-safe manner, correctly implementing and supporting OS-signalling
 - HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
-- h2 readyness, now commented. Whole implementation is 3 lines away, but commented out as debug in HTTP/2 is way harder than HTTP/1.1 and I consider this a beta-phase
-- observable metrics and counters (entropy source availability, entropy buffer, pressure, reseed interval, reseed bits etc)
+- h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
+- observable metrics and counters (entropy source availability, entropy buffer, pressure, reseed interval, reseed bits, time since last reseed, ...)
 - random imgage generation, heatmaps
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
