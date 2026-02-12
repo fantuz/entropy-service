@@ -404,11 +404,16 @@ func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 
 func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// write heeaders immediately
+		d.WriteHeaders(w)
+		w.Header().Set("Content-Type", "application/octet-stream")
 		// Derive 32 bytes from master
 		seed, _ := d.Derive(32)
 		nonce, _ := d.Derive(12)
+
 		// Create per-request DRBG
 		child, _ := rng.NewDRBG(seed, nonce)
+		//connDRBG := r.Context().Value("conn_drbg").(*rng.DRBG)
 
 		size := 4096
 		if q := r.URL.Query().Get("bytes"); q != "" {
@@ -416,33 +421,16 @@ func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 				size = v
 			}
 		}
-
 		buf := make([]byte, size)
+
 		child.Read(buf)
 		atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 		atomic.AddUint64(&httpRequests, +1)
-		d.WriteHeaders(w)
-		w.Header().Set("Content-Type", "application/octet-stream")
+
 		w.Write(buf)
 	}
 }
 
-/*
-func randomBytesHandler(w http.ResponseWriter, r *http.Request) {
-	connDRBG := r.Context().Value("conn_drbg").(*rng.DRBG)
-
-	buf := make([]byte, size)
-	connDRBG.Read(buf)
-
-	atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-	atomic.AddUint64(&httpRequests, +1)
-	w.Header().Set("Content-Type", "application/octet-stream")
-
-	w.Write(buf)
-}
-*/
-
-// func metricsHandler(drbg *DRBG) http.HandlerFunc
 func metricsHandler(d *rng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metrics := d.GetMetadata()
@@ -545,7 +533,13 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 			// derive per-connection DRBG from master
 			seed, _ := master.Derive(32)
 			nonce, _ := master.Derive(12) // 32 is too much
+
+			//childDRBG, _ := rng.NewConnectionDRBG(DRBG)
 			childDRBG, _ := rng.NewDRBG(seed, nonce)
+			if err != nil {
+				return ctx
+			}
+
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
 		},
@@ -574,23 +568,15 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 	return srv, nil
 }
 
-/*
-func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Server, error) {
-	srv := &http.Server{
-		Handler: handler,
-		ConnContext: func(ctx context.Context, c net.Conn) context.Context {
-			connDRBG, err := rng.NewConnectionDRBG(DRBG)
-			if err != nil {
-				return ctx
-			}
-			return context.WithValue(ctx, "conn_drbg", connDRBG)
-		},
-	}
-
-}
-*/
-
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *rng.DRBG) (*http.Server, error) {
+	/*
+		if os.Getenv("TLS") == "1" {
+			tlsCfg := newTLSConfig("cert.pem", "key.pem")
+			tlsCfg.Certificates = []tls.Certificate{cert}
+			ln = tls.NewListener(ln, tlsCfg)
+		}
+	*/
+
 	ln, err := newTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -613,14 +599,6 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
 		},
 	}
-
-	/*
-		if os.Getenv("TLS") == "1" {
-			tlsCfg := newTLSConfig("cert.pem", "key.pem")
-			tlsCfg.Certificates = []tls.Certificate{cert}
-			ln = tls.NewListener(ln, tlsCfg)
-		}
-	*/
 
 	// remove comment to enable HTTP/2
 	/*
@@ -669,17 +647,14 @@ func main() {
 	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
 
 	// Initialize seed space (in bytes here)
-	seed, err := fetchEntropy(64) // 64*8 = 512 bits
-	if err != nil {
-		log.Fatal(err)
-	}
-	nonce, err := fetchEntropy(12) // 12*8 = 96 bits
+	seed, serr := fetchEntropy(64) // 64*8 = 512 bits
+	if serr != nil { log.Fatal(serr) }
+	nonce, nerr := fetchEntropy(12) // 12*8 = 96 bits
+	if nerr != nil { log.Fatal(nerr) }
 
 	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
-	drbg, err := rng.NewDRBG(seed, nonce)
-	if err != nil {
-		log.Fatal(err)
-	}
+	drbg, derr := rng.NewDRBG(seed, nonce)
+	if derr != nil { log.Fatal(derr) }
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
 	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", 2000*time.Millisecond, 256, qrngBuf)
@@ -688,12 +663,10 @@ func main() {
 	drbg.SetEntropyBuffer(qrngBuf)
 
 	//tln := newTunedListener(ln)
-	cert, err := tls.LoadX509KeyPair("cert.pem", "key.pem")
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	tlsCfg := newTLSConfig("cert.pem", "key.pem")
+	tlsCfg := newTLSConfig("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
+	cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
+	if err != nil { log.Fatal(err) }
 	tlsCfg.Certificates = []tls.Certificate{cert}
 
 	masterDRBG, _ := rng.NewDRBG(seed, nonce)
@@ -711,19 +684,12 @@ func main() {
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
-	//go startHTTP(ctx, ":8080", mux) (httpSrv)
-	//go startHTTPS(ctx, ":8443", mux)
-
 	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr := startHTTP(ctx, ":8080", mux, masterDRBG)
-	if httpErr != nil {
-		log.Fatal(httpErr)
-	}
+	if httpErr != nil { log.Fatal(httpErr) }
 
 	httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg, masterDRBG)
-	if httpsErr != nil {
-		log.Fatal(httpsErr)
-	}
+	if httpsErr != nil { log.Fatal(httpsErr) }
 
 	log.Println("HTTP server running on :8080")
 	log.Println("HTTPs server running on :8443")
@@ -731,19 +697,13 @@ func main() {
 	<-ctx.Done()
 	log.Println("shutdown signal received")
 
-	// here was select, and waitForSignal. no more.
-
 	// Block and wait for shutdown
 	//shutdownCtx, cancel := context.WithCancel(context.Background())
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if httpErr != nil {
-		_ = httpSrv.Shutdown(shutdownCtx)
-	}
-	if httpsSrv != nil {
-		_ = httpsSrv.Shutdown(shutdownCtx)
-	}
+	if httpErr != nil { _ = httpSrv.Shutdown(shutdownCtx) }
+	if httpsSrv != nil { _ = httpsSrv.Shutdown(shutdownCtx) }
 
 	log.Println("shutdown complete")
 
