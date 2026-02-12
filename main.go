@@ -648,13 +648,19 @@ func main() {
 
 	// Initialize seed space (in bytes here)
 	seed, serr := fetchEntropy(64) // 64*8 = 512 bits
-	if serr != nil { log.Fatal(serr) }
+	if serr != nil {
+		log.Fatal(serr)
+	}
 	nonce, nerr := fetchEntropy(12) // 12*8 = 96 bits
-	if nerr != nil { log.Fatal(nerr) }
+	if nerr != nil {
+		log.Fatal(nerr)
+	}
 
 	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
 	drbg, derr := rng.NewDRBG(seed, nonce)
-	if derr != nil { log.Fatal(derr) }
+	if derr != nil {
+		log.Fatal(derr)
+	}
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
 	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", 2000*time.Millisecond, 256, qrngBuf)
@@ -666,7 +672,9 @@ func main() {
 
 	tlsCfg := newTLSConfig("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
 	cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
-	if err != nil { log.Fatal(err) }
+	if err != nil {
+		log.Fatal(err)
+	}
 	tlsCfg.Certificates = []tls.Certificate{cert}
 
 	masterDRBG, _ := rng.NewDRBG(seed, nonce)
@@ -686,10 +694,14 @@ func main() {
 
 	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr := startHTTP(ctx, ":8080", mux, masterDRBG)
-	if httpErr != nil { log.Fatal(httpErr) }
+	if httpErr != nil {
+		log.Fatal(httpErr)
+	}
 
 	httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg, masterDRBG)
-	if httpsErr != nil { log.Fatal(httpsErr) }
+	if httpsErr != nil {
+		log.Fatal(httpsErr)
+	}
 
 	log.Println("HTTP server running on :8080")
 	log.Println("HTTPs server running on :8443")
@@ -702,8 +714,12 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if httpErr != nil { _ = httpSrv.Shutdown(shutdownCtx) }
-	if httpsSrv != nil { _ = httpsSrv.Shutdown(shutdownCtx) }
+	if httpErr != nil {
+		_ = httpSrv.Shutdown(shutdownCtx)
+	}
+	if httpsSrv != nil {
+		_ = httpsSrv.Shutdown(shutdownCtx)
+	}
 
 	log.Println("shutdown complete")
 
