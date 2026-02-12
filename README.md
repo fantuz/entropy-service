@@ -50,7 +50,7 @@ The last command will start the HTTP & HHTPS listeners on all available interfac
 NB: GO may hint about the lack of several dependancies, imported libraries from our main.go. Follow on-screen instructions to proceed with "go get" libraries installation.
 
 ### Mature PoC
-The whole project is just a showcase and PoC using very very old PCI-not-Express motherboard, an old-unsuppoorted QRNG card by ID Quantique (as support ended with Kernel 4, I had to migrate some calls to make it compile on Kernel(s) 5 and 6. PC is equipped with a very old Core Duo 2, having only two cores, about 3Ghz and a bus limited to 3Gbit (I believe is the old PCI bandwidth).
+The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
 
 ### Performances
 Software was proven able to respond up to 70'000 requests per second (with payload of 64B), or reaching an impressive bandwidth of 1GB/s (payload 512KB) on a 10+ years old hardware.
