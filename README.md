@@ -10,15 +10,14 @@ With this simple yet very performant software, users can setup their own cryptog
 ### GO programming techniques and logics implemented, including:
 - socket management
 - per-connection DRBG
-- HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
 - thread-safe and thread-aware structs
-- observable metrics and counters (entropy source availability, entropy buffer, pressure, reseed interval, reseed bits etc)
 - running multiple routines in a context-safe manner, correctly implementing and supporting OS-signalling
-- pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
+- HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
 - h2 readyness, now commented. Whole implementation is 3 lines away, but commented out as debug in HTTP/2 is way harder than HTTP/1.1 and I consider this a beta-phase
-- OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
+- observable metrics and counters (entropy source availability, entropy buffer, pressure, reseed interval, reseed bits etc)
 - random imgage generation, heatmaps
-- ...
+- pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
+- OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
 
 ### What is (yet) missing:
 - CLI options, for example to enable different /dev/Xrandom sources, different reseed interval, different buffer sizes and so on
@@ -26,7 +25,6 @@ With this simple yet very performant software, users can setup their own cryptog
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator
-- ...
 
 ### Supported/tested hardware
 ```
