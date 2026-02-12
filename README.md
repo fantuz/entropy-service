@@ -43,18 +43,21 @@ $ sudo apt-get install golang
 ## optionally, install testing tools
 $ sudo apt-get install wrk dieharder rng-tools
 
+# GO may hint about the lack of several dependancies, imported libraries from our main.go.
+# Follow on-screen instructions to proceed with "go get" libraries installation.
+
 $ go vet
 go: downloading golang.org/x/crypto v0.47.0
 
 $ go fmt
 $ go build
 
+# SUDO command may be necessary to access the xRNG device on some platforms (e.g. when you compile with ChaosKey and create a symbolic link under /dev).
 $ sudo go run entropy-service
 2026/02/12 07:28:54 HTTP server running on :8080
 2026/02/12 07:28:54 HTTPs server running on :8443
 ```
-The last command will start the HTTP & HHTPS listeners on all available interfaces. SUDO command may be necessary to access the /dev device on some platforms (e.g. when you compile with ChaosKey).
-NB: GO may hint about the lack of several dependancies, imported libraries from our main.go. Follow on-screen instructions to proceed with "go get" libraries installation.
+This way, you just started both HTTP & HTTPS listeners on all available interfacesm respectively on ports 8080 and 8443.
 
 ### Mature PoC
 The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
