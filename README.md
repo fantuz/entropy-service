@@ -53,7 +53,43 @@ NB: GO may hint about the lack of several dependancies, imported libraries from 
 The whole project is just a showcase and PoC using very very old PCI-not-Express motherboard, an old-unsuppoorted QRNG card by ID Quantique (as support ended with Kernel 4, I had to migrate some calls to make it compile on Kernel(s) 5 and 6. PC is equipped with a very old Core Duo 2, having only two cores, about 3Ghz and a bus limited to 3Gbit (I believe is the old PCI bandwidth).
 
 ### Performances
-Nonetheless this software was easily able to respond up to 29'500 requests per second (with payload of 1KB), and also reaching an impressive bandwidth of 380MB/s (payload 256KB) on that very same hardware dating circa 2012.
+Software was proven able to respond up to 70'000 requests per second (with payload of 64B), or reaching an impressive bandwidth of 1GB/s (payload 512KB) on a 10+ years old hardware.
+```
+max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=1048576
+Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=1048576
+  16 threads and 64 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    92.95ms  106.46ms 704.04ms   86.57%
+    Req/Sec    62.26     35.23   202.00     70.57%
+  Latency Distribution
+     50%   48.30ms
+     75%  144.44ms
+     90%  231.82ms
+     99%  484.71ms
+  4838 requests in 5.03s, 4.73GB read
+Requests/sec:    962.23
+Transfer/sec:      0.94GB
 
+max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=64
+Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
+  16 threads and 64 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     2.24ms    3.35ms  35.56ms   87.12%
+    Req/Sec     4.32k     1.67k   14.34k    78.76%
+  Latency Distribution
+     50%  750.00us
+     75%    3.11ms
+     90%    6.57ms
+     99%   15.28ms
+  346811 requests in 5.10s, 59.53MB read
+Requests/sec:  68019.56
+Transfer/sec:     11.68MB
+
+max@iMac:~/entropy-service$ grep model\ name /proc/cpuinfo
+model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
+model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
+model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
+model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
+```
 
 
