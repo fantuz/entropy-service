@@ -24,7 +24,7 @@ func newTLSConfig(certFile, keyFile string) *tls.Config {
 			tls.CurveP256,
 		},
 
-		// remove comment to enable HTTP/2
+		// remove below comment to enable HTTP/2
 		//NextProtos: []string{"h2", "http/1.1"},
 
 		// Enable session resumption (important for API workloads)

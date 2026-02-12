@@ -1,11 +1,11 @@
 package rng
 
-
 import (
 	"os"
 	"sync"
 	"time"
 	"errors"
+	//"sync/atomic"
 )
 
 // QRNG represents a hardware or network QRNG
@@ -13,7 +13,7 @@ type QRNG interface {
 	Read(p []byte) error
 }
 
-// Example: PCIe card driver stub
+// PCIe card driver stub
 type QRNGCard struct {
 	// add fields if needed for device handle
 }
@@ -114,11 +114,12 @@ func (q *QRNGBuffer) fillLoop() {
 		total := 0
 		for total < free {
 			m, err := f.Read(tmp[total:])
-			if err != nil {
-				break
-			}
+			if err != nil { break }
 			total += m
+			//incTest(m)
 		}
+		//atomic.AddUint64(&rngBytesBuffered, uint64(total))
+		//atomic.AddUint64(&rngBufferSize, uint64(len(total)))
 		f.Close()
 
 		// Append new entropy to the buffer
