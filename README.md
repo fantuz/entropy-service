@@ -31,16 +31,23 @@ With this simple yet very performant software, users can setup their own cryptog
 ### GO build and run
 In the base directory, simply run:
 ```
-go vet
-go fmt
-go build
-```
-NB: GO may hint and complain about the lack of several imported libraries from main.go. Will try to summarize those here to save your time, soon.
+$ sudo apt-get install golang
 
-THe below simple invocation command will spinup two listeners, on all available interfaces, the unsecured HTTP on port 8080, the HTTPS one on 8443.
-```./entropy-service```
-or alternatively
-```go run entropy-service```
+## optionally, install testing tools
+$ sudo apt-get install wrk dieharder rng-tools
+
+$ go vet
+go: downloading golang.org/x/crypto v0.47.0
+
+$ go fmt
+$ go build
+
+$ sudo go run entropy-service
+2026/02/12 07:28:54 HTTP server running on :8080
+2026/02/12 07:28:54 HTTPs server running on :8443
+```
+The last command will start the HTTP & HHTPS listeners on all available interfaces. SUDO command may be necessary to access the /dev device on some platforms (e.g. when you compile with ChaosKey).
+NB: GO may hint about the lack of several dependancies, imported libraries from our main.go. Follow on-screen instructions to proceed with "go get" libraries installation.
 
 ### Mature PoC
 The whole project is just a showcase and PoC using very very old PCI-not-Express motherboard, an old-unsuppoorted QRNG card by ID Quantique (as support ended with Kernel 4, I had to migrate some calls to make it compile on Kernel(s) 5 and 6. PC is equipped with a very old Core Duo 2, having only two cores, about 3Ghz and a bus limited to 3Gbit (I believe is the old PCI bandwidth).
