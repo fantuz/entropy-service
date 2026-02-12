@@ -8,9 +8,7 @@ import (
 // newTLSConfig builds a TLS 1.3–only config suitable for high-throughput APIs
 func newTLSConfig(certFile, keyFile string) *tls.Config {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		log.Fatalf("failed to load TLS certificate: %v", err)
-	}
+	if err != nil { log.Fatalf("failed to load TLS certificate: %v", err) }
 
 	return &tls.Config{
 		MinVersion: tls.VersionTLS13,
@@ -24,7 +22,7 @@ func newTLSConfig(certFile, keyFile string) *tls.Config {
 			tls.CurveP256,
 		},
 
-		// Required for HTTP/2
+		// remove comment to enable HTTP/2
 		//NextProtos: []string{"h2", "http/1.1"},
 
 		// Enable session resumption (important for API workloads)
