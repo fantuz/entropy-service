@@ -137,7 +137,7 @@ up to 1.1 GB/s (payload 512KB)
 up to 600 MB/s (payload 512KB)
 
 Results from WRK test utility are summarized here below:
-- 2MB payload
+- Test with HTTP / 2MB payload
 ```
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5s --latency --timeout 1 http://localhost:8080/v1/random?bytes=2097152
 Running 5s test @ http://localhost:8080/v1/random?bytes=2097152
@@ -155,7 +155,7 @@ Running 5s test @ http://localhost:8080/v1/random?bytes=2097152
 Requests/sec:    572.97
 Transfer/sec:      1.12GB
 ```
-64B payload
+- Test with HTTP / 64B payload
 ```
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=64
 Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
