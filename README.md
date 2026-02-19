@@ -78,27 +78,25 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
 
 ### Build & run
-Once cloned the repository via Github, install the only base-package required:
+Once cloned the repository via Github, go through the below steps to freshly build your entropy-service.
+- Install the only base-package required:
 ```sudo apt-get install golang```
-
-Optionally, install a few well-known tools for performance testing
+- Optionally, install a few well-known tools for performance testing
 ```sudo apt-get install wrk dieharder rng-tools```
-
-Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
+- Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
 ```
 $ go vet
 go: downloading golang.org/x/crypto v0.47.0
 ```
-Format
+- GO Format
 ```
 go fmt
 ```
-GO Build
+- GO Build
 ```
 go build
 ```
-
-GO Run
+- GO Run
 This way, you will start both HTTP & HTTPS listeners on all available interfacesm respectively on ports 8080 and 8443.
 SUDO command may be necessary to access the xRNG device on some platforms (e.g. when you compile with ChaosKey and create a symbolic link under /dev).
 ```
@@ -121,7 +119,6 @@ Reseed Buffer size: 2
 2026/02/19 21:07:56 initQRNG() set to 2048 KB
 2026/02/19 21:07:58 HTTP server running on :8080
 ```
-
 
 ### Mature PoC
 The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
