@@ -35,7 +35,7 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
 	flag.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Size of QRNG buffer in KB")
 	flag.IntVar(&cfg.MaxBytes, "max-bytes", 2097152, "Maximum bytes per request")
-	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", false, "Enable HTTPS server (disabled by default)")
+	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
 
 	flag.Usage = func() {
