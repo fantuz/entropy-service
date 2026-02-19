@@ -377,7 +377,7 @@ func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 }
 */
 
-func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
+func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// write heeaders immediately
 		d.WriteHeaders(w)
@@ -388,12 +388,15 @@ func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
 
 		// Create per-request DRBG
 		child, _ := rng.NewDRBG(seed)
-		//connDRBG := r.Context().Value("conn_drbg").(*rng.DRBG)
+		//child, _ := rng.Context().Value("conn_drbg").(*rng.DRBG)
 
-		size := 4096
+		size := 65536
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+			//if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= maxSize {
 				size = v
+			} else {
+				size = maxSize
 			}
 		}
 		buf := make([]byte, size)
@@ -627,6 +630,19 @@ func main() {
 
 	cfg := ParseConfig()
 
+	if cfg.ReseedMS <= 0 || cfg.ReseedMS > 10001 {
+		panic("reseed-ms must be between 1 and 10000 msec")
+	}
+
+	if cfg.MaxBytes > 2097153 {
+		panic("max-bytes must be < 2097152")
+	}
+
+	if cfg.QRNGBuffer < 1 || cfg.QRNGBuffer > 4097 {
+		panic("QRNG buffer size KB must be between 1 and 4096 KB")
+	}
+
+	//if os.Getenv("TLS") == "1"
 	fmt.Println("---")
 	fmt.Println("HTTP port:", cfg.HTTPAddr)
 	fmt.Println("HTTPS port:", cfg.HTTPSAddr)
@@ -638,20 +654,6 @@ func main() {
 	fmt.Println("MaxBytes request size:", cfg.MaxBytes)
 	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
 	fmt.Println("---")
-
-	if cfg.ReseedMS <= 0 {
-		panic("reseed-ms must be > 0")
-	}
-
-	if cfg.MaxBytes > 2097152 {
-		panic("max-bytes must be < 2097152")
-	}
-
-	if cfg.QRNGBuffer < 0 || cfg.QRNGBuffer > 4097 {
-		panic("QRNG buffer size KB must be between 0 and 4096 KB")
-	}
-
-	//if os.Getenv("TLS") == "1"
 
 	// Initialize QRNG buffer
 	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", cfg.QRNGBuffer*1024)
@@ -669,7 +671,7 @@ func main() {
 	}
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
-	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMS)*time.Millisecond, 256, qrngBuf)
+	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMS)*time.Millisecond, cfg.ReseedSize, qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
@@ -690,7 +692,7 @@ func main() {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/v1/random", randomBytesHandler(drbg))
+	mux.HandleFunc("/v1/random", randomBytesHandler(drbg, cfg.MaxBytes))
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
