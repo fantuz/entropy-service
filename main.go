@@ -570,6 +570,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		return nil, err
 	}
 
+	//cert, err := tls.LoadX509KeyPair(CertFile, KeyFile)
 	cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
 	tlsConfig.Certificates = []tls.Certificate{cert}
 	tlsLn := tls.NewListener(ln, tlsConfig)
@@ -582,8 +583,8 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 			// derive per-connection DRBG from master
 			seed, _ := master.Derive(32)
 			//nonce, _ := master.Derive(12)
+			//childDRBG, cerr := rng.NewConnectionDRBG(master)
 			childDRBG, _ := rng.NewDRBG(seed)
-			//childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
 		},
@@ -632,16 +633,33 @@ func main() {
 	)
 	defer stop()
 
+	// pass cfg to your init functions
+	cfg := ParseConfig()
+	fmt.Println("HTTP:", cfg.HTTPAddr)
+	fmt.Println("HTTPS:", cfg.HTTPSAddr)
+	fmt.Println("ReseedMS:", cfg.ReseedMS)
+	fmt.Println("MaxBytes:", cfg.MaxBytes)
+	fmt.Println("QRNGBuffer:", cfg.QRNGBuffer)
+	fmt.Println("CertFile:", cfg.CertFile)
+	fmt.Println("KeyFile:", cfg.KeyFile)
+	fmt.Println("EnableHTTPS:", cfg.EnableHTTPS)
+
+	if cfg.ReseedMS <= 0 {
+		panic("reseed-ms must be > 0")
+	}
+
+	if cfg.MaxBytes > 2097152 {
+		panic("max-bytes-ms must be < 2097152")
+	}
+
 	// Initialize QRNG buffer
-	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
+	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", cfg.QRNGBuffer*1024)
 
 	// Initialize seed space (in bytes here)
 	seed, serr := fetchEntropy(64) // 64*8 = 512 bits
 	if serr != nil {
 		log.Fatal(serr)
 	}
-	//nonce, nerr := fetchEntropy(12) // 12*8 = 96 bits
-	//if nerr != nil { log.Fatal(nerr) }
 
 	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
 	drbg, derr := rng.NewDRBG(seed)
@@ -650,15 +668,14 @@ func main() {
 	}
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
-	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", 2000*time.Millisecond, 256, qrngBuf)
+	drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMS)*time.Millisecond, 256, qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
 
 	//tln := newTunedListener(ln)
-
-	tlsCfg := newTLSConfig("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
-	cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
+	tlsCfg := newTLSConfig(cfg.CertFile, cfg.KeyFile)
+	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -672,7 +689,7 @@ func main() {
 	// Run permanent reseed loop
 	go reseedLoop(ctx, drbg)
 
-	mux.HandleFunc("/v1/random", randomBytesHandler(drbg)) // now reads DRBG from context
+	mux.HandleFunc("/v1/random", randomBytesHandler(drbg))
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
@@ -680,18 +697,20 @@ func main() {
 	mux.Handle("/metrics", metricsHandler(drbg))
 
 	// start HTTP & HTTPS servers on the same mux
-	httpSrv, httpErr := startHTTP(ctx, ":8080", mux, masterDRBG)
+	httpSrv, httpErr := startHTTP(ctx, cfg.HTTPAddr, mux, masterDRBG)
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	}
 
-	httpsSrv, httpsErr := startHTTPS(ctx, ":8443", mux, tlsCfg, masterDRBG)
-	if httpsErr != nil {
-		log.Fatal(httpsErr)
-	}
+	//if cfg.HTTPSAddr != "" {
+		httpsSrv, httpsErr := startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
+		if httpsErr != nil {
+			log.Fatal(httpsErr)
+		}
+	//}
 
-	log.Println("HTTP server running on :8080")
-	log.Println("HTTPs server running on :8443")
+	log.Println("HTTP server running on", cfg.HTTPAddr)
+	log.Println("HTTPs server running on", cfg.HTTPSAddr)
 
 	<-ctx.Done()
 	log.Println("shutdown signal received")
@@ -704,8 +723,11 @@ func main() {
 	if httpErr != nil {
 		_ = httpSrv.Shutdown(shutdownCtx)
 	}
-	if httpsSrv != nil {
-		_ = httpsSrv.Shutdown(shutdownCtx)
+	if cfg.HTTPSAddr != "" {
+		//if httpsSrv != nil {
+		if httpsErr != nil {
+			_ = httpsSrv.Shutdown(shutdownCtx)
+		}
 	}
 
 	log.Println("shutdown complete")
