@@ -7,15 +7,15 @@ import (
 )
 
 type Config struct {
-	HTTPAddr   string
-	HTTPSAddr  string
-	ReseedMS   int
-	MaxBytes   int
-	QRNGBuffer int
-	CertFile   string
-	KeyFile    string
-	BufferKB   int
-	LogLevel   string
+	HTTPAddr    string
+	HTTPSAddr   string
+	ReseedMS    int
+	MaxBytes    int
+	QRNGBuffer  int
+	CertFile    string
+	KeyFile     string
+	BufferKB    int
+	LogLevel    string
 	EnableHTTPS bool
 }
 

@@ -235,10 +235,9 @@ func fetchEntropy(n int) ([]byte, error) {
 	return qrngBuffer.Get(n)
 }
 
-// reseed loop default interval: 250ms
-func reseedLoop(ctx context.Context, d *rng.DRBG) {
-	//ticker := time.NewTicker(10 * time.Second)
-	ticker := time.NewTicker(2000 * time.Millisecond)
+// reseed loop
+func reseedLoop(ctx context.Context, d *rng.DRBG, i int) {
+	ticker := time.NewTicker(time.Duration(i) * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -571,8 +570,8 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 	}
 
 	//cert, err := tls.LoadX509KeyPair(CertFile, KeyFile)
-	cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
-	tlsConfig.Certificates = []tls.Certificate{cert}
+	//cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
+	//tlsConfig.Certificates = []tls.Certificate{cert}
 	tlsLn := tls.NewListener(ln, tlsConfig)
 
 	srv := &http.Server{
@@ -686,8 +685,11 @@ func main() {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
+	// wait for first reseed to fully complete
+	//time.Sleep(time.Duration(cfg.ReseedMS))
+
 	// Run permanent reseed loop
-	go reseedLoop(ctx, drbg)
+	go reseedLoop(ctx, drbg, cfg.ReseedMS)
 
 	mux.HandleFunc("/v1/random", randomBytesHandler(drbg))
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
@@ -703,33 +705,32 @@ func main() {
 	}
 
 	//if cfg.HTTPSAddr != "" {
-		httpsSrv, httpsErr := startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
-		if httpsErr != nil {
-			log.Fatal(httpsErr)
-		}
+	//	go func() {
+	httpsSrv, httpsErr := startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
+	if httpsErr != nil {
+		log.Fatal(httpsErr)
+	}
+	//	}()
 	//}
 
 	log.Println("HTTP server running on", cfg.HTTPAddr)
-	log.Println("HTTPs server running on", cfg.HTTPSAddr)
+	log.Println("HTTPS server running on", cfg.HTTPSAddr)
 
 	<-ctx.Done()
+
 	log.Println("shutdown signal received")
 
-	// Block and wait for shutdown
 	//shutdownCtx, cancel := context.WithCancel(context.Background())
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Block and wait for shutdown
 	if httpErr != nil {
 		_ = httpSrv.Shutdown(shutdownCtx)
 	}
-	if cfg.HTTPSAddr != "" {
-		//if httpsSrv != nil {
-		if httpsErr != nil {
-			_ = httpsSrv.Shutdown(shutdownCtx)
-		}
+	if httpsErr != nil {
+		_ = httpsSrv.Shutdown(shutdownCtx)
 	}
 
 	log.Println("shutdown complete")
-
 }
