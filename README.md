@@ -151,7 +151,8 @@ Running 5s test @ http://localhost:8080/v1/random?bytes=2097152
   2834 requests in 5.05s, 5.54GB read
 Requests/sec:    561.65
 Transfer/sec:      1.10GB
-
+```
+```
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=64
 Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
   16 threads and 64 connections
@@ -166,7 +167,8 @@ Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
   346811 requests in 5.10s, 59.53MB read
 Requests/sec:  68019.56
 Transfer/sec:     11.68MB
-
+```
+```
 max@iMac:~/entropy-service$ grep model\ name /proc/cpuinfo
 model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
 model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
