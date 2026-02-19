@@ -78,28 +78,50 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
 
 ### Build & run
-Once cloned the repository via Github, simply run:
+Once cloned the repository via Github, install the only base-package required:
+```sudo apt-get install golang```
+
+Optionally, install a few well-known tools for performance testing
+```sudo apt-get install wrk dieharder rng-tools```
+
+Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
 ```
-$ sudo apt-get install golang
-
-## optionally, install testing tools
-$ sudo apt-get install wrk dieharder rng-tools
-
-# GO may hint about the lack of several dependancies, imported libraries from our main.go.
-# Follow on-screen instructions to proceed with "go get" libraries installation.
-
 $ go vet
 go: downloading golang.org/x/crypto v0.47.0
-
-$ go fmt
-$ go build
-
-# SUDO command may be necessary to access the xRNG device on some platforms (e.g. when you compile with ChaosKey and create a symbolic link under /dev).
-$ sudo go run entropy-service
-2026/02/12 07:28:54 HTTP server running on :8080
-2026/02/12 07:28:54 HTTPs server running on :8443
 ```
-This way, you just started both HTTP & HTTPS listeners on all available interfacesm respectively on ports 8080 and 8443.
+Format
+```
+go fmt
+```
+GO Build
+```
+go build
+```
+
+GO Run
+This way, you will start both HTTP & HTTPS listeners on all available interfacesm respectively on ports 8080 and 8443.
+SUDO command may be necessary to access the xRNG device on some platforms (e.g. when you compile with ChaosKey and create a symbolic link under /dev).
+```
+sudo go run entropy-service -device /dev/chaoskey1 -reseed-ms 10000 -max-bytes 2097152 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2
+---
+HTTP port: :8080
+HTTPS port: :8443
+CertFile TLS: cert.pem
+KeyFile TLS: key.pem
+EnableHTTPS flag: false
+---
+Reseed size: 512
+ReseedMS interval: 10000
+Max request size KB: 2048
+QRNGBuffer size: 2
+Reseed Buffer size: 2
+---
+2026/02/19 21:07:56 Entropy mode: hardware device: /dev/chaoskey1
+2026/02/19 21:07:56 Entropy source: /dev/chaoskey1
+2026/02/19 21:07:56 initQRNG() set to 2048 KB
+2026/02/19 21:07:58 HTTP server running on :8080
+```
+
 
 ### Mature PoC
 The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
