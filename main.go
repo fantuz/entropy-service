@@ -166,8 +166,9 @@ func NewEntropySource(path string, require bool) (EntropySource, error) {
 }
 
 func initQRNGBuffer(dev string, l int) {
-	// For example, 2MB for testing purposes
+	// size in MB
 	qrngBuffer = NewQRNGBuffer(dev, l*1024*1024)
+	// report in KB
 	log.Printf("initQRNG() set to %v KB", l*1024)
 
 	// Attach it to DRBG
@@ -788,8 +789,8 @@ func main() {
 	//master := NewMasterDRBG(entropy)
 
 	// Initialize seed space (in bytes here)
-	//seed, serr := fetchEntropy(64, cfg.DevicePath, cfg.QRNGBufferSize) // 64*8 = 512 bits
-	seed, serr := fetchEntropy(64, cfg.DevicePath, cfg.SeedBuffer) // 64*8 = 512 bits
+	//seed, serr := fetchEntropy(64, dev, cfg.QRNGBufferSize) // 64*8 = 512 bits
+	seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
 	if serr != nil {
 		log.Fatal(serr)
 	}
@@ -806,9 +807,6 @@ func main() {
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
 
-	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
-	time.Sleep(time.Duration(cfg.ReseedMS))
-
 	//tln := newTunedListener(ln)
 	tlsCfg := newTLSConfig(cfg.CertFile, cfg.KeyFile)
 	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
@@ -822,6 +820,7 @@ func main() {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/random", randomBytesHandler(drbg, cfg.MaxBytes))
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
@@ -829,9 +828,12 @@ func main() {
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
+	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
+	//time.Sleep(time.Duration(cfg.ReseedMS))
+
 	// Run permanent reseed loop
-	//go reseedLoop(ctx, drbg, cfg.ReseedMS, cfg.DevicePath, cfg.BufferSize)
-	go reseedLoop(ctx, drbg, cfg.ReseedMS, cfg.DevicePath, cfg.QRNGBuffer)
+	//go reseedLoop(ctx, drbg, cfg.ReseedMS, dev, cfg.BufferSize)
+	go reseedLoop(ctx, drbg, cfg.ReseedMS, dev, cfg.QRNGBuffer)
 
 	// context was here
 	//ctx, cancel := context.WithCancel(context.Background())
