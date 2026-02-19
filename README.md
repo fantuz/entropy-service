@@ -80,9 +80,13 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ### Build & run
 Once cloned the repository via Github, go through the below steps to freshly build your entropy-service.
 - Install the only base-package required:
-```sudo apt-get install golang```
-- Optionally, install a few well-known tools for performance testing
-```sudo apt-get install wrk dieharder rng-tools```
+```
+sudo apt-get install golang
+```
+- Optionally, install a few well-known tools for performance testing:
+```
+sudo apt-get install wrk dieharder rng-tools
+```
 - Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
 ```
 $ go vet
