@@ -7,18 +7,18 @@ import (
 )
 
 type Config struct {
-	ReseedMS    int
-	ReseedSize  int
-	MaxBytes    int
-	QRNGBuffer  int
-	BufferSize  int
-	HTTPAddr    string
-	HTTPSAddr   string
-	CertFile    string
-	KeyFile     string
-	LogLevel    string
-	DevicePath  string
-	EnableHTTPS bool
+	ReseedMS      int
+	ReseedSize    int
+	MaxBytes      int
+	QRNGBuffer    int
+	SeedBuffer    int
+	HTTPAddr      string
+	HTTPSAddr     string
+	CertFile      string
+	KeyFile       string
+	LogLevel      string
+	DevicePath    string
+	EnableHTTPS   bool
 	RequireDevice bool
 }
 
@@ -31,10 +31,10 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flag.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
 	flag.IntVar(&cfg.ReseedMS, "reseed-ms", 250, "Reseed interval (ms)")
-	flag.IntVar(&cfg.ReseedSize, "reseed-size", 256, "Reseed size (Bytes)")
-	flag.IntVar(&cfg.BufferSize, "buffer-size", 64, "Entropy buffer size (KB)")
+	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
+	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
+	flag.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Size of QRNG buffer in KB")
 	flag.IntVar(&cfg.MaxBytes, "max-bytes", 2097152, "Maximum bytes per request")
-	flag.IntVar(&cfg.QRNGBuffer, "qrng-buffer-kb", 2048, "QRNG Buffer in Kilobytes")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", false, "Enable HTTPS server (disabled by default)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
 

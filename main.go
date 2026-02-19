@@ -12,6 +12,7 @@ import (
 	"net"
 	// remove below comment to enable HTTP/2
 	//"golang.org/x/net/http2"
+	"crypto/rand"
 	"log"
 	"net/http"
 	"os"
@@ -21,12 +22,11 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	"crypto/rand"
 	//"io"
 )
 
 type EntropySource interface {
-    Read(p []byte) (int, error)
+	Read(p []byte) (int, error)
 }
 
 type HealthInfo struct {
@@ -59,7 +59,6 @@ var bufPool = sync.Pool{
 		return make([]byte, 1<<20) // 1 MB
 	},
 }
-
 
 func popcount(b byte) int {
 	b = b - ((b >> 1) & 0x55)
@@ -147,28 +146,29 @@ func fetchEntropy(n int) ([]byte, error) {
 */
 
 func NewEntropySource(path string, require bool) (EntropySource, error) {
-    if path == "" {
-        if require {
-            return nil, fmt.Errorf("device required but not specified")
-        }
-        return rand.Reader, nil
-    }
+	if path == "" {
+		if require {
+			return nil, fmt.Errorf("device required but not specified")
+		}
+		return rand.Reader, nil
+	}
 
-    f, err := os.Open(path)
-    if err != nil {
-        if require {
-            return nil, fmt.Errorf("cannot open required device: %w", err)
-        }
-        log.Printf("Falling back to crypto/rand: %v\n", err)
-        return rand.Reader, nil
-    }
+	f, err := os.Open(path)
+	if err != nil {
+		if require {
+			return nil, fmt.Errorf("cannot open required device: %w", err)
+		}
+		log.Printf("Falling back to crypto/rand: %v\n", err)
+		return rand.Reader, nil
+	}
 
-    return f, nil
+	return f, nil
 }
 
-func initQRNGBuffer(dev string) {
-	// For example, 64 KB buffer. 2MB for testing purposes
-	qrngBuffer = NewQRNGBuffer(dev, 2*1024*1024)
+func initQRNGBuffer(dev string, l int) {
+	// For example, 2MB for testing purposes
+	qrngBuffer = NewQRNGBuffer(dev, l*1024*1024)
+	log.Printf("initQRNG() set to %v KB", l*1024)
 
 	// Attach it to DRBG
 	//drbg.SetEntropyBuffer(qrngBuffer)
@@ -257,9 +257,9 @@ func (q *QRNGBuffer) fillLoop() {
 }
 
 // fetchEntropy reads n bytes from the buffered QRNG
-func fetchEntropy(n int, dev string) ([]byte, error) {
+func fetchEntropy(n int, dev string, l int) ([]byte, error) {
 	if qrngBuffer == nil {
-		initQRNGBuffer(dev)
+		initQRNGBuffer(dev, l)
 	}
 	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
 	incTestA(n)
@@ -267,7 +267,7 @@ func fetchEntropy(n int, dev string) ([]byte, error) {
 }
 
 // reseed loop
-func reseedLoop(ctx context.Context, d *rng.DRBG, i int, dev string) {
+func reseedLoop(ctx context.Context, d *rng.DRBG, i int, dev string, l int) {
 	ticker := time.NewTicker(time.Duration(i) * time.Millisecond)
 	defer ticker.Stop()
 
@@ -279,7 +279,7 @@ func reseedLoop(ctx context.Context, d *rng.DRBG, i int, dev string) {
 		case <-ticker.C:
 			for range ticker.C {
 				atomic.AddUint64(&rngReseeds, +1)
-				entropy, err := fetchEntropy(64, dev)
+				entropy, err := fetchEntropy(64, dev, l)
 				if err != nil {
 					log.Println("entropy fetch failed:", err)
 					continue
@@ -582,6 +582,35 @@ func validateEntropyDevice(path string) error {
 	return nil
 }
 
+const DefaultCSPRNG = "/dev/urandom"
+
+func ResolveEntropyDevice(path string, require bool) (string, error) {
+
+	// If no device specified → use kernel CSPRNG
+	if path == "" {
+		return DefaultCSPRNG, nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if require {
+			return "", fmt.Errorf("required device not available: %w", err)
+		}
+		log.Printf("Device %s unavailable, falling back to /dev/urandom\n", path)
+		return DefaultCSPRNG, nil
+	}
+
+	if info.Mode()&os.ModeCharDevice == 0 {
+		if require {
+			return "", fmt.Errorf("%s is not a character device", path)
+		}
+		log.Printf("%s is not a device, falling back to /dev/urandom\n", path)
+		return DefaultCSPRNG, nil
+	}
+
+	return path, nil
+}
+
 func startHTTP(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error) {
 	//ln, err := net.Listen("tcp", addr)
 	//if err != nil { return nil, err }
@@ -725,30 +754,42 @@ func main() {
 	fmt.Println("KeyFile TLS:", cfg.KeyFile)
 	fmt.Println("EnableHTTPS flag:", cfg.EnableHTTPS)
 	fmt.Println("---")
+	fmt.Println("Reseed size:", cfg.ReseedSize)
 	fmt.Println("ReseedMS interval:", cfg.ReseedMS)
-	fmt.Println("MaxBytes request size:", cfg.MaxBytes)
+	fmt.Println("Max request size KB:", cfg.MaxBytes/1024)
 	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
+	fmt.Println("Reseed Buffer size:", cfg.SeedBuffer)
 	fmt.Println("---")
 
 	//check for entropy source availability and access rights
-	if err := deviceExists(cfg.DevicePath); err != nil {
+	dev, err := ResolveEntropyDevice(cfg.DevicePath, cfg.RequireDevice)
+	if err != nil {
 		log.Fatal(err)
 	}
-	if err := validateEntropyDevice(cfg.DevicePath); err != nil {
-		log.Fatal("Entropy device validation failed: ", err)
+	if derr := deviceExists(dev); derr != nil {
+		log.Fatal(derr)
 	}
+	if verr := validateEntropyDevice(dev); verr != nil {
+		log.Fatal("Entropy device validation failed: ", verr)
+	}
+	if dev == "/dev/urandom" {
+		log.Println("Entropy mode: kernel CSPRNG fallback")
+	} else {
+		log.Println("Entropy mode: hardware device:", dev)
+	}
+	log.Printf("Entropy source: %s\n", dev)
 
 	// Initialize QRNG buffer
 	//entropy := NewEntropySource(cfg.DevicePath)
-	qrngBuf := rng.NewQRNGBuffer(cfg.DevicePath, cfg.QRNGBuffer*1024)
-	//qrngBuf := rng.NewQRNGBuffer(entropy, cfg.QRNGBuffer*1024)
 	//qrngBuf := rng.NewQRNGBuffer(entropy, cfg.BufferKB*1024)
+	qrngBuf := rng.NewQRNGBuffer(dev, cfg.QRNGBuffer*1024)
 
 	// pass entropy along
 	//master := NewMasterDRBG(entropy)
 
 	// Initialize seed space (in bytes here)
-	seed, serr := fetchEntropy(64,cfg.DevicePath) // 64*8 = 512 bits
+	//seed, serr := fetchEntropy(64, cfg.DevicePath, cfg.QRNGBufferSize) // 64*8 = 512 bits
+	seed, serr := fetchEntropy(64, cfg.DevicePath, cfg.SeedBuffer) // 64*8 = 512 bits
 	if serr != nil {
 		log.Fatal(serr)
 	}
@@ -765,8 +806,8 @@ func main() {
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
 
-	// wait for first reseed to fully complete
-	//time.Sleep(time.Duration(cfg.ReseedMS))
+	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
+	time.Sleep(time.Duration(cfg.ReseedMS))
 
 	//tln := newTunedListener(ln)
 	tlsCfg := newTLSConfig(cfg.CertFile, cfg.KeyFile)
@@ -789,7 +830,8 @@ func main() {
 	mux.Handle("/metrics", metricsHandler(drbg))
 
 	// Run permanent reseed loop
-	go reseedLoop(ctx, drbg, cfg.ReseedMS, cfg.DevicePath)
+	//go reseedLoop(ctx, drbg, cfg.ReseedMS, cfg.DevicePath, cfg.BufferSize)
+	go reseedLoop(ctx, drbg, cfg.ReseedMS, cfg.DevicePath, cfg.QRNGBuffer)
 
 	// context was here
 	//ctx, cancel := context.WithCancel(context.Background())
