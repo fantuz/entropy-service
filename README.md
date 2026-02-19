@@ -105,10 +105,10 @@ This way, you just started both HTTP & HTTPS listeners on all available interfac
 The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
 
 ### Performances
-Under extensive tests on a 10+ years old hardware, the software was able to respond up to:
+Pressure tests on a 10+ years old hardware showed pretty impressive numbers:
 - **HTTP**\
 70'000 requests per second (payload 64B)\
-up to 1 GB/s (payload 512KB)
+up to 1.1 GB/s (payload 512KB)
 - **HTTPS**\
 50'000 requests per second (payload 64B)\
 up to 600 MB/s (payload 512KB)
