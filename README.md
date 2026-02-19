@@ -52,25 +52,23 @@ Reseed → Periodic refresh of the master DRBG from entropy buffer
 Derive → Per-connection DRBG instantiation (state isolation)
 Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
-- socket management
-- per-connection DRBG
-- thread-safe and thread-aware structs
-- running multiple routines in a context-safe manner, correctly implementing and supporting OS-signalling
+- socket management, thread-safe and thread-aware structs
+- per-connection DRBG isolation
+- running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
 - HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
 - h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
 - observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
 - use of GO atomic counters to accomodate atomic updates even under high-concurrency
 - random imgage generation, heatmaps
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
-- OS Variables to enable/disable TLS, h2, and other useful test features. Already present somehow, but currently commented out, as other points above.
+- OS Variables to enable/disable TLS, h2, and other useful test features
+- CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, etc
 
 ### What is yet to come
-- CLI options, for example to enable different /dev/Xrandom sources, different reseed interval, different buffer sizes and so on
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator
-- replace ChaCha20 with AES-CRT 
 
 ### Supported/tested hardware
 ```
