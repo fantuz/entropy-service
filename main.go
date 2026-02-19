@@ -556,13 +556,6 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 }
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *rng.DRBG) (*http.Server, error) {
-	/*
-		if os.Getenv("TLS") == "1" {
-			tlsCfg := newTLSConfig("cert.pem", "key.pem")
-			tlsCfg.Certificates = []tls.Certificate{cert}
-			ln = tls.NewListener(ln, tlsCfg)
-		}
-	*/
 
 	ln, err := newTunedListener(addr, 4<<20)
 	if err != nil {
@@ -632,24 +625,33 @@ func main() {
 	)
 	defer stop()
 
-	// pass cfg to your init functions
 	cfg := ParseConfig()
-	fmt.Println("HTTP:", cfg.HTTPAddr)
-	fmt.Println("HTTPS:", cfg.HTTPSAddr)
-	fmt.Println("ReseedMS:", cfg.ReseedMS)
-	fmt.Println("MaxBytes:", cfg.MaxBytes)
-	fmt.Println("QRNGBuffer:", cfg.QRNGBuffer)
-	fmt.Println("CertFile:", cfg.CertFile)
-	fmt.Println("KeyFile:", cfg.KeyFile)
-	fmt.Println("EnableHTTPS:", cfg.EnableHTTPS)
+
+	fmt.Println("---")
+	fmt.Println("HTTP port:", cfg.HTTPAddr)
+	fmt.Println("HTTPS port:", cfg.HTTPSAddr)
+	fmt.Println("CertFile TLS:", cfg.CertFile)
+	fmt.Println("KeyFile TLS:", cfg.KeyFile)
+	fmt.Println("EnableHTTPS flag:", cfg.EnableHTTPS)
+	fmt.Println("---")
+	fmt.Println("ReseedMS interval:", cfg.ReseedMS)
+	fmt.Println("MaxBytes request size:", cfg.MaxBytes)
+	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
+	fmt.Println("---")
 
 	if cfg.ReseedMS <= 0 {
 		panic("reseed-ms must be > 0")
 	}
 
 	if cfg.MaxBytes > 2097152 {
-		panic("max-bytes-ms must be < 2097152")
+		panic("max-bytes must be < 2097152")
 	}
+
+	if cfg.QRNGBuffer < 0 || cfg.QRNGBuffer > 4097 {
+		panic("QRNG buffer size KB must be between 0 and 4096 KB")
+	}
+
+	//if os.Getenv("TLS") == "1"
 
 	// Initialize QRNG buffer
 	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", cfg.QRNGBuffer*1024)
@@ -672,11 +674,14 @@ func main() {
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
 
+	// wait for first reseed to fully complete
+	//time.Sleep(time.Duration(cfg.ReseedMS))
+
 	//tln := newTunedListener(ln)
 	tlsCfg := newTLSConfig(cfg.CertFile, cfg.KeyFile)
-	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-	if err != nil {
-		log.Fatal(err)
+	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+	if crterr != nil {
+		log.Fatal(crterr)
 	}
 	tlsCfg.Certificates = []tls.Certificate{cert}
 
@@ -685,12 +690,6 @@ func main() {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
-	// wait for first reseed to fully complete
-	//time.Sleep(time.Duration(cfg.ReseedMS))
-
-	// Run permanent reseed loop
-	go reseedLoop(ctx, drbg, cfg.ReseedMS)
-
 	mux.HandleFunc("/v1/random", randomBytesHandler(drbg))
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
@@ -698,23 +697,37 @@ func main() {
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
+	// Run permanent reseed loop
+	go reseedLoop(ctx, drbg, cfg.ReseedMS)
+
+	// context was here
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
+
+	var httpSrv *http.Server
+	var httpsSrv *http.Server
+	var httpErr error
+	var httpsErr error
+
 	// start HTTP & HTTPS servers on the same mux
-	httpSrv, httpErr := startHTTP(ctx, cfg.HTTPAddr, mux, masterDRBG)
+	//httpSrv, httpErr := startHTTP(ctx, cfg.HTTPAddr, mux, masterDRBG)
+	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, masterDRBG)
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	}
 
-	//if cfg.HTTPSAddr != "" {
-	//	go func() {
-	httpsSrv, httpsErr := startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
-	if httpsErr != nil {
-		log.Fatal(httpsErr)
+	if cfg.EnableHTTPS == true {
+		//httpsSrv, httpsErr := startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
+		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
+		if httpsErr != nil {
+			log.Fatal(httpsErr)
+		}
 	}
-	//	}()
-	//}
 
 	log.Println("HTTP server running on", cfg.HTTPAddr)
-	log.Println("HTTPS server running on", cfg.HTTPSAddr)
+	if cfg.EnableHTTPS == true {
+		log.Println("HTTPS server running on", cfg.HTTPSAddr)
+	}
 
 	<-ctx.Done()
 
@@ -728,8 +741,11 @@ func main() {
 	if httpErr != nil {
 		_ = httpSrv.Shutdown(shutdownCtx)
 	}
-	if httpsErr != nil {
-		_ = httpsSrv.Shutdown(shutdownCtx)
+	//if cfg.HTTPSAddr != ""
+	if cfg.EnableHTTPS == true {
+		if httpsErr != nil {
+			_ = httpsSrv.Shutdown(shutdownCtx)
+		}
 	}
 
 	log.Println("shutdown complete")
