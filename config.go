@@ -7,17 +7,19 @@ import (
 )
 
 type Config struct {
-	HTTPAddr    string
-	HTTPSAddr   string
 	ReseedMS    int
 	ReseedSize  int
 	MaxBytes    int
 	QRNGBuffer  int
+	BufferSize  int
+	HTTPAddr    string
+	HTTPSAddr   string
 	CertFile    string
 	KeyFile     string
-	BufferSize  int
 	LogLevel    string
+	DevicePath  string
 	EnableHTTPS bool
+	RequireDevice bool
 }
 
 func ParseConfig() *Config {
@@ -27,12 +29,14 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.HTTPSAddr, "https", ":8443", "HTTPS listen address")
 	flag.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
 	flag.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
+	flag.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
 	flag.IntVar(&cfg.ReseedMS, "reseed-ms", 250, "Reseed interval (ms)")
 	flag.IntVar(&cfg.ReseedSize, "reseed-size", 256, "Reseed size (Bytes)")
 	flag.IntVar(&cfg.BufferSize, "buffer-size", 64, "Entropy buffer size (KB)")
 	flag.IntVar(&cfg.MaxBytes, "max-bytes", 2097152, "Maximum bytes per request")
 	flag.IntVar(&cfg.QRNGBuffer, "qrng-buffer-kb", 2048, "QRNG Buffer in Kilobytes")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", false, "Enable HTTPS server (disabled by default)")
+	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Entropy Server\n\n")

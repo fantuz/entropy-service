@@ -21,9 +21,13 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	//"crypto/rand"
+	"crypto/rand"
 	//"io"
 )
+
+type EntropySource interface {
+    Read(p []byte) (int, error)
+}
 
 type HealthInfo struct {
 	Status               string `json:"status"`
@@ -49,6 +53,13 @@ type QRNGBuffer struct {
 
 // maps to older fetchEntropy
 var qrngBuffer *QRNGBuffer
+
+var bufPool = sync.Pool{
+	New: func() any {
+		return make([]byte, 1<<20) // 1 MB
+	},
+}
+
 
 func popcount(b byte) int {
 	b = b - ((b >> 1) & 0x55)
@@ -135,9 +146,29 @@ func fetchEntropy(n int) ([]byte, error) {
 }
 */
 
-func initQRNGBuffer() {
+func NewEntropySource(path string, require bool) (EntropySource, error) {
+    if path == "" {
+        if require {
+            return nil, fmt.Errorf("device required but not specified")
+        }
+        return rand.Reader, nil
+    }
+
+    f, err := os.Open(path)
+    if err != nil {
+        if require {
+            return nil, fmt.Errorf("cannot open required device: %w", err)
+        }
+        log.Printf("Falling back to crypto/rand: %v\n", err)
+        return rand.Reader, nil
+    }
+
+    return f, nil
+}
+
+func initQRNGBuffer(dev string) {
 	// For example, 64 KB buffer. 2MB for testing purposes
-	qrngBuffer = NewQRNGBuffer("/dev/qrandom0", 2*1024*1024)
+	qrngBuffer = NewQRNGBuffer(dev, 2*1024*1024)
 
 	// Attach it to DRBG
 	//drbg.SetEntropyBuffer(qrngBuffer)
@@ -226,9 +257,9 @@ func (q *QRNGBuffer) fillLoop() {
 }
 
 // fetchEntropy reads n bytes from the buffered QRNG
-func fetchEntropy(n int) ([]byte, error) {
+func fetchEntropy(n int, dev string) ([]byte, error) {
 	if qrngBuffer == nil {
-		initQRNGBuffer()
+		initQRNGBuffer(dev)
 	}
 	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
 	incTestA(n)
@@ -236,7 +267,7 @@ func fetchEntropy(n int) ([]byte, error) {
 }
 
 // reseed loop
-func reseedLoop(ctx context.Context, d *rng.DRBG, i int) {
+func reseedLoop(ctx context.Context, d *rng.DRBG, i int, dev string) {
 	ticker := time.NewTicker(time.Duration(i) * time.Millisecond)
 	defer ticker.Stop()
 
@@ -248,7 +279,7 @@ func reseedLoop(ctx context.Context, d *rng.DRBG, i int) {
 		case <-ticker.C:
 			for range ticker.C {
 				atomic.AddUint64(&rngReseeds, +1)
-				entropy, err := fetchEntropy(64)
+				entropy, err := fetchEntropy(64, dev)
 				if err != nil {
 					log.Println("entropy fetch failed:", err)
 					continue
@@ -365,18 +396,6 @@ func randomHandler(d *rng.DRBG) http.HandlerFunc {
 	}
 }
 
-/*
-func randomBytesHandler(d *rng.DRBG) http.HandlerFunc {
-		//buf := bufPool.Get().([]byte)
-		//defer bufPool.Put(buf)
-		//data := d.ReadInto(buf[:size]) //n
-		//io.Reader(buf)
-		//d.WriteTo(w, size)
-		//w.Write(data)
-		//io.Copy(w, buf)
-}
-*/
-
 func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// write heeaders immediately
@@ -400,6 +419,13 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 			}
 		}
 		buf := make([]byte, size)
+		//buf := bufPool.Get().([]byte)
+		//defer bufPool.Put(buf)
+		//data := d.ReadInto(buf[:size]) //n
+		//io.Reader(buf)
+		//d.WriteTo(w, size)
+		//w.Write(data)
+		//io.Copy(w, buf)
 
 		child.Read(buf)
 		atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
@@ -501,10 +527,59 @@ func healthHandler(d *rng.DRBG) http.HandlerFunc {
 	}
 }
 
-var bufPool = sync.Pool{
-	New: func() any {
-		return make([]byte, 1<<20) // 1 MB
-	},
+func deviceExists(path string) error {
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("device %s does not exist", path)
+		}
+		return fmt.Errorf("error accessing device %s: %w", path, err)
+	}
+	return nil
+}
+
+func validateDevice(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	mode := info.Mode()
+
+	if mode&os.ModeDevice == 0 {
+		return fmt.Errorf("%s exists but is not a device file", path)
+	}
+
+	return nil
+}
+
+func testDeviceReadable(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("cannot open device %s: %w", path, err)
+	}
+	defer f.Close()
+	return nil
+}
+
+func validateEntropyDevice(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	//if mode&os.ModeCharDevice == 0
+	if info.Mode()&os.ModeCharDevice == 0 {
+		return fmt.Errorf("%s is not a character device", path)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("cannot open %s: %w", path, err)
+	}
+	defer f.Close()
+
+	return nil
 }
 
 func startHTTP(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error) {
@@ -655,11 +730,25 @@ func main() {
 	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
 	fmt.Println("---")
 
+	//check for entropy source availability and access rights
+	if err := deviceExists(cfg.DevicePath); err != nil {
+		log.Fatal(err)
+	}
+	if err := validateEntropyDevice(cfg.DevicePath); err != nil {
+		log.Fatal("Entropy device validation failed: ", err)
+	}
+
 	// Initialize QRNG buffer
-	qrngBuf := rng.NewQRNGBuffer("/dev/qrandom0", cfg.QRNGBuffer*1024)
+	//entropy := NewEntropySource(cfg.DevicePath)
+	qrngBuf := rng.NewQRNGBuffer(cfg.DevicePath, cfg.QRNGBuffer*1024)
+	//qrngBuf := rng.NewQRNGBuffer(entropy, cfg.QRNGBuffer*1024)
+	//qrngBuf := rng.NewQRNGBuffer(entropy, cfg.BufferKB*1024)
+
+	// pass entropy along
+	//master := NewMasterDRBG(entropy)
 
 	// Initialize seed space (in bytes here)
-	seed, serr := fetchEntropy(64) // 64*8 = 512 bits
+	seed, serr := fetchEntropy(64,cfg.DevicePath) // 64*8 = 512 bits
 	if serr != nil {
 		log.Fatal(serr)
 	}
@@ -700,7 +789,7 @@ func main() {
 	mux.Handle("/metrics", metricsHandler(drbg))
 
 	// Run permanent reseed loop
-	go reseedLoop(ctx, drbg, cfg.ReseedMS)
+	go reseedLoop(ctx, drbg, cfg.ReseedMS, cfg.DevicePath)
 
 	// context was here
 	//ctx, cancel := context.WithCancel(context.Background())
