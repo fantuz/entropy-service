@@ -26,10 +26,10 @@ With this simple yet very performant software, users can setup their own cryptog
                                          │ reseed (timer-driven)
                                          ▼
                            ┌─────────────────────────┐
-                           │      Master DRBG       │
-                           │   (ChaCha20 stream)    │
-                           │  - expands entropy     │
-                           │  - derives child seeds │
+                           │      Master DRBG        │
+                           │   (ChaCha20 stream)     │
+                           │  - expands entropy      │
+                           │  - derives child seeds  │
                            └─────────────┬───────────┘
                                          │ derive()
               ┌──────────────────────────┼──────────────────────────┐
@@ -46,6 +46,11 @@ With this simple yet very performant software, users can setup their own cryptog
                                          ▼
                                       Clients
 
+Legend
+Fetch → External entropy acquisition from QRNG source
+Reseed → Periodic refresh of the master DRBG from entropy buffer
+Derive → Per-connection DRBG instantiation (state isolation)
+Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
 - socket management
 - per-connection DRBG
