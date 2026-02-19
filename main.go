@@ -2,7 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
+	"html/template"
+	"math/big"
+	//"net/http"
 	"encoding/json"
 	"entropy-service/rng"
 	"fmt"
@@ -12,7 +18,6 @@ import (
 	"net"
 	// remove below comment to enable HTTP/2
 	//"golang.org/x/net/http2"
-	"crypto/rand"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +28,7 @@ import (
 	"syscall"
 	"time"
 	//"io"
+	"github.com/8ff/diceware"
 )
 
 type EntropySource interface {
@@ -394,6 +400,119 @@ func randomHandler(d *rng.DRBG) http.HandlerFunc {
 		w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		w.Write(buf)
+	}
+}
+
+func join(words []string, sep string) string {
+	result := ""
+	for i, w := range words {
+		if i > 0 {
+			result += sep
+		}
+		result += w
+	}
+	return result
+}
+
+//func entropyHandler(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error)
+func entropyWordHandler( quantity int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		//fmt.Println("Number of entries:", len(words))
+		//fmt.Println("Number of entries:", len(dicewareWords))
+
+		//var dicewareWords []string // load your 7776-word list here
+
+		// Get a slice of words
+		words := diceware.GetWords()
+
+		// Get a randomised slice of words
+		randomWords := diceware.GetRandomWords()
+		//fmt.Println("Number of entries in randomised list:", len(randomWords))
+
+		// Get a map of words
+		//wordsMap := diceware.GetWordsMap()
+		//fmt.Println("Number of entries in words map:", len(wordsMap))
+
+		// Generate 256 bits random
+		randomBytes := make([]byte, 32)
+		_, err := rand.Read(randomBytes)
+		if err != nil {
+			http.Error(w, "entropy failure", http.StatusInternalServerError)
+			return
+		}
+
+		// Optional scramble layer
+		hash := sha256.Sum256(randomBytes)
+
+		//if len(dicewareWords) == 0
+		if len(words) == 0 {
+			http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
+			return
+		}
+
+		// Convert to big.Int
+		n := new(big.Int).SetBytes(hash[:])
+		base := big.NewInt(int64(len(randomWords)))
+		//base := big.NewInt(int64(len(words)))
+
+		// Extract words
+		var wordsout []string
+		zero := big.NewInt(0)
+
+		for n.Cmp(zero) > 0 {
+			mod := new(big.Int)
+			n.DivMod(n, base, mod)
+			index := mod.Int64()
+			//wordsout = append(wordsout, words[index])
+			wordsout = append(wordsout, randomWords[index])
+		}
+
+		// Prepare output
+		hashHex := hex.EncodeToString(hash[:])
+
+		tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="5">
+<style>
+body {
+	background-color: black;
+	color: #00ff88;
+	font-family: monospace;
+	text-align: center;
+	padding-top: 20%;
+}
+.words {
+	font-size: 2em;
+	letter-spacing: 2px;
+}
+.hash {
+	margin-top: 30px;
+	font-size: 0.8em;
+	color: #444;
+}
+</style>
+</head>
+<body>
+<div class="words">{{.Words}}</div>
+<div class="hash">{{.Hash}}</div>
+</body>
+</html>
+`
+
+		data := struct {
+			Words string
+			Hash  string
+		}{
+			//Words: template.HTMLEscapeString(join(words, " ")),
+			Words: template.HTMLEscapeString(join(randomWords, " ")),
+			Hash:  hashHex,
+		}
+
+		t := template.Must(template.New("page").Parse(tmpl))
+		t.Execute(w, data)
 	}
 }
 
@@ -827,6 +946,7 @@ func main() {
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
+	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(10))
 
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
 	//time.Sleep(time.Duration(cfg.ReseedMS))
