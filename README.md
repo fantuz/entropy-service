@@ -114,20 +114,20 @@ up to 1.1 GB/s (payload 512KB)
 up to 600 MB/s (payload 512KB)
 
 ```
-max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=1048576
-Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=1048576
-  16 threads and 64 connections
+max@iMac:~/entropy-service$ wrk -t16 -c32 -d5s --latency --timeout 1 http://localhost:8080/v1/random?bytes=2097152
+Running 5s test @ http://localhost:8080/v1/random?bytes=2097152
+  16 threads and 32 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    92.95ms  106.46ms 704.04ms   86.57%
-    Req/Sec    62.26     35.23   202.00     70.57%
+    Latency    66.63ms   62.93ms 514.41ms   85.64%
+    Req/Sec    36.07     18.38   120.00     72.88%
   Latency Distribution
-     50%   48.30ms
-     75%  144.44ms
-     90%  231.82ms
-     99%  484.71ms
-  4838 requests in 5.03s, 4.73GB read
-Requests/sec:    962.23
-Transfer/sec:      0.94GB
+     50%   44.87ms
+     75%  100.07ms
+     90%  147.71ms
+     99%  286.56ms
+  2834 requests in 5.05s, 5.54GB read
+Requests/sec:    561.65
+Transfer/sec:      1.10GB
 
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=64
 Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
