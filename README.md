@@ -11,6 +11,42 @@ The software can be easily adapted to fetch entropy from etherogeneous sources, 
 With this simple yet very performant software, users can setup their own cryptographically-strong randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, and even sounds (later feature to be added soon).
 
 ### Architecture and logic
+
+```
+                           ┌─────────────────────────┐
+                           │     External QRNG       │
+                           │  (hardware / upstream)  │
+                           └─────────────┬───────────┘
+                                         │ fetch
+                                         ▼
+                           ┌─────────────────────────┐
+                           │     Entropy Buffer      │
+                           │   (ring / pool cache)   │
+                           └─────────────┬───────────┘
+                                         │ reseed (timer-driven)
+                                         ▼
+                           ┌─────────────────────────┐
+                           │      Master DRBG       │
+                           │   (ChaCha20 stream)    │
+                           │  - expands entropy     │
+                           │  - derives child seeds │
+                           └─────────────┬───────────┘
+                                         │ derive()
+              ┌──────────────────────────┼──────────────────────────┐
+              ▼                          ▼                          ▼
+      ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
+      │ Conn DRBG #1 │           │ Conn DRBG #2 │           │ Conn DRBG #N │
+      │ isolated key │           │ isolated key │           │ isolated key │
+      └───────┬──────┘           └───────┬──────┘           └───────┬──────┘
+              │ serve                    │ serve                    │ serve
+              ▼                          ▼                          ▼
+         HTTP / HTTPS               HTTP / HTTPS               HTTP / HTTPS
+              └──────────────────────────┴──────────────────────────┘
+                                         │
+                                         ▼
+                                      Clients
+
+```
 - socket management
 - per-connection DRBG
 - thread-safe and thread-aware structs
@@ -35,11 +71,11 @@ With this simple yet very performant software, users can setup their own cryptog
 ```
  - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
  - Quantis PCI by ID Quantique
- - pretty much any character device under Linux, including kernel RNG
+ - pretty much any character device under Linux, including kernel RNG, radio-receivers ...
 ```
 
 ### Build & run
-In the base directory, simply run:
+Once cloned the repository via Github, simply run:
 ```
 $ sudo apt-get install golang
 
