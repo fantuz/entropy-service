@@ -136,22 +136,26 @@ up to 1.1 GB/s (payload 512KB)
 50'000 requests per second (payload 64B)\
 up to 600 MB/s (payload 512KB)
 
+Results from WRK test utility are summarized here below:
+- 2MB payload
 ```
-max@iMac:~/entropy-service$ wrk -t16 -c32 -d5s --latency --timeout 1 http://localhost:8080/v1/random?bytes=2097152
+max@iMac:~/entropy-service$ wrk -t16 -c64 -d5s --latency --timeout 1 http://localhost:8080/v1/random?bytes=2097152
 Running 5s test @ http://localhost:8080/v1/random?bytes=2097152
-  16 threads and 32 connections
+  16 threads and 64 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    66.63ms   62.93ms 514.41ms   85.64%
-    Req/Sec    36.07     18.38   120.00     72.88%
+    Latency   132.02ms  134.43ms 978.98ms   85.13%
+    Req/Sec    37.79     23.16   131.00     72.42%
   Latency Distribution
-     50%   44.87ms
-     75%  100.07ms
-     90%  147.71ms
-     99%  286.56ms
-  2834 requests in 5.05s, 5.54GB read
-Requests/sec:    561.65
-Transfer/sec:      1.10GB
+     50%  102.16ms
+     75%  217.21ms
+     90%  301.35ms
+     99%  593.49ms
+  2887 requests in 5.04s, 5.64GB read
+  Socket errors: connect 0, read 0, write 0, timeout 2
+Requests/sec:    572.97
+Transfer/sec:      1.12GB
 ```
+64B payload
 ```
 max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=64
 Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
@@ -168,6 +172,7 @@ Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
 Requests/sec:  68019.56
 Transfer/sec:     11.68MB
 ```
+Evidence of my poor-man test-platform:
 ```
 max@iMac:~/entropy-service$ grep model\ name /proc/cpuinfo
 model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
@@ -175,5 +180,25 @@ model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
 model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
 model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
 ```
-
-
+### sysctl & ulimit tuning
+I currently run those commonly tuned parameters:
+```
+ulimit -n 1048576
+```
+```
+sysctl -w net.core.wmem_max=33554432
+sysctl -w net.core.wmem_default=8388608
+sysctl -w net.core.rmem_max=33554432
+sysctl -w net.core.rmem_default=8388608
+sysctl -w net.ipv4.tcp_rmem="4096 87380 33554432"
+sysctl -w net.ipv4.tcp_wmem="4096 65536 33554432"
+sysctl -w net.ipv4.tcp_slow_start_after_idle=0
+sysctl -w net.core.somaxconn=65535
+sysctl -w net.ipv4.tcp_max_syn_backlog=65535
+sysctl -w net.ipv4.tcp_tw_reuse=1
+sysctl -w net.ipv4.tcp_fin_timeout=15
+sysctl -w net.ipv4.tcp_keepalive_time=60
+sysctl -w net.ipv4.tcp_keepalive_intvl=10
+sysctl -w net.ipv4.tcp_keepalive_probes=6
+sysctl -w net.ipv4.tcp_no_metrics_save=1
+```
