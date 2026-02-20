@@ -430,10 +430,10 @@ func projectWords(n *big.Int, count int) []string {
 */
 
 // func entropyHandler(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error)
-func entropyWordHandler(quantity int) http.HandlerFunc {
+func entropyWordHandler(quantity int, refreshRate int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		//fmt.Println("Number of entries:", len(dicewareWords))
 		//var dicewareWords []string
+		//fmt.Println("Number of entries:", len(dicewareWords))
 
 		// Get a slice of words
 		words := diceware.GetWords()
@@ -483,12 +483,15 @@ func entropyWordHandler(quantity int) http.HandlerFunc {
 		// Prepare output
 		hashHex := hex.EncodeToString(hash[:])
 
+		// Optional console output
+		//fmt.Println("Words:", join(wordsout,"-"))
+
 		tmpl := `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="10">
+<meta http-equiv="refresh" content="{{.Refresh}}">
 <style>
 body {
 	background-color: black;
@@ -516,11 +519,13 @@ body {
 `
 
 		data := struct {
-			Words string
-			Hash  string
+			Words   string
+			Hash    string
+			Refresh int
 		}{
-			Words: template.HTMLEscapeString(join(wordsout, " ")),
-			Hash:  hashHex,
+			Words:   template.HTMLEscapeString(join(wordsout, " ")),
+			Hash:    hashHex,
+			Refresh: refreshRate,
 		}
 
 		t := template.Must(template.New("page").Parse(tmpl))
@@ -956,8 +961,8 @@ func main() {
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
-	mux.HandleFunc("/v1/randomwords", entropyWordHandler(cfg.MaxWords))
-	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(cfg.MaxWords))
+	mux.HandleFunc("/v1/randomwords", entropyWordHandler(cfg.MaxWords, cfg.RefreshRate))
+	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(cfg.MaxWords, cfg.RefreshRate))
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
