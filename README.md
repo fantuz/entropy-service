@@ -64,6 +64,18 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 - OS Variables to enable/disable TLS, h2, and other useful test features
 - CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, etc
 
+### API mappings
+```
+mux.HandleFunc("/", randomImageHandler(drbg))
+mux.HandleFunc("/v1/random", randomBytesHandler(drbg, cfg.MaxBytes))
+mux.HandleFunc("/v1/test", randomHandler(drbg))
+mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
+mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
+mux.HandleFunc("/health", healthHandler(drbg))
+mux.HandleFunc("/paroleparoleparole", entropyWordHandler(10))
+mux.Handle("/metrics", metricsHandler(drbg))
+```
+
 ### What is yet to come
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
