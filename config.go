@@ -12,6 +12,7 @@ type Config struct {
 	MaxBytes      int
 	QRNGBuffer    int
 	SeedBuffer    int
+	MaxWords      int
 	HTTPAddr      string
 	HTTPSAddr     string
 	CertFile      string
@@ -30,6 +31,7 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
 	flag.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flag.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
+	flag.IntVar(&cfg.MaxWords, "max-words", 12, "Default number of words presented by /randomwords endpoint")
 	flag.IntVar(&cfg.ReseedMS, "reseed-ms", 250, "Reseed interval (ms)")
 	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
 	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")

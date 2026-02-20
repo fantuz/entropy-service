@@ -429,8 +429,8 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-//func entropyHandler(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error)
-func entropyWordHandler( quantity int ) http.HandlerFunc {
+// func entropyHandler(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error)
+func entropyWordHandler(quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		//fmt.Println("Number of entries:", len(dicewareWords))
 		//var dicewareWords []string
@@ -468,17 +468,16 @@ func entropyWordHandler( quantity int ) http.HandlerFunc {
 		// Extract words
 		var wordsout []string
 		zero := big.NewInt(0)
-		
-		counter := 0 
-		maxWords := 12
+
+		counter := 0
+		maxWords := quantity
 
 		//for i := 0; i < maxWords; i++ {
 		for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
 			mod := new(big.Int)
- 			n.DivMod(n, base, mod)
-				wordsout = append(wordsout, randomWords[counter])
-				counter ++
-			//}
+			n.DivMod(n, base, mod)
+			wordsout = append(wordsout, randomWords[counter])
+			counter++
 		}
 
 		// Prepare output
@@ -496,7 +495,7 @@ body {
 	color: #00ff88;
 	font-family: monospace;
 	text-align: center;
-	padding-top: 5%;
+	padding-top: 10%;
 }
 .words {
 	font-size: 2em;
@@ -534,6 +533,7 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 		// write heeaders immediately
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
+
 		// Derive 32 bytes from master
 		seed, _ := d.Derive(32)
 
@@ -956,9 +956,10 @@ func main() {
 	mux.HandleFunc("/v1/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
+	mux.HandleFunc("/v1/randomwords", entropyWordHandler(cfg.MaxWords))
+	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(cfg.MaxWords))
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
-	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(10))
 
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
 	//time.Sleep(time.Duration(cfg.ReseedMS))
