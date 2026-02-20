@@ -84,22 +84,6 @@ mux.HandleFunc("/paroleparoleparole", entropyWordHandler(10))
 mux.Handle("/metrics", metricsHandler(drbg))
 ```
 
-## What is yet to come
-
-### Features
-- systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
-- CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
-- ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
-- random sound generator
-
-### Supported/tested hardware
-```
- - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
- - Quantis PCI by ID Quantique
- - Linux default CSRNG source, /dev/urandom, either as fallback or as primary entropy source, especially useful when testing
- - pretty much any character device under Linux, including kernel RNG, radio-receivers ...
-```
-
 ## Build & run
 
 ### Prerequisites
@@ -230,3 +214,21 @@ sysctl -w net.ipv4.tcp_no_metrics_save=1
 ```
 ### Mature PoC
 The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
+
+
+## What is yet to come
+
+### Features to be added
+- systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
+- CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
+- ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
+- random sound generator
+
+### Hardware already supported, more to be added
+```
+ - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
+ - Quantis PCI by ID Quantique
+ - Linux default CSRNG source, /dev/urandom, useful when testing or need to fallback
+ - pretty much any character device under Linux
+ - eventually any SDR radio-receiver, as AirSpy, RTL, BladeRF and others.
+```
