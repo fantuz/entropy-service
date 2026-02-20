@@ -52,17 +52,24 @@ Reseed → Periodic refresh of the master DRBG from entropy buffer
 Derive → Per-connection DRBG instantiation (state isolation)
 Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
+
+Server robustness and stability, by design:
 - socket management, thread-safe and thread-aware structs
 - per-connection DRBG isolation
 - running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
 - HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
-- h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
-- observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
 - use of GO atomic counters to accomodate atomic updates even under high-concurrency
-- random imgage generation, heatmaps
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features
-- CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, etc
+- CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, and more.
+
+Services being offered via API:
+- random passphrase / wordlist generation
+- random imgage generation
+- random binary generation, length of wich is configurable via URI parameter
+- entropy heatmaps (to infer the quality of RNG source)
+- h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
+- observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
 
 ### API mappings
 ```
