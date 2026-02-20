@@ -414,24 +414,35 @@ func join(words []string, sep string) string {
 	return result
 }
 
-//func entropyHandler(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error)
-func entropyWordHandler( quantity int) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		//fmt.Println("Number of entries:", len(words))
-		//fmt.Println("Number of entries:", len(dicewareWords))
+/*
+func projectWords(n *big.Int, count int) []string {
+    base := big.NewInt(int64(len(dicewareWords)))
+    words := make([]string, 0, count)
 
-		//var dicewareWords []string // load your 7776-word list here
+    for i := 0; i < count; i++ {
+        mod := new(big.Int)
+        n.DivMod(n, base, mod)
+        words = append(words, dicewareWords[mod.Int64()])
+    }
+
+    return words
+}
+*/
+
+//func entropyHandler(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error)
+func entropyWordHandler( quantity int ) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		//fmt.Println("Number of entries:", len(dicewareWords))
+		//var dicewareWords []string
 
 		// Get a slice of words
 		words := diceware.GetWords()
 
 		// Get a randomised slice of words
 		randomWords := diceware.GetRandomWords()
-		//fmt.Println("Number of entries in randomised list:", len(randomWords))
 
 		// Get a map of words
 		//wordsMap := diceware.GetWordsMap()
-		//fmt.Println("Number of entries in words map:", len(wordsMap))
 
 		// Generate 256 bits random
 		randomBytes := make([]byte, 32)
@@ -453,18 +464,21 @@ func entropyWordHandler( quantity int) http.HandlerFunc {
 		// Convert to big.Int
 		n := new(big.Int).SetBytes(hash[:])
 		base := big.NewInt(int64(len(randomWords)))
-		//base := big.NewInt(int64(len(words)))
 
 		// Extract words
 		var wordsout []string
 		zero := big.NewInt(0)
+		
+		counter := 0 
+		maxWords := 12
 
-		for n.Cmp(zero) > 0 {
+		//for i := 0; i < maxWords; i++ {
+		for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
 			mod := new(big.Int)
-			n.DivMod(n, base, mod)
-			index := mod.Int64()
-			//wordsout = append(wordsout, words[index])
-			wordsout = append(wordsout, randomWords[index])
+ 			n.DivMod(n, base, mod)
+				wordsout = append(wordsout, randomWords[counter])
+				counter ++
+			//}
 		}
 
 		// Prepare output
@@ -475,14 +489,14 @@ func entropyWordHandler( quantity int) http.HandlerFunc {
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="5">
+<meta http-equiv="refresh" content="10">
 <style>
 body {
 	background-color: black;
 	color: #00ff88;
 	font-family: monospace;
 	text-align: center;
-	padding-top: 20%;
+	padding-top: 5%;
 }
 .words {
 	font-size: 2em;
@@ -506,8 +520,7 @@ body {
 			Words string
 			Hash  string
 		}{
-			//Words: template.HTMLEscapeString(join(words, " ")),
-			Words: template.HTMLEscapeString(join(randomWords, " ")),
+			Words: template.HTMLEscapeString(join(wordsout, " ")),
 			Hash:  hashHex,
 		}
 
@@ -523,7 +536,6 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		// Derive 32 bytes from master
 		seed, _ := d.Derive(32)
-		//nonce, _ := d.Derive(12)
 
 		// Create per-request DRBG
 		child, _ := rng.NewDRBG(seed)
