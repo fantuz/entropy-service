@@ -1,17 +1,18 @@
 # entropy-service
 
-### Intended usage
+## Intended usage
 entropy-service is a GO-based software intended to let users fetch an amount randomness via simple API(s). Useful in daily cryptographic operations, where the randomness source may be "staving" or tampered-with.
 In my demo setup, real-time entropy is provided by a real QRNG (Quantum Random Number Generator) card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of QRNG using either ChaCha20 or AES-CRT functions.
 
-### Project goals
+## Project goals
 The software can be easily adapted to fetch entropy from etherogeneous sources, as the Linux PRNG itself (for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam or mouse, your imagination is the limit !
 
-### Practical implementations
+## Practical implementations
 With this simple yet very performant software, users can setup their own cryptographically-strong randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, and even sounds (later feature to be added soon).
 
-### Architecture and logic
+## Architecture and logic
 
+### High-Level Overview
 ```
                            ┌─────────────────────────┐
                            │     External QRNG       │
@@ -53,7 +54,7 @@ Derive → Per-connection DRBG instantiation (state isolation)
 Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
 
-Server robustness and stability, by design:
+### Server robustness and stability, by design:
 - socket management, thread-safe and thread-aware structs
 - per-connection DRBG isolation
 - running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
@@ -63,7 +64,7 @@ Server robustness and stability, by design:
 - OS Variables to enable/disable TLS, h2, and other useful test features
 - CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, and more.
 
-Services being offered via API:
+### Services being offered via API:
 - random passphrase / wordlist generation
 - random imgage generation
 - random binary generation, length of wich is configurable via URI parameter
@@ -83,7 +84,9 @@ mux.HandleFunc("/paroleparoleparole", entropyWordHandler(10))
 mux.Handle("/metrics", metricsHandler(drbg))
 ```
 
-### What is yet to come
+## What is yet to come
+
+### Features
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
@@ -93,10 +96,13 @@ mux.Handle("/metrics", metricsHandler(drbg))
 ```
  - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
  - Quantis PCI by ID Quantique
+ - Linux default CSRNG source, /dev/urandom, either as fallback or as primary entropy source, especially useful when testing
  - pretty much any character device under Linux, including kernel RNG, radio-receivers ...
 ```
 
-### Build & run
+## Build & run
+
+### Prerequisites
 Once cloned the repository via Github, go through the below steps to freshly build your entropy-service.
 - Install the only base-package required:
 ```
@@ -106,21 +112,22 @@ sudo apt-get install golang
 ```
 sudo apt-get install wrk dieharder rng-tools
 ```
+### Preliminary and preparation steps
 - Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
 ```
 $ go vet
 go: downloading golang.org/x/crypto v0.47.0
 ```
-- GO Format
+- go Format
 ```
 go fmt
 ```
-- GO Build
+- go Build
 ```
 go build
 ```
-- GO Run
-This way, you will start both HTTP & HTTPS listeners on all available interfacesm respectively on ports 8080 and 8443.
+### Runtime
+We are now ready to start both HTTP & HTTPS listeners on all available interfaces, respectively on ports 8080 and 8443 by default.
 SUDO command may be necessary to access the xRNG device on some platforms (e.g. when you compile with ChaosKey and create a symbolic link under /dev).
 ```
 max@iMac:~/entropy-service$ sudo go run entropy-service -reseed-ms 10000 -max-bytes 2097152 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/chaoskey1 
@@ -144,10 +151,9 @@ Reseed Buffer size: 2
 2026/02/19 22:06:48 HTTPS server running on :8443
 ```
 
-### Mature PoC
-The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
+## Performances
 
-### Performances
+### Results
 Pressure tests on a 10+ years old hardware showed pretty impressive numbers:
 - **HTTP**\
 70'000 requests per second (payload 64B)\
@@ -222,3 +228,5 @@ sysctl -w net.ipv4.tcp_keepalive_intvl=10
 sysctl -w net.ipv4.tcp_keepalive_probes=6
 sysctl -w net.ipv4.tcp_no_metrics_save=1
 ```
+### Mature PoC
+The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
