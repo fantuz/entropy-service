@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Entropy Stream</title>
+<style>
+body {
+    background: black;
+    color: #00ff88;
+    font-family: monospace;
+    text-align: center;
+    padding-top: 20%;
+}
+
+.fade {
+    font-size: 2em;
+    opacity: 1;
+    transition: opacity 0.8s ease-in-out;
+}
+
+.fade.out {
+    opacity: 0;
+}
+
+.hash {
+    margin-top: 20px;
+    font-size: 0.7em;
+    color: #444;
+}
+</style>
+</head>
+<body>
+
+<div id="words" class="fade">connecting...</div>
+<div id="hash" class="hash"></div>
+
+<script>
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/ws"
+);
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    const words = document.getElementById("words");
+    const hash = document.getElementById("hash");
+
+    words.classList.add("out");
+
+    setTimeout(() => {
+        words.textContent = data.words;
+        hash.textContent = data.hash;
+        words.classList.remove("out");
+    }, 800);
+};
+</script>
+
+</body>
+</html>

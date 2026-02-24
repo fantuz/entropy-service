@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/sha512"
 	//"crypto/sha256"
+	"sync/atomic"
 	"strconv"
 	"sync"
 	"time"
@@ -32,6 +33,9 @@ type DRBG struct {
 
 	// optional: pointer to external entropy buffer
 	entropyBuf *QRNGBuffer
+	
+	// counter for number of DRBG instances
+	DRBGInstanceCnt      int 
 }
 
 // Metadata contains all info needed for headers / JSON
@@ -44,6 +48,7 @@ type Metadata struct {
 	ReseedSizeBits		int
 	EntropyBufferedBytes	int
 	EntropyFillPct		int
+	DRBGInstanceCnt         int64
 }
 
 // HealthInfo contains all info needed to generate JSON
@@ -59,6 +64,12 @@ type HealthInfo struct {
 	EntropyFillPct		int    `json:"entropy_buffered_pct"`
 }
 
+var activeDRBG atomic.Int64
+
+func ActiveInstances() int64 {
+    return activeDRBG.Load()
+}
+
 func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -66,10 +77,8 @@ func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
 }
 
 // NewDRBG creates a new DRBG instance from a seed
-//func NewDRBG(seed []byte, noncee []byte) (*DRBG, error) {
 func NewDRBG(seed []byte) (*DRBG, error) {
 	if len(seed) < 32 { panic("seed too short") }
-	//if len(noncee) < 12 { panic("failed to generate nonce") }
 	h := sha512.Sum512(seed)
 	//n := sha256.Sum256(noncee)
 
@@ -86,6 +95,7 @@ func NewDRBG(seed []byte) (*DRBG, error) {
 	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
 	if err != nil { return nil, err }
 
+	activeDRBG.Add(1)
 	return &DRBG{
 		key:      key,
 		nonce:    nonce,
@@ -102,7 +112,6 @@ func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
 	//nonce := make([]byte, 12) // 96-bit nonce
 	//copy(nonce, seed[:12])
 
-	//return NewDRBG(seed, nonce)
 	return NewDRBG(seed)
 }
 
@@ -121,6 +130,7 @@ func (d *DRBG) Reseed(seed []byte) error {
 	}
 	d.cipher = c
 	d.reseeded = time.Now()
+	activeDRBG.Add(-1)
 	return nil
 }
 
@@ -130,6 +140,22 @@ func (d *DRBG) Read(p []byte) {
 	defer d.mu.Unlock()
 	d.cipher.XORKeyStream(p, p)
 }
+
+// for later fix
+/*
+func (d *DRBG) Read(p []byte) (int, error) {
+    // fill p
+    return len(p), nil
+}
+func (d *DRBG) Derive(seedSize int) ([]byte, error) {
+	seed := make([]byte, seedSize)
+	_, err := d.Read(seed)
+	if err != nil {
+		return nil, err
+	}
+	return seed, nil
+}
+*/
 
 // ReseedAge returns how long since last reseed
 func (d *DRBG) ReseedAge() time.Duration {
@@ -188,6 +214,7 @@ func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration,
 	d.reseedInterval = interval
 	d.reseedSizeBits = sizeBits
 	d.entropyBuf = buf
+	//d.DRBGInstanceNumber = activeDRBG
 }
 
 // GetMetadata returns a snapshot of metadata
@@ -214,6 +241,8 @@ func (d *DRBG) GetMetadata() Metadata {
     	ReseedSizeBits:		d.reseedSizeBits,
     	EntropyBufferedBytes:	bufKB,
     	EntropyFillPct:		bufPct,
+	//DRBGInstanceCnt:        d.DRBGInstanceCnt,
+	DRBGInstanceCnt:        ActiveInstances(),
     }
     
 }
@@ -229,22 +258,6 @@ func (d *DRBG) Write(p []byte) (int, error) {
     d.ReadInto(p)
     return len(p), nil
 }
-
-// for later fix, 
-/*
-func (d *DRBG) Read(p []byte) (int, error) {
-    // fill p
-    return len(p), nil
-}
-func (d *DRBG) Derive(seedSize int) ([]byte, error) {
-	seed := make([]byte, seedSize)
-	_, err := d.Read(seed)
-	if err != nil {
-		return nil, err
-	}
-	return seed, nil
-}
-*/
 
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
