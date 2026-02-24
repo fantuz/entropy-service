@@ -99,8 +99,13 @@ sudo apt-get install wrk dieharder rng-tools
 ### Preliminary and preparation steps
 - Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
 ```
+$ go get github.com/8ff/diceware
+...
+$ go get github.com/gorilla/websocket
+...
 $ go vet
 go: downloading golang.org/x/crypto v0.47.0
+...
 ```
 - go Format
 ```
