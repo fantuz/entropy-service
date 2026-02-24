@@ -459,18 +459,17 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		// Get a randomised slice of words
-		randomWords := diceware.GetRandomWords()
-		base := big.NewInt(int64(len(randomWords)))
-	
-		//if len(dicewareWords) == 0
-		if len(randomWords) == 0 {
-			http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
-			return
-		}
-	
-	
 		for {
+			// Get a randomised slice of words
+			randomWords := diceware.GetRandomWords()
+			base := big.NewInt(int64(len(randomWords)))
+	
+			//if len(dicewareWords) == 0
+			if len(randomWords) == 0 {
+				http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
+				return
+			}
+
 			// Generate 256 bits entropy
 			randomBytes := make([]byte, 32)
 			_, err := rand.Read(randomBytes)
@@ -494,7 +493,6 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 			maxWords := quantity
 	
 			// fixed word count
-			//for i := 0; i < 8; i++
 			//for i := 0; i < maxWords; i++
 			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
 				mod := new(big.Int)
