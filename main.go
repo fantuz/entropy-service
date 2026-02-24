@@ -9,9 +9,9 @@ import (
 	"html/template"
 	"math/big"
 	//"net/http"
+	"embed"
 	"encoding/json"
 	"entropy-service/rng"
-	"embed"
 	"fmt"
 	"image"
 	"image/color"
@@ -463,7 +463,7 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
 			base := big.NewInt(int64(len(randomWords)))
-	
+
 			//if len(dicewareWords) == 0
 			if len(randomWords) == 0 {
 				http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
@@ -477,21 +477,20 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 				http.Error(w, "entropy failure", http.StatusInternalServerError)
 				return
 			}
-	
+
 			// Optional scramble layer
 			hash := sha256.Sum256(randomBytes)
-	
+
 			// Convert to big.Int
 			n := new(big.Int).SetBytes(hash[:])
-	
-	
+
 			// Extract words
 			var wordsout []string
-			
+
 			zero := big.NewInt(0)
 			counter := 0
 			maxWords := quantity
-	
+
 			// fixed word count
 			//for i := 0; i < maxWords; i++
 			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
@@ -501,15 +500,15 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 				wordsout = append(wordsout, randomWords[counter])
 				counter++
 			}
-	
+
 			// Prepare output
 			frame := EntropyFrame{
 				Words: join(wordsout, " "),
 				Hash:  hex.EncodeToString(hash[:]),
 			}
-	
+
 			conn.WriteJSON(frame)
-	
+
 			time.Sleep(5 * time.Second)
 		}
 	}
@@ -521,12 +520,12 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 		//fmt.Println("Number of entries:", len(dicewareWords))
 
 		/*
-		conn, cerr := upgrader.Upgrade(w, r, nil)
-		if cerr != nil {
-			log.Println("ws upgrade failed")
-			return
-		}
-		defer conn.Close()
+			conn, cerr := upgrader.Upgrade(w, r, nil)
+			if cerr != nil {
+				log.Println("ws upgrade failed")
+				return
+			}
+			defer conn.Close()
 		*/
 
 		// Get a slice of words
@@ -1059,15 +1058,15 @@ func main() {
 	mux := http.NewServeMux()
 
 	/*
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./web/index.html")
-	})
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./web/index.html")
+		})
 	*/
-	
+
 	//fs := http.FS(webFS)
 	//http.Handle("/", http.FileServer(fs))
 
-	mux.HandleFunc("/ws", wsEntropyHandler(drbg,64))
+	mux.HandleFunc("/ws", wsEntropyHandler(drbg, 64))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	//mux.HandleFunc("/", randomImageHandler(drbg))
@@ -1153,4 +1152,3 @@ type EntropyFrame struct {
 	Hash  string `json:"hash"`
 }
 */
-
