@@ -146,10 +146,10 @@ go fmt
 go build
 ```
 ### Runtime
-We are now ready to start both HTTP & HTTPS listeners on all available interfaces, respectively on ports 8080 and 8443 by default.
-SUDO command may be necessary to access the xRNG device on some platforms (e.g. when you compile with ChaosKey and create a symbolic link under /dev).
+We are now ready to start both HTTP & HTTPS listeners, respectively on ports 8080 and 8443 by default, on all available inet interfaces.
+SUDO command may be necessary to access the xRNG devices on different platforms (e. including symbolic links under /dev).
 ```
-max@iMac:~/entropy-service$ sudo go run entropy-service -reseed-ms 10000 -max-bytes 2097152 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/chaoskey1 
+max@iMac:~/entropy-service$ sudo go run entropy-service -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/chaoskey1 -words 8 -max-bytes 2097152
 ---
 HTTP port: :8080
 HTTPS port: :8443
@@ -158,16 +158,16 @@ KeyFile TLS: key.pem
 EnableHTTPS flag: true
 ---
 Reseed size: 512
-ReseedMS interval: 10000
+ReseedMs interval: 2500
 Max request size KB: 2048
 QRNGBuffer size: 2
 Reseed Buffer size: 2
 ---
-2026/02/19 22:06:46 Entropy mode: hardware device: /dev/chaoskey1
-2026/02/19 22:06:46 Entropy source: /dev/chaoskey1
-2026/02/19 22:06:46 initQRNG() set to 2048 KB
-2026/02/19 22:06:48 HTTP server running on :8080
-2026/02/19 22:06:48 HTTPS server running on :8443
+2026/02/25 20:35:28 Entropy mode: hardware device: /dev/chaoskey1
+2026/02/25 20:35:28 Entropy source: /dev/chaoskey1
+2026/02/25 20:35:28 initQRNG() set to 2048 KB
+2026/02/25 20:35:31 HTTP server running on :8080
+2026/02/25 20:35:31 HTTPS server running on :8443
 ```
 
 ## Performances
