@@ -105,8 +105,8 @@ Regular HTTP
 ```
 
 ### Screenshots
-<img width="2560" height="1440" alt="Screenshot From 2026-02-25 14-56-33" src="https://github.com/user-attachments/assets/560a0a37-0c2f-40cc-afce-48eb4d2d73eb" />
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
 
 ## Build & run
 
