@@ -88,7 +88,7 @@ Regular HTTP
 	mux.HandleFunc("/v1/data/test", randomHandler(drbg))
  - words
 	mux.HandleFunc("/v1/meta/random", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
-  mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
+    mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
  - metrics, health
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
