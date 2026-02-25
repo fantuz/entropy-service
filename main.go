@@ -66,8 +66,9 @@ type EntropyFrame struct {
 }
 
 type EntropyDataFrame struct {
-	Hex  string `json:"data"`
-	Hash string `json:"hash"`
+	Hex    string `json:"hex"`
+	Base64 string `json:"base64"`
+	Hash   string `json:"hash"`
 }
 
 //go:embed web/*
@@ -673,14 +674,6 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-			n := 1024
-			if q := r.URL.Query().Get("bytes"); q != "" {
-				if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
-					n = v
-				fmt.Println("URL parameter bytes:", v)
-				}
-			}
-
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -688,34 +681,46 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		for {
+		n := 1024
+		if q := r.URL.Query().Get("bytes"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+				n = v
+				//fmt.Println("URL parameter bytes:", v)
+			}
+		}
 
+		for {
 			buf := make([]byte, n)
+			//if buf != nil
 			d.Read(buf)
-			//if buf != nil {
-			//	http.Error(w, "entropy read failure", http.StatusInternalServerError)
-			//	return
-			//}
+
+			// two options available here, raw encode or b64 encode
+			base64 := base64.StdEncoding.EncodeToString(buf)
+			//fmt.Println("base64:", base64)
+
+			/*
+				if n < 64 {
+					//http.Error(w, "entropy too low, needing higher ?bytes= value, now set to ", http.StatusInternalServerError)
+					return
+				}
+			*/
 
 			//conv := strconv.Itoa(int(buf))
 			//conv := string(buf[:])
 			//conv := hex.EncodeToString(buf)
 			hash := sha256.Sum256(buf)
 
+			// Prepare output
+			frame := EntropyDataFrame{
+				Hex:    hex.EncodeToString(buf[:]),
+				Base64: base64,
+				Hash:   hex.EncodeToString(hash[:]),
+			}
+
 			//w.Header().Set("Content-Type", "application/octet-stream")
 			//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
 			//w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
-
-			// two options available here, raw encode or b64 encode
-			base64 := base64.StdEncoding.EncodeToString(buf)
-
-			// Prepare output
-			frame := EntropyDataFrame{
-				//Hex:  hex.EncodeToString(buf[:]),
-				Hex:  base64,
-				Hash: hex.EncodeToString(hash[:]),
-			}
 
 			conn.WriteJSON(frame)
 			//conn.WriteMessage(websocket.BinaryMessage, buf)

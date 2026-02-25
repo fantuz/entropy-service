@@ -5,43 +5,80 @@
 <title>Entropy Stream</title>
 <style>
 body {
+    margin: 5%;
+    font-family: "JetBrains Mono", monospace;
+    #font-family: monospace;
+    #display: flex;
+    #justify-content: center;
+    text-align: center;
+    #align-items: center;
+    #height: 100vh;
     background: black;
     color: #00ff88;
-    font-family: monospace;
-    text-align: center;
-    padding-top: 20%;
+    #padding-top: 5%;
     word-wrap: break-word;
     overflow: hidden;
 }
 
 .fade {
-    font-size: 1em;
     opacity: 1;
+    font-size: 1em;
     transition: opacity 0.8s ease-in-out;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.65);
+    #backdrop-filter: blur(12px);
+    padding: 40px;
+    #padding: 5%;
+    border-radius: 16px;
+    max-width: 90%;
 }
 
 .fade.out {
     opacity: 0;
 }
 
-.hash {
+.base64 {
+    opacity: 1;
     margin-top: 20px;
-    font-size: 0.7em;
+    margin-bottom: 20px;
+    font-size: 1em;
     color: #444;
+    transition: opacity 0.8s ease-in-out;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.65);
+    padding: 40px;
+    #padding: 5%;
+    border-radius: 16px;
+    max-width: 90%;
+}
+
+.hash {
+    opacity: 1;
+    font-family: monospace;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 1.4em;
+    color: #444;
+    #box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    background: rgba(255, 255, 255, 0.65);
+    #padding: 5%;
+    padding: 40px;
+    border-radius: 16px;
+    max-width: 90%;
 }
 </style>
 </head>
 <body>
 
 <div id="hex" class="fade">connecting...</div>
-<div id="hash" class="hash"></div>
+<div id="base64" class="base64"></div>
+<div id="hash" class="hash">please wait</div>
 
 <script>
-//var name = $_GET[bytes];
 const queryString = window.location.search;
-//console.log(queryString);
 const urlParams = new URLSearchParams(queryString);
 const bytes = urlParams.get('bytes')
+//console.log(queryString);
 //console.log(bytes);
 
 const ws = new WebSocket(
@@ -52,6 +89,7 @@ const ws = new WebSocket(
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
     const hex = document.getElementById("hex");
+    const base64 = document.getElementById("base64");
     const hash = document.getElementById("hash");
 
     // derive color from first 3 bytes of hex
@@ -62,12 +100,13 @@ ws.onmessage = function(event) {
     hex.classList.add("out");
 
     setTimeout(() => {
-        hex.textContent = data.data;
+        hex.textContent = data.hex;
+        base64.textContent = data.base64;
         hash.textContent = data.hash;
         hex.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
-    }, 800);
+    }, 1000);
 
     //console.log(hex);
 };
