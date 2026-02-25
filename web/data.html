@@ -18,19 +18,19 @@ body {
     #padding-top: 5%;
     word-wrap: break-word;
     overflow: hidden;
+    max-width: 100%;
 }
 
 .fade {
     opacity: 1;
     font-size: 1em;
-    transition: opacity 0.8s ease-in-out;
+    transition: opacity 0.5s ease-in-out;
     box-shadow: 0 0 30px rgba(0,0,0,0.6);
     background: rgba(0, 0, 0, 0.65);
     #backdrop-filter: blur(12px);
     padding: 40px;
     #padding: 5%;
     border-radius: 16px;
-    max-width: 90%;
 }
 
 .fade.out {
@@ -49,7 +49,10 @@ body {
     padding: 40px;
     #padding: 5%;
     border-radius: 16px;
-    max-width: 90%;
+}
+
+.base64.out {
+    opacity: 0;
 }
 
 .hash {
@@ -64,7 +67,6 @@ body {
     #padding: 5%;
     padding: 40px;
     border-radius: 16px;
-    max-width: 90%;
 }
 </style>
 </head>
@@ -98,12 +100,14 @@ ws.onmessage = function(event) {
     const b = parseInt(data.hash.slice(4,6),16);
 
     hex.classList.add("out");
+    base64.classList.add("out");
 
     setTimeout(() => {
         hex.textContent = data.hex;
         base64.textContent = data.base64;
         hash.textContent = data.hash;
         hex.classList.remove("out");
+        base64.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
     }, 1000);
