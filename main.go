@@ -698,9 +698,29 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 
 		n := 1024
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<20 {
 				n = v
 				//fmt.Println("URL parameter bytes:", v)
+			}
+		}
+		/*
+			if q := r.URL.Query().Get("words"); q != "" {
+				if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 7776 {
+					quantity = v
+					//fmt.Println("URL parameter words:", quantity)
+				} else {
+					log.Println("too many words requested:", v)
+					quantity = 20
+					//return
+				}
+			}
+		*/
+		if x := r.URL.Query().Get("refresh"); x != "" {
+			fmt.Println("URL parameter refresh:", x)
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
+				dtime := time.Duration(z)
+				refresh = dtime
+				fmt.Println("URL parameter refresh:", z)
 			}
 		}
 

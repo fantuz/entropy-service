@@ -59,24 +59,8 @@ body {
     opacity: 0;
 }
 
-.base64 {
-    opacity: 1;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    font-size: 1em;
-    color: #444;
-    transition: opacity 0.5s ease-in-out;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    background: rgba(0, 0, 0, 0.65);
-    padding: 40px;
-    border-radius: 16px;
-}
-
-.base64.out {
-    opacity: 0;
-}
-
 .hash {
+    opacity: 1;
     font-family: "IBM Plex Mono", monospace;
     text-shadow: 0 0 8px rgba(0,255,200,0.4);
     #letter-spacing: 0.04em;
@@ -91,6 +75,10 @@ body {
     #padding: 5%;
     padding: 40px;
     border-radius: 16px;
+}
+
+.hash.out {
+    opacity: 0;
 }
 
 h3 {
@@ -130,8 +118,6 @@ const ws = new WebSocket(
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
-    //const hex = document.getElementById("hex");
-    //const base64 = document.getElementById("base64");
     const hash = document.getElementById("hash");
 
     // derive color from first 3 bytes of hex
@@ -139,20 +125,16 @@ ws.onmessage = function(event) {
     const g = parseInt(data.hash.slice(2,4),16);
     const b = parseInt(data.hash.slice(4,6),16);
 
-    //hex.classList.add("out");
-    //base64.classList.add("out");
+    //hash.classList.add("out");
 
     setTimeout(() => {
-        //hex.textContent = data.hex;
-        //base64.textContent = data.base64;
         hash.textContent = data.hash;
-        //hex.classList.remove("out");
-        //base64.classList.remove("out");
+        //hash.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
     }, 100);
 
-    //console.log(hex);
+    //console.log(hash);
 };
 
 /*
