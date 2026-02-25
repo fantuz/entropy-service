@@ -7,6 +7,7 @@
 body {
     margin: 5%;
     font-family: "JetBrains Mono", monospace;
+    #letter-spacing: 0.04em;
     #font-family: monospace;
     #display: flex;
     #justify-content: center;
@@ -19,9 +20,30 @@ body {
     word-wrap: break-word;
     overflow: hidden;
     max-width: 100%;
+    transition: background 1.5s ease-in-out;
 }
 
-.fade {
+.section {
+    margin-bottom: 25px;
+}
+
+.panel {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.data {
+    color: #00ffcc;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.hex {
     opacity: 1;
     font-size: 1em;
     transition: opacity 0.5s ease-in-out;
@@ -33,7 +55,7 @@ body {
     border-radius: 16px;
 }
 
-.fade.out {
+.hex.out {
     opacity: 0;
 }
 
@@ -56,6 +78,9 @@ body {
 }
 
 .hash {
+    font-family: "IBM Plex Mono", monospace;
+    text-shadow: 0 0 8px rgba(0,255,200,0.4);
+    #letter-spacing: 0.04em;
     opacity: 1;
     font-family: monospace;
     margin-top: 20px;
@@ -68,13 +93,38 @@ body {
     padding: 40px;
     border-radius: 16px;
 }
+
+h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+}
 </style>
 </head>
 <body>
 
-<div id="hex" class="fade">connecting...</div>
-<div id="base64" class="base64"></div>
-<div id="hash" class="hash">please wait</div>
+<!--
+    <div id="hex" class="fade">connecting...</div>
+    <div id="base64" class="base64"></div>
+    <div id="hash" class="hash">please wait</div>
+-->
+
+<div class="panel">
+
+    <div class="section">
+        <h3>Hex</h3>
+        <div class="hex" id="hex"></div>
+    </div>
+    <div class="section">
+        <h3>Base64</h3>
+        <div class="base64" id="base64"></div>
+    </div>
+    <div class="section">
+        <h3>SHA256</h3>
+        <div class="hash" id="hash"></div>
+    </div>
+</div>
 
 <script>
 const queryString = window.location.search;
