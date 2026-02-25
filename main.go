@@ -67,7 +67,7 @@ type EntropyFrame struct {
 
 type EntropyDataFrame struct {
 	Hex  string `json:"data"`
-	Hash  string `json:"hash"`
+	Hash string `json:"hash"`
 }
 
 //go:embed web/*
@@ -673,6 +673,14 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
+			n := 1024
+			if q := r.URL.Query().Get("bytes"); q != "" {
+				if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+					n = v
+				fmt.Println("URL parameter bytes:", v)
+				}
+			}
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -681,12 +689,6 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 		defer conn.Close()
 
 		for {
-			n := 1024
-			if q := r.URL.Query().Get("bytes"); q != "" {
-				if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
-					n = v
-				}
-			}
 
 			buf := make([]byte, n)
 			d.Read(buf)
@@ -712,7 +714,7 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			frame := EntropyDataFrame{
 				//Hex:  hex.EncodeToString(buf[:]),
 				Hex:  base64,
-				Hash:  hex.EncodeToString(hash[:]),
+				Hash: hex.EncodeToString(hash[:]),
 			}
 
 			conn.WriteJSON(frame)

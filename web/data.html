@@ -37,9 +37,16 @@ body {
 <div id="hash" class="hash"></div>
 
 <script>
+//var name = $_GET[bytes];
+const queryString = window.location.search;
+//console.log(queryString);
+const urlParams = new URLSearchParams(queryString);
+const bytes = urlParams.get('bytes')
+//console.log(bytes);
+
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
-    + location.host + "/data"
+    + location.host + "/data?bytes=" + bytes
 );
 
 ws.onmessage = function(event) {
