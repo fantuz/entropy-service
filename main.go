@@ -450,7 +450,7 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
+func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -489,11 +489,11 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 
 			zero := big.NewInt(0)
 			counter := 0
-			maxWords := quantity
+			//maxWords := quantity
 
 			// fixed word count
 			//for i := 0; i < maxWords; i++
-			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
+			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < quantity {
 				mod := new(big.Int)
 				n.DivMod(n, base, mod)
 				//wordsout = append(wordsout, randomWords[mod.Int64()])
@@ -509,7 +509,8 @@ func wsEntropyHandler(d *rng.DRBG, quantity int) http.HandlerFunc {
 
 			conn.WriteJSON(frame)
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(refresh * time.Millisecond)
+			//time.Sleep(1 * time.Second)
 		}
 	}
 }
@@ -561,7 +562,6 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 		// Extract words
 		var wordsout []string
 		zero := big.NewInt(0)
-
 		counter := 0
 		maxWords := quantity
 
@@ -970,7 +970,7 @@ func main() {
 
 	cfg := ParseConfig()
 
-	if cfg.ReseedMS <= 0 || cfg.ReseedMS > 10001 {
+	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10001 {
 		panic("reseed-ms must be between 1 and 10000 msec")
 	}
 
@@ -991,7 +991,7 @@ func main() {
 	fmt.Println("EnableHTTPS flag:", cfg.EnableHTTPS)
 	fmt.Println("---")
 	fmt.Println("Reseed size:", cfg.ReseedSize)
-	fmt.Println("ReseedMS interval:", cfg.ReseedMS)
+	fmt.Println("ReseedMs interval:", cfg.ReseedMs)
 	fmt.Println("Max request size KB:", cfg.MaxBytes/1024)
 	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
 	fmt.Println("Reseed Buffer size:", cfg.SeedBuffer)
@@ -1038,8 +1038,8 @@ func main() {
 	}
 
 	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
-	//drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMS)*time.Millisecond, cfg.ReseedSize, qrngBuf)
-	drbg.SetMetadata("1.0.0", dev, "ChaCha20", time.Duration(cfg.ReseedMS)*time.Millisecond, cfg.ReseedSize, qrngBuf)
+	//drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, qrngBuf)
+	drbg.SetMetadata("1.0.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
@@ -1066,7 +1066,7 @@ func main() {
 	//fs := http.FS(webFS)
 	//http.Handle("/", http.FileServer(fs))
 
-	mux.HandleFunc("/ws", wsEntropyHandler(drbg, 64))
+	mux.HandleFunc("/ws", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	//mux.HandleFunc("/", randomImageHandler(drbg))
@@ -1081,12 +1081,12 @@ func main() {
 	mux.Handle("/metrics", metricsHandler(drbg))
 
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
-	//time.Sleep(time.Duration(cfg.ReseedMS))
+	//time.Sleep(time.Duration(cfg.ReseedMs))
 
 	// TODO: fix logic here
 	// Run permanent reseed loop
-	//go reseedLoop(ctx, drbg, cfg.ReseedMS, dev, cfg.BufferSize)
-	go reseedLoop(ctx, drbg, cfg.ReseedMS, dev, cfg.QRNGBuffer)
+	//go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.BufferSize)
+	go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.QRNGBuffer)
 
 	// context was here
 	//ctx, cancel := context.WithCancel(context.Background())
