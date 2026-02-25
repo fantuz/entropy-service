@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Entropy Stream</title>
+<style>
+body {
+    background: black;
+    color: #00ff88;
+    font-family: monospace;
+    text-align: center;
+    padding-top: 20%;
+    word-wrap: break-word;
+    overflow: hidden;
+}
+
+.fade {
+    font-size: 1em;
+    opacity: 1;
+    transition: opacity 0.8s ease-in-out;
+}
+
+.fade.out {
+    opacity: 0;
+}
+
+.hash {
+    margin-top: 20px;
+    font-size: 0.7em;
+    color: #444;
+}
+</style>
+</head>
+<body>
+
+<div id="hex" class="fade">connecting...</div>
+<div id="hash" class="hash"></div>
+
+<script>
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/data"
+);
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    const hex = document.getElementById("hex");
+    const hash = document.getElementById("hash");
+
+    // derive color from first 3 bytes of hex
+    const r = parseInt(data.hash.slice(0,2),16);
+    const g = parseInt(data.hash.slice(2,4),16);
+    const b = parseInt(data.hash.slice(4,6),16);
+
+    hex.classList.add("out");
+
+    setTimeout(() => {
+        hex.textContent = data.data;
+        hash.textContent = data.hash;
+        hex.classList.remove("out");
+        document.body.style.backgroundColor =
+            `rgb(${r/2},${g/2},${b/2})`;
+    }, 800);
+
+    //console.log(hex);
+};
+/*
+ws.binaryType = "arraybuffer";
+
+ws.onmessage = function(event) {
+    const bytes = new Uint8Array(event.data);
+    console.log(bytes);
+};
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    const words = document.getElementById("hex");
+    //document.getElementById("hex") = data.data;
+
+    // derive color from first 3 bytes of hex
+    const r = parseInt(data.data.slice(0,2),16);
+    const g = parseInt(data.data.slice(2,4),16);
+    const b = parseInt(data.data.slice(4,6),16);
+
+    console.log(bytes);
+    document.body.style.backgroundColor =
+        `rgb(${r/2},${g/2},${b/2})`;
+};
+
+*/
+
+
+</script>
+
+</body>
+</html>

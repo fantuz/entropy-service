@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"encoding/base64"
 	"html/template"
 	"math/big"
 	//"net/http"
@@ -61,6 +62,11 @@ type QRNGBuffer struct {
 
 type EntropyFrame struct {
 	Words string `json:"words"`
+	Hash  string `json:"hash"`
+}
+
+type EntropyDataFrame struct {
+	Hex  string `json:"data"`
 	Hash  string `json:"hash"`
 }
 
@@ -478,7 +484,7 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 				return
 			}
 
-			// Optional scramble layer
+			// Optional scramble layer (sha256 calculator)
 			hash := sha256.Sum256(randomBytes)
 
 			// Convert to big.Int
@@ -492,7 +498,6 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 			//maxWords := quantity
 
 			// fixed word count
-			//for i := 0; i < maxWords; i++
 			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < quantity {
 				mod := new(big.Int)
 				n.DivMod(n, base, mod)
@@ -509,8 +514,8 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 
 			conn.WriteJSON(frame)
 
-			time.Sleep(refresh * time.Millisecond)
 			//time.Sleep(1 * time.Second)
+			time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
@@ -662,6 +667,60 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 		atomic.AddUint64(&httpRequests, +1)
 
 		w.Write(buf)
+	}
+}
+
+func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		conn, cerr := upgrader.Upgrade(w, r, nil)
+		if cerr != nil {
+			log.Println("ws upgrade failed")
+			return
+		}
+		defer conn.Close()
+
+		for {
+			n := 1024
+			if q := r.URL.Query().Get("bytes"); q != "" {
+				if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+					n = v
+				}
+			}
+
+			buf := make([]byte, n)
+			d.Read(buf)
+			//if buf != nil {
+			//	http.Error(w, "entropy read failure", http.StatusInternalServerError)
+			//	return
+			//}
+
+			//conv := strconv.Itoa(int(buf))
+			//conv := string(buf[:])
+			//conv := hex.EncodeToString(buf)
+			hash := sha256.Sum256(buf)
+
+			//w.Header().Set("Content-Type", "application/octet-stream")
+			//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
+			//w.Header().Set("X-RNG-Reseed-Age-ms-test",
+			//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+
+			// two options available here, raw encode or b64 encode
+			//Hex:  hex.EncodeToString(buf[:]),
+			base64 := base64.StdEncoding.EncodeToString(buf)
+
+			// Prepare output
+			frame := EntropyDataFrame{
+				Hex:  base64,
+				Hash:  hex.EncodeToString(hash[:]),
+			}
+
+			conn.WriteJSON(frame)
+			//conn.WriteMessage(websocket.BinaryMessage, buf)
+
+			//time.Sleep(1 * time.Second)
+			time.Sleep(refresh * time.Millisecond)
+		}
 	}
 }
 
@@ -1066,6 +1125,7 @@ func main() {
 	//fs := http.FS(webFS)
 	//http.Handle("/", http.FileServer(fs))
 
+	mux.HandleFunc("/data", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
 	mux.HandleFunc("/ws", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 

@@ -35,7 +35,7 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flag.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
 	flag.IntVar(&cfg.RefreshRate, "refresh", 5, "Default refresh rate (in seconds) of words presented by /randomwords endpoint")
-	flag.DurationVar(&cfg.RefreshRateMs, "refresh-ms", 2000, "Default refresh rate (in ms) of words presented by websocket")
+	flag.DurationVar(&cfg.RefreshRateMs, "refresh-ms", 3000, "Default refresh rate (in ms) of words presented by websocket")
 	flag.IntVar(&cfg.MaxWords, "words", 12, "Default number of words presented by /randomwords endpoint")
 	flag.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Reseed interval (ms)")
 	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
