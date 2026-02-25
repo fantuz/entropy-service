@@ -63,20 +63,30 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 - use of GO atomic counters to accomodate atomic updates even under high-concurrency
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features
-- CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, and more.
+- CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, timers and more.
 
 ### Services being offered via API:
-- random passphrase / wordlist generation
+- random binary data generation, length of which is configurable via URI parameter
+- random passphrase / wordlist generation, presentated in different encodings, length of which is configurable via URI parameter
 - random imgage generation
-- random binary generation, length of wich is configurable via URI parameter
 - entropy heatmaps (to infer the quality of RNG source)
 - h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
+- support for websockets and JSON payloads (more efficient, less network overhead, entropy is streamed and broadcasted continuously)
 - observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
+
+### Hardware already supported, more to be added
+```
+ - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
+ - Quantis PCI by ID Quantique
+ - Linux default CSRNG source, /dev/urandom, useful when testing or need to fallback
+ - pretty much any character device under Linux
+ - eventually any SDR radio-receiver, as AirSpy, RTL, BladeRF and others.
+```
 
 ### API mappings
 ```
 Websockets, HTTP 101 Upgrade
-	/data.html?bytes=<#> -> mux.HandleFunc("/data", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
+	/bytes.html?bytes=<#> -> mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
 	/words.html?words=<#> -> mux.HandleFunc("/words", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
 
 Regular HTTP
@@ -93,6 +103,13 @@ Regular HTTP
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 ```
+
+### Screenshots
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 17-32-55" src="https://github.com/user-attachments/assets/420bb4dc-1e83-4f1e-8f59-5040dbbcda99" />
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/143ce488-f2a3-4286-a6fd-d088371b455f" />
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 14-56-33" src="https://github.com/user-attachments/assets/560a0a37-0c2f-40cc-afce-48eb4d2d73eb" />
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 14-56-33" src="https://github.com/user-attachments/assets/820d3d85-f4d7-421a-844d-fa4f8e1ae37f" />
 
 ## Build & run
 
@@ -238,12 +255,3 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator
-
-### Hardware already supported, more to be added
-```
- - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
- - Quantis PCI by ID Quantique
- - Linux default CSRNG source, /dev/urandom, useful when testing or need to fallback
- - pretty much any character device under Linux
- - eventually any SDR radio-receiver, as AirSpy, RTL, BladeRF and others.
-```
