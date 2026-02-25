@@ -459,13 +459,6 @@ func projectWords(n *big.Int, count int) []string {
 
 func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if q := r.URL.Query().Get("words"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
-				quantity = v
-				//fmt.Println("URL parameter words:", quantity)
-			}
-		}
-
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -473,19 +466,29 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 		}
 		defer conn.Close()
 
+		if q := r.URL.Query().Get("words"); q != "" {
+			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 7776 {
+				quantity = v
+				fmt.Println("URL parameter words:", quantity)
+			} else {
+				log.Println("too many words requested:", v)
+				quantity = 20
+				//return
+			}
+		}
+
 		for {
 			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
 			base := big.NewInt(int64(len(randomWords)))
 
-			//if len(dicewareWords) == 0
 			if len(randomWords) == 0 {
 				http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
 				return
 			}
 
-			// Generate 256 bits entropy
-			randomBytes := make([]byte, 32)
+			// Generate 256 bits entropy (32 * 8)
+			randomBytes := make([]byte, 32) // add more bits
 			_, err := rand.Read(randomBytes)
 			if err != nil {
 				http.Error(w, "entropy failure", http.StatusInternalServerError)
@@ -505,11 +508,11 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 			counter := 0
 
 			// fixed word count
-			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < quantity {
+			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter <= quantity {
 				mod := new(big.Int)
 				n.DivMod(n, base, mod)
 				wordsout = append(wordsout, randomWords[mod.Int64()])
-				wordsout = append(wordsout, randomWords[counter])
+				//wordsout = append(wordsout, randomWords[counter])
 				counter++
 			}
 
@@ -518,6 +521,12 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 				Words: join(wordsout, " "),
 				Hash:  hex.EncodeToString(hash[:]),
 			}
+
+			/*
+			fmt.Println("Number of entries:", len(randomWords))
+			fmt.Println("URL parameter words:", quantity)
+			fmt.Println("Function output words:", counter)
+			*/
 
 			conn.WriteJSON(frame)
 
