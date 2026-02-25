@@ -87,7 +87,8 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 ```
 Websockets, HTTP 101 Upgrade
 	/bytes.html?bytes=<#> -> mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	/words.html?words=<#> -> mux.HandleFunc("/words", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
+	/colors.html?refresh=<#> -> mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
+    /words.html?words=<#> -> mux.HandleFunc("/words", wsEntropyWordsHandler(drbg, 64, cfg.RefreshRateMs))
 
 Regular HTTP
  - images
