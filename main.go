@@ -469,7 +469,7 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 		if q := r.URL.Query().Get("words"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 7776 {
 				quantity = v
-				fmt.Println("URL parameter words:", quantity)
+				//fmt.Println("URL parameter words:", quantity)
 			} else {
 				log.Println("too many words requested:", v)
 				quantity = 20
@@ -523,9 +523,9 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 			}
 
 			/*
-			fmt.Println("Number of entries:", len(randomWords))
-			fmt.Println("URL parameter words:", quantity)
-			fmt.Println("Function output words:", counter)
+				fmt.Println("Number of entries:", len(randomWords))
+				fmt.Println("URL parameter words:", quantity)
+				fmt.Println("Function output words:", counter)
 			*/
 
 			conn.WriteJSON(frame)

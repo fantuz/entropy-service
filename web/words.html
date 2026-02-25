@@ -22,7 +22,7 @@ body {
     #word-wrap: break-word;
     overflow: hidden;
     max-width: 100%;
-    #transition: background 1.5s ease-in-out;
+    transition: background 0.5s ease-in-out;
 }
 
 .section {
@@ -55,7 +55,7 @@ body {
     margin-top: 20px;
     margin-bottom: 20px;
     font-size: 2em;
-    transition: opacity 0.8s ease-in-out;
+    transition: opacity 0.5s ease-in-out;
 }
 
 .words.out {
@@ -128,7 +128,7 @@ ws.onmessage = function(event) {
         hash.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
-    }, 800);
+    }, 400);
 
 };
 </script>
