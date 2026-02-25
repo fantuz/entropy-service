@@ -37,7 +37,7 @@ body {
 <script>
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
-    + location.host + "/ws"
+    + location.host + "/words"
 );
 
 ws.onmessage = function(event) {

@@ -5,13 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
-	"encoding/hex"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"html/template"
 	"math/big"
 	//"net/http"
 	"embed"
-	"encoding/json"
 	"entropy-service/rng"
 	"fmt"
 	"image"
@@ -706,11 +706,11 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 
 			// two options available here, raw encode or b64 encode
-			//Hex:  hex.EncodeToString(buf[:]),
 			base64 := base64.StdEncoding.EncodeToString(buf)
 
 			// Prepare output
 			frame := EntropyDataFrame{
+				//Hex:  hex.EncodeToString(buf[:]),
 				Hex:  base64,
 				Hash:  hex.EncodeToString(hash[:]),
 			}
@@ -1126,7 +1126,7 @@ func main() {
 	//http.Handle("/", http.FileServer(fs))
 
 	mux.HandleFunc("/data", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	mux.HandleFunc("/ws", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
+	mux.HandleFunc("/words", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	//mux.HandleFunc("/", randomImageHandler(drbg))
