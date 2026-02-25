@@ -459,6 +459,13 @@ func projectWords(n *big.Int, count int) []string {
 
 func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if q := r.URL.Query().Get("words"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
+				quantity = v
+				//fmt.Println("URL parameter words:", quantity)
+			}
+		}
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -496,13 +503,12 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 
 			zero := big.NewInt(0)
 			counter := 0
-			//maxWords := quantity
 
 			// fixed word count
 			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < quantity {
 				mod := new(big.Int)
 				n.DivMod(n, base, mod)
-				//wordsout = append(wordsout, randomWords[mod.Int64()])
+				wordsout = append(wordsout, randomWords[mod.Int64()])
 				wordsout = append(wordsout, randomWords[counter])
 				counter++
 			}
@@ -1132,8 +1138,8 @@ func main() {
 	//fs := http.FS(webFS)
 	//http.Handle("/", http.FileServer(fs))
 
-	mux.HandleFunc("/data", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	mux.HandleFunc("/words", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
+	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
+	mux.HandleFunc("/words", wsEntropyHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	//mux.HandleFunc("/", randomImageHandler(drbg))

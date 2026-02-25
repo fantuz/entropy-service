@@ -5,54 +5,133 @@
 <title>Entropy Stream</title>
 <style>
 body {
-    background: black;
+    #background: black;
     color: #00ff88;
     font-family: monospace;
     text-align: center;
-    padding-top: 20%;
+    padding-top: 5%;
+    padding-bottom: 5%;
+    margin: 5%;
+    font-family: "JetBrains Mono", monospace;
+    #letter-spacing: 0.04em;
+    #font-family: monospace;
+    #display: flex;
+    #justify-content: center;
+    align-items: center;
+    #height: 100vh;
+    #word-wrap: break-word;
+    overflow: hidden;
+    max-width: 100%;
+    #transition: background 1.5s ease-in-out;
 }
 
-.fade {
-    font-size: 2em;
+.section {
+    margin-bottom: 25px;
+}
+
+.panel {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.data {
     opacity: 1;
+    color: #00ffcc;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.data.out {
+    opacity: 0;
+}
+
+.words {
+    opacity: 1;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 2em;
     transition: opacity 0.8s ease-in-out;
 }
 
-.fade.out {
+.words.out {
     opacity: 0;
 }
 
 .hash {
+    opacity: 1;
     margin-top: 20px;
-    font-size: 0.7em;
+    margin-bottom: 20px;
+    margin-bottom: 20px;
+    font-size: 1em;
     color: #444;
+}
+
+.hash.out {
+    opacity: 0;
+}
+
+h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
 }
 </style>
 </head>
 <body>
 
-<div id="words" class="fade">connecting...</div>
-<div id="hash" class="hash"></div>
+<div class="panel">
+    <div class="section">
+        <h3>Words</h3>
+        <div id="words" class="words">connecting...</div>
+    </div>
+    <div class="section">
+        <h3>SHA256</h3>
+        <div id="hash" class="data">please wait</div>
+    </div>
+</div>
 
 <script>
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+const wordset = urlParams.get('words')
+//console.log(queryString);
+//console.log(words);
+
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
-    + location.host + "/words"
+    + location.host + "/words?words=" + wordset
 );
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
-
     const words = document.getElementById("words");
     const hash = document.getElementById("hash");
 
+    // derive color from first 3 bytes of hex
+    const r = parseInt(data.hash.slice(0,2),16);
+    const g = parseInt(data.hash.slice(2,4),16);
+    const b = parseInt(data.hash.slice(4,6),16);
+
     words.classList.add("out");
+    hash.classList.add("out");
 
     setTimeout(() => {
         words.textContent = data.words;
         hash.textContent = data.hash;
         words.classList.remove("out");
-    }, 800);
+        hash.classList.remove("out");
+        document.body.style.backgroundColor =
+            `rgb(${r/2},${g/2},${b/2})`;
+    }, 500);
+
+    //words.classList.add("out");
+    //hash.classList.add("data");
 };
 </script>
 
