@@ -58,7 +58,8 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 - socket management, thread-safe and thread-aware structs
 - per-connection DRBG isolation
 - running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
-- HTTP and HTTPS servers sharing same mux, HTTP headers & JSON telemetry
+- HTTP and HTTPS servers sharing same mux, HTTP headers
+- JSON and modern wesockets support, allowing less overhead and a continuous stream of data
 - use of GO atomic counters to accomodate atomic updates even under high-concurrency
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features
@@ -74,14 +75,23 @@ Serve → HTTP/HTTPS streaming of expanded cryptographic output
 
 ### API mappings
 ```
-mux.HandleFunc("/", randomImageHandler(drbg))
-mux.HandleFunc("/v1/random", randomBytesHandler(drbg, cfg.MaxBytes))
-mux.HandleFunc("/v1/test", randomHandler(drbg))
-mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
-mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
-mux.HandleFunc("/health", healthHandler(drbg))
-mux.HandleFunc("/paroleparoleparole", entropyWordHandler(10))
-mux.Handle("/metrics", metricsHandler(drbg))
+Websockets, HTTP 101 Upgrade
+	/data.html?bytes=<#> -> mux.HandleFunc("/data", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
+	/words.html?words=<#> -> mux.HandleFunc("/words", wsEntropyHandler(drbg, 64, cfg.RefreshRateMs))
+
+Regular HTTP
+ - images
+	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
+	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
+ - data
+	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))
+	mux.HandleFunc("/v1/data/test", randomHandler(drbg))
+ - words
+	mux.HandleFunc("/v1/meta/random", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
+  mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
+ - metrics, health
+	mux.HandleFunc("/health", healthHandler(drbg))
+	mux.Handle("/metrics", metricsHandler(drbg))
 ```
 
 ## Build & run
