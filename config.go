@@ -8,22 +8,23 @@ import (
 )
 
 type Config struct {
-	ReseedMs      int
-	ReseedSize    int
-	MaxBytes      int
-	QRNGBuffer    int
-	SeedBuffer    int
-	MaxWords      int
-	RefreshRate   int
-	RefreshRateMs time.Duration
-	HTTPAddr      string
-	HTTPSAddr     string
-	CertFile      string
-	KeyFile       string
-	LogLevel      string
-	DevicePath    string
-	EnableHTTPS   bool
-	RequireDevice bool
+	ReseedMs       int
+	ReseedSize     int
+	MaxBytes       int
+	QRNGBuffer     int
+	SeedBuffer     int
+	MaxWords       int
+	RefreshRate    int
+	RefreshRateMs  time.Duration
+	RefreshColorMs time.Duration
+	HTTPAddr       string
+	HTTPSAddr      string
+	CertFile       string
+	KeyFile        string
+	LogLevel       string
+	DevicePath     string
+	EnableHTTPS    bool
+	RequireDevice  bool
 }
 
 func ParseConfig() *Config {
@@ -35,7 +36,8 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flag.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
 	flag.IntVar(&cfg.RefreshRate, "refresh", 5, "Default refresh rate (in seconds) of words presented by /v1/words/random endpoint")
-	flag.DurationVar(&cfg.RefreshRateMs, "refresh-ms", 3000, "Default refresh rate (in ms) of words presented by websocket")
+	flag.DurationVar(&cfg.RefreshRateMs, "refresh-ms", 3000, "Default refresh rate (in ms) for data presented over websockets")
+	flag.DurationVar(&cfg.RefreshColorMs, "refresh-colors-ms", 250, "Default refresh rate (in ms) for colors-only websocket /colors.html")
 	flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of words presented by /words endpoint (maximum 20)")
 	flag.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Reseed interval (ms)")
 	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")

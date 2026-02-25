@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Entropy Stream</title>
+<style>
+body {
+    margin: 5%;
+    font-family: "JetBrains Mono", monospace;
+    #letter-spacing: 0.04em;
+    #font-family: monospace;
+    #display: flex;
+    #justify-content: center;
+    text-align: center;
+    align-items: center;
+    #height: 100vh;
+    background: black;
+    color: #00ff88;
+    padding-top: 5%;
+    padding-bottom: 5%;
+    word-wrap: break-word;
+    overflow: hidden;
+    max-width: 100%;
+    #transition: background 0.5s ease-in-out;
+}
+
+.section {
+    margin-bottom: 25px;
+}
+
+.panel {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.data {
+    color: #00ffcc;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.hex {
+    opacity: 1;
+    font-size: 1em;
+    transition: opacity 0.3s ease-in-out;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 40px;
+    border-radius: 16px;
+}
+
+.hex.out {
+    opacity: 0;
+}
+
+.base64 {
+    opacity: 1;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 1em;
+    color: #444;
+    transition: opacity 0.5s ease-in-out;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.65);
+    padding: 40px;
+    border-radius: 16px;
+}
+
+.base64.out {
+    opacity: 0;
+}
+
+.hash {
+    font-family: "IBM Plex Mono", monospace;
+    text-shadow: 0 0 8px rgba(0,255,200,0.4);
+    #letter-spacing: 0.04em;
+    opacity: 1;
+    font-family: monospace;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 1.4em;
+    color: #444;
+    #box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    background: rgba(255, 255, 255, 0.65);
+    #padding: 5%;
+    padding: 40px;
+    border-radius: 16px;
+}
+
+h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+}
+</style>
+</head>
+<body>
+
+<!--
+    <div id="hex" class="fade">connecting...</div>
+    <div id="base64" class="base64"></div>
+    <div id="hash" class="hash">please wait</div>
+-->
+
+<div class="panel">
+    <div class="section">
+        <h3>SHA256</h3>
+        <div class="hash" id="hash">please wait</div>
+    </div>
+</div>
+
+<script>
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+const refresh = urlParams.get('refresh')
+//console.log(queryString);
+//console.log(bytes);
+
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/colors?refresh=" + refresh
+);
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    //const hex = document.getElementById("hex");
+    //const base64 = document.getElementById("base64");
+    const hash = document.getElementById("hash");
+
+    // derive color from first 3 bytes of hex
+    const r = parseInt(data.hash.slice(0,2),16);
+    const g = parseInt(data.hash.slice(2,4),16);
+    const b = parseInt(data.hash.slice(4,6),16);
+
+    //hex.classList.add("out");
+    //base64.classList.add("out");
+
+    setTimeout(() => {
+        //hex.textContent = data.hex;
+        //base64.textContent = data.base64;
+        hash.textContent = data.hash;
+        //hex.classList.remove("out");
+        //base64.classList.remove("out");
+        document.body.style.backgroundColor =
+            `rgb(${r/2},${g/2},${b/2})`;
+    }, 100);
+
+    //console.log(hex);
+};
+
+/*
+ws.binaryType = "arraybuffer";
+
+ws.onmessage = function(event) {
+    const bytes = new Uint8Array(event.data);
+    console.log(bytes);
+};
+
+ws.onmessage = function(event) {
+    //document.getElementById("hex") = data.data;
+    console.log(bytes);
+};
+
+*/
+
+</script>
+
+</body>
+</html>

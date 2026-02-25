@@ -1147,6 +1147,7 @@ func main() {
 	//fs := http.FS(webFS)
 	//http.Handle("/", http.FileServer(fs))
 
+	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
 	mux.HandleFunc("/words", wsEntropyHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
