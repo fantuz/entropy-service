@@ -105,11 +105,8 @@ Regular HTTP
 ```
 
 ### Screenshots
-<img width="2560" height="1440" alt="Screenshot From 2026-02-25 17-32-55" src="https://github.com/user-attachments/assets/420bb4dc-1e83-4f1e-8f59-5040dbbcda99" />
-<img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/143ce488-f2a3-4286-a6fd-d088371b455f" />
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 14-56-33" src="https://github.com/user-attachments/assets/560a0a37-0c2f-40cc-afce-48eb4d2d73eb" />
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
-<img width="2560" height="1440" alt="Screenshot From 2026-02-25 14-56-33" src="https://github.com/user-attachments/assets/820d3d85-f4d7-421a-844d-fa4f8e1ae37f" />
 
 ## Build & run
 
