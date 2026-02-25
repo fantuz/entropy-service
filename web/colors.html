@@ -10,18 +10,20 @@ body {
     #letter-spacing: 0.04em;
     #font-family: monospace;
     #display: flex;
-    #justify-content: center;
+    justify-content: center;
     text-align: center;
     align-items: center;
     #height: 100vh;
     background: black;
     color: #00ff88;
-    padding-top: 5%;
-    padding-bottom: 5%;
+    padding-top: 20%;
+    padding-bottom: 20%;
+    padding-left: 15%;
+    padding-right: 15%;
     word-wrap: break-word;
     overflow: hidden;
     max-width: 100%;
-    #transition: background 0.5s ease-in-out;
+    transition: background 0.1s ease-in-out;
 }
 
 .section {
@@ -44,35 +46,25 @@ body {
     line-height: 1.6;
 }
 
-.hex {
-    opacity: 1;
-    font-size: 1em;
-    transition: opacity 0.3s ease-in-out;
-    box-shadow: 0 0 30px rgba(0,0,0,0.6);
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(12px);
-    padding: 40px;
-    border-radius: 16px;
-}
-
-.hex.out {
-    opacity: 0;
-}
-
 .hash {
-    opacity: 1;
-    font-family: "IBM Plex Mono", monospace;
+    opacity: 0.3;
+    #font-family: "IBM Plex Mono", monospace;
+    font-family: monospace;
     text-shadow: 0 0 8px rgba(0,255,200,0.4);
     #letter-spacing: 0.04em;
+    letter-spacing: 0.1em;
+    transition: opacity 0.2s ease-in-out;
+    backdrop-filter: blur(12px);
     opacity: 1;
-    font-family: monospace;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    font-size: 1.4em;
+    margin-top: 5%;
+    margin-bottom: 5%;
+    #margin-top: 20px;
+    #margin-bottom: 20px;
+    font-size: 2rem;
     color: #444;
-    #box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
     background: rgba(255, 255, 255, 0.65);
-    #padding: 5%;
+    #padding: 10%;
     padding: 40px;
     border-radius: 16px;
 }
@@ -91,11 +83,12 @@ h3 {
 </head>
 <body>
 
+    <div id="hash" class="hash">please wait</div>
+
 <!--
     <div id="hex" class="fade">connecting...</div>
     <div id="base64" class="base64"></div>
     <div id="hash" class="hash">please wait</div>
--->
 
 <div class="panel">
     <div class="section">
@@ -103,6 +96,7 @@ h3 {
         <div class="hash" id="hash">please wait</div>
     </div>
 </div>
+-->
 
 <script>
 const queryString = window.location.search;
@@ -132,7 +126,7 @@ ws.onmessage = function(event) {
         //hash.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
-    }, 100);
+    }, 50);
 
     //console.log(hash);
 };
