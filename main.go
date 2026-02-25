@@ -457,7 +457,7 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
+func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -470,17 +470,13 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 7776 {
 				quantity = v
 				//fmt.Println("URL parameter words:", quantity)
-			} else {
-				log.Println("too many words requested:", v)
-				quantity = 20
-				//return
 			}
 		}
 
 		for {
 			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
-			base := big.NewInt(int64(len(randomWords)))
+			//base := big.NewInt(int64(len(randomWords)))
 
 			if len(randomWords) == 0 {
 				http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
@@ -508,11 +504,12 @@ func wsEntropyHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Han
 			counter := 0
 
 			// fixed word count
-			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter <= quantity {
-				mod := new(big.Int)
-				n.DivMod(n, base, mod)
-				wordsout = append(wordsout, randomWords[mod.Int64()])
-				//wordsout = append(wordsout, randomWords[counter])
+			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter <= quantity-1 {
+				//mod := new(big.Int)
+				//n.DivMod(n, base, mod)
+				//wordsout = append(wordsout, randomWords[mod.Int64()])
+				wordsout = append(wordsout, randomWords[counter])
+				//wordsout = append(wordsout, randomWords[quantity])
 				counter++
 			}
 
@@ -1155,7 +1152,7 @@ func main() {
 
 	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	mux.HandleFunc("/words", wsEntropyHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
+	mux.HandleFunc("/words", wsEntropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	//mux.HandleFunc("/", randomImageHandler(drbg))
