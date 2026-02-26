@@ -23,13 +23,13 @@ With this simple yet very performant software, users can setup their own "crypto
                            │     External QRNG       │
                            │  (hardware / upstream)  │
                            └─────────────┬───────────┘
-                                         │ fetch
+                                         │ fetch()
                                          ▼
                            ┌─────────────────────────┐
                            │     Entropy Buffer      │
                            │   (ring / pool cache)   │
                            └─────────────┬───────────┘
-                                         │ reseed (timer-driven)
+                                         │ reseed() (time-driven)
                                          ▼
                            ┌─────────────────────────┐
                            │      Master DRBG        │
@@ -38,19 +38,22 @@ With this simple yet very performant software, users can setup their own "crypto
                            │  - derives child seeds  │
                            └─────────────┬───────────┘
                                          │ derive()
+                                         |
+                                         |
               ┌──────────────────────────┼──────────────────────────┐
               ▼                          ▼                          ▼
       ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
       │ Conn DRBG #1 │           │ Conn DRBG #2 │           │ Conn DRBG #N │
       │ isolated key │           │ isolated key │           │ isolated key │
       └───────┬──────┘           └───────┬──────┘           └───────┬──────┘
-              │ serve                    │ serve                    │ serve
+              │ serve()                    │ serve()                  │ serve()
               ▼                          ▼                          ▼
-         HTTP / HTTPS               HTTP / HTTPS               HTTP / HTTPS
+       HTTP/HTTPS/WS              HTTP/HTTPS/WS              HTTP/HTTPS/WS
               └──────────────────────────┴──────────────────────────┘
                                          │
                                          ▼
                                       Clients
+                          (browsers, curl, websockets, ..)
 
 Legend
 Fetch → External entropy acquisition from QRNG source
