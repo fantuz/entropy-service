@@ -81,16 +81,16 @@ h3 {
 <body>
 
 <div class="panel">
-    <div class="section">
-        <h3>LIVE STREAMING DATA</h3>
 	<h3>Shannon Entropy: <span id="entropy">0</span></h3>
-    </div>
     <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
 	<canvas id="histogram" width="800" height="200"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">RGB mosaic & 0/1 distribution</br></br>
-	<canvas id="mosaic" width="400" height="100"></canvas>
+    <div class="hex" id="hex">RGB mosaic</br></br>
+	<canvas id="mosaic" width="400" height="95"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">0/1 distribution</br></br>
 	<canvas id="pie" width="150" height="150"></canvas>
     </div>
     </br>
@@ -148,7 +148,8 @@ function renderHistogram() {
     for (let i = 0; i < 256; i++) {
         const height = (histogram[i] / max) * canvas.height;
 
-        ctx.fillStyle = "#00ffcc";
+        //ctx.fillStyle = "#00ffcc";
+        ctx.fillStyle = "#00aacc";
         ctx.fillRect(
             i * barWidth,
             canvas.height - height,
@@ -173,14 +174,14 @@ function renderPie() {
     pieCtx.beginPath();
     pieCtx.moveTo(75, 75);
     pieCtx.arc(75, 75, 60, 0, zeroAngle);
-    pieCtx.fillStyle = "#0077ff";
+    pieCtx.fillStyle = "#000000";
     pieCtx.fill();
 
     // ones slice
     pieCtx.beginPath();
     pieCtx.moveTo(75, 75);
     pieCtx.arc(75, 75, 60, zeroAngle, 2 * Math.PI);
-    pieCtx.fillStyle = "#00ffcc";
+    pieCtx.fillStyle = "#ffffcc";
     pieCtx.fill();
 }
 
@@ -193,7 +194,7 @@ function renderMosaic(bytes) {
     let x = 0;
     let y = 0;
 
-    mosaicCtx.clearRect(0, 0, 400, 200);
+    mosaicCtx.clearRect(0, 0, 400, 400);
 
     for (let i = 0; i < bytes.length - 2; i += 3) {
 
@@ -235,7 +236,7 @@ function renderWave(bytes) {
             waveCtx.lineTo(x, y);
     }
 
-    waveCtx.strokeStyle = "#00ffcc";
+    waveCtx.strokeStyle = "#00ff00";
     waveCtx.stroke();
 }
 
@@ -288,8 +289,10 @@ function renderFFT(bytes) {
 }
 */
 
-ws.onmessage = (event) => {
-    const buffer = event.data; // ArrayBuffer
+//ws.onmessage = (event)
+ws.onmessage = async (event) => {
+    const buffer = event.data;
+    //const buffer = await event.data.arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
     // derive color from first 3 bytes of hex
@@ -343,7 +346,7 @@ ws.onmessage = (event) => {
     const entropy = computeEntropy(histogram, totalBytes) - 6;
 
     document.getElementById("entropy").textContent =
-        entropy.toFixed(4) + " bits";
+        entropy.toFixed(5) + " / 8 bits (" + ((100*entropy)/8).toFixed(3) + "%)";
 
     // clear histogram cache over time
     //histogram[byte] = (histogram[byte] + 1) % 10000;
@@ -360,25 +363,10 @@ ws.onmessage = (event) => {
 };
 
 /*
-ws.onmessage = async (event) => {
-    const buffer = await event.data.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-};
-*/
-
-/*
-ws.binaryType = "arraybuffer";
-
 ws.onmessage = function(event) {
     const bytes = new Uint8Array(event.data);
     console.log(bytes);
 };
-
-ws.onmessage = function(event) {
-    //document.getElementById("hex") = data.data;
-    console.log(bytes);
-};
-
 */
 
 </script>

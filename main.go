@@ -885,7 +885,7 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 }
 
 // wsRandomBinaryHandler writes the bynary data directly on WSS
-func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
+func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		atomic.AddUint64(&httpRequests, +1)
@@ -901,10 +901,10 @@ func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc 
 		defer conn.Close()
 		defer ticker.Stop()
 
-		n := 1024
+		//n := 1024
 		if q := r.URL.Query().Get("bytes"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<20 {
-				n = v
+				quantity = v
 			}
 		}
 
@@ -928,7 +928,7 @@ func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc 
 		}()
 
 		for {
-			buf := make([]byte, n)
+			buf := make([]byte, quantity)
 			d.Read(buf)
 			// two options available here, raw encode or b64 encode
 			//base64 := base64.StdEncoding.EncodeToString(buf)
@@ -1358,7 +1358,7 @@ func main() {
 	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
 	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	mux.HandleFunc("/stream", wsRandomBinaryHandler(drbg, cfg.RefreshColorMs*4))
+	mux.HandleFunc("/stream", wsRandomBinaryHandler(drbg, cfg.RefreshColorMs*4, 2048)) // cfg.MaxBytes
 	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/words", wsEntropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
