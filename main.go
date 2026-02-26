@@ -18,8 +18,7 @@ import (
 	"image/color"
 	"image/png"
 	"net"
-	// remove below comment to enable HTTP/2
-	//"golang.org/x/net/http2"
+	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
 	"log"
 	"net/http"
 	"os"
@@ -70,6 +69,8 @@ type EntropyDataFrame struct {
 	Base64 string `json:"base64"`
 	Hash   string `json:"hash"`
 }
+
+const DefaultCSPRNG = "/dev/urandom"
 
 //go:embed web/*
 var webFS embed.FS
@@ -385,6 +386,37 @@ func randomImageHandler(d *rng.DRBG) http.HandlerFunc {
 }
 */
 
+/*
+import (
+    "fmt"
+    "image"
+    _ "image/jpeg"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+)
+
+const dir_to_scan string = "/home/da/to_merge"
+
+func main() {
+    files, _ := ioutil.ReadDir(dir_to_scan)
+    for _, imgFile := range files {
+
+        if reader, err := os.Open(filepath.Join(dir_to_scan, imgFile.Name())); err == nil {
+            defer reader.Close()
+            im, _, err := image.DecodeConfig(reader)
+            if err != nil {
+                fmt.Fprintf(os.Stderr, "%s: %v\n", imgFile.Name(), err)
+                continue
+            }
+            fmt.Printf("%s %d %d\n", imgFile.Name(), im.Width, im.Height)
+        } else {
+            fmt.Println("Impossible to open the file:", err)
+        }
+    }
+}
+*/
+
 func randomImageHandler(d *rng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		width := 1024
@@ -409,6 +441,8 @@ func randomImageHandler(d *rng.DRBG) http.HandlerFunc {
 		w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		png.Encode(w, img)
+		atomic.AddUint64(&rngBytesGenerated, uint64(len(img.Pix)))
+		atomic.AddUint64(&httpRequests, +1)
 	}
 }
 
@@ -459,6 +493,15 @@ func projectWords(n *big.Int, count int) []string {
 
 func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		/*
+			// Corresponding client-side logic with "dialer". Cited for reference
+			c, _ , err := websocket.DefaultDialer.Dial("ws://localhost:5002/ws", nil)
+			if err != nil {
+				// handle error
+			}
+			defer c.Close()
+		*/
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -526,6 +569,9 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 			*/
 
 			conn.WriteJSON(frame)
+
+			//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+			atomic.AddUint64(&httpRequests, +1)
 
 			//time.Sleep(1 * time.Second)
 			time.Sleep(refresh * time.Millisecond)
@@ -641,6 +687,10 @@ body {
 
 		t := template.Must(template.New("page").Parse(tmpl))
 		t.Execute(w, data)
+		//atomic.AddUint64(&rngBytesGenerated, uint64(len(data.Hash)))
+		atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+		atomic.AddUint64(&httpRequests, +1)
+
 	}
 }
 
@@ -743,6 +793,8 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			conn.WriteJSON(frame)
 			//conn.WriteMessage(websocket.BinaryMessage, buf)
 
+			atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+			atomic.AddUint64(&httpRequests, +1)
 			//time.Sleep(1 * time.Second)
 			time.Sleep(refresh * time.Millisecond)
 		}
@@ -901,8 +953,6 @@ func validateEntropyDevice(path string) error {
 
 	return nil
 }
-
-const DefaultCSPRNG = "/dev/urandom"
 
 func ResolveEntropyDevice(path string, require bool) (string, error) {
 
@@ -1066,7 +1116,6 @@ func main() {
 		panic("QRNG buffer size KB must be between 1 and 4096 KB")
 	}
 
-	//if os.Getenv("TLS") == "1"
 	fmt.Println("---")
 	fmt.Println("HTTP port:", cfg.HTTPAddr)
 	fmt.Println("HTTPS port:", cfg.HTTPSAddr)
@@ -1141,29 +1190,26 @@ func main() {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
-	/*
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "./web/index.html")
-		})
-	*/
-
 	//fs := http.FS(webFS)
 	//http.Handle("/", http.FileServer(fs))
+	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
 	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
 	mux.HandleFunc("/words", wsEntropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
-	//mux.HandleFunc("/", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))
 	mux.HandleFunc("/v1/data/test", randomHandler(drbg))
 	mux.HandleFunc("/v1/meta/random", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
-	mux.HandleFunc("/health", healthHandler(drbg))
-	//mux.HandleFunc("/v1/qr/random", healthHandler(drbg))
 	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
+	// placeholder for QR-codes generation
+	//mux.HandleFunc("/v1/qr/random", healthHandler(drbg))
+	// placeholder for publick/private key generation
+	//mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
+	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
 
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
@@ -1189,6 +1235,7 @@ func main() {
 		log.Fatal(httpErr)
 	}
 
+	//if os.Getenv("TLS") == "1"
 	if cfg.EnableHTTPS == true {
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, masterDRBG)
 		if httpsErr != nil {
