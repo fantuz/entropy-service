@@ -16,12 +16,10 @@ body {
     #height: 100vh;
     background: black;
     color: #00ff88;
-    #padding-top: 25%;
-    #padding-bottom: 25%;
     word-wrap: break-word;
     overflow: hidden;
     max-width: 100%;
-    transition: background 0.3s ease-in-out;
+    #transition: background 0.2s ease-in-out;
 }
 
 .section {
@@ -31,9 +29,9 @@ body {
 .panel {
     background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(12px);
-    padding: 5%;
-    margin-top: 5%;
-    margin-bottom: 5%;
+    padding: 20px;
+    margin-top: 20px;
+    margin-bottom: 20px;
     border-radius: 16px;
     box-shadow: 0 0 60px rgba(0,0,0,0.6);
     max-width: 100%;
@@ -52,18 +50,14 @@ body {
     backdrop-filter: blur(12px);
     padding: 10px;
     border-radius: 16px;
-    opacity: 1;
-    #margin-top: 5%;
-    #margin-bottom: 5%;
     color: #444;
-    transition: opacity 0.2s ease-in-out;
+    #transition: opacity 0.2s ease-in-out;
     border-radius: 16px;
     font-family: "IBM Plex Mono", monospace;
     box-shadow: 0 0 60px rgba(0,0,0,0.6);
     text-shadow: 0 0 8px rgba(0,255,200,0.4);
     #letter-spacing: 0.04em;
     background: rgba(255, 255, 255, 0.65);
-    #padding: 5%;
 }
 
 .hex.out {
@@ -104,22 +98,20 @@ h3 {
 <script>
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
-//const bytes = urlParams.get('bytes')
-//console.log(queryString);
-//console.log(bytes);
+const bytes = urlParams.get('bytes')
+const refresh = urlParams.get('refresh')
 
-//const ws = new WebSocket("ws://localhost:8080/stream");
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
-    + location.host + "/stream"
+    + location.host + "/stream?bytes=" + bytes + "&refresh=" + refresh
 );
 ws.binaryType = "arraybuffer";
 
 let ones = 0;
 let zeros = 0;
+let totalBytes = 0;
 
 const histogram = new Array(256).fill(0);
-let totalBytes = 0;
 
 const canvas = document.getElementById("histogram");
 const ctx = canvas.getContext("2d");
@@ -148,7 +140,6 @@ function renderHistogram() {
     for (let i = 0; i < 256; i++) {
         const height = (histogram[i] / max) * canvas.height;
 
-        //ctx.fillStyle = "#00ffcc";
         ctx.fillStyle = "#00aacc";
         ctx.fillRect(
             i * barWidth,
@@ -289,8 +280,8 @@ function renderFFT(bytes) {
 }
 */
 
-//ws.onmessage = (event)
-ws.onmessage = async (event) => {
+//ws.onmessage = async (event)
+ws.onmessage = (event) => {
     const buffer = event.data;
     //const buffer = await event.data.arrayBuffer();
     const bytes = new Uint8Array(buffer);
@@ -302,14 +293,14 @@ ws.onmessage = async (event) => {
 
     //base64.classList.add("out");
 
+    /*
     setTimeout(() => {
         //base64.textContent = data.base64;
         //base64.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
-    }, 400);
-
-    //console.log(data);
+    }, 200);
+    */
 
     for (let b of bytes) {
         for (let i = 0; i < 8; i++) {
@@ -335,8 +326,6 @@ ws.onmessage = async (event) => {
     renderWave(bytes);
     renderMosaic(bytes);
 
-    //console.log(bytes); // raw entropy bytes
-
     for (let i = 0; i < bytes.length; i++) {
         histogram[bytes[i]]++;
     }
@@ -348,14 +337,17 @@ ws.onmessage = async (event) => {
     document.getElementById("entropy").textContent =
         entropy.toFixed(5) + " / 8 bits (" + ((100*entropy)/8).toFixed(3) + "%)";
 
+    //console.log(bytes); // raw entropy bytes
+    //console.log(totalBytes);
+
     // clear histogram cache over time
     //histogram[byte] = (histogram[byte] + 1) % 10000;
 
-    if (totalBytes > 1000000) {
-    histogram.fill(0);
-    totalBytes = 0;
-    ones = 0;
-    zeros = 0;
+    if (totalBytes >= 4194304) {
+        histogram.fill(0);
+        totalBytes = 0;
+        ones = 0;
+        zeros = 0;
     }
 
     //updateStats(bytes);
