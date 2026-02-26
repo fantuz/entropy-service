@@ -8,7 +8,7 @@ import (
 	//"sync/atomic"
 )
 
-// QRNG represents a hardware or network QRNG
+// QRNG represents hardware or networked QRNG. Supports fallback to default Linux CSPRNG
 type QRNG interface {
 	Read(p []byte) error
 }

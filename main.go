@@ -293,9 +293,9 @@ func (q *QRNGBuffer) fillLoop() {
 }
 
 // fetchEntropy reads n bytes from the buffered QRNG
-func fetchEntropy(n int, dev string, l int) ([]byte, error) {
+func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	if qrngBuffer == nil {
-		initQRNGBuffer(dev, l)
+		initQRNGBuffer(dev, bufferlen)
 	}
 	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
 	incTestA(n)
@@ -303,8 +303,8 @@ func fetchEntropy(n int, dev string, l int) ([]byte, error) {
 }
 
 // reseed loop
-func reseedLoop(ctx context.Context, d *rng.DRBG, i int, dev string, l int) {
-	ticker := time.NewTicker(time.Duration(i) * time.Millisecond)
+func reseedLoop(ctx context.Context, d *rng.DRBG, interval int, dev string, bufferlen int, reseedbuf int) {
+	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -315,13 +315,13 @@ func reseedLoop(ctx context.Context, d *rng.DRBG, i int, dev string, l int) {
 		case <-ticker.C:
 			for range ticker.C {
 				atomic.AddUint64(&rngReseeds, +1)
-				entropy, err := fetchEntropy(64, dev, l)
-				if err != nil {
-					log.Println("entropy fetch failed:", err)
+				entropy, eerr := fetchEntropy(reseedbuf, dev, bufferlen)
+				if eerr != nil {
+					log.Println("entropy fetch failed:", eerr)
 					continue
 				}
-				if err := d.Reseed(entropy); err != nil {
-					log.Println("reseed failed:", err)
+				if rerr := d.Reseed(entropy); rerr != nil {
+					log.Println("reseed failed:", rerr)
 				}
 			}
 		}
@@ -516,6 +516,7 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 
 		defer cancel()
 		defer conn.Close()
+		defer ticker.Stop()
 
 		if q := r.URL.Query().Get("words"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 7776 {
@@ -787,6 +788,7 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 
 		defer cancel()
 		defer conn.Close()
+		defer ticker.Stop()
 
 		n := 1024
 
@@ -1233,10 +1235,9 @@ func main() {
 	// pass entropy along
 	//master := NewMasterDRBG(entropy)
 
-	// TODO: fix logic here
 	// Initialize seed space (in bytes here)
-	//seed, serr := fetchEntropy(64, dev, cfg.QRNGBufferSize) // 64*8 = 512 bits
-	seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
+	//seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
+	seed, serr := fetchEntropy(cfg.SeedBuffer, dev, cfg.QRNGBuffer) // 64*8 = 512 bits
 	if serr != nil {
 		log.Fatal(serr)
 	}
@@ -1247,9 +1248,8 @@ func main() {
 		log.Fatal(derr)
 	}
 
-	// SetMetadata(version, source, drbg-algo, reseed-interval, reseed-size, buffer-source)
 	//drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, qrngBuf)
-	drbg.SetMetadata("1.0.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, qrngBuf)
+	drbg.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
 	drbg.SetEntropyBuffer(qrngBuf)
@@ -1271,15 +1271,15 @@ func main() {
 	//http.Handle("/", http.FileServer(fs))
 	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
-	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
+	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/words", wsEntropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
-	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
-	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))
 	mux.HandleFunc("/v1/data/test", randomHandler(drbg))
+	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
+	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
 	mux.HandleFunc("/v1/meta/random", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
 	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
 	// placeholder for QR-codes generation
@@ -1294,8 +1294,8 @@ func main() {
 
 	// TODO: fix logic here
 	// Run permanent reseed loop
-	//go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.BufferSize)
-	go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.QRNGBuffer)
+	//go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.BufferSize, cfg.SeedBuffer)
+	go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
 
 	// context was here
 	//ctx, cancel := context.WithCancel(context.Background())
