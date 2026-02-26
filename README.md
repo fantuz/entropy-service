@@ -57,10 +57,15 @@ With this simple yet very performant software, users can setup their own "crypto
                           (browsers, curl, websockets, ..)
 
 Legend
-Fetch → External entropy acquisition from QRNG source
-Reseed → Periodic refresh of the master DRBG from entropy buffer
-Derive → Per-connection DRBG instantiation (state isolation)
-Serve → HTTP/HTTPS streaming of expanded cryptographic output
+Fetch()  → External entropy acquisition from QRNG source
+Reseed() → Periodically refreshes the master DRBG providing with new entropy buffer
+Derive() → Per-connection DRBG instantiation (state isolation)
+Serve()  → HTTP/HTTPS streaming of expanded cryptographic output
+
+Supported client protocols
+HTTP/1.1
+h2
+wss://
 ```
 
 ### Server robustness and stability, by design:
@@ -264,6 +269,7 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 ## What is yet to come
 
 ### Features to be added
+- GO build tags: for PROD and for DEMO
 - systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
