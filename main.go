@@ -537,6 +537,8 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 
 		// write cycle
 		for {
+			atomic.AddUint64(&wssPayloads, +1)
+
 			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
 			//base := big.NewInt(int64(len(randomWords)))
@@ -762,6 +764,16 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 
 func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		/*
+			// Corresponding client-side logic with "dialer". Cited for reference
+			c, _ , err := websocket.DefaultDialer.Dial("ws://localhost:5002/ws", nil)
+			if err != nil {
+				// handle error
+			}
+			defer c.Close()
+		*/
+
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 
 		atomic.AddUint64(&httpRequests, +1)
 
@@ -770,9 +782,14 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			log.Println("ws upgrade failed")
 			return
 		}
+
+		ctx, cancel := context.WithCancel(r.Context())
+
+		defer cancel()
 		defer conn.Close()
 
 		n := 1024
+
 		if q := r.URL.Query().Get("bytes"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<20 {
 				n = v
@@ -786,7 +803,20 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			}
 		}
 
+		// read cycle, to detect ghost clients and ensure proper close
+		go func() {
+			defer cancel() // cancel context when read fails
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					break
+				}
+			}
+		}()
+
 		for {
+			atomic.AddUint64(&wssPayloads, +1)
+
 			buf := make([]byte, n)
 			//if buf != nil
 			d.Read(buf)
@@ -819,18 +849,28 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			//w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 
-			conn.WriteJSON(frame)
-			//conn.WriteMessage(websocket.BinaryMessage, buf)
-
 			atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				err := conn.WriteJSON(frame)
+				if err != nil {
+					return
+				}
+			}
+
 			//rng.DecreaseActiveInstances(-1)
-			//atomic.AddUint64(&activeDRBG, -1)
 
 			//time.Sleep(1 * time.Second)
-			time.Sleep(refresh * time.Millisecond)
+			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
+
+// TODO: create a function writing the bynary data directly on WSS
+//conn.WriteMessage(websocket.BinaryMessage, buf)
 
 func metricsHandler(d *rng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -843,6 +883,7 @@ func metricsHandler(d *rng.DRBG) http.HandlerFunc {
 		bufBytes := metrics.EntropyBufferedBytes / 1024
 		bufCap := metrics.EntropyFillPct
 		reqs := atomic.LoadUint64(&httpRequests)
+		payloads := atomic.LoadUint64(&wssPayloads)
 		entropy := atomic.LoadUint64(&rngBytesBuffered) // took out the division by 1024 for testing
 		entropyA := atomic.LoadUint64(&rngBytesTestA)
 		entropyB := atomic.LoadUint64(&rngBytesTestB)
@@ -873,6 +914,10 @@ qrng_buffer_capacity_pct %d
 # TYPE http_requests_total counter
 http_requests_total %d
 
+# HELP wss_payloads_total Total WSS Payloads sent within sessions
+# TYPE wss_payloads counter
+wss_payloads %d
+
 # HELP entropy_buffer_size_kb Total size of entropy buffer
 # TYPE entropy_buffer_size_kb gauge
 entropy_buffer_capacity_kb %d
@@ -895,6 +940,7 @@ drbg_instance_count %d
 			bufBytes,
 			bufCap,
 			reqs,
+			payloads,
 			entropy,
 			entropyA,
 			entropyB,

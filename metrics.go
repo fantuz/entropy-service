@@ -11,6 +11,7 @@ var (
 	rngBytesTestA     uint64
 	rngBytesTestB     uint64
 	httpRequests      uint64
+	wssPayloads       uint64
 )
 
 func incRNGBytes(n int) {
@@ -35,4 +36,8 @@ func incTestB(y int) {
 
 func incHTTP() {
 	atomic.AddUint64(&httpRequests, 1)
+}
+
+func incWSS() {
+	atomic.AddUint64(&wssPayloads, 1)
 }
