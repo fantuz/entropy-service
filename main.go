@@ -12,7 +12,6 @@ import (
 	"math/big"
 	//"net/http"
 	"embed"
-	"entropy-service/rng"
 	"fmt"
 	"image"
 	"image/color"
@@ -29,6 +28,7 @@ import (
 	"syscall"
 	"time"
 	//"io"
+	"entropy-service/rng"
 	"github.com/8ff/diceware"
 	"github.com/gorilla/websocket"
 )
@@ -502,11 +502,19 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 			defer c.Close()
 		*/
 
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
+
+		atomic.AddUint64(&httpRequests, +1)
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
 			return
 		}
+
+		ctx, cancel := context.WithCancel(r.Context())
+
+		defer cancel()
 		defer conn.Close()
 
 		if q := r.URL.Query().Get("words"); q != "" {
@@ -516,6 +524,18 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 			}
 		}
 
+		// read cycle, to detect ghost clients and ensure proper close
+		go func() {
+			defer cancel() // cancel context when read fails
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					break
+				}
+			}
+		}()
+
+		// write cycle
 		for {
 			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
@@ -568,13 +588,23 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 				fmt.Println("Function output words:", counter)
 			*/
 
-			conn.WriteJSON(frame)
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				err := conn.WriteJSON(frame)
+				if err != nil {
+					return
+				}
+			}
+
+			//conn.WriteJSON(frame)
 
 			//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
-			atomic.AddUint64(&httpRequests, +1)
+			//rng.DecreaseActiveInstances(-1)
 
 			//time.Sleep(1 * time.Second)
-			time.Sleep(refresh * time.Millisecond)
+			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
@@ -613,7 +643,6 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 		// Optional scramble layer
 		hash := sha256.Sum256(randomBytes)
 
-		//if len(dicewareWords) == 0
 		if len(words) == 0 {
 			http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
 			return
@@ -629,7 +658,6 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 		counter := 0
 		maxWords := quantity
 
-		//for i := 0; i < maxWords; i++
 		for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
 			mod := new(big.Int)
 			n.DivMod(n, base, mod)
@@ -687,10 +715,9 @@ body {
 
 		t := template.Must(template.New("page").Parse(tmpl))
 		t.Execute(w, data)
-		//atomic.AddUint64(&rngBytesGenerated, uint64(len(data.Hash)))
 		atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
 		atomic.AddUint64(&httpRequests, +1)
-
+		//rng.DecreaseActiveInstances(-1)
 	}
 }
 
@@ -735,6 +762,8 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 
 func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		atomic.AddUint64(&httpRequests, +1)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -794,7 +823,9 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			//conn.WriteMessage(websocket.BinaryMessage, buf)
 
 			atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-			atomic.AddUint64(&httpRequests, +1)
+			//rng.DecreaseActiveInstances(-1)
+			//atomic.AddUint64(&activeDRBG, -1)
+
 			//time.Sleep(1 * time.Second)
 			time.Sleep(refresh * time.Millisecond)
 		}

@@ -35,7 +35,7 @@ type DRBG struct {
 	entropyBuf *QRNGBuffer
 	
 	// counter for number of DRBG instances
-	DRBGInstanceCnt      int 
+	DRBGInstanceCnt      int64
 }
 
 // Metadata contains all info needed for headers / JSON
@@ -66,8 +66,13 @@ type HealthInfo struct {
 
 var activeDRBG atomic.Int64
 
+//func DecreaseActiveInstances() int64
+func DecreaseActiveInstances (quantity int64) {
+	activeDRBG.Add(-1)
+}
+
 func ActiveInstances() int64 {
-    return activeDRBG.Load()
+	return activeDRBG.Load()
 }
 
 func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
@@ -95,7 +100,7 @@ func NewDRBG(seed []byte) (*DRBG, error) {
 	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
 	if err != nil { return nil, err }
 
-	activeDRBG.Add(1)
+	//activeDRBG.Add(1)
 	return &DRBG{
 		key:      key,
 		nonce:    nonce,
@@ -130,7 +135,7 @@ func (d *DRBG) Reseed(seed []byte) error {
 	}
 	d.cipher = c
 	d.reseeded = time.Now()
-	activeDRBG.Add(-1)
+	//activeDRBG.Add(-1)
 	return nil
 }
 
@@ -218,7 +223,6 @@ func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration,
 }
 
 // GetMetadata returns a snapshot of metadata
-//func (d *DRBG) GetMetadata() (version, source, algo string, reseedInterval, reseedSizeBits, bufKB, bufPct) 
 func (d *DRBG) GetMetadata() Metadata {
     bufKB := 0
     bufPct := 0
