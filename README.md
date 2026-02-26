@@ -129,6 +129,9 @@ WSS Endpoint /words.html
 WSS Endpoint /colors.html
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
 
+WSS Endpoint /stream.html
+<img width="2560" height="1440" alt="Screenshot From 2026-02-27 00-34-04" src="https://github.com/user-attachments/assets/415771af-aaf4-4480-80c2-a1dac5f9c40a" />
+
 ## Build & run
 
 ### Prerequisites
