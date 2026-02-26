@@ -38,15 +38,16 @@ With this simple yet very performant software, users can setup their own "crypto
                            │  - derives child seeds  │
                            └─────────────┬───────────┘
                                          │ derive()
-                                         |
-                                         |
+                                         │
+                                         │
+                                         │
               ┌──────────────────────────┼──────────────────────────┐
               ▼                          ▼                          ▼
       ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
       │ Conn DRBG #1 │           │ Conn DRBG #2 │           │ Conn DRBG #N │
       │ isolated key │           │ isolated key │           │ isolated key │
       └───────┬──────┘           └───────┬──────┘           └───────┬──────┘
-              │ serve()                    │ serve()                  │ serve()
+              │ serve()                  │ serve()                  │ serve()
               ▼                          ▼                          ▼
        HTTP/HTTPS/WS              HTTP/HTTPS/WS              HTTP/HTTPS/WS
               └──────────────────────────┴──────────────────────────┘
