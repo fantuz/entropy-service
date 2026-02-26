@@ -8,11 +8,11 @@ In my demonstrative setup, real-time entropy is backed by a real QRNG (Quantum R
 The software has been adapted to fetch entropy from etherogeneous sources, as the Linux CSPRNG itself (/dev/urandom, for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam, mouse, or radio-wave, your imagination is the limit !
 
 ## Practical implementations
-With this simple yet very performant software, users can setup their own "cryptographically-strong randomness source" and use API to retrieve different amounts of randomness, either:
- - in a binary form
- - or a set of words
- - a background color
- - or randomly-generated images.
+With this simple yet very performant software, users can setup their own "cryptographically-strong randomness source" and use API to retrieve different amounts of randomness, either in:
+ - a binary stream
+ - a set of words
+ - a background color ever changing
+ - randomly-generated images and heatmaps
  - random sound generation (to be added soon)
 
 ## Architecture and logic
