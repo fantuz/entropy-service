@@ -1,14 +1,19 @@
 # entropy-service
 
 ## Intended usage
-entropy-service is a GO-based software intended to let users fetch an amount randomness via simple API(s). Useful in daily cryptographic operations, where the randomness source may be "staving" or tampered-with.
-In my demo setup, real-time entropy is provided by a real QRNG (Quantum Random Number Generator) card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of QRNG using either ChaCha20 or AES-CRT functions.
+entropy-service is a GO-based software intended to let users fetch an amount randomness via simple API(s). Useful in daily cryptographic operations, where the randomness source may be "staving" or being tampered-with.
+In my demonstrative setup, real-time entropy is backed by a real QRNG (Quantum Random Number Generator), a PCI card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of entropy source, using well-known algorithms as ChaCha20 or AES-CRT.
 
 ## Project goals
-The software can be easily adapted to fetch entropy from etherogeneous sources, as the Linux PRNG itself (for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam or mouse, your imagination is the limit !
+The software has been adapted to fetch entropy from etherogeneous sources, as the Linux CSPRNG itself (/dev/urandom, for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam, mouse, or radio-wave, your imagination is the limit !
 
 ## Practical implementations
-With this simple yet very performant software, users can setup their own cryptographically-strong randomness source, and use API(s) to retrieve different amounts of binary randomness, randomly-generated images, and even sounds (later feature to be added soon).
+With this simple yet very performant software, users can setup their own "cryptographically-strong randomness source" and use API to retrieve different amounts of randomness, either:
+ - in a binary form
+ - or a set of words
+ - a background color
+ - or randomly-generated images.
+ - random sound generation (to be added soon)
 
 ## Architecture and logic
 
