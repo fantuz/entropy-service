@@ -17,6 +17,8 @@ func newTLSConfig(certFile, keyFile string) *tls.Config {
 
 		// TLS 1.3 handles cipher selection internally
 		Certificates: []tls.Certificate{cert},
+		//ClientAuth: tls.VerifyClientCertIfGiven,
+		ClientAuth: tls.NoClientCert,
 
 		// Fast, modern curves
 		CurvePreferences: []tls.CurveID{
@@ -28,6 +30,6 @@ func newTLSConfig(certFile, keyFile string) *tls.Config {
 		//NextProtos: []string{"h2", "http/1.1"},
 
 		// Enable session resumption (important for API workloads)
-		SessionTicketsDisabled: false,
+		SessionTicketsDisabled: true,
 	}
 }

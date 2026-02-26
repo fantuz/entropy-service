@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Entropy Stream Service - Random Bytes Stream</title>
+<style>
+body {
+    #margin: 5%;
+    font-family: "JetBrains Mono", monospace;
+    #letter-spacing: 0.04em;
+    #font-family: monospace;
+    #display: flex;
+    #justify-content: center;
+    text-align: center;
+    align-items: center;
+    #height: 100vh;
+    background: black;
+    color: #00ff88;
+    #padding-top: 25%;
+    #padding-bottom: 25%;
+    word-wrap: break-word;
+    overflow: hidden;
+    max-width: 100%;
+    transition: background 0.3s ease-in-out;
+}
+
+.section {
+    margin-bottom: 15px;
+}
+
+.panel {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 5%;
+    margin-top: 5%;
+    margin-bottom: 5%;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.data {
+    color: #00ffcc;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.hex {
+    opacity: 1;
+    font-size: 1em;
+    backdrop-filter: blur(12px);
+    padding: 10px;
+    border-radius: 16px;
+    opacity: 1;
+    #margin-top: 5%;
+    #margin-bottom: 5%;
+    color: #444;
+    transition: opacity 0.2s ease-in-out;
+    border-radius: 16px;
+    font-family: "IBM Plex Mono", monospace;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    text-shadow: 0 0 8px rgba(0,255,200,0.4);
+    #letter-spacing: 0.04em;
+    background: rgba(255, 255, 255, 0.65);
+    #padding: 5%;
+}
+
+.hex.out {
+    opacity: 0;
+}
+
+h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+}
+</style>
+</head>
+<body>
+
+<div class="panel">
+    <div class="section">
+        <h3>LIVE STREAMING DATA</h3>
+	<h3>Shannon Entropy: <span id="entropy">0</span></h3>
+    </div>
+    <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
+	<canvas id="histogram" width="800" height="200"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">RGB mosaic & 0/1 distribution</br></br>
+	<canvas id="mosaic" width="400" height="100"></canvas>
+	<canvas id="pie" width="150" height="150"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">oscilloscope waveform visualization</br></br>
+	<canvas id="wave" width="800" height="200"></canvas>
+    </div>
+</div>
+
+<!-- <script src="https://cdn.jsdelivr.net/npm/fft.js/dist/fft.min.js"></script> -->
+
+<script>
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+//const bytes = urlParams.get('bytes')
+//console.log(queryString);
+//console.log(bytes);
+
+//const ws = new WebSocket("ws://localhost:8080/stream");
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/stream"
+);
+ws.binaryType = "arraybuffer";
+
+let ones = 0;
+let zeros = 0;
+
+const histogram = new Array(256).fill(0);
+let totalBytes = 0;
+
+const canvas = document.getElementById("histogram");
+const ctx = canvas.getContext("2d");
+
+function computeEntropy(histogram, total) {
+    if (total === 0) return 0;
+
+    let entropy = 0;
+
+    for (let count of histogram) {
+        if (count === 0) continue;
+
+        const p = count / total;
+        entropy -= p * Math.log2(p);
+    }
+
+    return entropy;
+}
+
+function renderHistogram() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const max = Math.max(...histogram);
+    const barWidth = canvas.width / 256;
+
+    for (let i = 0; i < 256; i++) {
+        const height = (histogram[i] / max) * canvas.height;
+
+        ctx.fillStyle = "#00ffcc";
+        ctx.fillRect(
+            i * barWidth,
+            canvas.height - height,
+            barWidth,
+            height
+        );
+    }
+}
+
+const pieCanvas = document.getElementById("pie");
+const pieCtx = pieCanvas.getContext("2d");
+
+function renderPie() {
+    const total = ones + zeros;
+    if (total === 0) return;
+
+    const zeroAngle = (zeros / total) * 2 * Math.PI;
+
+    pieCtx.clearRect(0, 0, 75, 75);
+
+    // zeros slice
+    pieCtx.beginPath();
+    pieCtx.moveTo(75, 75);
+    pieCtx.arc(75, 75, 60, 0, zeroAngle);
+    pieCtx.fillStyle = "#0077ff";
+    pieCtx.fill();
+
+    // ones slice
+    pieCtx.beginPath();
+    pieCtx.moveTo(75, 75);
+    pieCtx.arc(75, 75, 60, zeroAngle, 2 * Math.PI);
+    pieCtx.fillStyle = "#00ffcc";
+    pieCtx.fill();
+}
+
+const mosaicCanvas = document.getElementById("mosaic");
+const mosaicCtx = mosaicCanvas.getContext("2d");
+
+function renderMosaic(bytes) {
+
+    const tileSize = 8;
+    let x = 0;
+    let y = 0;
+
+    mosaicCtx.clearRect(0, 0, 400, 200);
+
+    for (let i = 0; i < bytes.length - 2; i += 3) {
+
+        const r = bytes[i];
+        const g = bytes[i+1];
+        const b = bytes[i+2];
+
+        mosaicCtx.fillStyle = `rgb(${r},${g},${b})`;
+        mosaicCtx.fillRect(x, y, tileSize, tileSize);
+
+        x += tileSize;
+
+        if (x >= 400) {
+            x = 0;
+            y += tileSize;
+        }
+
+        if (y >= 400) break;
+    }
+}
+
+const waveCanvas = document.getElementById("wave");
+const waveCtx = waveCanvas.getContext("2d");
+
+function renderWave(bytes) {
+
+    waveCtx.clearRect(0, 0, 800, 200);
+    waveCtx.beginPath();
+
+    const step = 800 / bytes.length;
+
+    for (let i = 0; i < bytes.length; i++) {
+        const x = i * step;
+        const y = 200 - (bytes[i] / 255) * 200;
+
+        if (i === 0)
+            waveCtx.moveTo(x, y);
+        else
+            waveCtx.lineTo(x, y);
+    }
+
+    waveCtx.strokeStyle = "#00ffcc";
+    waveCtx.stroke();
+}
+
+/*
+const fftCanvas = document.getElementById("fft");
+const fftCtx = fftCanvas.getContext("2d");
+
+const FFT_SIZE = 1024;
+const fft = new FFT(FFT_SIZE);
+
+const db = 20 * Math.log10(magnitude + 1);
+
+function renderFFT(bytes) {
+
+    if (bytes.length < FFT_SIZE) return;
+
+    const input = new Array(FFT_SIZE);
+
+    // center signal around zero
+    for (let i = 0; i < FFT_SIZE; i++) {
+        input[i] = bytes[i] - 128;
+    }
+
+    const out = fft.createComplexArray();
+    fft.realTransform(out, input);
+    fft.completeSpectrum(out);
+
+    fftCtx.clearRect(0, 0, 800, 300);
+
+    const half = FFT_SIZE / 2;
+    const barWidth = 800 / half;
+
+    for (let i = 0; i < half; i++) {
+
+        const re = out[2*i];
+        const im = out[2*i+1];
+
+        const magnitude = Math.sqrt(re*re + im*im);
+
+        const height = magnitude * 0.01; // scaling
+
+        fftCtx.fillStyle = "#00ffcc";
+        fftCtx.fillRect(
+            i * barWidth,
+            300 - height,
+            barWidth,
+            height
+        );
+    }
+}
+*/
+
+ws.onmessage = (event) => {
+    const buffer = event.data; // ArrayBuffer
+    const bytes = new Uint8Array(buffer);
+
+    // derive color from first 3 bytes of hex
+    const r = parseInt(bytes.slice(0,2),16);
+    const g = parseInt(bytes.slice(2,4),16);
+    const b = parseInt(bytes.slice(4,6),16);
+
+    //base64.classList.add("out");
+
+    setTimeout(() => {
+        //base64.textContent = data.base64;
+        //base64.classList.remove("out");
+        document.body.style.backgroundColor =
+            `rgb(${r/2},${g/2},${b/2})`;
+    }, 400);
+
+    //console.log(data);
+
+    for (let b of bytes) {
+        for (let i = 0; i < 8; i++) {
+            if (b & (1 << i)) ones++;
+            else zeros++;
+        }
+    }
+
+    for (let b of bytes) {
+
+        // histogram
+        histogram[b]++;
+        totalBytes++;
+
+        // bit count
+        for (let i = 0; i < 8; i++) {
+            if (b & (1 << i)) ones++;
+            else zeros++;
+        }
+    }
+
+    renderPie();
+    renderWave(bytes);
+    renderMosaic(bytes);
+
+    //console.log(bytes); // raw entropy bytes
+
+    for (let i = 0; i < bytes.length; i++) {
+        histogram[bytes[i]]++;
+    }
+
+    renderHistogram();
+
+    const entropy = computeEntropy(histogram, totalBytes) - 6;
+
+    document.getElementById("entropy").textContent =
+        entropy.toFixed(4) + " bits";
+
+    // clear histogram cache over time
+    //histogram[byte] = (histogram[byte] + 1) % 10000;
+
+    if (totalBytes > 1000000) {
+    histogram.fill(0);
+    totalBytes = 0;
+    ones = 0;
+    zeros = 0;
+    }
+
+    //updateStats(bytes);
+    //renderFFT(bytes);
+};
+
+/*
+ws.onmessage = async (event) => {
+    const buffer = await event.data.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+};
+*/
+
+/*
+ws.binaryType = "arraybuffer";
+
+ws.onmessage = function(event) {
+    const bytes = new Uint8Array(event.data);
+    console.log(bytes);
+};
+
+ws.onmessage = function(event) {
+    //document.getElementById("hex") = data.data;
+    console.log(bytes);
+};
+
+*/
+
+</script>
+
+</body>
+</html>

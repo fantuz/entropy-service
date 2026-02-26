@@ -314,7 +314,6 @@ func reseedLoop(ctx context.Context, d *rng.DRBG, interval int, dev string, buff
 
 		case <-ticker.C:
 			for range ticker.C {
-				atomic.AddUint64(&rngReseeds, +1)
 				entropy, eerr := fetchEntropy(reseedbuf, dev, bufferlen)
 				if eerr != nil {
 					log.Println("entropy fetch failed:", eerr)
@@ -323,6 +322,7 @@ func reseedLoop(ctx context.Context, d *rng.DRBG, interval int, dev string, buff
 				if rerr := d.Reseed(entropy); rerr != nil {
 					log.Println("reseed failed:", rerr)
 				}
+				atomic.AddUint64(&rngReseeds, +1)
 			}
 		}
 	}
@@ -521,13 +521,13 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 		if q := r.URL.Query().Get("words"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 7776 {
 				quantity = v
-				//fmt.Println("URL parameter words:", quantity)
 			}
 		}
 
 		// read cycle, to detect ghost clients and ensure proper close
 		go func() {
-			defer cancel() // cancel context when read fails
+			// cancel context when read fails
+			defer cancel()
 
 			for {
 				if _, _, err := conn.ReadMessage(); err != nil {
@@ -536,10 +536,10 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 			}
 		}()
 
+		first := 1
+
 		// write cycle
 		for {
-			atomic.AddUint64(&wssPayloads, +1)
-
 			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
 			//base := big.NewInt(int64(len(randomWords)))
@@ -575,7 +575,6 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 				//n.DivMod(n, base, mod)
 				//wordsout = append(wordsout, randomWords[mod.Int64()])
 				wordsout = append(wordsout, randomWords[counter])
-				//wordsout = append(wordsout, randomWords[quantity])
 				counter++
 			}
 
@@ -591,6 +590,16 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 				fmt.Println("Function output words:", counter)
 			*/
 
+			if first == 1 {
+				err := conn.WriteJSON(frame)
+				if err != nil {
+					return
+				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+				first = 0
+			}
+
 			select {
 			case <-ctx.Done():
 				return
@@ -599,12 +608,9 @@ func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http
 				if err != nil {
 					return
 				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
 			}
-
-			//conn.WriteJSON(frame)
-
-			//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
-			//rng.DecreaseActiveInstances(-1)
 
 			//time.Sleep(1 * time.Second)
 			//time.Sleep(refresh * time.Millisecond)
@@ -807,7 +813,8 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 
 		// read cycle, to detect ghost clients and ensure proper close
 		go func() {
-			defer cancel() // cancel context when read fails
+			// cancel context when read fails
+			defer cancel()
 
 			for {
 				if _, _, err := conn.ReadMessage(); err != nil {
@@ -816,16 +823,12 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			}
 		}()
 
+		first := 1
+
 		for {
-			atomic.AddUint64(&wssPayloads, +1)
-
-			buf := make([]byte, n)
 			//if buf != nil
+			buf := make([]byte, n)
 			d.Read(buf)
-
-			// two options available here, raw encode or b64 encode
-			base64 := base64.StdEncoding.EncodeToString(buf)
-			//fmt.Println("base64:", base64)
 
 			/*
 				if n < 64 {
@@ -834,9 +837,10 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 				}
 			*/
 
-			//conv := strconv.Itoa(int(buf))
-			//conv := string(buf[:])
+			// two options available here, raw encode or b64 encode
+			base64 := base64.StdEncoding.EncodeToString(buf)
 			//conv := hex.EncodeToString(buf)
+
 			hash := sha256.Sum256(buf)
 
 			// Prepare output
@@ -851,7 +855,15 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			//w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 
-			atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+			if first == 1 {
+				err := conn.WriteJSON(frame)
+				if err != nil {
+					return
+				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				first = 0
+			}
 
 			select {
 			case <-ctx.Done():
@@ -861,9 +873,10 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 				if err != nil {
 					return
 				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				//rng.DecreaseActiveInstances(-1)
 			}
-
-			//rng.DecreaseActiveInstances(-1)
 
 			//time.Sleep(1 * time.Second)
 			//time.Sleep(refresh * time.Millisecond)
@@ -871,8 +884,76 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	}
 }
 
-// TODO: create a function writing the bynary data directly on WSS
-//conn.WriteMessage(websocket.BinaryMessage, buf)
+// wsRandomBinaryHandler writes the bynary data directly on WSS
+func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
+		atomic.AddUint64(&httpRequests, +1)
+
+		conn, cerr := upgrader.Upgrade(w, r, nil)
+		if cerr != nil {
+			log.Println("ws upgrade failed")
+			return
+		}
+
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+		defer conn.Close()
+		defer ticker.Stop()
+
+		n := 1024
+		if q := r.URL.Query().Get("bytes"); q != "" {
+			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<20 {
+				n = v
+			}
+		}
+
+		if x := r.URL.Query().Get("refresh"); x != "" {
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
+				dtime := time.Duration(z)
+				refresh = dtime
+			}
+		}
+
+		// read cycle, to detect ghost clients and ensure proper close
+		go func() {
+			// cancel context when read fails
+			defer cancel()
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					break
+				}
+			}
+		}()
+
+		for {
+			buf := make([]byte, n)
+			d.Read(buf)
+			// two options available here, raw encode or b64 encode
+			//base64 := base64.StdEncoding.EncodeToString(buf)
+			//conv := hex.EncodeToString(buf)
+			//hash := sha256.Sum256(buf)
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				err := conn.WriteMessage(websocket.BinaryMessage, buf)
+
+				if err != nil {
+					return
+				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				//rng.DecreaseActiveInstances(-1)
+			}
+
+			//time.Sleep(1 * time.Second)
+			//time.Sleep(refresh * time.Millisecond)
+		}
+	}
+}
 
 func metricsHandler(d *rng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1075,13 +1156,13 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
 			//seed, _ := master.Derive(32)
 			//nonce, _ := master.Derive(12)
-
 			// derive per-connection DRBG from master
 			//childDRBG, _ := rng.NewDRBG(seed)
 			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
 			if cerr != nil {
 				return ctx
 			}
+			//rng.DecreaseActiveInstances(-1)
 
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
@@ -1119,8 +1200,9 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 	}
 
 	//cert, err := tls.LoadX509KeyPair(CertFile, KeyFile)
-	//cert, err := tls.LoadX509KeyPair("/home/max/entropy-service/cert.pem", "/home/max/entropy-service/key.pem")
 	//tlsConfig.Certificates = []tls.Certificate{cert}
+
+	tlsConfig.ClientAuth = tls.NoClientCert
 	tlsLn := tls.NewListener(ln, tlsConfig)
 
 	srv := &http.Server{
@@ -1128,11 +1210,14 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		Handler:   handler,
 		TLSConfig: tlsConfig,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			// derive per-connection DRBG from master
-			seed, _ := master.Derive(32)
+			//seed, _ := master.Derive(32)
 			//nonce, _ := master.Derive(12)
-			//childDRBG, cerr := rng.NewConnectionDRBG(master)
-			childDRBG, _ := rng.NewDRBG(seed)
+			// derive per-connection DRBG from master
+			//childDRBG, _ := rng.NewDRBG(seed)
+			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
+			if cerr != nil {
+				return ctx
+			}
 			// attach to context for handlers
 			return context.WithValue(cctx, "conn_drbg", childDRBG)
 		},
@@ -1236,8 +1321,8 @@ func main() {
 	//master := NewMasterDRBG(entropy)
 
 	// Initialize seed space (in bytes here)
-	//seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
-	seed, serr := fetchEntropy(cfg.SeedBuffer, dev, cfg.QRNGBuffer) // 64*8 = 512 bits
+	seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
+	//seed, serr := fetchEntropy(cfg.SeedBuffer, dev, cfg.QRNGBuffer) // 64*8 = 512 bits
 	if serr != nil {
 		log.Fatal(serr)
 	}
@@ -1261,6 +1346,7 @@ func main() {
 		log.Fatal(crterr)
 	}
 	tlsCfg.Certificates = []tls.Certificate{cert}
+	tlsCfg.ClientAuth = tls.NoClientCert
 
 	masterDRBG, _ := rng.NewDRBG(seed)
 
@@ -1272,6 +1358,7 @@ func main() {
 	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
 	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
+	mux.HandleFunc("/stream", wsRandomBinaryHandler(drbg, cfg.RefreshColorMs*4))
 	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/words", wsEntropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
@@ -1284,7 +1371,7 @@ func main() {
 	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
 	// placeholder for QR-codes generation
 	//mux.HandleFunc("/v1/qr/random", healthHandler(drbg))
-	// placeholder for publick/private key generation
+	// placeholder for public/private key generation
 	//mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
 	mux.HandleFunc("/health", healthHandler(drbg))
 	mux.Handle("/metrics", metricsHandler(drbg))
