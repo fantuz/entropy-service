@@ -57,15 +57,15 @@ With this simple yet very performant software, users can setup their own "crypto
                           (browsers, curl, websockets, ..)
 
 Legend
-Fetch()  → External entropy acquisition from QRNG source
-Reseed() → Periodically refreshes the master DRBG providing with new entropy buffer
-Derive() → Per-connection DRBG instantiation (state isolation)
-Serve()  → HTTP/HTTPS streaming of expanded cryptographic output
+  Fetch()  → External entropy acquisition from QRNG source
+  Reseed() → Periodically refreshes the master DRBG providing with new entropy buffer
+  Derive() → Per-connection DRBG instantiation (state isolation)
+  Serve()  → HTTP/HTTPS streaming of expanded cryptographic output
 
 Supported client protocols
-HTTP/1.1
-h2
-wss://
+  HTTP/1.1
+  h2
+  wss://
 ```
 
 ### Server robustness and stability, by design:
