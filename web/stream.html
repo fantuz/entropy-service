@@ -20,6 +20,7 @@ body {
     overflow: hidden;
     max-width: 50%;
     #transition: background 0.2s ease-in-out;
+    background: rgba(148, 0, 0, 1);
 }
 
 .section {
@@ -76,7 +77,8 @@ h3 {
 <body>
 
 <div class="panel">
-    <h3>Shannon Entropy: <span id="entropy">0</span></h3>
+    <h3>Shannon Entropy Index: <span id="entropy">0</span></h3>
+    </br>
     <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
 	<canvas id="histogram" width="800" height="100"></canvas>
     </div>
@@ -89,11 +91,11 @@ h3 {
 	<canvas id="pie" width="150" height="150"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">input waveform (oscilloscope)</br></br>
+    <div class="hex" id="hex">input waveform sample (live oscilloscope)</br></br>
 	<canvas id="wave" width="800" height="200"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">Fast Fourier Transformation (FFT)</br></br>
+    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span></br></br>
 	<canvas id="fft" width="800" height="75"></canvas>
     </div>
     </br>
@@ -117,7 +119,7 @@ let ones = 0;
 let zeros = 0;
 let totalBytes = 0;
 
-const histogram = new Array(256).fill(0);
+const histogram = new Array(512).fill(0);
 const canvas = document.getElementById("histogram");
 const ctx = canvas.getContext("2d");
 
@@ -142,7 +144,7 @@ function renderHistogram() {
     const max = Math.max(...histogram);
     const barWidth = canvas.width / 256;
 
-    for (let i = 0; i < 256; i++) {
+    for (let i = 0; i < 512; i++) {
         const height = (histogram[i] / max) * canvas.height;
 
         ctx.fillStyle = "#00aacc";
@@ -150,7 +152,7 @@ function renderHistogram() {
             i * barWidth,
             canvas.height - height,
             barWidth,
-            height
+            100 - height
         );
     }
 }
@@ -217,10 +219,11 @@ const waveCtx = waveCanvas.getContext("2d");
 
 function renderWave(bytes) {
 
-    waveCtx.clearRect(0, 0, 800, 200);
+    waveCtx.clearRect(0, 0, 800, 250);
     waveCtx.beginPath();
 
-    const step = 800 / bytes.length;
+    //const step = 800 / bytes.length;
+    const step = 10;
 
     for (let i = 0; i < bytes.length; i++) {
         const x = i * step;
@@ -230,6 +233,8 @@ function renderWave(bytes) {
             waveCtx.moveTo(x, y);
         else
             waveCtx.lineTo(x, y);
+	//if (i > 800)
+	//    return
     }
 
     waveCtx.strokeStyle = "#00ff55";
@@ -239,7 +244,7 @@ function renderWave(bytes) {
 let frameCounter = 0;
 const fftCanvas = document.getElementById("fft");
 const fftCtx = fftCanvas.getContext("2d");
-const FFT_SIZE = 512;
+const FFT_SIZE = 1024;
 
 function fft(real, imag) {
     const n = real.length;
@@ -312,7 +317,7 @@ function renderFFT(bytes) {
 
         // Convert to decibel scale for better visualization
         const db = 20 * Math.log10(magnitude + 1);
-        const height = db * 3; // scaling factor
+        const height = db * 2; // scaling factor
         //const re = out[2*i];
         //const im = out[2*i+1];
         //const height = magnitude * 0.01; // scaling
@@ -322,8 +327,8 @@ function renderFFT(bytes) {
         fftCtx.fillRect(
             i * barWidth,
             //height,
-            175 - height*2,
-            barWidth*2,
+            150 - height*2,
+            barWidth*1,
             height
         );
     }
@@ -334,6 +339,7 @@ function renderFFT(bytes) {
 ws.onmessage = (event) => {
     const buffer = event.data;
     const bytes = new Uint8Array(buffer);
+    const fftvalue = 3;
 
     //const buffer = await event.data.arrayBuffer();
     //const hex = document.getElementById("hex");
@@ -391,8 +397,10 @@ ws.onmessage = (event) => {
     }
     //histogram[byte] = (histogram[byte] + 1) % 10000;
 
-    if (++frameCounter % 1 === 0) {
+    if (++frameCounter % fftvalue === 0) {
         renderFFT(bytes);
+    	document.getElementById("fftvalue").textContent =
+	" every " + fftvalue + " frames";
     }
 
 };
