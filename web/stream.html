@@ -14,13 +14,13 @@ body {
     text-align: center;
     align-items: center;
     #height: 100vh;
-    background: black;
+    background: grey;
     color: #00ff88;
     word-wrap: break-word;
     overflow: hidden;
     max-width: 50%;
     #transition: background 0.2s ease-in-out;
-    background: rgba(148, 0, 0, 1);
+    #background: rgba(148, 0, 0, 1);
 }
 
 .section {
@@ -59,7 +59,7 @@ body {
     box-shadow: 0 0 60px rgba(0,0,0,0.6);
     text-shadow: 0 0 8px rgba(0,255,200,0.4);
     #letter-spacing: 0.04em;
-    background: rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.85);
 }
 
 .hex.out {
@@ -80,7 +80,7 @@ h3 {
     <h3>Shannon Entropy Index: <span id="entropy">0</span></h3>
     </br>
     <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
-	<canvas id="histogram" width="800" height="100"></canvas>
+	<canvas id="histogram" width="800" height="75"></canvas>
     </div>
     </br>
     <div class="hex" id="hex">RGB mosaic</br></br>
@@ -100,8 +100,6 @@ h3 {
     </div>
     </br>
 </div>
-
-<!-- <script src="https://cdn.jsdelivr.net/npm/fft.js/dist/fft.min.js"></script> -->
 
 <script>
 const queryString = window.location.search;
