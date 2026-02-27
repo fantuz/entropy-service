@@ -130,7 +130,7 @@ WSS Endpoint /colors.html
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
 
 WSS Endpoint /stream.html
-<img width="2560" height="1440" alt="Screenshot From 2026-02-27 00-34-04" src="https://github.com/user-attachments/assets/415771af-aaf4-4480-80c2-a1dac5f9c40a" />
+<img width="2560" height="1440" alt="Screenshot From 2026-02-27 02-53-58" src="https://github.com/user-attachments/assets/d4e320d4-e6fc-4aca-8b6e-240734786570" />
 
 ## Build & run
 
