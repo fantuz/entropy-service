@@ -27,6 +27,8 @@ body {
 }
 
 .panel {
+    position:relative;
+    margin: auto;
     background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(12px);
     padding: 20px;
@@ -76,7 +78,7 @@ h3 {
 <div class="panel">
     <h3>Shannon Entropy: <span id="entropy">0</span></h3>
     <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
-	<canvas id="histogram" width="800" height="200"></canvas>
+	<canvas id="histogram" width="800" height="100"></canvas>
     </div>
     </br>
     <div class="hex" id="hex">RGB mosaic</br></br>
@@ -87,8 +89,12 @@ h3 {
 	<canvas id="pie" width="150" height="150"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">oscilloscope waveform visualization</br></br>
-	<canvas id="wave" width="800" height="400"></canvas>
+    <div class="hex" id="hex">input waveform (oscilloscope)</br></br>
+	<canvas id="wave" width="800" height="200"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">Fast Fourier Transformation (FFT)</br></br>
+	<canvas id="fft" width="800" height="75"></canvas>
     </div>
     </br>
 </div>
@@ -211,14 +217,14 @@ const waveCtx = waveCanvas.getContext("2d");
 
 function renderWave(bytes) {
 
-    waveCtx.clearRect(0, 0, 800, 400);
+    waveCtx.clearRect(0, 0, 800, 200);
     waveCtx.beginPath();
 
     const step = 800 / bytes.length;
 
     for (let i = 0; i < bytes.length; i++) {
         const x = i * step;
-        const y = 400 - (bytes[i] / 255) * 400;
+        const y = 200 - (bytes[i] / 255) * 200;
 
         if (i === 0)
             waveCtx.moveTo(x, y);
@@ -230,77 +236,122 @@ function renderWave(bytes) {
     waveCtx.stroke();
 }
 
-/*
+let frameCounter = 0;
 const fftCanvas = document.getElementById("fft");
 const fftCtx = fftCanvas.getContext("2d");
+const FFT_SIZE = 512;
 
-const FFT_SIZE = 1024;
-const fft = new FFT(FFT_SIZE);
+function fft(real, imag) {
+    const n = real.length;
 
-const db = 20 * Math.log10(magnitude + 1);
+    if (n <= 1) return;
+
+    // divide
+    const half = n / 2;
+    const evenReal = new Array(half);
+    const evenImag = new Array(half);
+    const oddReal  = new Array(half);
+    const oddImag  = new Array(half);
+
+    for (let i = 0; i < half; i++) {
+        evenReal[i] = real[i*2];
+        evenImag[i] = imag[i*2];
+        oddReal[i]  = real[i*2+1];
+        oddImag[i]  = imag[i*2+1];
+    }
+
+    fft(evenReal, evenImag);
+    fft(oddReal, oddImag);
+
+    // conquer
+    for (let k = 0; k < half; k++) {
+        const angle = -2 * Math.PI * k / n;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        const tre =  cos * oddReal[k] - sin * oddImag[k];
+        const tim =  sin * oddReal[k] + cos * oddImag[k];
+
+        real[k]       = evenReal[k] + tre;
+        imag[k]       = evenImag[k] + tim;
+        real[k+half]  = evenReal[k] - tre;
+        imag[k+half]  = evenImag[k] - tim;
+    }
+}
+
+/*
+    const out = fft.createComplexArray();
+    fft.realTransform(out, input);
+    fft.completeSpectrum(out);
+*/
 
 function renderFFT(bytes) {
 
     if (bytes.length < FFT_SIZE) return;
 
-    const input = new Array(FFT_SIZE);
+    const real = new Array(FFT_SIZE);
+    const imag = new Array(FFT_SIZE).fill(0);
 
-    // center signal around zero
+    // Center signal around zero (-128..127)
     for (let i = 0; i < FFT_SIZE; i++) {
-        input[i] = bytes[i] - 128;
+        real[i] = bytes[i] - 128;
     }
 
-    const out = fft.createComplexArray();
-    fft.realTransform(out, input);
-    fft.completeSpectrum(out);
+    fft(real, imag);
 
-    fftCtx.clearRect(0, 0, 800, 300);
+    fftCtx.clearRect(0, 0, 800, 150);
 
     const half = FFT_SIZE / 2;
     const barWidth = 800 / half;
 
     for (let i = 0; i < half; i++) {
 
-        const re = out[2*i];
-        const im = out[2*i+1];
+        const magnitude = Math.sqrt(
+            real[i]*real[i] + imag[i]*imag[i]
+        );
 
-        const magnitude = Math.sqrt(re*re + im*im);
-
-        const height = magnitude * 0.01; // scaling
+        // Convert to decibel scale for better visualization
+        const db = 20 * Math.log10(magnitude + 1);
+        const height = db * 3; // scaling factor
+        //const re = out[2*i];
+        //const im = out[2*i+1];
+        //const height = magnitude * 0.01; // scaling
+        //const magnitude = Math.sqrt(re*re + im*im);
 
         fftCtx.fillStyle = "#00ffcc";
         fftCtx.fillRect(
             i * barWidth,
-            300 - height,
-            barWidth,
+            //height,
+            175 - height*2,
+            barWidth*2,
             height
         );
     }
 }
-*/
 
 //ws.onmessage = function(event)
-//ws.onmessage = (event)
-ws.onmessage = async (event) => {
+//ws.onmessage = async (event)
+ws.onmessage = (event) => {
     const buffer = event.data;
     const bytes = new Uint8Array(buffer);
+
     //const buffer = await event.data.arrayBuffer();
     //const hex = document.getElementById("hex");
 
+/*
     // derive color from first 3 bytes of hex
-    //const r = parseInt(bytes.slice(0,2),16);
-    //const g = parseInt(bytes.slice(2,4),16);
-    //const b = parseInt(bytes.slice(4,6),16);
+    const r = parseInt(bytes.slice(0,2),16);
+    const g = parseInt(bytes.slice(2,4),16);
+    const b = parseInt(bytes.slice(4,6),16);
 
-    /*
-    hex.classList.add("out");
+    //hex.classList.add("out");
     setTimeout(() => {
-        //base64.textContent = data.base64;
-        hex.classList.remove("out");
+        //hex.textContent = data.base64;
+        //hex.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
     }, 500);
-    */
+*/
 
     for (let b of bytes) {
         histogram[b]++;
@@ -323,7 +374,7 @@ ws.onmessage = async (event) => {
     renderPie();
     renderWave(bytes);
 
-    const entropy = computeEntropy(histogram, totalBytes) - 6;
+    const entropy = computeEntropy(histogram, totalBytes);
 
     document.getElementById("entropy").textContent =
         entropy.toFixed(5) + " / 8 bits (" + ((100*entropy)/8).toFixed(3) + "%)";
@@ -340,8 +391,10 @@ ws.onmessage = async (event) => {
     }
     //histogram[byte] = (histogram[byte] + 1) % 10000;
 
-    //updateStats(bytes);
-    //renderFFT(bytes);
+    if (++frameCounter % 1 === 0) {
+        renderFFT(bytes);
+    }
+
 };
 
 </script>
