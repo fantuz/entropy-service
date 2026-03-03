@@ -127,17 +127,17 @@ Regular HTTP
 ```
 
 ### Screenshots
-WSS Endpoint /bytes.html
-<img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+WSS Endpoint /stream.html
+<img width="2560" height="1440" alt="Screenshot From 2026-03-03 19-55-31" src="https://github.com/user-attachments/assets/cd50fb75-2049-485b-b386-0deedb308290" />
 
 WSS Endpoint /words.html
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
 
+WSS Endpoint /bytes.html
+<img width="2560" height="1440" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+
 WSS Endpoint /colors.html
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
-
-WSS Endpoint /stream.html
-<img width="2560" height="1440" alt="Screenshot From 2026-03-03 19-55-31" src="https://github.com/user-attachments/assets/cd50fb75-2049-485b-b386-0deedb308290" />
 
 ## Build & run
 

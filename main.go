@@ -763,14 +763,13 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 		for {
 			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			/*
+				if n < 64 { return }
+				if first == 1 { first = 0 }
 				if buf == nil {
 					http.Error(w, "failed to create buf", http.StatusInternalServerError)
 					return
 				}
 			*/
-
-			//if n < 64 { return }
-			//if first == 1 { first = 0 }
 
 			select {
 			case <-ctx.Done():
@@ -781,7 +780,6 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 				// two options available here, raw encode or b64 encode
 				base64 := base64.StdEncoding.EncodeToString(buf)
 				//conv := hex.EncodeToString(buf)
-
 				hash := sha256.Sum256(buf)
 
 				frame := EntropyDataFrame{
@@ -858,16 +856,11 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 		for {
 			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			buf := make([]byte, quantity)
-			// two options available here, raw encode or b64 encode
-			//base64 := base64.StdEncoding.EncodeToString(buf)
-			//conv := hex.EncodeToString(buf)
-			//hash := sha256.Sum256(buf)
 
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				//for {
 				d.Read(buf)
 				err := conn.WriteMessage(websocket.BinaryMessage, buf)
 				if err != nil {
@@ -876,15 +869,12 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 				atomic.AddUint64(&wssPayloads, +1)
 				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				//rng.DecreaseActiveInstances(-1)
-				//}
 			default:
 				{
 					continue
 					//log.Println("Nothing to see here")
 				}
 			}
-
-			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
@@ -901,7 +891,7 @@ func metricsHandler(d *rng.DRBG) http.HandlerFunc {
 		bufCap := metrics.EntropyFillPct
 		reqs := atomic.LoadUint64(&httpRequests)
 		payloads := atomic.LoadUint64(&wssPayloads)
-		entropy := atomic.LoadUint64(&rngBytesBuffered) // took out the division by 1024 for testing
+		entropy := atomic.LoadUint64(&rngBytesBuffered)
 		entropyA := atomic.LoadUint64(&rngBytesTestA)
 		entropyB := atomic.LoadUint64(&rngBytesTestB)
 		DRBGcnt := metrics.DRBGInstanceCnt
@@ -983,7 +973,6 @@ func healthHandler(d *rng.DRBG) http.HandlerFunc {
 			EntropyBufferedPCT:   meta.EntropyFillPct,
 		}
 
-		// keep headers
 		d.WriteHeaders(w)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -1095,8 +1084,8 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 			//nonce, _ := master.Derive(12)
 			// derive per-connection DRBG from master
 			//childDRBG, _ := rng.NewDRBG(seed)
-			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
-			if cerr != nil {
+			childDRBG, childerr := rng.NewConnectionDRBG(master) // (DRBG)
+			if childerr != nil {
 				return ctx
 			}
 			//rng.DecreaseActiveInstances(-1)
@@ -1130,7 +1119,6 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 }
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *rng.DRBG) (*http.Server, error) {
-
 	ln, err := newTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -1138,19 +1126,17 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 
 	//cert, err := tls.LoadX509KeyPair(CertFile, KeyFile)
 	//tlsConfig.Certificates = []tls.Certificate{cert}
-
 	tlsConfig.ClientAuth = tls.NoClientCert
 	tlsLn := tls.NewListener(ln, tlsConfig)
 
 	srv := &http.Server{
-		Addr:      addr,
-		Handler:   handler,
-		TLSConfig: tlsConfig,
+		Addr:         addr,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		Handler:      handler,
+		TLSConfig:    tlsConfig,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			//seed, _ := master.Derive(32)
-			//nonce, _ := master.Derive(12)
-			// derive per-connection DRBG from master
-			//childDRBG, _ := rng.NewDRBG(seed)
 			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
 			if cerr != nil {
 				return ctx
@@ -1229,6 +1215,13 @@ func main() {
 	fmt.Println("Max request size KB:", cfg.MaxBytes/1024)
 	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
 	fmt.Println("Reseed Buffer size:", cfg.SeedBuffer)
+	fmt.Println("---")
+	fmt.Println("Max number of Bytes:", cfg.MaxBytes)
+	fmt.Println("Maximum number of Words:", cfg.MaxWords)
+	fmt.Println("---")
+	fmt.Println("Refresh Rate (seconds) value:", cfg.RefreshRate)
+	fmt.Println("RefreshMs (ms) value:", cfg.RefreshRateMs)
+	fmt.Println("RefreshColorMs (ms) value:", cfg.RefreshColorMs)
 	fmt.Println("---")
 
 	//check for entropy source availability and access rights
