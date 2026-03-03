@@ -99,25 +99,25 @@ Supported client protocols
 
 ### API mappings
 ```
-Websockets, HTTP 101 Upgrade
-    /stream.html?bytes=<#>&refresh=<#> -> mux.HandleFunc("/words", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048)) // cfg.MaxBytes
-	/bytes.html?bytes=<#>&refresh=<#> -> mux.HandleFunc("/bytes", wsBytesHandler(drbg, cfg.RefreshRateMs))
-	/colors.html?refresh=<#> -> mux.HandleFunc("/colors", wsBytesHandler(drbg, cfg.RefreshColorMs))
-    /words.html?words=<#> -> mux.HandleFunc("/words", wsWordsHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
+Websockets (Standard HTTP 101 Upgrade)
+    /stream.html?bytes=<B>&refresh=<MS>
+	/bytes.html?bytes=<B>&refresh=<MS>
+    /words.html?words=N>&refresh=<MS>
+	/colors.html?refresh=<MS>
 
 Regular HTTP
  - images
-	mux.HandleFunc("/v1/image/random", randomImageHandler(drbg))
-	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbg))
+	/v1/image/random
+	/v1/image/heatmap
  - data
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))
-	mux.HandleFunc("/v1/data/test", randomHandler(drbg))
+	/v1/data/random
+	/v1/data/test
  - words
-	mux.HandleFunc("/v1/meta/random", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
-    mux.HandleFunc("/paroleparoleparole", entropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRate))
+	/v1/meta/random
+    /paroleparoleparole
  - metrics, health
-	mux.HandleFunc("/health", healthHandler(drbg))
-	mux.Handle("/metrics", metricsHandler(drbg))
+	/health
+	/metrics
 ```
 
 ### Screenshots
