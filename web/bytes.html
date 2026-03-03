@@ -139,7 +139,6 @@ const urlParams = new URLSearchParams(queryString);
 const bytes = urlParams.get('bytes')
 const refresh = urlParams.get('refresh')
 //console.log(queryString);
-//console.log(bytes);
 
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
@@ -170,25 +169,8 @@ ws.onmessage = function(event) {
         //hash.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
-    }, 400);
-
-    //console.log(hex);
+    }, refresh/4);
 };
-
-/*
-ws.binaryType = "arraybuffer";
-
-ws.onmessage = function(event) {
-    const bytes = new Uint8Array(event.data);
-    console.log(bytes);
-};
-
-ws.onmessage = function(event) {
-    //document.getElementById("hex") = data.data;
-    console.log(bytes);
-};
-
-*/
 
 </script>
 

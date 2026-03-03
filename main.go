@@ -493,27 +493,14 @@ func projectWords(n *big.Int, count int) []string {
 
 func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		/*
-			// Corresponding client-side logic with "dialer". Cited for reference
-			c, _ , err := websocket.DefaultDialer.Dial("ws://localhost:5002/ws", nil)
-			if err != nil {
-				// handle error
-			}
-			defer c.Close()
-		*/
-
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-
 		atomic.AddUint64(&httpRequests, +1)
-
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
 			return
 		}
-
 		ctx, cancel := context.WithCancel(r.Context())
-
 		defer cancel()
 		defer conn.Close()
 		defer ticker.Stop()
@@ -533,20 +520,19 @@ func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handl
 
 		// read cycle, to detect ghost clients and ensure proper close
 		go func() {
-			// cancel context when read fails
 			defer cancel()
 
 			for {
 				if _, _, err := conn.ReadMessage(); err != nil {
+					//ctx.Done() <- 0
 					break
 				}
 			}
+			//quit <- 0
 		}()
 
-		first := 1
-
-		// write cycle
 		for {
+
 			randomWords := diceware.GetRandomWords()
 			//base := big.NewInt(int64(len(randomWords)))
 
@@ -555,8 +541,7 @@ func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handl
 				return
 			}
 
-			// Generate 256 bits entropy (32 * 8)
-			randomBytes := make([]byte, 32) // add more bits
+			randomBytes := make([]byte, 32) // Generate 256 bits entropy (32 * 8)
 			_, err := rand.Read(randomBytes)
 			if err != nil {
 				http.Error(w, "entropy failure", http.StatusInternalServerError)
@@ -569,46 +554,40 @@ func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handl
 			zero := big.NewInt(0)
 			counter := 0
 
-			// fixed word count
-			for n.Sign() > 0 && n.Cmp(zero) > 0 && counter <= quantity-1 {
-				//mod := new(big.Int)
-				//n.DivMod(n, base, mod)
-				//wordsout = append(wordsout, randomWords[mod.Int64()])
-				wordsout = append(wordsout, randomWords[counter])
-				counter++
-			}
-
-			frame := EntropyFrame{
-				Words: join(wordsout, " "),
-				Hash:  hex.EncodeToString(hash[:]),
-			}
-
-			/*
-				fmt.Println("Number of entries:", len(randomWords))
-				fmt.Println("URL parameter words:", quantity)
-				fmt.Println("Function output words:", counter)
-			*/
-
-			if first == 1 {
-				err := conn.WriteJSON(frame)
-				if err != nil {
-					return
-				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
-				first = 0
-			}
-
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				// fixed word count
+				for n.Sign() > 0 && n.Cmp(zero) > 0 && counter <= quantity-1 {
+					//mod := new(big.Int)
+					//n.DivMod(n, base, mod)
+					//wordsout = append(wordsout, randomWords[mod.Int64()])
+					wordsout = append(wordsout, randomWords[counter])
+					counter++
+				}
+
+				/*
+					fmt.Println("Number of entries:", len(randomWords))
+					fmt.Println("URL parameter words:", quantity)
+					fmt.Println("Function output words:", counter)
+				*/
+
+				frame := EntropyFrame{
+					Words: join(wordsout, " "),
+					Hash:  hex.EncodeToString(hash[:]),
+				}
+
+				conn.SetWriteDeadline(time.Now().Add((refresh + 2000) * time.Millisecond))
 				err := conn.WriteJSON(frame)
 				if err != nil {
 					return
 				}
 				atomic.AddUint64(&wssPayloads, +1)
 				atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+			default:
+				continue
+				//log.Println("Nothing to see here")
 			}
 		}
 	}
@@ -741,29 +720,14 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 
 func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		/*
-			// Corresponding client-side logic with "dialer". Cited for reference
-			c, _ , err := websocket.DefaultDialer.Dial("ws://localhost:5002/ws", nil)
-			if err != nil {
-				// handle error
-			}
-			defer c.Close()
-		*/
-
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-
 		atomic.AddUint64(&httpRequests, +1)
-
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
 			return
-		} else {
-			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		}
-
 		ctx, cancel := context.WithCancel(r.Context())
-
 		defer cancel()
 		defer conn.Close()
 		defer ticker.Stop()
@@ -780,77 +744,64 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
 				dtime := time.Duration(z)
 				refresh = dtime
+				//log.Printf("Nothing to see here: %d", dtime)
 			}
 		}
 
 		// read cycle, to detect ghost clients and ensure proper close
 		go func() {
-			// cancel context when read fails
 			defer cancel()
 
 			for {
 				if _, _, err := conn.ReadMessage(); err != nil {
+					//ctx.Done() <- 0
 					break
 				}
 			}
 		}()
 
-		first := 1
-
 		for {
-			//if buf != nil
-			buf := make([]byte, n)
-			d.Read(buf)
-
+			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			/*
-				if n < 64 {
-					//http.Error(w, "entropy too low, needing higher ?bytes= value, now set to ", http.StatusInternalServerError)
+				if buf == nil {
+					http.Error(w, "failed to create buf", http.StatusInternalServerError)
 					return
 				}
 			*/
 
-			// two options available here, raw encode or b64 encode
-			base64 := base64.StdEncoding.EncodeToString(buf)
-			//conv := hex.EncodeToString(buf)
+			//if n < 64 { return }
+			//if first == 1 { first = 0 }
 
-			hash := sha256.Sum256(buf)
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				buf := make([]byte, n)
+				d.Read(buf)
+				// two options available here, raw encode or b64 encode
+				base64 := base64.StdEncoding.EncodeToString(buf)
+				//conv := hex.EncodeToString(buf)
 
-			frame := EntropyDataFrame{
-				Hex:    hex.EncodeToString(buf[:]),
-				Base64: base64,
-				Hash:   hex.EncodeToString(hash[:]),
-			}
+				hash := sha256.Sum256(buf)
 
-			//w.Header().Set("Content-Type", "application/octet-stream")
-			//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
-			//w.Header().Set("X-RNG-Reseed-Age-ms-test",
-			//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+				frame := EntropyDataFrame{
+					Hex:    hex.EncodeToString(buf[:]),
+					Base64: base64,
+					Hash:   hex.EncodeToString(hash[:]),
+				}
 
-			if first == 1 {
+				//w.Header().Set("Content-Type", "application/octet-stream")
+				//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
+				//w.Header().Set("X-RNG-Reseed-Age-ms-test",
+				//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+
 				err := conn.WriteJSON(frame)
 				if err != nil {
 					return
 				}
 				atomic.AddUint64(&wssPayloads, +1)
 				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-				first = 0
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				for {
-					//d.Read(buf)
-					//err := conn.WriteMessage(websocket.BinaryMessage, buf)
-					err := conn.WriteJSON(frame)
-					if err != nil {
-						return
-					}
-					atomic.AddUint64(&wssPayloads, +1)
-					atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-					//rng.DecreaseActiveInstances(-1)
-				}
+				//rng.DecreaseActiveInstances(-1)
 			default:
 				{
 					continue
@@ -871,8 +822,6 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 		if cerr != nil {
 			log.Println("ws upgrade failed")
 			return
-		} else {
-			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		}
 
 		ctx, cancel := context.WithCancel(r.Context())
@@ -907,6 +856,7 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 		}()
 
 		for {
+			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			buf := make([]byte, quantity)
 			// two options available here, raw encode or b64 encode
 			//base64 := base64.StdEncoding.EncodeToString(buf)
@@ -917,16 +867,16 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for {
-					d.Read(buf)
-					err := conn.WriteMessage(websocket.BinaryMessage, buf)
-					if err != nil {
-						return
-					}
-					atomic.AddUint64(&wssPayloads, +1)
-					atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-					//rng.DecreaseActiveInstances(-1)
+				//for {
+				d.Read(buf)
+				err := conn.WriteMessage(websocket.BinaryMessage, buf)
+				if err != nil {
+					return
 				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				//rng.DecreaseActiveInstances(-1)
+				//}
 			default:
 				{
 					continue
@@ -1347,7 +1297,7 @@ func main() {
 	mux.HandleFunc("/bytes", wsBytesHandler(drbg, cfg.RefreshRateMs))
 	mux.HandleFunc("/stream", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048)) // cfg.MaxBytes
 	mux.HandleFunc("/colors", wsBytesHandler(drbg, cfg.RefreshColorMs))
-	mux.HandleFunc("/words", wsWordsHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
+	mux.HandleFunc("/words", wsWordsHandler(drbg, cfg.MaxWords, cfg.RefreshColorMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))

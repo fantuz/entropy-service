@@ -104,12 +104,13 @@ h3 {
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const length = urlParams.get('words')
+const refresh = urlParams.get('refresh')
 //console.log(queryString);
 //console.log(length);
 
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
-    + location.host + "/words?words=" + length
+    + location.host + "/words?words=" + length + "&refresh=" + refresh
 );
 
 ws.onmessage = function(event) {
@@ -132,7 +133,7 @@ ws.onmessage = function(event) {
         hash.classList.remove("out");
         document.body.style.backgroundColor =
             `rgb(${r/2},${g/2},${b/2})`;
-    }, 400);
+    }, refresh/4);
 
 };
 </script>
