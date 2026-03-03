@@ -21,6 +21,15 @@ body {
     max-width: 50%;
     #transition: background 0.2s ease-in-out;
     #background: rgba(148, 0, 0, 1);
+    background-color: ivory;
+}
+
+#yinyang {
+  border: 1px solid red;
+}
+
+#entropy {
+  border: 1px solid red;
 }
 
 .section {
@@ -87,16 +96,17 @@ h3 {
 	<canvas id="mosaic" width="800" height="96"></canvas>
     </div>
     </br>
+    <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
     <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br></br>
-	<canvas id="pie" width="150" height="150"></canvas>
+	<canvas id="pie" width="150" height="170"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">input waveform sample (live oscilloscope)</br></br>
+    <div class="hex" id="hex">input waveform sample (oscilloscope view)</br></br>
 	<canvas id="wave" width="800" height="200"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span></br></br>
-	<canvas id="fft" width="800" height="75"></canvas>
+    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br></br>
+	<canvas id="fft" width="800" height="50"></canvas>
     </div>
     </br>
 </div>
@@ -155,6 +165,73 @@ function renderHistogram() {
     }
 }
 
+function computeTotal(values) {
+    let total = 0;
+    for (let i = 0; i < values.length; i++) {
+        total += values[i];
+    }
+    return total;
+}
+
+function computePercentages(values) {
+
+    let total = 0;
+    for (let i = 0; i < values.length; i++) {
+        total += values[i];
+    }
+
+    const percentages = new Array(values.length);
+
+    for (let i = 0; i < values.length; i++) {
+        percentages[i] = total === 0
+            ? 0
+            : (values[i] / total) * 100;
+    }
+
+    return percentages;
+}
+
+/*
+function computePercentages(values) {
+    const total = values.reduce((sum, v) => sum + v, 0);
+
+    return values.map(v => {
+        return total === 0 ? 0 : (v / total) * 100;
+    });
+}
+*/
+
+function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
+    const percentages = computePercentages(values);
+    ctx.font = "12px Arial";
+    ctx.textBaseline = "middle";
+
+    labels.forEach((label, i) => {
+        const y = startY + i * 15;
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(startX, y - 6, 12, 12);
+        ctx.fillStyle = "#000";
+	//const percentText = percentages[i].toFixed(2) + "%";
+	//const percentText = percentages[i] + "%";
+	//const percentText = values[i] + "%";
+	const percentText = values[i];
+        const fullText = `${label} — ${percentText}`;
+        ctx.fillText(fullText, startX + 20, y);
+        //ctx.fillText(label, startX + 20, y);
+    });
+}
+
+function generateByteRangeLabels(bucketSize) {
+    const labels = [];
+
+    for (let i = 0; i < 2; i += bucketSize) {
+        //labels.push(`${i}-${i + bucketSize - 1}`);
+        labels.push(`Number of ${i}`);
+    }
+
+    return labels;
+}
+
 const pieCanvas = document.getElementById("pie");
 const pieCtx = pieCanvas.getContext("2d");
 
@@ -163,8 +240,13 @@ function renderPie() {
     if (total === 0) return;
 
     const zeroAngle = (zeros / total) * 2 * Math.PI;
+    const labels = generateByteRangeLabels(1);
+    var allvalues = [];
+    allvalues[0] = zeros;
+    allvalues[1] = ones;
 
-    pieCtx.clearRect(0, 0, 75, 75);
+    pieCtx.clearRect(0, 0, 300, 200);
+    //pieCtx.clearRect(0, 0, canvas.width, canvas.height);
 
     // zeros slice
     pieCtx.beginPath();
@@ -179,6 +261,23 @@ function renderPie() {
     pieCtx.arc(75, 75, 60, zeroAngle, 2 * Math.PI);
     pieCtx.fillStyle = "#ffffcc";
     pieCtx.fill();
+
+	/*
+    const startAngle = 0
+    const endAngle = 0
+    // draw the label
+    var radius = 75;
+    var cx = 150;
+    var cy = 150;
+    var midAngle = startAngle + (endAngle - startAngle) / 2;
+    var labelRadius = radius * .75;
+    var x = cx + (labelRadius) * Math.cos(midAngle);
+    var y = cy + (labelRadius) * Math.sin(midAngle);
+    pieCtx.fillStyle = 'grey';
+    pieCtx.fillText(label, x, y);
+	*/
+
+    drawLegendOnCanvas(pieCtx, labels, "grey", [allvalues[0],allvalues[1]], 0, 150);
 }
 
 const mosaicCanvas = document.getElementById("mosaic");
@@ -297,14 +396,12 @@ function renderFFT(bytes) {
     }
 
     fft(real, imag);
-
     fftCtx.clearRect(0, 0, 800, 150);
 
     const half = FFT_SIZE / 2;
     const barWidth = 800 / half;
 
     for (let i = 0; i < half; i++) {
-
         const magnitude = Math.sqrt(
             real[i]*real[i] + imag[i]*imag[i]
         );
@@ -321,7 +418,7 @@ function renderFFT(bytes) {
         //fftCtx.fillStyle = "#00ffcc";
         fftCtx.fillRect(
             i * barWidth,
-            150 - height*2,
+            135 - height*2,
             barWidth,
             height
         );
@@ -338,6 +435,7 @@ function computeHistogram(bytes) {
     return hist;
 }
 
+/*
 function handleByteStream(arrayBuffer) {
     const bytes = new Uint8Array(arrayBuffer);
     const histogram = computeHistogram(bytes);
@@ -353,6 +451,7 @@ function handleByteStream(arrayBuffer) {
         }
     });
 }
+*/
 
 function computeShannonEntropy(histogram, total) {
     let entropy = 0;
@@ -380,20 +479,25 @@ ws.onmessage = function (event) {
     const bytes = new Uint8Array(buffer);
     //const buffer = await event.data.arrayBuffer();
 
-    //worker.postMessage(event.data); // JSON
-    //worker.postMessage(event.data, [event.data]); // binary
+    // JSON
+    //worker.postMessage(event.data);
+    // binary
+    //worker.postMessage(event.data, [event.data]);
+
     worker.postMessage({
         type: "PROCESS_BYTES",
         payload: event.data
     }, [event.data]); // Transfer ownership (zero copy!)
 
+	/*
     if (++frameCounter % fftvalue === 3) {
-    	//worker.postMessage({
-    	//    type: "PROCESS_STREAM",
-    	//    payload: event.data
-    	//}, [event.data]); // Transfer ownership (zero copy!)
-	lastRender = now;
+    	worker.postMessage({
+    	    type: "PROCESS_TEST",
+    	    payload: event.data
+    	}, [event.data]); // Transfer ownership (zero copy!)
+	//lastRender = now;
     }
+    	*/
 
 };
 
@@ -427,11 +531,9 @@ worker.onmessage = function (event) {
     }
 
     if (type === "RESULT") {
-
 	self.renderMosaic(buffer.payload.raw);
 
         for (let b of buffer.payload.raw) {
-
             histogram[b]++;
             totalBytes++;
 
@@ -458,11 +560,15 @@ worker.onmessage = function (event) {
         if (now - lastRender > 1000) {
     	    self.renderWave(buffer.payload.raw);
             self.renderFFT(buffer.payload.raw);
+            //self.computeFFT(buffer.payload.raw);
             lastRender = now;
 	}
 
 	self.document.getElementById("entropy").textContent =
 	    self.event.data.payload.entropy.toFixed(5) + " / 8 bits (" + ((100*self.event.data.payload.entropy)/8).toFixed(3) + "%)";
+	    
+	//self.document.getElementById("yinyang").textContent =
+	//    self.event.data.payload.yinyang.toFixed(5) + " / 8 bits (" + ((100*self.event.data.payload.yinyang)/8).toFixed(3) + "%)";
 	    
     	self.document.getElementById("fftvalue").textContent =
 		" every " + fftvalue + " frames";
@@ -477,10 +583,18 @@ worker.onmessage = function (event) {
 
 	busy = false;
 
-        //console.log(self.event.data.payload.raw);
+        //console.log(self.event.data.payload.fft);
         //console.log(lastRender);
         //console.log(frameCounter);
 
+    }
+
+    if (type === "TEST") {
+	//self.requestAnimationFrame(() => {
+            self.renderFFT(buffer.payload.fft);
+            //self.computeFFT(buffer.payload.raw);
+	//}
+        console.log(self.event.data.payload.fft);
     }
 };
 

@@ -72,10 +72,20 @@ Supported client protocols
   h2
   wss://
 ```
+### Services being offered via API:
+- entropy control panel with metrics graphs and quality indexes
+- entropy heatmaps (to infer the quality of RNG source)
+- random binary data generation, length of which is configurable via URI parameter
+- random passphrase / wordlist generation, presentated in different encodings, length of which is configurable via URI parameter
+- random imgage generation
+- support for websockets and JSON payloads (more efficient, less network overhead, entropy is streamed and broadcasted continuously)
+- observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
+- h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
 
 ### Server robustness and stability, by design:
 - socket management, thread-safe and thread-aware structs
 - per-connection DRBG isolation
+- rolling buffers, to better feed client expectations, to improve dashboard rendering
 - running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
 - HTTP and HTTPS servers sharing same mux, HTTP headers
 - JSON and modern wesockets support, allowing less overhead and a continuous stream of data
@@ -84,16 +94,7 @@ Supported client protocols
 - OS Variables to enable/disable TLS, h2, and other useful test features
 - CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, timers and more.
 
-### Services being offered via API:
-- random binary data generation, length of which is configurable via URI parameter
-- random passphrase / wordlist generation, presentated in different encodings, length of which is configurable via URI parameter
-- random imgage generation
-- entropy heatmaps (to infer the quality of RNG source)
-- h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
-- support for websockets and JSON payloads (more efficient, less network overhead, entropy is streamed and broadcasted continuously)
-- observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
-
-### Hardware already supported, more to be added
+### Hardware already supported, more to be added soon
 ```
  - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
  - Quantis PCI by ID Quantique
@@ -136,7 +137,6 @@ WSS Endpoint /colors.html
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
 
 WSS Endpoint /stream.html
-<img width="2560" height="1440" alt="Screenshot From 2026-02-27 02-53-58" src="https://github.com/user-attachments/assets/d4e320d4-e6fc-4aca-8b6e-240734786570" />
 
 ## Build & run
 

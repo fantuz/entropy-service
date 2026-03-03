@@ -1,34 +1,23 @@
-function computeFFT(bytes) {
-
-    const N = 1024; // power of 2
-    const real = new Float32Array(N);
-    const imag = new Float32Array(N);
-
-    for (let i = 0; i < N && i < bytes.length; i++) {
-        real[i] = bytes[i] - 128;
-        imag[i] = 0;
-    }
-
-    fftRadix2(real, imag);
-
-    return computeMagnitude(real, imag);
-}
 
 let rollingBuffer = [];
+let rollingHistBuffer = [];
 
 function handleByteStream(arrayBuffer) {
 
     const bytes = new Uint8Array(arrayBuffer);
     const histogram = computeHistogram(bytes);
     const entropy = computeShannonEntropy(histogram, bytes.length);
-    //const fft = computeFFT(bytes);
-    const fft = 0;
+    const fft = computeFFT(bytes);
+    //const fft = computeFFT(buffer.payload.fft);
+    //const fft = 0;
     const raw = bytes;
 
     rollingBuffer.push(...bytes);
-    //rollingBuffer.push(...histogram);
-    if (rollingBuffer.length >= 1024) {
-        newhistogram = computeHistogram(rollingBuffer.slice(0, 1024));
+    rollingHistBuffer.push(...histogram);
+
+    if (rollingBuffer.length >= 4096) {
+        const newhistogram = computeHistogram(rollingHistBuffer.slice(0, 4096));
+        rollingBuffer = [];
         self.postMessage({
             type: "RESULT",
             payload: {
@@ -38,38 +27,33 @@ function handleByteStream(arrayBuffer) {
                 raw
             }
         });
-        rollingBuffer = [];
-    }
+    } else {
+        self.postMessage({
+            type: "RESULT",
+            payload: {
+                histogram,
+                entropy,
+                fft,
+                raw
+            }
+        });
 
-	/*
-    self.postMessage({
-        type: "RESULT",
-        payload: {
-            histogram,
-            entropy,
-            fft,
-            raw
-        }
-    });
-        */
+    }
 }
 
 function handleBytesOnly(arrayBuffer) {
 
     const bytes = new Uint8Array(arrayBuffer);
-    const histogram = computeHistogram(bytes);
-    const entropy = computeShannonEntropy(histogram, bytes.length);
+    //const histogram = computeHistogram(bytes);
+    //const entropy = computeShannonEntropy(histogram, bytes.length);
     const fft = computeFFT(bytes);
     //const fft = 0;
-    const raw = bytes;
+    //const raw = bytes;
 
     self.postMessage({
-        type: "RESULT",
+        type: "TEST",
         payload: {
-            histogram,
-            entropy,
-            fft,
-	    raw
+            fft
         }
     });
 }
@@ -95,6 +79,99 @@ function computeShannonEntropy(histogram, total) {
     }
 
     return entropy;
+}
+
+function fftRadix2(real, imag) {
+    const n = real.length;
+
+    if (n <= 1) return;
+
+    if ((n & (n - 1)) !== 0) {
+        throw new Error("FFT size must be power of 2");
+    }
+
+    // Bit-reversal permutation
+    let j = 0;
+    for (let i = 0; i < n; i++) {
+        if (i < j) {
+            [real[i], real[j]] = [real[j], real[i]];
+            [imag[i], imag[j]] = [imag[j], imag[i]];
+        }
+
+        let m = n >> 1;
+        while (j >= m && m > 0) {
+            j -= m;
+            m >>= 1;
+        }
+        j += m;
+    }
+
+    // Cooley–Tukey
+    for (let size = 2; size <= n; size <<= 1) {
+
+        const halfsize = size >> 1;
+        const tablestep = n / size;
+
+        for (let i = 0; i < n; i += size) {
+
+            for (let k = 0; k < halfsize; k++) {
+
+                const angle = -2 * Math.PI * k / size;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+
+                const tpre =  real[i + k + halfsize] * cos
+                            - imag[i + k + halfsize] * sin;
+
+                const tpim =  real[i + k + halfsize] * sin
+                            + imag[i + k + halfsize] * cos;
+
+                real[i + k + halfsize] = real[i + k] - tpre;
+                imag[i + k + halfsize] = imag[i + k] - tpim;
+
+                real[i + k] += tpre;
+                imag[i + k] += tpim;
+            }
+        }
+    }
+}
+
+function computeMagnitude(real, imag) {
+    const n = real.length;
+    const half = n >> 1;
+    const magnitude = new Float32Array(half);
+
+    for (let i = 0; i < half; i++) {
+        magnitude[i] = Math.sqrt(
+            real[i] * real[i] +
+            imag[i] * imag[i]
+        );
+    }
+
+    return magnitude;
+}
+
+function computeFFT(bytes) {
+
+    const N = 1024; // must be power of 2
+    const real = new Float32Array(N);
+    const imag = new Float32Array(N);
+
+    for (let i = 0; i < N; i++) {
+        real[i] = (i < bytes.length ? bytes[i] : 0) - 128;
+        imag[i] = 0;
+    }
+
+	/*
+    for (let i = 0; i < N && i < bytes.length; i++) {
+        real[i] = bytes[i] - 128;
+        imag[i] = 0;
+    }
+    	*/
+
+    fftRadix2(real, imag);
+
+    return computeMagnitude(real, imag);
 }
 
 self.onmessage = function (event) {
@@ -135,7 +212,7 @@ self.onmessage = function (event) {
         case "PROCESS_BYTES":
             handleByteStream(payload);
             break;
-        case "PROCESS_STREAM":
+        case "PROCESS_TEST":
             handleBytesOnly(payload);
             break;
         case "RESET":
