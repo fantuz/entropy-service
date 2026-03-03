@@ -25,11 +25,12 @@ body {
 }
 
 #yinyang {
-  border: 1px solid red;
+    border: 1px solid red;
 }
 
 #entropy {
-  border: 1px solid red;
+    position:relative;
+    #border: 1px solid red;
 }
 
 .section {
@@ -80,6 +81,7 @@ h3 {
     text-transform: uppercase;
     letter-spacing: 0.2em;
     opacity: 0.6;
+    border: 1px solid red;
 }
 </style>
 </head>
@@ -226,7 +228,7 @@ function generateByteRangeLabels(bucketSize) {
 
     for (let i = 0; i < 2; i += bucketSize) {
         //labels.push(`${i}-${i + bucketSize - 1}`);
-        labels.push(`Number of ${i}`);
+        labels.push(`# of ${i}`);
     }
 
     return labels;
@@ -415,7 +417,6 @@ function renderFFT(bytes) {
         //const height = magnitude * 0.01; // scaling
 
         fftCtx.fillStyle = 'purple';
-        //fftCtx.fillStyle = "#00ffcc";
         fftCtx.fillRect(
             i * barWidth,
             135 - height*2,
@@ -434,24 +435,6 @@ function computeHistogram(bytes) {
 
     return hist;
 }
-
-/*
-function handleByteStream(arrayBuffer) {
-    const bytes = new Uint8Array(arrayBuffer);
-    const histogram = computeHistogram(bytes);
-    const entropy = computeShannonEntropy(histogram, bytes.length);
-    const fft = computeFFT(bytes);
-
-    self.postMessage({
-        type: "RESULT",
-        payload: {
-            histogram,
-            entropy,
-            fft
-        }
-    });
-}
-*/
 
 function computeShannonEntropy(histogram, total) {
     let entropy = 0;
