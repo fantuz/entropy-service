@@ -23,7 +23,9 @@ The suite also includes advanced SRE-style views, statistics and metrics:
 ## Architecture and logic
 
 ### High-Level Overview
+* Interaction between GO server and HTTP/WS generic clients
 ```
+
                            ┌─────────────────────────┐
                            │     External QRNG       │
                            │  (hardware / upstream)  │
@@ -71,6 +73,20 @@ Supported client protocols
   HTTP/1.1
   h2
   wss://
+```
+* Description of the interaction between GO server and Javascript engine on clients
+```
++----------------------------+
+| GO entropy-service backend |             (server)
++----------------------------+
+            ↓
+    << WebSocket binary >>          (half-duplex channel)
+            ↓
+ +------------------------+
+ | Main Thread (IO + DOM) |
+ |           ↓            |                (client)
+ |  Worker (math engine)  |
+ +------------------------+
 ```
 ### Services being offered via API:
 - entropy control panel with metrics graphs and quality indexes
