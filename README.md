@@ -82,11 +82,11 @@ Supported client protocols
             ↓
     << WebSocket binary >>          (half-duplex channel)
             ↓
- +------------------------+
- | Main Thread (IO + DOM) |
- |           ↓            |                (client)
- |  Worker (math engine)  |
- +------------------------+
+  +------------------------+
+  | Main Thread (IO + DOM) |
+  |           ↓            |                (client)
+  |  Worker (math engine)  |
+  +------------------------+
 ```
 ### Services being offered via API:
 - entropy control panel with metrics graphs and quality indexes
