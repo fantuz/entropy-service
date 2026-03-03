@@ -491,7 +491,7 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-func wsEntropyWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
+func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		/*
 			// Corresponding client-side logic with "dialer". Cited for reference
@@ -632,33 +632,25 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 			defer conn.Close()
 		*/
 
-		// Get a slice of words
 		words := diceware.GetWords()
-
-		// Get a randomised slice of words
 		randomWords := diceware.GetRandomWords()
-
-		// Get a map of words
 		//wordsMap := diceware.GetWordsMap()
 
-		// Generate 256 bits random
-		randomBytes := make([]byte, 32)
+		randomBytes := make([]byte, 32) // Generate 256 bits random
 		_, err := rand.Read(randomBytes)
 		if err != nil {
 			http.Error(w, "entropy failure", http.StatusInternalServerError)
 			return
 		}
 
-		// Optional scramble layer
-		hash := sha256.Sum256(randomBytes)
+		hash := sha256.Sum256(randomBytes) // Optional scramble layer
 
 		if len(words) == 0 {
 			http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
 			return
 		}
 
-		// Convert to big.Int
-		n := new(big.Int).SetBytes(hash[:])
+		n := new(big.Int).SetBytes(hash[:]) // Convert to big.Int
 		base := big.NewInt(int64(len(randomWords)))
 
 		// Extract words
@@ -674,8 +666,7 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 			counter++
 		}
 
-		// Prepare output
-		hashHex := hex.EncodeToString(hash[:])
+		hashHex := hex.EncodeToString(hash[:]) // Prepare output
 
 		// Optional console output
 		//fmt.Println("Words:", join(wordsout,"-"))
@@ -732,7 +723,6 @@ body {
 
 func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// write heeaders immediately
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
@@ -769,7 +759,7 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 	}
 }
 
-func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
+func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		/*
 			// Corresponding client-side logic with "dialer". Cited for reference
@@ -877,15 +867,12 @@ func wsRandomBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				//rng.DecreaseActiveInstances(-1)
 			}
-
-			//time.Sleep(1 * time.Second)
 			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
 
-// wsRandomBinaryHandler writes the bynary data directly on WSS
-func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
+func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		atomic.AddUint64(&httpRequests, +1)
@@ -894,6 +881,8 @@ func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) htt
 		if cerr != nil {
 			log.Println("ws upgrade failed")
 			return
+		} else {
+			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		}
 
 		ctx, cancel := context.WithCancel(r.Context())
@@ -912,6 +901,7 @@ func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) htt
 			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
 				dtime := time.Duration(z)
 				refresh = dtime
+				log.Printf("Nothing to see here: %d", dtime)
 			}
 		}
 
@@ -929,7 +919,6 @@ func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) htt
 
 		for {
 			buf := make([]byte, quantity)
-			d.Read(buf)
 			// two options available here, raw encode or b64 encode
 			//base64 := base64.StdEncoding.EncodeToString(buf)
 			//conv := hex.EncodeToString(buf)
@@ -939,17 +928,23 @@ func wsRandomBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) htt
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				err := conn.WriteMessage(websocket.BinaryMessage, buf)
-
-				if err != nil {
-					return
+				for {
+					d.Read(buf)
+					err := conn.WriteMessage(websocket.BinaryMessage, buf)
+					if err != nil {
+						return
+					}
+					atomic.AddUint64(&wssPayloads, +1)
+					atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+					//rng.DecreaseActiveInstances(-1)
 				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-				//rng.DecreaseActiveInstances(-1)
+			default:
+				{
+					continue
+					//log.Println("Nothing to see here")
+				}
 			}
 
-			//time.Sleep(1 * time.Second)
 			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
@@ -1116,7 +1111,7 @@ func validateEntropyDevice(path string) error {
 
 func ResolveEntropyDevice(path string, require bool) (string, error) {
 
-	// If no device specified → use kernel CSPRNG
+	// If no device specified use kernel CSPRNG
 	if path == "" {
 		return DefaultCSPRNG, nil
 	}
@@ -1151,8 +1146,11 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 	}
 
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+		Addr:         addr,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		Handler:      handler,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
 			//seed, _ := master.Derive(32)
 			//nonce, _ := master.Derive(12)
@@ -1357,10 +1355,10 @@ func main() {
 	//http.Handle("/", http.FileServer(fs))
 	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
-	mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	mux.HandleFunc("/stream", wsRandomBinaryHandler(drbg, cfg.RefreshColorMs*4, 2048)) // cfg.MaxBytes
-	mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshColorMs))
-	mux.HandleFunc("/words", wsEntropyWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
+	mux.HandleFunc("/bytes", wsBytesHandler(drbg, cfg.RefreshRateMs))
+	mux.HandleFunc("/stream", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048)) // cfg.MaxBytes
+	mux.HandleFunc("/colors", wsBytesHandler(drbg, cfg.RefreshColorMs))
+	mux.HandleFunc("/words", wsWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))

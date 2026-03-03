@@ -137,12 +137,13 @@ h3 {
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const bytes = urlParams.get('bytes')
+const refresh = urlParams.get('refresh')
 //console.log(queryString);
 //console.log(bytes);
 
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
-    + location.host + "/bytes?bytes=" + bytes
+    + location.host + "/bytes?bytes=" + bytes + "&refresh=" + refresh
 );
 
 ws.onmessage = function(event) {

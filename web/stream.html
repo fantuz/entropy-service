@@ -84,7 +84,7 @@ h3 {
     </div>
     </br>
     <div class="hex" id="hex">RGB mosaic</br></br>
-	<canvas id="mosaic" width="800" height="48"></canvas>
+	<canvas id="mosaic" width="800" height="96"></canvas>
     </div>
     </br>
     <div class="hex" id="hex">0/1 distribution</br></br>
@@ -113,14 +113,6 @@ const ws = new WebSocket(
 );
 ws.binaryType = "arraybuffer";
 
-let ones = 0;
-let zeros = 0;
-let totalBytes = 0;
-
-const histogram = new Array(512).fill(0);
-const canvas = document.getElementById("histogram");
-const ctx = canvas.getContext("2d");
-
 function computeEntropy(histogram, total) {
     if (total === 0) return 0;
 
@@ -136,20 +128,28 @@ function computeEntropy(histogram, total) {
     return entropy;
 }
 
+let ones = 0;
+let zeros = 0;
+let totalBytes = 0;
+
+const histogram = new Array(1024).fill(0);
+const canvas = document.getElementById("histogram");
+const ctx = canvas.getContext("2d");
+
 function renderHistogram() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const max = Math.max(...histogram);
-    const barWidth = canvas.width / 256;
+    const barWidth = canvas.width / 512;
 
-    for (let i = 0; i < 512; i++) {
+    for (let i = 0; i < 1024; i++) {
         const height = (histogram[i] / max) * canvas.height;
 
         ctx.fillStyle = "#00aacc";
         ctx.fillRect(
-            i * barWidth,
+            2 * i * barWidth,
             canvas.height - height,
-            barWidth,
+            barWidth/2,
             100 - height
         );
     }
@@ -190,7 +190,7 @@ function renderMosaic(bytes) {
     let x = 0;
     let y = 0;
 
-    mosaicCtx.clearRect(0, 0, 800, 200);
+    mosaicCtx.clearRect(0, 0, 800, 400);
 
     for (let i = 0; i < bytes.length - 2; i += 3) {
 
@@ -208,7 +208,7 @@ function renderMosaic(bytes) {
             y += tileSize;
         }
 
-        if (y >= 48) break;
+        if (y >= 96) break;
     }
 }
 
@@ -218,10 +218,12 @@ const waveCtx = waveCanvas.getContext("2d");
 function renderWave(bytes) {
 
     waveCtx.clearRect(0, 0, 800, 250);
+    waveCtx.fillStyle = 'black';
+    waveCtx.fillRect(0, 0, canvas.width, canvas.height*3);
     waveCtx.beginPath();
 
-    //const step = 800 / bytes.length;
-    const step = 10;
+    const step = 800 *100 / bytes.length;
+    //const step = 10;
 
     for (let i = 0; i < bytes.length; i++) {
         const x = i * step;
@@ -242,7 +244,7 @@ function renderWave(bytes) {
 let frameCounter = 0;
 const fftCanvas = document.getElementById("fft");
 const fftCtx = fftCanvas.getContext("2d");
-const FFT_SIZE = 1024;
+const FFT_SIZE = 2048;
 
 function fft(real, imag) {
     const n = real.length;
@@ -282,12 +284,6 @@ function fft(real, imag) {
     }
 }
 
-/*
-    const out = fft.createComplexArray();
-    fft.realTransform(out, input);
-    fft.completeSpectrum(out);
-*/
-
 function renderFFT(bytes) {
 
     if (bytes.length < FFT_SIZE) return;
@@ -318,89 +314,174 @@ function renderFFT(bytes) {
         const height = db * 2; // scaling factor
         //const re = out[2*i];
         //const im = out[2*i+1];
-        //const height = magnitude * 0.01; // scaling
         //const magnitude = Math.sqrt(re*re + im*im);
+        //const height = magnitude * 0.01; // scaling
 
-        fftCtx.fillStyle = "#00ffcc";
+        fftCtx.fillStyle = 'purple';
+        //fftCtx.fillStyle = "#00ffcc";
         fftCtx.fillRect(
             i * barWidth,
-            //height,
             150 - height*2,
-            barWidth*1,
+            barWidth,
             height
         );
     }
 }
 
-//ws.onmessage = function(event)
-//ws.onmessage = async (event)
-ws.onmessage = (event) => {
+function computeHistogram(bytes) {
+    const hist = new Array(512).fill(0);
+
+    for (let i = 0; i < bytes.length; i++) {
+        hist[bytes[i]]++;
+    }
+
+    return hist;
+}
+
+function handleByteStream(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    const histogram = computeHistogram(bytes);
+    const entropy = computeShannonEntropy(histogram, bytes.length);
+    const fft = computeFFT(bytes);
+
+    self.postMessage({
+        type: "RESULT",
+        payload: {
+            histogram,
+            entropy,
+            fft
+        }
+    });
+}
+
+function computeShannonEntropy(histogram, total) {
+    let entropy = 0;
+
+    for (let i = 0; i < histogram.length; i++) {
+        if (histogram[i] === 0) continue;
+
+        const p = histogram[i] / total;
+        entropy -= p * Math.log2(p);
+    }
+
+    return entropy;
+}
+
+const worker = new Worker("worker.js");
+
+let busy = false;
+
+ws.onmessage = function (event) {
+    //ws.onmessage = async (event)
+    //if (busy) return;
+    //busy = true;
+
     const buffer = event.data;
     const bytes = new Uint8Array(buffer);
-    const fftvalue = 3;
-
     //const buffer = await event.data.arrayBuffer();
-    //const hex = document.getElementById("hex");
 
-/*
-    // derive color from first 3 bytes of hex
-    const r = parseInt(bytes.slice(0,2),16);
-    const g = parseInt(bytes.slice(2,4),16);
-    const b = parseInt(bytes.slice(4,6),16);
+    //worker.postMessage(event.data); // JSON
+    //worker.postMessage(event.data, [event.data]); // binary
+    worker.postMessage({
+        type: "PROCESS_BYTES",
+        payload: event.data
+    }, [event.data]); // Transfer ownership (zero copy!)
 
-    //hex.classList.add("out");
-    setTimeout(() => {
-        //hex.textContent = data.base64;
-        //hex.classList.remove("out");
-        document.body.style.backgroundColor =
-            `rgb(${r/2},${g/2},${b/2})`;
-    }, 500);
-*/
+    if (++frameCounter % fftvalue === 3) {
+    	//worker.postMessage({
+    	//    type: "PROCESS_STREAM",
+    	//    payload: event.data
+    	//}, [event.data]); // Transfer ownership (zero copy!)
+	lastRender = now;
+    }
+
+};
+
+worker.onmessage = function (event) {
+    //if (busy) return;
+    busy = true;
+
+    const { type, payload } = event.data;
+
+    let totalBytes = 0;
+    const now = performance.now();
+    const fftvalue = 3;
+    //const buffer = event.data.arrayBuffer;
+    //const buffer = event.data.arrayBufferData;
+    const buffer = self.event.data;
+    const bytes = new Uint8Array(buffer);
+    const entropy = self.computeEntropy(histogram, totalBytes);
+    const total = bytes.length;
+
+    let frameCounter = 0;
+    let lastRender = 0;
+    let count = 0;
 
     for (let b of bytes) {
-        histogram[b]++;
+        self.event.data.payload.histogram[b]++;
         totalBytes++;
-
         for (let i = 0; i < 8; i++) {
             if (b & (1 << i)) ones++;
             else zeros++;
         }
     }
 
-    /*
-    for (let i = 0; i < bytes.length; i++) {
-        histogram[bytes[i]]++;
+    if (type === "RESULT") {
+
+	self.renderMosaic(buffer.payload.raw);
+
+        for (let b of buffer.payload.raw) {
+
+            histogram[b]++;
+            totalBytes++;
+
+            for (let i = 0; i < 8; i++) {
+                if (b & (1 << i)) ones++;
+                else zeros++;
+            }
+
+	    if ((totalBytes >= 4194304) || (total >= 4194304)) {
+                self.event.data.payload.histogram.fill(0);
+                histogram.fill(0);
+                totalBytes = 0;
+                ones = 0;
+                zeros = 0;
+            }
+        }
+
+	self.requestAnimationFrame(() => {
+	    busy = false;
+	    self.renderHistogram();
+	    self.renderPie();
+	});
+
+        if (now - lastRender > 1000) {
+    	    self.renderWave(buffer.payload.raw);
+            self.renderFFT(buffer.payload.raw);
+            lastRender = now;
+	}
+
+	self.document.getElementById("entropy").textContent =
+	    self.event.data.payload.entropy.toFixed(5) + " / 8 bits (" + ((100*self.event.data.payload.entropy)/8).toFixed(3) + "%)";
+	    
+    	self.document.getElementById("fftvalue").textContent =
+		" every " + fftvalue + " frames";
+
+	if ((totalBytes >= 4194304) || (total >= 4194304)) {
+            self.event.data.payload.histogram.fill(0);
+            histogram.fill(0);
+            totalBytes = 0;
+            ones = 0;
+            zeros = 0;
+        }
+
+	busy = false;
+
+        //console.log(self.event.data.payload.raw);
+        //console.log(lastRender);
+        //console.log(frameCounter);
+
     }
-    */
-
-    renderHistogram();
-    renderMosaic(bytes);
-    renderPie();
-    renderWave(bytes);
-
-    const entropy = computeEntropy(histogram, totalBytes);
-
-    document.getElementById("entropy").textContent =
-        entropy.toFixed(5) + " / 8 bits (" + ((100*entropy)/8).toFixed(3) + "%)";
-
-    //console.log(bytes); // raw entropy bytes
-    //console.log(totalBytes);
-
-    // clear histogram cache over time
-    if (totalBytes >= 4194304) {
-        histogram.fill(0);
-        totalBytes = 0;
-        ones = 0;
-        zeros = 0;
-    }
-    //histogram[byte] = (histogram[byte] + 1) % 10000;
-
-    if (++frameCounter % fftvalue === 0) {
-        renderFFT(bytes);
-    	document.getElementById("fftvalue").textContent =
-	" every " + fftvalue + " frames";
-    }
-
 };
 
 </script>
