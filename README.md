@@ -23,7 +23,7 @@ The suite also includes advanced SRE-style views, statistics and metrics:
 ## Architecture and logic
 
 ### High-Level Overview
-* Interaction between GO server and HTTP/WS generic clients
+* Summary of the different functions from entropy sourcing to randomness streaming
 ```
 
                            ┌─────────────────────────┐
@@ -74,7 +74,7 @@ Supported client protocols
   h2
   wss://
 ```
-* Description of the interaction between GO server and Javascript engine on clients
+* Isolation of roles: server streams binary data, client processes and renders using Javascript engine on clients
 ```
 +----------------------------+
 | GO entropy-service backend |             (server)
@@ -84,7 +84,7 @@ Supported client protocols
             ↓
   +------------------------+
   | Main Thread (IO + DOM) |
-  |           ↓            |                (client)
+  |           ↓            |               (client)
   |  Worker (math engine)  |
   +------------------------+
 ```
