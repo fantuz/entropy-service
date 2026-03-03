@@ -100,9 +100,10 @@ Supported client protocols
 ### API mappings
 ```
 Websockets, HTTP 101 Upgrade
-	/bytes.html?bytes=<#> -> mux.HandleFunc("/bytes", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-	/colors.html?refresh=<#> -> mux.HandleFunc("/colors", wsRandomBytesHandler(drbg, cfg.RefreshRateMs))
-    /words.html?words=<#> -> mux.HandleFunc("/words", wsEntropyWordsHandler(drbg, 64, cfg.RefreshRateMs))
+    /stream.html?bytes=<#>&refresh=<#> -> mux.HandleFunc("/words", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048)) // cfg.MaxBytes
+	/bytes.html?bytes=<#>&refresh=<#> -> mux.HandleFunc("/bytes", wsBytesHandler(drbg, cfg.RefreshRateMs))
+	/colors.html?refresh=<#> -> mux.HandleFunc("/colors", wsBytesHandler(drbg, cfg.RefreshColorMs))
+    /words.html?words=<#> -> mux.HandleFunc("/words", wsWordsHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 
 Regular HTTP
  - images

@@ -491,7 +491,7 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
+func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		/*
 			// Corresponding client-side logic with "dialer". Cited for reference
@@ -524,6 +524,13 @@ func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handle
 			}
 		}
 
+		if x := r.URL.Query().Get("refresh"); x != "" {
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
+				dtime := time.Duration(z)
+				refresh = dtime
+			}
+		}
+
 		// read cycle, to detect ghost clients and ensure proper close
 		go func() {
 			// cancel context when read fails
@@ -540,7 +547,6 @@ func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handle
 
 		// write cycle
 		for {
-			// Get a randomised slice of words
 			randomWords := diceware.GetRandomWords()
 			//base := big.NewInt(int64(len(randomWords)))
 
@@ -557,15 +563,9 @@ func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handle
 				return
 			}
 
-			// Optional scramble layer (sha256 calculator)
-			hash := sha256.Sum256(randomBytes)
-
-			// Convert to big.Int
+			hash := sha256.Sum256(randomBytes) // Optional scramble layer (sha256 calculator)
 			n := new(big.Int).SetBytes(hash[:])
-
-			// Extract words
-			var wordsout []string
-
+			var wordsout []string // Extract words
 			zero := big.NewInt(0)
 			counter := 0
 
@@ -578,7 +578,6 @@ func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handle
 				counter++
 			}
 
-			// Prepare output
 			frame := EntropyFrame{
 				Words: join(wordsout, " "),
 				Hash:  hex.EncodeToString(hash[:]),
@@ -611,27 +610,12 @@ func wsWordHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handle
 				atomic.AddUint64(&wssPayloads, +1)
 				atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
 			}
-
-			//time.Sleep(1 * time.Second)
-			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
 
 func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		//var dicewareWords []string
-		//fmt.Println("Number of entries:", len(dicewareWords))
-
-		/*
-			conn, cerr := upgrader.Upgrade(w, r, nil)
-			if cerr != nil {
-				log.Println("ws upgrade failed")
-				return
-			}
-			defer conn.Close()
-		*/
-
 		words := diceware.GetWords()
 		randomWords := diceware.GetRandomWords()
 		//wordsMap := diceware.GetWordsMap()
@@ -653,7 +637,6 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 		n := new(big.Int).SetBytes(hash[:]) // Convert to big.Int
 		base := big.NewInt(int64(len(randomWords)))
 
-		// Extract words
 		var wordsout []string
 		zero := big.NewInt(0)
 		counter := 0
@@ -667,9 +650,6 @@ func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.Handler
 		}
 
 		hashHex := hex.EncodeToString(hash[:]) // Prepare output
-
-		// Optional console output
-		//fmt.Println("Words:", join(wordsout,"-"))
 
 		tmpl := `
 <!DOCTYPE html>
@@ -778,6 +758,8 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 		if cerr != nil {
 			log.Println("ws upgrade failed")
 			return
+		} else {
+			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		}
 
 		ctx, cancel := context.WithCancel(r.Context())
@@ -786,7 +768,7 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 		defer conn.Close()
 		defer ticker.Stop()
 
-		n := 1024
+		n := 2048
 
 		if q := r.URL.Query().Get("bytes"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<20 {
@@ -833,7 +815,6 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 
 			hash := sha256.Sum256(buf)
 
-			// Prepare output
 			frame := EntropyDataFrame{
 				Hex:    hex.EncodeToString(buf[:]),
 				Base64: base64,
@@ -859,15 +840,24 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				err := conn.WriteJSON(frame)
-				if err != nil {
-					return
+				for {
+					//d.Read(buf)
+					//err := conn.WriteMessage(websocket.BinaryMessage, buf)
+					err := conn.WriteJSON(frame)
+					if err != nil {
+						return
+					}
+					atomic.AddUint64(&wssPayloads, +1)
+					atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+					//rng.DecreaseActiveInstances(-1)
 				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-				//rng.DecreaseActiveInstances(-1)
+			default:
+				{
+					continue
+					//log.Println("Nothing to see here")
+				}
+
 			}
-			//time.Sleep(refresh * time.Millisecond)
 		}
 	}
 }
@@ -890,7 +880,6 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 		defer conn.Close()
 		defer ticker.Stop()
 
-		//n := 1024
 		if q := r.URL.Query().Get("bytes"); q != "" {
 			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<20 {
 				quantity = v
@@ -901,7 +890,7 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
 				dtime := time.Duration(z)
 				refresh = dtime
-				log.Printf("Nothing to see here: %d", dtime)
+				//log.Printf("Nothing to see here: %d", dtime)
 			}
 		}
 
@@ -1358,7 +1347,7 @@ func main() {
 	mux.HandleFunc("/bytes", wsBytesHandler(drbg, cfg.RefreshRateMs))
 	mux.HandleFunc("/stream", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048)) // cfg.MaxBytes
 	mux.HandleFunc("/colors", wsBytesHandler(drbg, cfg.RefreshColorMs))
-	mux.HandleFunc("/words", wsWordHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
+	mux.HandleFunc("/words", wsWordsHandler(drbg, cfg.MaxWords, cfg.RefreshRateMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbg, cfg.MaxBytes))
