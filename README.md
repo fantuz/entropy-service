@@ -74,7 +74,7 @@ Supported client protocols
   h2
   wss://
 ```
-* Isolation of roles: server streams binary data, client processes and renders using Javascript engine on clients
+* Separation of roles: server streams binary data, client processes WSS binary data and renders via Javascript engine
 ```
 +----------------------------+
 | GO entropy-service backend |             (server)
