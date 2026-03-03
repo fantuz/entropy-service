@@ -104,7 +104,7 @@ Supported client protocols
 - rolling buffers, to better feed client expectations, to improve dashboard rendering
 - running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
 - HTTP and HTTPS servers sharing same mux, HTTP headers
-- JSON and modern wesockets support, allowing less overhead and a continuous stream of data
+- support for modern wesockets, allowing less overhead while guaranteeing a continuous and timely stream of data
 - use of GO atomic counters to accomodate atomic updates even under high-concurrency
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features
