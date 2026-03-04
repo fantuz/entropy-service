@@ -8,23 +8,24 @@ import (
 )
 
 type Config struct {
-	ReseedMs       int
-	ReseedSize     int
-	MaxBytes       int
-	QRNGBuffer     int
-	SeedBuffer     int
-	MaxWords       int
-	RefreshRate    int
-	RefreshRateMs  time.Duration
-	RefreshColorMs time.Duration
-	HTTPAddr       string
-	HTTPSAddr      string
-	CertFile       string
-	KeyFile        string
-	LogLevel       string
-	DevicePath     string
-	EnableHTTPS    bool
-	RequireDevice  bool
+	ReseedMs         int
+	ReseedSize       int
+	MaxBytes         int
+	QRNGBuffer       int
+	SeedBuffer       int
+	MaxWords         int
+	RefreshRate      int
+	BytesFingerprint int
+	RefreshRateMs    time.Duration
+	RefreshColorMs   time.Duration
+	HTTPAddr         string
+	HTTPSAddr        string
+	CertFile         string
+	KeyFile          string
+	LogLevel         string
+	DevicePath       string
+	EnableHTTPS      bool
+	RequireDevice    bool
 }
 
 func ParseConfig() *Config {
@@ -44,6 +45,7 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
 	flag.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Size of QRNG buffer in KB")
 	flag.IntVar(&cfg.MaxBytes, "max-bytes", 2097152, "Maximum bytes per request")
+	flag.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
 

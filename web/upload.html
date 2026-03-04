@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Entropy Stream Service - Random Bytes Stream</title>
+<style>
+body {
+    position:relative;
+    margin: auto;
+    font-family: "JetBrains Mono", monospace;
+    #letter-spacing: 0.04em;
+    #display: flex;
+    #justify-content: center;
+    text-align: center;
+    align-items: center;
+    #height: 100vh;
+    background: grey;
+    color: #00ff88;
+    word-wrap: break-word;
+    overflow: hidden;
+    max-width: 50%;
+    #transition: background 0.2s ease-in-out;
+    #background: rgba(148, 0, 0, 1);
+    background-color: ivory;
+}
+
+#yinyang {
+    border: 1px solid red;
+}
+
+#entropy {
+    position:relative;
+    #border: 1px solid red;
+}
+
+.section {
+    margin-bottom: 15px;
+}
+
+.panel {
+    position:relative;
+    margin: auto;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 20px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.data {
+    color: #00ffcc;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.hex {
+    opacity: 1;
+    font-size: 1em;
+    backdrop-filter: blur(12px);
+    padding: 10px;
+    color: #444;
+    transition: opacity 0.2s ease-in-out;
+    border-radius: 16px;
+    font-family: "IBM Plex Mono", monospace;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    text-shadow: 0 0 8px rgba(0,255,200,0.4);
+    #letter-spacing: 0.04em;
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.hex.out {
+    opacity: 0;
+}
+
+h3 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+    border: 1px solid red;
+}
+</style>
+</head>
+<body>
+
+<form id="uploadForm" enctype="multipart/form-data">
+<input type="file" id="fileInput" name="file" accept="*/*" />
+<button type="submit">Upload and Analyze</button>
+</form>
+
+<div class="panel">
+    <h3>Shannon Entropy Index: <span id="entropy">0</span></h3>
+    <h3>Loaded File: <span id="file-entropy">0</span></h3>
+    </br>
+    <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
+	<canvas id="histogram" width="800" height="75"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">RGB mosaic</br></br>
+	<canvas id="mosaic" width="800" height="96"></canvas>
+    </div>
+    </br>
+    <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
+    <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br></br>
+	<canvas id="pie" width="150" height="170"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">input waveform sample (oscilloscope view)</br></br>
+	<canvas id="wave" width="800" height="200"></canvas>
+    </div>
+    </br>
+    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br></br>
+	<canvas id="fft" width="800" height="50"></canvas>
+    </div>
+    </br>
+</div>
+
+<script>
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+//const bytes = urlParams.get('bytes')
+const refresh = urlParams.get('refresh')
+
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/files?refresh=" + refresh
+);
+ws.binaryType = "arraybuffer";
+
+function computeEntropy(histogram, total) {
+    if (total === 0) return 0;
+
+    let entropy = 0;
+
+    for (let count of histogram) {
+        if (count === 0) continue;
+
+        const p = count / total;
+        entropy -= p * Math.log2(p);
+    }
+
+    return entropy;
+}
+
+let ones = 0;
+let zeros = 0;
+let totalBytes = 0;
+
+const histogram = new Array(1024).fill(0);
+const canvas = document.getElementById("histogram");
+const ctx = canvas.getContext("2d");
+
+function uploadFileBytes(bytes) {
+    fetch('/files', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/octet-stream',
+        },
+        body: bytes
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Update UI based on the data returned
+        renderFileHistogram(data.histogram, data.totalBytes);
+        document.getElementById('entropy').textContent = data.entropy.toFixed(4);
+    });
+        console.log("inside uploadFilesBytes routine");
+}
+
+function renderHistogram() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const max = Math.max(...histogram);
+    const barWidth = canvas.width / 512;
+
+    for (let i = 0; i < 1024; i++) {
+        const height = (histogram[i] / max) * canvas.height;
+
+        ctx.fillStyle = "#00aacc";
+        ctx.fillRect(
+            2 * i * barWidth,
+            canvas.height - height,
+            barWidth/2,
+            100 - height
+        );
+    }
+}
+
+function computeTotal(values) {
+    let total = 0;
+    for (let i = 0; i < values.length; i++) {
+        total += values[i];
+    }
+    return total;
+}
+
+function computePercentages(values) {
+
+    let total = 0;
+    for (let i = 0; i < values.length; i++) {
+        total += values[i];
+    }
+
+    const percentages = new Array(values.length);
+
+    for (let i = 0; i < values.length; i++) {
+        percentages[i] = total === 0
+            ? 0
+            : (values[i] / total) * 100;
+    }
+
+    return percentages;
+}
+
+function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
+    const percentages = computePercentages(values);
+    ctx.font = "12px Arial";
+    ctx.textBaseline = "middle";
+
+    labels.forEach((label, i) => {
+        const y = startY + i * 15;
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(startX, y - 6, 12, 12);
+        ctx.fillStyle = "#000";
+	//const percentText = percentages[i].toFixed(2) + "%";
+	//const percentText = percentages[i] + "%";
+	//const percentText = values[i] + "%";
+	const percentText = values[i];
+        const fullText = `${label} — ${percentText}`;
+        ctx.fillText(fullText, startX + 20, y);
+        //ctx.fillText(label, startX + 20, y);
+    });
+}
+
+function generateByteRangeLabels(bucketSize) {
+    const labels = [];
+
+    for (let i = 0; i < 2; i += bucketSize) {
+        //labels.push(`${i}-${i + bucketSize - 1}`);
+        labels.push(`# of ${i}`);
+    }
+
+    return labels;
+}
+
+const pieCanvas = document.getElementById("pie");
+const pieCtx = pieCanvas.getContext("2d");
+
+function renderPie() {
+    const total = ones + zeros;
+    if (total === 0) return;
+
+    const zeroAngle = (zeros / total) * 2 * Math.PI;
+    const labels = generateByteRangeLabels(1);
+    var allvalues = [];
+    allvalues[0] = zeros;
+    allvalues[1] = ones;
+
+    pieCtx.clearRect(0, 0, 300, 200);
+    //pieCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // zeros slice
+    pieCtx.beginPath();
+    pieCtx.moveTo(75, 75);
+    pieCtx.arc(75, 75, 60, 0, zeroAngle);
+    pieCtx.fillStyle = "#000000";
+    pieCtx.fill();
+
+    // ones slice
+    pieCtx.beginPath();
+    pieCtx.moveTo(75, 75);
+    pieCtx.arc(75, 75, 60, zeroAngle, 2 * Math.PI);
+    pieCtx.fillStyle = "#ffffcc";
+    pieCtx.fill();
+
+    drawLegendOnCanvas(pieCtx, labels, "grey", [allvalues[0],allvalues[1]], 0, 150);
+}
+
+const mosaicCanvas = document.getElementById("mosaic");
+const mosaicCtx = mosaicCanvas.getContext("2d");
+
+function renderMosaic(bytes) {
+
+    const tileSize = 16;
+    let x = 0;
+    let y = 0;
+
+    mosaicCtx.clearRect(0, 0, 800, 400);
+
+    for (let i = 0; i < bytes.length - 2; i += 3) {
+
+        const r = bytes[i];
+        const g = bytes[i+1];
+        const b = bytes[i+2];
+
+        mosaicCtx.fillStyle = `rgb(${r},${g},${b})`;
+        mosaicCtx.fillRect(x, y, tileSize, tileSize);
+
+        x += tileSize;
+
+        if (x >= 800) {
+            x = 0;
+            y += tileSize;
+        }
+
+        if (y >= 96) break;
+    }
+}
+
+const waveCanvas = document.getElementById("wave");
+const waveCtx = waveCanvas.getContext("2d");
+
+function renderWave(bytes) {
+
+    waveCtx.clearRect(0, 0, 800, 250);
+    waveCtx.fillStyle = 'black';
+    waveCtx.fillRect(0, 0, canvas.width, canvas.height*3);
+    waveCtx.beginPath();
+
+    const step = 800 *100 / bytes.length;
+    //const step = 10;
+
+    for (let i = 0; i < bytes.length; i++) {
+        const x = i * step;
+        const y = 200 - (bytes[i] / 255) * 200;
+
+        if (i === 0)
+            waveCtx.moveTo(x, y);
+        else
+            waveCtx.lineTo(x, y);
+	//if (i > 800)
+	//    return
+    }
+
+    waveCtx.strokeStyle = "#00ff55";
+    waveCtx.stroke();
+}
+
+let frameCounter = 0;
+const fftCanvas = document.getElementById("fft");
+const fftCtx = fftCanvas.getContext("2d");
+const FFT_SIZE = 2048;
+
+function fft(real, imag) {
+    const n = real.length;
+
+    if (n <= 1) return;
+
+    // divide
+    const half = n / 2;
+    const evenReal = new Array(half);
+    const evenImag = new Array(half);
+    const oddReal  = new Array(half);
+    const oddImag  = new Array(half);
+
+    for (let i = 0; i < half; i++) {
+        evenReal[i] = real[i*2];
+        evenImag[i] = imag[i*2];
+        oddReal[i]  = real[i*2+1];
+        oddImag[i]  = imag[i*2+1];
+    }
+
+    fft(evenReal, evenImag);
+    fft(oddReal, oddImag);
+
+    // conquer
+    for (let k = 0; k < half; k++) {
+        const angle = -2 * Math.PI * k / n;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        const tre =  cos * oddReal[k] - sin * oddImag[k];
+        const tim =  sin * oddReal[k] + cos * oddImag[k];
+
+        real[k]       = evenReal[k] + tre;
+        imag[k]       = evenImag[k] + tim;
+        real[k+half]  = evenReal[k] - tre;
+        imag[k+half]  = evenImag[k] - tim;
+    }
+}
+
+function renderFFT(bytes) {
+
+    if (bytes.length < FFT_SIZE) return;
+
+    const real = new Array(FFT_SIZE);
+    const imag = new Array(FFT_SIZE).fill(0);
+
+    // Center signal around zero (-128..127)
+    for (let i = 0; i < FFT_SIZE; i++) {
+        real[i] = bytes[i] - 128;
+    }
+
+    fft(real, imag);
+    fftCtx.clearRect(0, 0, 800, 150);
+
+    const half = FFT_SIZE / 2;
+    const barWidth = 800 / half;
+
+    for (let i = 0; i < half; i++) {
+        const magnitude = Math.sqrt(
+            real[i]*real[i] + imag[i]*imag[i]
+        );
+
+        // Convert to decibel scale for better visualization
+        const db = 20 * Math.log10(magnitude + 1);
+        const height = db * 2; // scaling factor
+        //const re = out[2*i];
+        //const im = out[2*i+1];
+        //const magnitude = Math.sqrt(re*re + im*im);
+        //const height = magnitude * 0.01; // scaling
+
+        fftCtx.fillStyle = 'purple';
+        fftCtx.fillRect(
+            i * barWidth,
+            135 - height*2,
+            barWidth,
+            height
+        );
+    }
+}
+
+function computeHistogram(bytes) {
+    const hist = new Array(512).fill(0);
+
+    for (let i = 0; i < bytes.length; i++) {
+        hist[bytes[i]]++;
+    }
+
+    return hist;
+}
+
+function computeShannonEntropy(histogram, total) {
+    let entropy = 0;
+
+    for (let i = 0; i < histogram.length; i++) {
+        if (histogram[i] === 0) continue;
+
+        const p = histogram[i] / total;
+        entropy -= p * Math.log2(p);
+    }
+
+    return entropy;
+}
+
+const worker = new Worker("worker.js");
+
+let busy = false;
+
+const form = document.getElementById("uploadForm");
+
+/*
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    await fetch("/files", {
+        method: "POST",
+        body: formData
+    });
+*/
+
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+    const arrayBuffer = await file.arrayBuffer();
+
+    if (!file) return;
+    console.log(file);
+    console.log(file.arrayBuffer());
+	self.document.getElementById("file-entropy").textContent =
+	    file.name + " (" + file.size + " Bytes)";
+
+    worker.postMessage({
+        type: "PROCESS_BYTES",
+        payload: arrayBuffer
+    }, [arrayBuffer]);
+});
+
+ws.onmessage = async function (event) {
+    //if (busy) return;
+    //busy = true;
+
+    //const buffer = event.data;
+    const buffer = await event.data.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+
+    //uploadFileBytes(bytes)
+    // JSON
+    //worker.postMessage(event.data);
+    // binary
+    //worker.postMessage(event.data, [event.data]);
+    console.log(self.event.data);
+    console.log(event.data);
+    console.log(bytes);
+
+    // Transfer ownership (zero copy!)
+    worker.postMessage({
+        type: "PROCESS_BYTES",
+        payload: event.data
+    }, [event.data]);
+
+	/*
+    if (++frameCounter % fftvalue === 3) {
+    	worker.postMessage({
+    	    type: "PROCESS_TEST",
+    	    payload: event.data
+    	}, [event.data]); // Transfer ownership (zero copy!)
+	//lastRender = now;
+    }
+    	*/
+};
+
+worker.onmessage = function (event) {
+    //if (busy) return;
+    busy = true;
+
+    const { type, payload } = event.data;
+
+    let totalBytes = 0;
+    const now = performance.now();
+    const fftvalue = 3;
+    //const buffer = event.data.arrayBuffer;
+    //const buffer = event.data.arrayBufferData;
+    const buffer = self.event.data;
+    const bytes = new Uint8Array(buffer);
+    const entropy = self.computeEntropy(histogram, totalBytes);
+    const total = bytes.length;
+
+    let frameCounter = 0;
+    let lastRender = 0;
+    let count = 0;
+
+    for (let b of bytes) {
+        self.event.data.payload.histogram[b]++;
+        totalBytes++;
+        for (let i = 0; i < 8; i++) {
+            if (b & (1 << i)) ones++;
+            else zeros++;
+        }
+    }
+
+    if (type === "RESULT") {
+	self.renderMosaic(buffer.payload.raw);
+
+        for (let b of buffer.payload.raw) {
+            histogram[b]++;
+            totalBytes++;
+
+            for (let i = 0; i < 8; i++) {
+                if (b & (1 << i)) ones++;
+                else zeros++;
+            }
+
+	    if ((totalBytes >= 4194304) || (total >= 4194304)) {
+                self.event.data.payload.histogram.fill(0);
+                histogram.fill(0);
+                totalBytes = 0;
+                ones = 0;
+                zeros = 0;
+            }
+        }
+
+	self.requestAnimationFrame(() => {
+	    busy = false;
+	    self.renderHistogram();
+	    self.renderPie();
+	});
+
+        if (now - lastRender > 1000) {
+    	    self.renderWave(buffer.payload.raw);
+            self.renderFFT(buffer.payload.raw);
+            //self.computeFFT(buffer.payload.raw);
+            lastRender = now;
+	}
+
+	self.document.getElementById("entropy").textContent =
+	    self.event.data.payload.entropy.toFixed(5) + " / 8 bits (" + ((100*self.event.data.payload.entropy)/8).toFixed(3) + "%)";
+	    
+	//self.document.getElementById("yinyang").textContent =
+	//    self.event.data.payload.yinyang.toFixed(5) + " / 8 bits (" + ((100*self.event.data.payload.yinyang)/8).toFixed(3) + "%)";
+	    
+    	self.document.getElementById("fftvalue").textContent =
+		" every " + fftvalue + " frames";
+
+	if ((totalBytes >= 4194304) || (total >= 4194304)) {
+            self.event.data.payload.histogram.fill(0);
+            histogram.fill(0);
+            totalBytes = 0;
+            ones = 0;
+            zeros = 0;
+        }
+
+	busy = false;
+
+        //console.log(self.event.data.payload.fft);
+        //console.log(lastRender);
+        //console.log(frameCounter);
+
+    }
+
+    if (type === "TEST") {
+	//self.requestAnimationFrame(() => {
+            self.renderFFT(buffer.payload.fft);
+            //self.computeFFT(buffer.payload.raw);
+	//}
+        console.log(self.event.data.payload.fft);
+    }
+};
+
+/*
+function computePercentages(values) {
+    const total = values.reduce((sum, v) => sum + v, 0);
+
+    return values.map(v => {
+        return total === 0 ? 0 : (v / total) * 100;
+    });
+}
+*/
+
+</script>
+
+</body>
+</html>

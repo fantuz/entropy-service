@@ -18,6 +18,10 @@ import (
 	"image/png"
 	"net"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
+	"entropy-service/rng"
+	"github.com/8ff/diceware"
+	"github.com/gorilla/websocket"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,10 +31,6 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	//"io"
-	"entropy-service/rng"
-	"github.com/8ff/diceware"
-	"github.com/gorilla/websocket"
 )
 
 type EntropySource interface {
@@ -718,6 +718,183 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 	}
 }
 
+func fileAnalyzeHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
+		atomic.AddUint64(&httpRequests, +1)
+		conn, cerr := upgrader.Upgrade(w, r, nil)
+		if cerr != nil {
+			log.Println("ws upgrade failed")
+			return
+		}
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+		defer conn.Close()
+		defer ticker.Stop()
+
+		if x := r.URL.Query().Get("refresh"); x != "" {
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<20 {
+				dtime := time.Duration(z)
+				refresh = dtime
+				//log.Printf("Nothing to see here: %d", dtime)
+			}
+		}
+
+		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
+		})
+		conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			{
+				bytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "Failed to read bytes", http.StatusBadRequest)
+					return
+				}
+
+				buf := make([]byte, len(bytes))
+				d.Read(bytes)
+
+				// two options available here, raw encode or b64 encode
+				base64 := base64.StdEncoding.EncodeToString(buf)
+				//conv := hex.EncodeToString(buf)
+				hash := sha256.Sum256(buf)
+
+				//w.Header().Set("Content-Type", "application/octet-stream")
+				//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
+				//w.Header().Set("X-RNG-Reseed-Age-ms-test",
+				//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+
+				//frame := processBytes(bytes)
+				frame := EntropyDataFrame{
+					Hex:    hex.EncodeToString(buf[:]),
+					Base64: base64,
+					Hash:   hex.EncodeToString(hash[:]),
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(frame)
+
+				cnerr := conn.WriteJSON(frame)
+				if cnerr != nil {
+					return
+				}
+				atomic.AddUint64(&wssPayloads, +1)
+				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				//rng.DecreaseActiveInstances(-1)
+				//continue
+				//log.Println("Nothing to see here")
+			}
+
+		default:
+			{
+			}
+		}
+	}
+}
+
+func uploadHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
+		atomic.AddUint64(&httpRequests, +1)
+		conn, cerr := upgrader.Upgrade(w, r, nil)
+		if cerr != nil {
+			log.Println("ws upgrade failed")
+			return
+		}
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+		defer conn.Close()
+		defer ticker.Stop()
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		err := r.ParseMultipartForm(32 << 20) // 32MB max
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			{
+				buffer := make([]byte, 4096)
+				//for {
+				n, err := file.Read(buffer)
+				if n > 0 {
+					//processChunk(buffer[:n]) // reuse your pipeline
+					//d.Read(n)
+
+					// two options available here, raw encode or b64 encode
+					//base64 := base64.StdEncoding.EncodeToString(n)
+					//conv := hex.EncodeToString(buf)
+					//hash := sha256.Sum256(n[:])
+
+					//w.Header().Set("Content-Type", "application/octet-stream")
+					//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
+					//w.Header().Set("X-RNG-Reseed-Age-ms-test",
+					//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+
+					//frame := processBytes(bytes)
+					/*
+						frame := EntropyDataFrame{
+							Hex:    hex.EncodeToString(n[:]),
+							Base64: base64,
+							Hash:   hex.EncodeToString(n[:]),
+						}
+					*/
+
+					conn.WriteMessage(websocket.BinaryMessage, buffer[:n])
+
+					w.Header().Set("Content-Type", "application/json")
+					//json.NewEncoder(w).Encode(frame)
+
+					//cnerr := conn.WriteJSON(frame)
+					//if cnerr != nil {
+					//	return
+					//}
+					atomic.AddUint64(&wssPayloads, +1)
+					//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+					//rng.DecreaseActiveInstances(-1)
+					//continue
+					//log.Println("Nothing to see here")
+					//}
+
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+				}
+				w.WriteHeader(http.StatusOK)
+			}
+		}
+	}
+}
+
 func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -1288,7 +1465,9 @@ func main() {
 	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
 	mux.HandleFunc("/bytes", wsBytesHandler(drbg, cfg.RefreshRateMs))
-	mux.HandleFunc("/stream", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048)) // cfg.MaxBytes
+	mux.HandleFunc("/stream", wsBinaryHandler(drbg, cfg.RefreshColorMs, 2048))
+	mux.HandleFunc("/files", uploadHandler(drbg, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
+	//mux.HandleFunc("/files", fileAnalyzeHandler(drbg, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 	mux.HandleFunc("/colors", wsBytesHandler(drbg, cfg.RefreshColorMs))
 	mux.HandleFunc("/words", wsWordsHandler(drbg, cfg.MaxWords, cfg.RefreshColorMs))
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
