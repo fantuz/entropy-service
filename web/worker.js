@@ -9,14 +9,13 @@ function handleByteStream(arrayBuffer) {
     const entropy = computeShannonEntropy(histogram, bytes.length);
     const fft = computeFFT(bytes);
     //const fft = computeFFT(buffer.payload.fft);
-    //const fft = 0;
     const raw = bytes;
 
-    rollingBuffer.push(...bytes);
+    //rollingBuffer.push(...bytes);
     rollingHistBuffer.push(...histogram);
 
-    if (rollingBuffer.length >= 4096) {
-        const newhistogram = computeHistogram(rollingHistBuffer.slice(0, 4096));
+    if (rollingHistBuffer.length >= 4194304) {
+        const newhistogram = computeHistogram(rollingHistBuffer.slice(0, 4194304));
         rollingBuffer = [];
         self.postMessage({
             type: "RESULT",
@@ -37,7 +36,6 @@ function handleByteStream(arrayBuffer) {
                 raw
             }
         });
-
     }
 }
 
