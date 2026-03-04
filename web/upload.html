@@ -24,6 +24,32 @@ body {
     background-color: ivory;
 }
 
+#uploadForm {
+    opacity: 1;
+    visibility: true;
+    margin: auto;
+    border: 1px solid red;
+}
+
+#uploadForm.out {
+    visibility: false;
+    opacity: 0;
+    border: 1px solid red;
+}
+
+.uploadForm {
+    opacity: 1;
+    visibility: true;
+    margin: auto;
+    border: 1px solid red;
+}
+
+.uploadForm.out {
+    opacity: 0;
+    visibility: false;
+    border: 1px solid red;
+}
+
 #yinyang {
     border: 1px solid red;
 }
@@ -87,15 +113,14 @@ h3 {
 </head>
 <body>
 
-<form id="uploadForm" enctype="multipart/form-data">
-<input type="file" id="fileInput" name="file" accept="*/*" />
-<button type="submit">Upload and Analyze</button>
-</form>
-
 <div class="panel">
-    <h3>Shannon Entropy Index: <span id="entropy">0</span></h3>
-    <h3>Loaded File: <span id="file-entropy">0</span></h3>
+    <h3>Shannon Entropy Index: <span id="entropy">NO FILE LOADED</span></h3>
+    <h3>File: <span id="file-entropy">NO FILE LOADED0</span></h3>
     </br>
+<form class=uploadForm id="uploadForm" enctype="multipart/form-data">
+<input type="file" id="fileInput" name="file" accept="*/*" />
+<button type="submit">Upload</button>
+</form>
     <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
 	<canvas id="histogram" width="800" height="75"></canvas>
     </div>
@@ -451,7 +476,6 @@ const worker = new Worker("worker.js");
 
 let busy = false;
 
-const form = document.getElementById("uploadForm");
 
 /*
     const fileInput = document.getElementById("fileInput");
@@ -466,7 +490,9 @@ const form = document.getElementById("uploadForm");
         method: "POST",
         body: formData
     });
+
 */
+const form = document.getElementById("uploadForm");
 
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -476,10 +502,11 @@ form.addEventListener("submit", async (e) => {
     const arrayBuffer = await file.arrayBuffer();
 
     if (!file) return;
-    console.log(file);
-    console.log(file.arrayBuffer());
-	self.document.getElementById("file-entropy").textContent =
-	    file.name + " (" + file.size + " Bytes)";
+    uploadForm.classList.add("out");
+    //console.log(file);
+    //console.log(file.arrayBuffer());
+    self.document.getElementById("file-entropy").textContent =
+        file.name + " (" + file.size + " Bytes)";
 
     worker.postMessage({
         type: "PROCESS_BYTES",
@@ -491,20 +518,19 @@ ws.onmessage = async function (event) {
     //if (busy) return;
     //busy = true;
 
-    //const buffer = event.data;
     const buffer = await event.data.arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
-    //uploadFileBytes(bytes)
-    // JSON
-    //worker.postMessage(event.data);
-    // binary
-    //worker.postMessage(event.data, [event.data]);
-    console.log(self.event.data);
-    console.log(event.data);
-    console.log(bytes);
+    //console.log(self.event.data);
+    //console.log(event.data);
 
-    // Transfer ownership (zero copy!)
+    setTimeout(() => {
+        uploadForm.classList.remove("out");
+        //self.document.getElementById("file-entropy").textContent = " UUU "
+        document.body.style.backgroundColor =
+            `rgb(255,0,0)`;
+    }, 250);
+
     worker.postMessage({
         type: "PROCESS_BYTES",
         payload: event.data

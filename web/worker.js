@@ -1,5 +1,5 @@
 
-let rollingBuffer = [];
+//let rollingBuffer = [];
 let rollingHistBuffer = [];
 
 function handleByteStream(arrayBuffer) {
