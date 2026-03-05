@@ -26,27 +26,27 @@ body {
 
 #uploadForm {
     opacity: 1;
-    visibility: true;
+    visibility: visible;
     margin: auto;
     border: 1px solid red;
 }
 
 #uploadForm.out {
-    visibility: false;
+    visibility: hidden;
     opacity: 0;
     border: 1px solid red;
 }
 
 .uploadForm {
     opacity: 1;
-    visibility: true;
+    visibility: visible;
     margin: auto;
     border: 1px solid red;
 }
 
 .uploadForm.out {
     opacity: 0;
-    visibility: false;
+    visibility: hidden;
     border: 1px solid red;
 }
 
@@ -115,12 +115,14 @@ h3 {
 
 <div class="panel">
     <h3>Shannon Entropy Index: <span id="entropy">NO FILE LOADED</span></h3>
-    <h3>File: <span id="file-entropy">NO FILE LOADED0</span></h3>
+    <h3>File: <span id="file-entropy">NO FILE LOADED</span></h3>
     </br>
+
 <form class=uploadForm id="uploadForm" enctype="multipart/form-data">
 <input type="file" id="fileInput" name="file" accept="*/*" />
 <button type="submit">Upload</button>
 </form>
+
     <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
 	<canvas id="histogram" width="800" height="75"></canvas>
     </div>
@@ -254,7 +256,8 @@ function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
 	//const percentText = percentages[i].toFixed(2) + "%";
 	//const percentText = percentages[i] + "%";
 	//const percentText = values[i] + "%";
-	const percentText = values[i];
+	const percentText = values[1-i];
+        //const fullText = `${label} — ${percentText}`;
         const fullText = `${label} — ${percentText}`;
         ctx.fillText(fullText, startX + 20, y);
         //ctx.fillText(label, startX + 20, y);
@@ -264,7 +267,7 @@ function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
 function generateByteRangeLabels(bucketSize) {
     const labels = [];
 
-    for (let i = 0; i < 2; i += bucketSize) {
+    for (let i = 0; i <= 1; i += bucketSize) {
         //labels.push(`${i}-${i + bucketSize - 1}`);
         labels.push(`# of ${i}`);
     }
