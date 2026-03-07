@@ -109,6 +109,7 @@ Supported client protocols
 - pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
 - OS Variables to enable/disable TLS, h2, and other useful test features
 - CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, timers and more.
+- pages are optimezed for client-side renderingm as the separation of DOM, canvas and JS workers is enforced by-design (not-blocking, not-CPU intensive, allows packet drop, recovery and other anti-stall features)
 
 ### Hardware already supported, more to be added soon
 ```
@@ -295,8 +296,14 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 ## What is yet to come
 
 ### Features to be added
-- GO build tags: for PROD and for DEMO
-- systemd implementation, to have it startup at boot, eventually after inserting or at leas probing, the proper kernel module to support the RNG source
+- eventually add go sync.Pool, to be evalueted yet
+- add GO build tags for PROD and for DEMO modes
+- define and implement GO tests
+- replace Diceware dependency with local dictionary, only used for /words endpoint
+- systemd implementation, allowing control of entropy-service startup, only after probing respective kernel module if existing (i.e. for Quantis PCI QNRG cards)
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator
+- entropy-client in GO
+- abstraction and reorganization of code for DRBG, transport, service and domain (for example: domain/ rng/ service/ transport/ /cmd)
+- add FUSE device and allor for "openssl rand -engine entropyctl"

@@ -760,6 +760,9 @@ func fileAnalyzeHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) htt
 					return
 				}
 
+				// TODO: add upload limiter, i.e. 50MB
+				//r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
+
 				buf := make([]byte, len(bytes))
 				d.Read(bytes)
 
