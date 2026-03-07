@@ -1,21 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
-	"io"
-	"math"
-	"net/http"
-	"sync/atomic"
-
-	//"entropy-service/internal/client"
+	"entropy-service/internal/client"
 	"entropy-service/internal/device"
 	"entropy-service/internal/diag"
 	"entropy-service/internal/tests"
+	"math"
+	//"entropy-service/internal/pipe"
 )
 
 /*
@@ -23,16 +22,16 @@ import (
 	"math"
 	"net/http"
 	"time"
+	"sync/atomic"
 	"encoding/hex"
 
 entropy-client \
-   -url http://127.0.0.1:8080/entropy \
-   -bytes 4096 \
    -device /dev/urandom \
    -stdout \
    -tests
 */
 
+/*
 var url = flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
 var size = flag.Int("bytes", 1048576, "bytes to fetch")
 
@@ -40,27 +39,13 @@ const (
 	serverURL = "http://127.0.0.1:8080/v1/data/random?bytes=1048576"
 	refresh   = time.Second / 2
 )
+*/
 
 type Stats struct {
 	TotalBytes int
 	Rate       float64
 	Entropy    float64
 	Hist       [256]int
-}
-
-func fetchEntropy(endpoint string, quantity *int) ([]byte, error) {
-
-	//resp, err := http.Get(serverURL)
-	resp, err := http.Get(endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-
-	return data, err
 }
 
 func computeEntropy(data []byte, hist *[256]int) float64 {
@@ -119,7 +104,7 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	fmt.Print("\033[H\033[2J")
 
 	fmt.Println("EntropyCTL Monitor")
-	fmt.Println("Server :", serverURL)
+	//fmt.Println("Server :", serverURL)
 	fmt.Println()
 
 	fmt.Printf("Rate        : %.1f KB/s\n", stats.Rate/1024)
@@ -138,7 +123,6 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	drawHistogram(&stats.Hist)
 
 	fmt.Println()
-	//fmt.Println("press Ctrl+C to exit")
 
 	tests.RunAll(data)
 	diag.RunDiagnostics(data)
@@ -146,9 +130,9 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 func main() {
 
-	endpoint := "http://127.0.0.1:8080/v1/data/random?bytes=1048576"
-	//url := flag.String("url", "http://127.0.0.1:8080/entropy?bytes=4096", "entropy endpoint")
+	url := flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
 	slice := flag.Int("slice", 1048576, "amount of entropy pre fetch")
+	showDebug := flag.Bool("debug", false, "print debug information")
 	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
 	showMatrix := flag.Bool("matrix", false, "print 64x64 matrix ")
 	showGraph := flag.Bool("graph", false, "print distribution graph")
@@ -156,9 +140,14 @@ func main() {
 	showHistogram := flag.Bool("histogram", false, "print extended histogram")
 
 	flag.Parse()
+
+	// create a cancellable context (useful for timeouts / graceful shutdown)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	fmt.Print("\033[H\033[2J") // clear screen
 
-	testdata, _ := fetchEntropy(endpoint, slice)
+	testdata, _ := client.FetchEntropy(ctx, *url, *slice)
 	result := diag.RunDiagnostics(testdata)
 
 	fmt.Println("Diagnostic summary")
@@ -177,39 +166,34 @@ func main() {
 	graph := diag.NewEntropyGraph(120) // was 80
 	dashboard := diag.NewDashboard(80)
 
-	//addplushttp := diag.incHTTP()
-	//addplusbytes := diag.incBytes(len(data))
-
 	for {
-
-		data, err := fetchEntropy(endpoint, slice)
-		//data, err := client.FetchEntropy(endpoint, slice)
+		data, err := client.FetchEntropy(ctx, *url, *slice)
 		if err != nil {
-			fmt.Println("connection error:", err)
-			fmt.Println("fetch error:", err)
+			fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
 			os.Exit(1)
 			//panic(err)
 		} else {
 			atomic.AddUint64(&diag.BytesFetched, uint64(len(data)))
-			btot := atomic.LoadUint64(&diag.BytesFetched)
+			//addplusbytes := diag.incBytes(len(data))
 			//atomic.AddUint64(&diag.httpCRequests, +1)
 			//htot := atomic.LoadUint64(&diag.httpCRequests)
-			//htot := incHTTP(1)
-			fmt.Println("real RECV:", btot)
+			//htot := diag.incHTTP(1)
 			//fmt.Println("real HTTP:", htot)
 		}
 
+		// ... call your diag / tests / UI code here
+		//_ = data
+
 		// optional device write
-		err = device.Write("/dev/urandom", data)
-		if err != nil {
-			fmt.Println("device write error:", err)
+		deverr := device.Write("/dev/urandom", data)
+		if deverr != nil {
+			fmt.Println("device write error:", deverr)
 		}
 
 		stats := Stats{}
 		start := time.Now()
 
 		stats.TotalBytes += len(data)
-		fmt.Println("received:", len(data), "bytes")
 
 		stats.Entropy = computeEntropy(data, &stats.Hist)
 
@@ -237,6 +221,12 @@ func main() {
 			//fmt.Println(hex.Dump(data[:32]))
 			// pause slightly so user sees preview in TTY
 			time.Sleep(500 * time.Millisecond)
+		}
+
+		if *showDebug && len(data) > 0 {
+			fmt.Printf("received %d bytes\n", len(data))
+			btot := atomic.LoadUint64(&diag.BytesFetched)
+			fmt.Println("real RECV:", btot)
 		}
 
 		if *showGraph && len(data) > 0 {
