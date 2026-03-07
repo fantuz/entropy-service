@@ -52,10 +52,8 @@ func RunAll(data []byte) {
 
 	if result.Pass {
 		fmt.Println("RESULT: OK")
-		fmt.Println("-------------------")
 	} else {
 		fmt.Println("RESULT: WARNING")
-		fmt.Println("-------------------")
 	}
 
 }

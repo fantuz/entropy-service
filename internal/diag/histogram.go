@@ -30,7 +30,7 @@ func PrintHistogram64(buckets int, data []byte) {
 		scale = 1
 	}
 
-	fmt.Println("\nByte distribution (64 bins)")
+	fmt.Println("\nByte distribution (32 bins)")
 
 	for i := 0; i < buckets; i++ {
 

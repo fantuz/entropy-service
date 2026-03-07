@@ -33,11 +33,11 @@ entropy-client \
    -tests
 */
 
-var url = flag.String("url", "http://127.0.0.1:8080/v1/data/random", "entropy endpoint")
-var size = flag.Int("bytes", 4096, "bytes to fetch")
+var url = flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
+var size = flag.Int("bytes", 1048576, "bytes to fetch")
 
 const (
-	serverURL = "http://127.0.0.1:8080/v1/data/random?bytes=65536"
+	serverURL = "http://127.0.0.1:8080/v1/data/random?bytes=1048576"
 	refresh   = time.Second / 2
 )
 
@@ -50,7 +50,8 @@ type Stats struct {
 
 func fetchEntropy(endpoint string, quantity *int) ([]byte, error) {
 
-	resp, err := http.Get(serverURL)
+	//resp, err := http.Get(serverURL)
+	resp, err := http.Get(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,6 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 	fmt.Println()
 	fmt.Println("Histogram (top 16)")
-	fmt.Println()
 	drawHistogram(&stats.Hist)
 
 	fmt.Println()
@@ -146,12 +146,14 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 func main() {
 
-	endpoint := "http://127.0.0.1:8080/v1/data/random?bytes=16384"
+	endpoint := "http://127.0.0.1:8080/v1/data/random?bytes=1048576"
 	//url := flag.String("url", "http://127.0.0.1:8080/entropy?bytes=4096", "entropy endpoint")
-	slice := flag.Int("slice", 16384, "amount of entropy pre fetch")
+	slice := flag.Int("slice", 1048576, "amount of entropy pre fetch")
 	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
 	showMatrix := flag.Bool("matrix", false, "print 64x64 matrix ")
-	showGraph := flag.Bool("graph", false, "print Shannon graph")
+	showGraph := flag.Bool("graph", false, "print distribution graph")
+	showDashboard := flag.Bool("dashboard", false, "print dashboard summaries")
+	showHistogram := flag.Bool("histogram", false, "print extended histogram")
 
 	flag.Parse()
 	fmt.Print("\033[H\033[2J") // clear screen
@@ -168,11 +170,13 @@ func main() {
 	fmt.Printf("PASS: %v\n", result.Pass)
 	fmt.Println("")
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// TODO: add exit here if tests FAIL
 
-	graph := diag.NewEntropyGraph(120)
+	graph := diag.NewEntropyGraph(120) // was 80
+	dashboard := diag.NewDashboard(80)
+
 	//addplushttp := diag.incHTTP()
 	//addplusbytes := diag.incBytes(len(data))
 
@@ -215,6 +219,8 @@ func main() {
 		hr := time.Since(start).Minutes()
 		fmt.Println("runtime:", hr, "seconds")
 
+		drawUI(&stats, start, data)
+
 		if *showMatrix && len(data) > 0 {
 			tm := diag.BuildTransitionMatrix(data)
 			tm.PrintHeatmap()
@@ -230,11 +236,8 @@ func main() {
 			fmt.Println(hex.EncodeToString(data[:32]))
 			//fmt.Println(hex.Dump(data[:32]))
 			// pause slightly so user sees preview in TTY
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
-
-		//time.Sleep(500 * time.Millisecond)
-		//time.Sleep(refresh)
 
 		if *showGraph && len(data) > 0 {
 			r := diag.RunDiagnostics(data)
@@ -243,12 +246,21 @@ func main() {
 			time.Sleep(500 * time.Millisecond)
 		}
 
-		//bgraph := diag.PrintHistogram64(data)
-		//bgraph.Render()
+		if *showDashboard && len(data) > 0 {
+			q := diag.RunDiagnostics(data)
+			dashboard.Add(q)
+			dashboard.Render()
+			time.Sleep(100 * time.Millisecond)
+		}
 
-		time.Sleep(100 * time.Millisecond)
-		drawUI(&stats, start, data)
+		if *showHistogram && len(data) > 0 {
+			//bgraph := diag.PrintHistogram64(, data)
+			//bgraph.Render()
+			diag.PrintHistogram64(32, data) // TODO: fix bucketsize
+			time.Sleep(200 * time.Millisecond)
+		}
 
-		//diag.PrintHistogram64(32, data) // TODO: fix bucketsize
+		time.Sleep(50 * time.Millisecond)
+		//time.Sleep(refresh)
 	}
 }

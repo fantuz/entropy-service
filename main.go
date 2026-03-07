@@ -694,11 +694,11 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 
 		size := 65536
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			//if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= maxSize {
+			//if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= maxSize
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<20 {
 				size = v
 			} else {
-				size = maxSize
+				//size = maxSize
 			}
 		}
 		buf := make([]byte, size)
