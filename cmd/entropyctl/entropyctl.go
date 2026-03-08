@@ -52,6 +52,12 @@ type Stats struct {
 const Reset = "\033[0m"
 const Red = "\033[31m"
 const Green = "\033[32m"
+const Yellow = "\033[33m"
+const Blue = "\033[34m"
+const Magenta = "\033[35m"
+const Cyan = "\033[36m"
+const Gray = "\033[37m"
+const White = "\033[97m"
 
 func computeEntropy(data []byte, hist *[256]int) float64 {
 
@@ -107,7 +113,7 @@ func drawHistogram(hist *[256]int) {
 func drawUI(stats *Stats, start time.Time, data []byte) {
 
 	fmt.Print("\033[H\033[2J")
-	fmt.Println("EntropyCTL Monitor")
+	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	//fmt.Println("Server :", serverURL)
 	fmt.Println()
 
@@ -151,6 +157,8 @@ func main() {
 	testdata, _ := client.FetchEntropySimple(url, slice)
 	result := diag.RunDiagnostics(testdata)
 
+	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
+	fmt.Println()
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
