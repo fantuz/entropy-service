@@ -40,8 +40,8 @@ func (d *Dashboard) Add(r Diagnostics) {
 	d.monoP = push(d.monoP, r.MonobitP, d.width)
 	d.serial = push(d.serial, r.SerialR, d.width)
 	d.rate.Update(r.N)
-	//d.rate.Update(int(math.Round(d.rate.RateMbps())))
 	//d.rate.Update(len(r.N))
+	//d.rate.Update(int(math.Round(d.rate.RateMbps())))
 }
 
 func spark(v float64, min float64, max float64) rune {

@@ -41,6 +41,7 @@ func RunAll(data []byte) {
 
 	result := diag.RunDiagnostics(data)
 
+	//result.Rate = r.Update()
 	fmt.Println("Entropy diagnostics")
 	fmt.Println("-------------------")
 
@@ -56,5 +57,7 @@ func RunAll(data []byte) {
 	} else {
 		fmt.Println("RESULT: WARNING")
 	}
+
+	fmt.Println()
 
 }

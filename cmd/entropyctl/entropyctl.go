@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"sync/atomic"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"entropy-service/internal/device"
 	"entropy-service/internal/diag"
 	"entropy-service/internal/tests"
-	"math"
+	"github.com/gorilla/websocket"
 	//"entropy-service/internal/pipe"
 )
 
@@ -32,7 +33,6 @@ entropy-client \
 */
 
 /*
-var url = flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
 var size = flag.Int("bytes", 1048576, "bytes to fetch")
 
 const (
@@ -40,6 +40,12 @@ const (
 	refresh   = time.Second / 2
 )
 */
+
+// var wsurl = "http://127.0.0.1:8080/stream.html?bytes=1048576"
+const (
+	//wsurl = "http://127.0.0.1:8080/stream.html?bytes=1048576"
+	wsurl = "ws://localhost:8080/stream?bytes=1048576"
+)
 
 type Stats struct {
 	TotalBytes int
@@ -106,19 +112,21 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	//fmt.Println("Server :", serverURL)
 	fmt.Println()
 
-	fmt.Printf("Rate        : %.1f KB/s\n", stats.Rate/1024)
-	fmt.Printf("Fetched     : %d KB\n", stats.TotalBytes/1024)
-	fmt.Printf("Entropy     : %.4f bits/byte\n", stats.Entropy)
+	//fmt.Printf("Rate    : %.1f MB/s\n", stats.Rate/1024/1024)
+	fmt.Printf("Bitrate : %.2f Mbit/s\n", stats.Rate/1024/1024)
+	fmt.Printf("Fetched : %d KB\n", stats.TotalBytes/1024)
+	fmt.Printf("Entropy : %.4f bits/byte\n", stats.Entropy)
 
 	status := "OK"
 	if stats.Entropy < 7.9 {
 		status = "WARN"
 	}
 
-	fmt.Printf("Status      : %s\n", status)
+	fmt.Printf("Status  : %s\n", status)
 	fmt.Println()
 
 	tests.RunAll(data)
+	//(*diag.RateMeter).Update(diag.RateMeter, 1024)
 }
 
 func main() {
@@ -132,6 +140,7 @@ func main() {
 	showDashboard := flag.Bool("dashboard", false, "print dashboard summaries")
 	showHistogram := flag.Bool("histogram", false, "print extended histogram")
 	refresh := flag.Duration("refresh", 50*time.Millisecond, "refresh interval for both HTTP and WS")
+	mode := flag.String("mode", "pull", "pull|stream")
 
 	flag.Parse()
 
@@ -145,16 +154,27 @@ func main() {
 	result := diag.RunDiagnostics(testdata)
 
 	fmt.Println("Diagnostic summary")
+	//fmt.Printf("Bitrate: %f\n", result.Rate)
 	fmt.Printf("Bytes: %d\n", result.N)
 	fmt.Printf("Shannon entropy: %.6f bits/byte\n", result.Shannon)
 	fmt.Printf("Chi²: %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
 	fmt.Printf("Monobit p-value: %.6f\n", result.MonobitP)
 	fmt.Printf("Serial r: %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
 	fmt.Printf("PASS: %v\n", result.Pass)
-	fmt.Printf("Bitrate: %f\n", result.Rate)
-	fmt.Println("")
+	fmt.Println()
 
 	time.Sleep(3 * time.Second)
+
+	wsconn, _, wscerr := websocket.DefaultDialer.Dial(wsurl, nil)
+	if wscerr != nil {
+		fmt.Fprintf(os.Stderr, "fetch error: %v\n", wscerr)
+		fmt.Printf("error: %v\n", *url)
+		fmt.Printf("error: %v\n", wsurl)
+		panic(wscerr)
+		//os.Exit(1)
+	}
+
+	defer wsconn.Close()
 
 	// TODO: add exit here if tests FAIL
 
@@ -195,6 +215,50 @@ func main() {
 
 		//defer iterCancel()
 		iterCancel()
+
+		/*
+			_, msg, wserr := wsconn.ReadMessage()
+			if wserr != nil {
+				fmt.Fprintf(os.Stderr, "fetch error: %v\n", wserr)
+				os.Exit(1)
+				//panic(err)
+			} else {
+				fmt.Printf("MSG: %v\n", len(msg))
+			}
+		*/
+
+		/*
+			for data := range msg {
+				r := diag.RunDiagnostics(data)
+				dashboard.Add(r)
+				dashboard.Render()
+				graph.Add(r.Shannon)
+				graph.Render()
+			}
+		*/
+
+		if *mode == "stream" {
+			stream, sterr := client.StreamEntropy(wsurl)
+			if sterr != nil {
+				panic(sterr)
+			}
+			for stdata := range stream {
+				//diag.RunDiagnostics(data)
+				r := diag.RunDiagnostics(stdata)
+				dashboard.Add(r)
+				dashboard.Render()
+				graph.Add(r.Shannon)
+				graph.Render()
+				fmt.Printf("MSG: %v\n", len(stdata))
+			}
+			/*
+				for stdata := range stream {
+					//r := diag.RunDiagnostics(data)
+					//dashboard.Add(r)
+					//dashboard.Render()
+				}
+			*/
+		}
 
 		// ... call your diag / tests / UI code here
 		//_ = data
@@ -256,8 +320,8 @@ func main() {
 		}
 
 		if *showHistogram && len(data) > 0 {
-			//fmt.Println("Histogram (top 16)")
-			//drawHistogram(&stats.Hist)
+			fmt.Println("\nHistogram (top 16)")
+			drawHistogram(&stats.Hist)
 
 			//bgraph := diag.PrintHistogram64(, data)
 			//bgraph.Render()
@@ -271,7 +335,6 @@ func main() {
 
 		hr := time.Since(start).Milliseconds()
 		fmt.Println("runtime:", hr, "ms")
-		//fmt.Printf( "Entropy rate : %.2f Mbit/s\n", diag.RateMbps(),)
 
 		time.Sleep(time.Duration(*refresh))
 	}

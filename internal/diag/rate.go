@@ -6,6 +6,7 @@ type RateMeter struct {
 	start time.Time
 	bytes int
 	rate  float64
+	//rate *RateMeter
 }
 
 func NewRateMeter() *RateMeter {

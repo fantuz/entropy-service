@@ -68,6 +68,7 @@ func RunDiagnostics(data []byte) Diagnostics {
 	atomic.AddUint64(&httpCRequests, uint64(n))
 
 	rate := NewRateMeter()
+	rate.Update(len(data))
 	//fmt.Println("real rate", rate.RateMbps())
 
 	return Diagnostics{
