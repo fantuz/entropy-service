@@ -1,6 +1,9 @@
 package diag
 
-import "fmt"
+import (
+	"fmt"
+	//"math"
+)
 
 type Dashboard struct {
 	width int
@@ -32,11 +35,12 @@ func push(series []float64, v float64, width int) []float64 {
 
 func (d *Dashboard) Add(r Diagnostics) {
 
-	d.rate.Update(r.N)
 	d.entropy = push(d.entropy, r.Shannon, d.width)
 	d.chiP = push(d.chiP, r.Chi2P, d.width)
 	d.monoP = push(d.monoP, r.MonobitP, d.width)
 	d.serial = push(d.serial, r.SerialR, d.width)
+	d.rate.Update(r.N)
+	//d.rate.Update(int(math.Round(d.rate.RateMbps())))
 	//d.rate.Update(len(r.N))
 }
 

@@ -102,7 +102,6 @@ func drawHistogram(hist *[256]int) {
 func drawUI(stats *Stats, start time.Time, data []byte) {
 
 	fmt.Print("\033[H\033[2J")
-
 	fmt.Println("EntropyCTL Monitor")
 	//fmt.Println("Server :", serverURL)
 	fmt.Println()
@@ -117,15 +116,9 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	}
 
 	fmt.Printf("Status      : %s\n", status)
-
-	fmt.Println()
-	fmt.Println("Histogram (top 16)")
-	drawHistogram(&stats.Hist)
-
 	fmt.Println()
 
 	tests.RunAll(data)
-	diag.RunDiagnostics(data)
 }
 
 func main() {
@@ -138,16 +131,17 @@ func main() {
 	showGraph := flag.Bool("graph", false, "print distribution graph")
 	showDashboard := flag.Bool("dashboard", false, "print dashboard summaries")
 	showHistogram := flag.Bool("histogram", false, "print extended histogram")
+	refresh := flag.Duration("refresh", 50*time.Millisecond, "refresh interval for both HTTP and WS")
 
 	flag.Parse()
 
 	// create a cancellable context (useful for timeouts / graceful shutdown)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	fmt.Print("\033[H\033[2J") // clear screen
 
-	testdata, _ := client.FetchEntropy(ctx, *url, *slice)
+	testdata, _ := client.FetchEntropySimple(url, slice)
 	result := diag.RunDiagnostics(testdata)
 
 	fmt.Println("Diagnostic summary")
@@ -157,17 +151,35 @@ func main() {
 	fmt.Printf("Monobit p-value: %.6f\n", result.MonobitP)
 	fmt.Printf("Serial r: %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
 	fmt.Printf("PASS: %v\n", result.Pass)
+	fmt.Printf("Bitrate: %f\n", result.Rate)
 	fmt.Println("")
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// TODO: add exit here if tests FAIL
 
 	graph := diag.NewEntropyGraph(120) // was 80
-	dashboard := diag.NewDashboard(80)
+	dashboard := diag.NewDashboard(120)
+
+	select {
+	case <-ctx.Done():
+		{
+			//fmt.Println("HERE-CASE-CTX-DONE:")
+			cancel()
+			//return
+		}
+	default:
+		{
+			//fmt.Println("HERE-CASE-CTX-CONTINUE:")
+		}
+	}
 
 	for {
-		data, err := client.FetchEntropy(ctx, *url, *slice)
+		iterCtx, iterCancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+		data, err := client.FetchEntropy(iterCtx, *url, *slice)
+		//data, err := client.FetchEntropySimple(url, slice)
+
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
 			os.Exit(1)
@@ -180,6 +192,9 @@ func main() {
 			//htot := diag.incHTTP(1)
 			//fmt.Println("real HTTP:", htot)
 		}
+
+		//defer iterCancel()
+		iterCancel()
 
 		// ... call your diag / tests / UI code here
 		//_ = data
@@ -199,9 +214,6 @@ func main() {
 
 		elapsed := time.Since(start).Seconds()
 		stats.Rate = float64(stats.TotalBytes) / elapsed
-
-		hr := time.Since(start).Minutes()
-		fmt.Println("runtime:", hr, "seconds")
 
 		drawUI(&stats, start, data)
 
@@ -244,13 +256,23 @@ func main() {
 		}
 
 		if *showHistogram && len(data) > 0 {
+			//fmt.Println("Histogram (top 16)")
+			//drawHistogram(&stats.Hist)
+
 			//bgraph := diag.PrintHistogram64(, data)
 			//bgraph.Render()
 			diag.PrintHistogram64(32, data) // TODO: fix bucketsize
 			time.Sleep(200 * time.Millisecond)
 		}
 
-		time.Sleep(50 * time.Millisecond)
+		//time.Sleep(50 * time.Millisecond)
 		//time.Sleep(refresh)
+		//time.Sleep(time.Duration(*refresh * (time.Millisecond)))
+
+		hr := time.Since(start).Milliseconds()
+		fmt.Println("runtime:", hr, "ms")
+		//fmt.Printf( "Entropy rate : %.2f Mbit/s\n", diag.RateMbps(),)
+
+		time.Sleep(time.Duration(*refresh))
 	}
 }

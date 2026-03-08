@@ -44,11 +44,12 @@ func RunAll(data []byte) {
 	fmt.Println("Entropy diagnostics")
 	fmt.Println("-------------------")
 
-	fmt.Printf("bytes             : %d\n", result.N)
-	fmt.Printf("shannon entropy   : %.5f / 8\n", result.Shannon)
-	fmt.Printf("chi-square        : %.3f (p=%.5f)\n", result.Chi2, result.Chi2P)
-	fmt.Printf("monobit p-value   : %.5f\n", result.MonobitP)
-	fmt.Printf("serial correlation: %.6f (p=%.5f)\n", result.SerialR, result.SerialP)
+	fmt.Printf("bytes              : %d\n", result.N)
+	fmt.Printf("shannon entropy    : %.5f / 8\n", result.Shannon)
+	fmt.Printf("chi-square         : %.3f (p=%.5f)\n", result.Chi2, result.Chi2P)
+	fmt.Printf("monobit p-value    : %.5f\n", result.MonobitP)
+	fmt.Printf("serial correlation : %.6f (p=%.5f)\n", result.SerialR, result.SerialP)
+	fmt.Printf("entropy rate       : %.2f Mbit/s\n", result.Rate)
 
 	if result.Pass {
 		fmt.Println("RESULT: OK")

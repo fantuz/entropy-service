@@ -5,7 +5,7 @@ import "fmt"
 // perfect RNG -> 1 / 64 ≈ 0.015625
 
 type TransitionMatrix struct {
-	Matrix [64][64]int
+	Matrix [32][32]int
 	Total  int
 }
 
@@ -19,8 +19,8 @@ func BuildTransitionMatrix(data []byte) TransitionMatrix {
 
 	for i := 0; i < len(data)-1; i++ {
 
-		a := int(data[i]) / 4
-		b := int(data[i+1]) / 4
+		a := int(data[i]) / 8
+		b := int(data[i+1]) / 8
 
 		tm.Matrix[a][b]++
 		tm.Total++
@@ -42,8 +42,8 @@ func (tm *TransitionMatrix) PrintHeatmap() {
 
 	max := 0
 
-	for i := 0; i < 64; i++ {
-		for j := 0; j < 64; j++ {
+	for i := 0; i < 32; i++ {
+		for j := 0; j < 32; j++ {
 			if tm.Matrix[i][j] > max {
 				max = tm.Matrix[i][j]
 			}
@@ -54,12 +54,12 @@ func (tm *TransitionMatrix) PrintHeatmap() {
 		max = 1
 	}
 
-	fmt.Println("\nTransition Matrix (64x64)")
+	fmt.Println("\nTransition Matrix (32x32)")
 	fmt.Println("--------------------------")
 
-	for i := 0; i < 64; i++ {
+	for i := 0; i < 32; i++ {
 
-		for j := 0; j < 64; j++ {
+		for j := 0; j < 32; j++ {
 
 			v := float64(tm.Matrix[i][j]) / float64(max)
 

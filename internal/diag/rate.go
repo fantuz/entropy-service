@@ -2,38 +2,6 @@ package diag
 
 import "time"
 
-/*
-type RateMeter struct {
-	lastTime  time.Time
-	lastBytes int
-	rate      float64
-}
-
-func NewRateMeter() *RateMeter {
-	return &RateMeter{
-		lastTime: time.Now(),
-	}
-}
-
-func (r *RateMeter) Update(bytes int) {
-
-	now := time.Now()
-	elapsed := now.Sub(r.lastTime).Seconds()
-
-	if elapsed == 0 {
-		return
-	}
-
-	delta := bytes - r.lastBytes
-
-	r.rate = float64(delta*8) / elapsed
-
-	r.lastBytes = bytes
-	r.lastTime = now
-}
-
-*/
-
 type RateMeter struct {
 	start time.Time
 	bytes int
@@ -58,8 +26,12 @@ func (r *RateMeter) Update(n int) {
 		return
 	}
 
+	//delta := bytes - r.lastBytes
+	//r.rate = float64(delta*8) / elapsed
+
 	r.rate = float64(r.bytes*8) / elapsed
 
+	//r.bytes = r.bytes
 	r.bytes = 0
 	r.start = now
 }

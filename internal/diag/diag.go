@@ -16,6 +16,7 @@ type Diagnostics struct {
 	MonobitP     float64
 	SerialR      float64
 	SerialP      float64
+	Rate	     float64
 	TMatrix      TransitionMatrix
 	Pass         bool
 	Notes        string
@@ -66,6 +67,9 @@ func RunDiagnostics(data []byte) Diagnostics {
 	atomic.AddUint64(&BytesFetched, uint64(n))
 	atomic.AddUint64(&httpCRequests, uint64(n))
 
+	rate := NewRateMeter()
+	//fmt.Println("real rate", rate.RateMbps())
+
 	return Diagnostics{
 		N:        n,
 		Chi2:     chi2,
@@ -76,6 +80,7 @@ func RunDiagnostics(data []byte) Diagnostics {
 		SerialP:  serialP,
 		TMatrix:  tm,
 		Pass:     pass,
+		Rate:	  rate.RateMbps(),
 	}
 }
 

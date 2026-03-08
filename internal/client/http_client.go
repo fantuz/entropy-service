@@ -9,30 +9,8 @@ import (
 	"time"
 )
 
-/*
-func fetchEntropy() ([]byte, error) {
-	resp, err := http.Get(serverURL)
-	data, err := io.ReadAll(resp.Body)
-	return data, err
-}
-*/
-
-/*
-func FetchEntropy(url string, size* int) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	return data, err
-	//return io.ReadAll(resp.Body)
-}
-*/
-
 func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
 
-	//resp, err := http.Get(serverURL)
 	resp, err := http.Get(*endpoint)
 	if err != nil {
 		return nil, err
@@ -43,6 +21,12 @@ func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
 	data, err := io.ReadAll(resp.Body)
 
 	return data, err
+}
+
+func FetchEntropySimple(endpoint *string, quantity *int) ([]byte, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
+    return FetchEntropy(ctx, *endpoint, *quantity)
 }
 
 // FetchEntropy requests `quantity` bytes from `endpoint` and returns the raw bytes.
@@ -75,6 +59,8 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, e
 
 		},
 	}
+	
+	//fmt.Println("HERE-HTTP:")
 
 	// Build request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -99,6 +85,7 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
+
 	return data, nil
 }
 
