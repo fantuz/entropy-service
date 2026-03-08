@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -41,18 +42,16 @@ const (
 )
 */
 
-// var wsurl = "http://127.0.0.1:8080/stream.html?bytes=1048576"
-const (
-	//wsurl = "http://127.0.0.1:8080/stream.html?bytes=1048576"
-	wsurl = "ws://localhost:8080/stream?bytes=1048576"
-)
-
 type Stats struct {
 	TotalBytes int
 	Rate       float64
 	Entropy    float64
 	Hist       [256]int
 }
+
+const Reset = "\033[0m"
+const Red = "\033[31m"
+const Green = "\033[32m"
 
 func computeEntropy(data []byte, hist *[256]int) float64 {
 
@@ -112,21 +111,20 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	//fmt.Println("Server :", serverURL)
 	fmt.Println()
 
-	//fmt.Printf("Rate    : %.1f MB/s\n", stats.Rate/1024/1024)
-	fmt.Printf("Bitrate : %.2f Mbit/s\n", stats.Rate/1024/1024)
+	fmt.Printf("Rate    : %.2f MB/s\n", stats.Rate/1024/1024)
 	fmt.Printf("Fetched : %d KB\n", stats.TotalBytes/1024)
 	fmt.Printf("Entropy : %.4f bits/byte\n", stats.Entropy)
 
-	status := "OK"
+	status := Green + "OK" + Reset
 	if stats.Entropy < 7.9 {
-		status = "WARN"
+		status = Red + "WARN" + Reset
 	}
 
 	fmt.Printf("Status  : %s\n", status)
 	fmt.Println()
 
-	tests.RunAll(data)
 	//(*diag.RateMeter).Update(diag.RateMeter, 1024)
+	tests.RunAll(data)
 }
 
 func main() {
@@ -145,25 +143,35 @@ func main() {
 	flag.Parse()
 
 	// create a cancellable context (useful for timeouts / graceful shutdown)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	timeoutctx, timeoutcancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer timeoutcancel()
 
 	fmt.Print("\033[H\033[2J") // clear screen
 
 	testdata, _ := client.FetchEntropySimple(url, slice)
 	result := diag.RunDiagnostics(testdata)
 
-	fmt.Println("Diagnostic summary")
-	//fmt.Printf("Bitrate: %f\n", result.Rate)
-	fmt.Printf("Bytes: %d\n", result.N)
-	fmt.Printf("Shannon entropy: %.6f bits/byte\n", result.Shannon)
-	fmt.Printf("Chi²: %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
-	fmt.Printf("Monobit p-value: %.6f\n", result.MonobitP)
-	fmt.Printf("Serial r: %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
-	fmt.Printf("PASS: %v\n", result.Pass)
+	fmt.Println("*--------------------------------------------*")
+	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
+	fmt.Println("*--------------------------------------------*")
+	fmt.Printf("Bitrate         : %f\n", result.Rate)
+	fmt.Printf("Bytes           : %d\n", result.N)
+	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
+	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
+	fmt.Printf("Monobit p-value : %.6f\n", result.MonobitP)
+	fmt.Printf("Serial ratio    : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
 	fmt.Println()
 
-	time.Sleep(3 * time.Second)
+	if result.Pass == true {
+		fmt.Printf("PASS            : "+Green+"%v"+Reset+"\n", result.Pass)
+	} else {
+		fmt.Printf("PASS            : "+Red+"%v"+Reset+"\n", result.Pass)
+	}
+
+	time.Sleep(5 * time.Second)
+
+	fps := strconv.FormatInt(1/refresh.Milliseconds(), 10)
+	var wsurl = "ws://localhost:8080/stream?bytes=1048576&refresh=" + fps
 
 	wsconn, _, wscerr := websocket.DefaultDialer.Dial(wsurl, nil)
 	if wscerr != nil {
@@ -178,14 +186,15 @@ func main() {
 
 	// TODO: add exit here if tests FAIL
 
-	graph := diag.NewEntropyGraph(120) // was 80
-	dashboard := diag.NewDashboard(120)
+	// number of lines, also 120 is OK
+	graph := diag.NewEntropyGraph(80)
+	dashboard := diag.NewDashboard(80)
 
 	select {
-	case <-ctx.Done():
+	case <-timeoutctx.Done():
 		{
-			//fmt.Println("HERE-CASE-CTX-DONE:")
-			cancel()
+			fmt.Println("HERE-CASE-CTX-DONE:")
+			timeoutcancel()
 			//return
 		}
 	default:
@@ -195,9 +204,9 @@ func main() {
 	}
 
 	for {
-		iterCtx, iterCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-		data, err := client.FetchEntropy(iterCtx, *url, *slice)
+		data, err := client.FetchEntropy(httpCtx, *url, *slice)
 		//data, err := client.FetchEntropySimple(url, slice)
 
 		if err != nil {
@@ -214,7 +223,7 @@ func main() {
 		}
 
 		//defer iterCancel()
-		iterCancel()
+		httpCancel()
 
 		/*
 			_, msg, wserr := wsconn.ReadMessage()
@@ -226,39 +235,6 @@ func main() {
 				fmt.Printf("MSG: %v\n", len(msg))
 			}
 		*/
-
-		/*
-			for data := range msg {
-				r := diag.RunDiagnostics(data)
-				dashboard.Add(r)
-				dashboard.Render()
-				graph.Add(r.Shannon)
-				graph.Render()
-			}
-		*/
-
-		if *mode == "stream" {
-			stream, sterr := client.StreamEntropy(wsurl)
-			if sterr != nil {
-				panic(sterr)
-			}
-			for stdata := range stream {
-				//diag.RunDiagnostics(data)
-				r := diag.RunDiagnostics(stdata)
-				dashboard.Add(r)
-				dashboard.Render()
-				graph.Add(r.Shannon)
-				graph.Render()
-				fmt.Printf("MSG: %v\n", len(stdata))
-			}
-			/*
-				for stdata := range stream {
-					//r := diag.RunDiagnostics(data)
-					//dashboard.Add(r)
-					//dashboard.Render()
-				}
-			*/
-		}
 
 		// ... call your diag / tests / UI code here
 		//_ = data
@@ -279,7 +255,35 @@ func main() {
 		elapsed := time.Since(start).Seconds()
 		stats.Rate = float64(stats.TotalBytes) / elapsed
 
-		drawUI(&stats, start, data)
+		wsctx, wscancel := context.WithCancel(context.Background())
+		defer wscancel()
+
+		if *mode == "stream" {
+			stream, sterr := client.StreamEntropy(wsctx, wsurl, 32)
+			if sterr != nil {
+				panic(sterr)
+			}
+
+			for stdata := range stream {
+				drawUI(&stats, start, stdata)
+				//diag.RunDiagnostics(data)
+				r := diag.RunDiagnostics(stdata)
+				//diag.BuildTransitionMatrix(data)
+
+				dashboard.Add(r)
+				dashboard.Render()
+				graph.Add(r.Shannon)
+				graph.Render()
+				//tm := diag.BuildTransitionMatrix(data)
+				//tm.PrintHeatmap()
+				//fmt.Printf("MSG: %v\n", len(stdata))
+				//time.Sleep(50 * time.Millisecond)
+				hr := time.Since(start).Milliseconds()
+				fmt.Println("runtime:", hr, "ms")
+			}
+		} else {
+			drawUI(&stats, start, data)
+		}
 
 		if *showMatrix && len(data) > 0 {
 			tm := diag.BuildTransitionMatrix(data)
@@ -336,6 +340,6 @@ func main() {
 		hr := time.Since(start).Milliseconds()
 		fmt.Println("runtime:", hr, "ms")
 
-		time.Sleep(time.Duration(*refresh))
+		//time.Sleep(time.Duration(*refresh))
 	}
 }

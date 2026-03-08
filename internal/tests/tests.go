@@ -6,6 +6,10 @@ import (
 	"entropy-service/internal/diag"
 )
 
+const Reset = "\033[0m"
+const Red = "\033[31m"
+const Green = "\033[32m"
+
 /*
 func runTests(data []byte) {
 
@@ -53,9 +57,9 @@ func RunAll(data []byte) {
 	fmt.Printf("entropy rate       : %.2f Mbit/s\n", result.Rate)
 
 	if result.Pass {
-		fmt.Println("RESULT: OK")
+		fmt.Println("RESULT             : " + Green + "OK" + Reset)
 	} else {
-		fmt.Println("RESULT: WARNING")
+		fmt.Println("RESULT             : " + Red + "WARNING" + Reset)
 	}
 
 	fmt.Println()

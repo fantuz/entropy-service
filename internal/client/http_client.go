@@ -53,14 +53,12 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, e
 				Timeout:   5 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
-			IdleConnTimeout:     90 * time.Second,
+			IdleConnTimeout:     60 * time.Second,
 			TLSHandshakeTimeout: 5 * time.Second,
 			//TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 
 		},
 	}
-	
-	//fmt.Println("HERE-HTTP:")
 
 	// Build request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

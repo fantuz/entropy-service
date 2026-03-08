@@ -18,6 +18,7 @@ func NewRateMeter() *RateMeter {
 
 func (r *RateMeter) Update(n int) {
 
+	delta := r.bytes - n
 	r.bytes += n
 
 	now := time.Now()
@@ -27,10 +28,9 @@ func (r *RateMeter) Update(n int) {
 		return
 	}
 
-	//delta := bytes - r.lastBytes
-	//r.rate = float64(delta*8) / elapsed
+	r.rate = float64(delta*8) / elapsed
 
-	r.rate = float64(r.bytes*8) / elapsed
+	//r.rate = float64(r.bytes*8) / elapsed
 
 	//r.bytes = r.bytes
 	r.bytes = 0

@@ -95,26 +95,26 @@ func (d *Dashboard) Render() {
 	fmt.Println("Entropy Health Monitor")
 	fmt.Println("----------------------")
 	fmt.Printf(
-		"Entropy rate : %.2f Mbit/s\n",
+		"Entropy rate       : %.2f Mbit/s\n",
 		d.rate.RateMbps(),
 	)
 	fmt.Printf(
-		"Entropy      %s\n",
+		"Entropy              %s\n",
 		renderSeries(d.entropy, 7.5, 8.0),
 	)
 
 	fmt.Printf(
-		"Chi-square   %s\n",
+		"Chi-square           %s\n",
 		renderSeries(d.chiP, 0.0, 1.0),
 	)
 
 	fmt.Printf(
-		"Monobit      %s\n",
+		"Monobit              %s\n",
 		renderSeries(d.monoP, 0.0, 1.0),
 	)
 
 	fmt.Printf(
-		"Serial corr  %s\n",
+		"Serial corr          %s\n",
 		renderSeries(d.serial, -0.1, 0.1),
 	)
 	//fmt.Println("----------------------")
