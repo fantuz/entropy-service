@@ -20,26 +20,14 @@ import (
 )
 
 /*
-	"io"
 	"math"
-	"net/http"
 	"time"
 	"sync/atomic"
 	"encoding/hex"
-
-entropy-client \
-   -device /dev/urandom \
-   -stdout \
-   -tests
 */
 
 /*
-var size = flag.Int("bytes", 1048576, "bytes to fetch")
-
-const (
-	serverURL = "http://127.0.0.1:8080/v1/data/random?bytes=1048576"
-	refresh   = time.Second / 2
-)
+entropy-client -device /dev/urandom -stdout -tests
 */
 
 type Stats struct {
@@ -114,7 +102,6 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 	fmt.Print("\033[H\033[2J")
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
-	//fmt.Println("Server :", serverURL)
 	fmt.Println()
 
 	fmt.Printf("Rate    : %.2f MB/s\n", stats.Rate/1024/1024)
@@ -135,7 +122,6 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 func main() {
 
-	url := flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
 	slice := flag.Int("slice", 1048576, "amount of entropy pre fetch")
 	showDebug := flag.Bool("debug", false, "print debug information")
 	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
@@ -145,6 +131,12 @@ func main() {
 	showHistogram := flag.Bool("histogram", false, "print extended histogram")
 	refresh := flag.Duration("refresh", 50*time.Millisecond, "refresh interval for both HTTP and WS")
 	mode := flag.String("mode", "pull", "pull|stream")
+
+	//var size = flag.Int("bytes", 1048576, "bytes to fetch")
+	url := flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
+	wsurl := flag.String("wsurl", "ws://127.0.0.1:8080/stream?bytes=1048576", "entropy endpoint")
+	fps := strconv.FormatInt(refresh.Milliseconds(), 10)
+	var refwsurl = *wsurl + "&refresh=" + fps
 
 	flag.Parse()
 
@@ -162,12 +154,18 @@ func main() {
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
+	fmt.Println("FPS             : 1 frame per " + fps + "ms")
+	fmt.Println("HTTP URL        : " + *url)
+	fmt.Println("WS URL          : " + *wsurl)
+	fmt.Println("WS URL with REF : " + refwsurl)
+	fmt.Println("-------------------")
 	fmt.Printf("Bitrate         : %f\n", result.Rate)
 	fmt.Printf("Bytes           : %d\n", result.N)
 	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
 	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
 	fmt.Printf("Monobit p-value : %.6f\n", result.MonobitP)
 	fmt.Printf("Serial ratio    : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
+	fmt.Println("-------------------")
 	fmt.Println()
 
 	if result.Pass == true {
@@ -178,14 +176,12 @@ func main() {
 
 	time.Sleep(5 * time.Second)
 
-	fps := strconv.FormatInt(1/refresh.Milliseconds(), 10)
-	var wsurl = "ws://localhost:8080/stream?bytes=1048576&refresh=" + fps
-
-	wsconn, _, wscerr := websocket.DefaultDialer.Dial(wsurl, nil)
+	//wsconn, _, wscerr := websocket.DefaultDialer.Dial(*wsurl, nil)
+	wsconn, _, wscerr := websocket.DefaultDialer.Dial(refwsurl, nil)
 	if wscerr != nil {
 		fmt.Fprintf(os.Stderr, "fetch error: %v\n", wscerr)
 		fmt.Printf("error: %v\n", *url)
-		fmt.Printf("error: %v\n", wsurl)
+		fmt.Printf("error: %v\n", refwsurl)
 		panic(wscerr)
 		//os.Exit(1)
 	}
@@ -267,7 +263,7 @@ func main() {
 		defer wscancel()
 
 		if *mode == "stream" {
-			stream, sterr := client.StreamEntropy(wsctx, wsurl, 32)
+			stream, sterr := client.StreamEntropy(wsctx, refwsurl, 32)
 			if sterr != nil {
 				panic(sterr)
 			}
