@@ -19,7 +19,8 @@ import (
 	"net"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
 	"github.com/8ff/diceware"
-	"github.com/fantuz/entropy-service/cmd/entropy-server/qrng"
+	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
+	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"
