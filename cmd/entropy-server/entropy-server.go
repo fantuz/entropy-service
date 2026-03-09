@@ -18,9 +18,8 @@ import (
 	"image/png"
 	"net"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
-	//"cmd/entropy-server/rng"
-	"github.com/fantuz/entropy-service/cmd/entropy-server/qrng"
 	"github.com/8ff/diceware"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/qrng"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"

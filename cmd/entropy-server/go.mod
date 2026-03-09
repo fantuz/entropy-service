@@ -1,4 +1,4 @@
-module github.com/fantuz/entropy-service/cmd/entropy-server
+module github.com/fantuz/entropy-service/entropy-server
 
 go 1.24.4
 
@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/8ff/diceware v1.0.0 // indirect
+	github.com/fantuz/entropy-service/cmd/entropy-server v0.0.0-20260309140804-65352bcfd830 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
