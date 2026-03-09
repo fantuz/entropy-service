@@ -16,7 +16,6 @@ import (
 	"image/color"
 	"image/png"
 	"net"
-	//"net/http"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
 	"github.com/8ff/diceware"
 	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
@@ -33,7 +32,6 @@ import (
 	"os/signal"
 	"strconv"
 	"sync"
-	//"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -226,7 +224,8 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 
 	// Start background fill
 	go q.fillLoop()
-	//atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity)))
+	// TODO: fix here
+	//metrics.AddBufferedBytes(uint64(q.capacity))
 	metrics.AddBufferedBytes(uint64(q.capacity))
 	//incBuffer()
 
@@ -305,8 +304,10 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	if qrngBuffer == nil {
 		initQRNGBuffer(dev, bufferlen)
 	}
-	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
+	// TODO: fix here
 	// TODO restore: incTestA(n)
+	//metrics.AddBufferedBytes(uint64(q.capacity))
+	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
 	return qrngBuffer.Get(n)
 }
 
@@ -330,7 +331,6 @@ func reseedLoop(ctx context.Context, d *qrng.DRBG, interval int, dev string, buf
 				if rerr := d.Reseed(entropy); rerr != nil {
 					log.Println("reseed failed:", rerr)
 				}
-				//atomic.AddUint64(&rngReseeds, +1)
 				metrics.AddReseeds(1)
 			}
 		}
@@ -450,9 +450,7 @@ func randomImageHandler(d *qrng.DRBG) http.HandlerFunc {
 		w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		png.Encode(w, img)
-		//atomic.AddUint64(&rngBytesGenerated, uint64(len(img.Pix)))
 		metrics.AddBytesGenerated(len(img.Pix))
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddHttpRequests(1)
 	}
 }
@@ -505,7 +503,6 @@ func projectWords(n *big.Int, count int) []string {
 func wsWordsHandler(d *qrng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddHttpRequests(1)
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -595,8 +592,6 @@ func wsWordsHandler(d *qrng.DRBG, quantity int, refresh time.Duration) http.Hand
 				if err != nil {
 					return
 				}
-				//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
-				//atomic.AddUint64(&wssPayloads, +1)
 				metrics.AddBytesGenerated(len(wordsout))
 				metrics.AddWSPayloads(1)
 			default:
@@ -688,8 +683,6 @@ body {
 
 		t := template.Must(template.New("page").Parse(tmpl))
 		t.Execute(w, data)
-		//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddBytesGenerated(len(wordsout))
 		metrics.AddHttpRequests(1)
 		//rng.DecreaseActiveInstances(-1)
@@ -727,8 +720,6 @@ func randomBytesHandler(d *qrng.DRBG, maxSize int) http.HandlerFunc {
 		//io.Copy(w, buf)
 
 		child.Read(buf)
-		//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddBytesGenerated(len(buf))
 		metrics.AddHttpRequests(1)
 
@@ -741,7 +732,6 @@ func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) ht
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddHttpRequests(1)
 		
 		conn, cerr := upgrader.Upgrade(w, r, nil)
@@ -813,8 +803,6 @@ func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) ht
 				}
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
-				//atomic.AddUint64(&wssPayloads, +1)
-				//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				//rng.DecreaseActiveInstances(-1)
 				//continue
 				//log.Println("Nothing to see here")
@@ -832,7 +820,6 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddHttpRequests(1)
 		
 		conn, cerr := upgrader.Upgrade(w, r, nil)
@@ -875,24 +862,12 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 					//processChunk(buffer[:n]) // reuse your pipeline
 					//d.Read(n)
 
-					// two options available here, raw encode or b64 encode
-					//base64 := base64.StdEncoding.EncodeToString(n)
-					//conv := hex.EncodeToString(buf)
-					//hash := sha256.Sum256(n[:])
-
 					//w.Header().Set("Content-Type", "application/octet-stream")
 					//w.Header().Set("X-Entropy-Metric", "random-data-websocket")
 					//w.Header().Set("X-RNG-Reseed-Age-ms-test",
 					//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 
 					//frame := processBytes(bytes)
-					/*
-						frame := EntropyDataFrame{
-							Hex:    hex.EncodeToString(n[:]),
-							Base64: base64,
-							Hash:   hex.EncodeToString(n[:]),
-						}
-					*/
 
 					conn.WriteMessage(websocket.BinaryMessage, buffer[:n])
 
@@ -903,11 +878,6 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 					//if cnerr != nil {
 					//	return
 					//}
-					//atomic.AddUint64(&wssPayloads, +1)
-					//metrics.AddBytesGenerated(len(buf))
-					metrics.AddWSPayloads(1)
-					//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-					//rng.DecreaseActiveInstances(-1)
 					//continue
 					//log.Println("Nothing to see here")
 					//}
@@ -919,6 +889,12 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
+
+					//metrics.AddBytesGenerated(len(buf))
+					//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+					//rng.DecreaseActiveInstances(-1)
+					metrics.AddWSPayloads(1)
+					metrics.AddHTTPRequests(1)
 				}
 				w.WriteHeader(http.StatusOK)
 			}
@@ -930,7 +906,6 @@ func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddHttpRequests(1)
 		
 		conn, cerr := upgrader.Upgrade(w, r, nil)
@@ -1008,8 +983,6 @@ func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 				if err != nil {
 					return
 				}
-				//atomic.AddUint64(&wssPayloads, +1)
-				//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
 				//rng.DecreaseActiveInstances(-1)
@@ -1028,7 +1001,6 @@ func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.Han
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 
-		//atomic.AddUint64(&httpRequests, +1)
 		metrics.AddHttpRequests(1)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
@@ -1083,8 +1055,6 @@ func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.Han
 				}
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
-				//atomic.AddUint64(&wssPayloads, +1)
-				//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				//rng.DecreaseActiveInstances(-1)
 			default:
 				{
@@ -1100,23 +1070,16 @@ func metricsHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metricsaa := d.GetMetadata()
 
-		//bytes := atomic.LoadUint64(&rngBytesGenerated) / 1024 / 1024
 		bytes := metrics.BytesGenerated() / 1024 / 1024
-		//reseeds := atomic.LoadUint64(&rngReseeds)
 		reseeds := metrics.Reseeds()
 		//age := metrics.ReseedAgeMs
 		age := d.ReseedAge().Milliseconds()
 		bufBytes := metricsaa.EntropyBufferedBytes / 1024
 		bufCap := metricsaa.EntropyFillPct
-		//reqs := atomic.LoadUint64(&httpRequests)
 		reqs := metrics.NumHttpRequests()
-		//payloads := atomic.LoadUint64(&wssPayloads)
 		payloads := metrics.NumWSPayloads()
-		//entropy := atomic.LoadUint64(&rngBytesBuffered)
 		entropy := metrics.BufferedBytes()
-		//entropyA := atomic.LoadUint64(&rngBytesTestA)
 		entropyA := metrics.TestA()
-		//entropyB := atomic.LoadUint64(&rngBytesTestB)
 		entropyB := metrics.TestB()
 		DRBGcnt := metricsaa.DRBGInstanceCnt
 

@@ -20,6 +20,10 @@ The suite also includes advanced SRE-style views, statistics and metrics:
  - a JSON status monitor, showing startup and runtime information (/health)
  - a Prometheus-like metrics collector, presenting live runtime counters (/metrics)
 
+The two programs operate as described:
+ - entropy-server ....
+ - entropy-client ....
+
 ## Architecture and logic
 
 ### High-Level Overview
@@ -110,6 +114,7 @@ Supported client protocols
 - OS Variables to enable/disable TLS, h2, and other useful test features
 - CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, timers and more.
 - pages are optimezed for client-side renderingm as the separation of DOM, canvas and JS workers is enforced by-design (not-blocking, not-CPU intensive, allows packet drop, recovery and other anti-stall features)
+- abstraction and reorganization of code in line with GO guidelines. DRBG, transport, service and domain are now located in more canonical project structure (for example: domain/ rng/ service/ transport/ /cmd)
 
 ### Hardware already supported, more to be added soon
 ```
@@ -296,6 +301,7 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 ## What is yet to come
 
 ### Features to be added
+- FUSE device support allowing for "openssl rand -engine entropyctl"
 - eventually add go sync.Pool, to be evalueted yet
 - add GO build tags for PROD and for DEMO modes
 - define and implement GO tests
@@ -304,6 +310,3 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator
-- entropy-client in GO
-- abstraction and reorganization of code for DRBG, transport, service and domain (for example: domain/ rng/ service/ transport/ /cmd)
-- add FUSE device and allor for "openssl rand -engine entropyctl"
