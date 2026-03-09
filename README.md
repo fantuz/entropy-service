@@ -151,7 +151,7 @@ Regular HTTP
 ### Screenshots
 WSS Endpoint /stream.html
 <img width="640" height="360" alt="Screenshot From 2026-03-03 19-55-31" src="https://github.com/user-attachments/assets/cd50fb75-2049-485b-b386-0deedb308290" />
-<img width="2560" height="1440" alt="Screenshot From 2026-03-08 14-32-49" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
+<img width="640" height="360" alt="Screenshot From 2026-03-08 14-32-49" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
 
 WSS Endpoint /words.html
 <img width="640" height="360" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
@@ -166,10 +166,10 @@ Metrics
 <img width="647" height="755" alt="Screenshot From 2026-03-09 19-32-00" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
 
 File upload & analysis interface
-<img width="1319" height="1299" alt="Screenshot From 2026-03-09 19-31-49" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
+<img width="600" height="600" alt="Screenshot From 2026-03-09 19-31-49" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
 
 entropy-client interface, ntop-style
-<img width="2560" height="1440" alt="Screenshot From 2026-03-08 14-16-42" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
+<img width="640" height="360" alt="Screenshot From 2026-03-08 14-16-42" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
 
 ## Build
 
