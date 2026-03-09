@@ -10,17 +10,20 @@ import (
 	"encoding/json"
 	"html/template"
 	"math/big"
-	//"net/http"
 	"embed"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"net"
+	//"net/http"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
 	"github.com/8ff/diceware"
-	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
 	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
+	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
+	"github.com/fantuz/entropy-service/entropy-server/internal/config"
+	"github.com/fantuz/entropy-service/entropy-server/internal/transport"
+	"github.com/fantuz/entropy-service/entropy-server/internal/protocol"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"
@@ -29,7 +32,7 @@ import (
 	"os/signal"
 	"strconv"
 	"sync"
-	"sync/atomic"
+	//"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -222,7 +225,8 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 
 	// Start background fill
 	go q.fillLoop()
-	atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity)))
+	//atomic.AddUint64(&rngBytesBuffered, uint64((q.capacity)))
+	metrics.AddBufferedBytes(uint64(q.capacity))
 	//incBuffer()
 
 	return q
@@ -247,7 +251,8 @@ func (q *QRNGBuffer) Get(n int) ([]byte, error) {
 
 	out := q.buf[:n]
 	q.buf = q.buf[n:]
-	incTestB(len(q.buf))
+	// TODO restore: incTestB(len(q.buf))
+	metrics.AddBufferedBytes(uint64(len(q.buf)))
 	return out, nil
 }
 
@@ -283,7 +288,8 @@ func (q *QRNGBuffer) fillLoop() {
 				break
 			}
 			total += m
-			incTestA(m)
+			// TODO restore: incTestA(m)
+			metrics.AddBufferedBytes(uint64(m))
 		}
 		f.Close()
 
@@ -299,7 +305,7 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 		initQRNGBuffer(dev, bufferlen)
 	}
 	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
-	incTestA(n)
+	// TODO restore: incTestA(n)
 	return qrngBuffer.Get(n)
 }
 
@@ -323,7 +329,8 @@ func reseedLoop(ctx context.Context, d *qrng.DRBG, interval int, dev string, buf
 				if rerr := d.Reseed(entropy); rerr != nil {
 					log.Println("reseed failed:", rerr)
 				}
-				atomic.AddUint64(&rngReseeds, +1)
+				//atomic.AddUint64(&rngReseeds, +1)
+				metrics.AddReseeds(1)
 			}
 		}
 	}
@@ -442,8 +449,10 @@ func randomImageHandler(d *qrng.DRBG) http.HandlerFunc {
 		w.Header().Set("X-RNG-Reseed-Age-ms-test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		png.Encode(w, img)
-		atomic.AddUint64(&rngBytesGenerated, uint64(len(img.Pix)))
-		atomic.AddUint64(&httpRequests, +1)
+		//atomic.AddUint64(&rngBytesGenerated, uint64(len(img.Pix)))
+		metrics.AddBytesGenerated(len(img.Pix))
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddHttpRequests(1)
 	}
 }
 
@@ -495,7 +504,8 @@ func projectWords(n *big.Int, count int) []string {
 func wsWordsHandler(d *qrng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		atomic.AddUint64(&httpRequests, +1)
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddHttpRequests(1)
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -584,8 +594,10 @@ func wsWordsHandler(d *qrng.DRBG, quantity int, refresh time.Duration) http.Hand
 				if err != nil {
 					return
 				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+				//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+				//atomic.AddUint64(&wssPayloads, +1)
+				metrics.AddBytesGenerated(len(wordsout))
+				metrics.AddWSPayloads(1)
 			default:
 				continue
 				//log.Println("Nothing to see here")
@@ -675,8 +687,10 @@ body {
 
 		t := template.Must(template.New("page").Parse(tmpl))
 		t.Execute(w, data)
-		atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
-		atomic.AddUint64(&httpRequests, +1)
+		//atomic.AddUint64(&rngBytesGenerated, uint64(len(wordsout)))
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddBytesGenerated(len(wordsout))
+		metrics.AddHttpRequests(1)
 		//rng.DecreaseActiveInstances(-1)
 	}
 }
@@ -712,8 +726,10 @@ func randomBytesHandler(d *qrng.DRBG, maxSize int) http.HandlerFunc {
 		//io.Copy(w, buf)
 
 		child.Read(buf)
-		atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
-		atomic.AddUint64(&httpRequests, +1)
+		//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddBytesGenerated(len(buf))
+		metrics.AddHttpRequests(1)
 
 		w.Write(buf)
 	}
@@ -723,7 +739,10 @@ func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		atomic.AddUint64(&httpRequests, +1)
+		
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddHttpRequests(1)
+		
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -791,8 +810,10 @@ func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) ht
 				if cnerr != nil {
 					return
 				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				metrics.AddBytesGenerated(len(buf))
+				metrics.AddWSPayloads(1)
+				//atomic.AddUint64(&wssPayloads, +1)
+				//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				//rng.DecreaseActiveInstances(-1)
 				//continue
 				//log.Println("Nothing to see here")
@@ -809,7 +830,10 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		atomic.AddUint64(&httpRequests, +1)
+		
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddHttpRequests(1)
+		
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -878,7 +902,9 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 					//if cnerr != nil {
 					//	return
 					//}
-					atomic.AddUint64(&wssPayloads, +1)
+					//atomic.AddUint64(&wssPayloads, +1)
+					//metrics.AddBytesGenerated(len(buf))
+					metrics.AddWSPayloads(1)
 					//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 					//rng.DecreaseActiveInstances(-1)
 					//continue
@@ -902,7 +928,10 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		atomic.AddUint64(&httpRequests, +1)
+
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddHttpRequests(1)
+		
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -978,8 +1007,10 @@ func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 				if err != nil {
 					return
 				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				//atomic.AddUint64(&wssPayloads, +1)
+				//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				metrics.AddBytesGenerated(len(buf))
+				metrics.AddWSPayloads(1)
 				//rng.DecreaseActiveInstances(-1)
 			default:
 				{
@@ -995,7 +1026,9 @@ func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		atomic.AddUint64(&httpRequests, +1)
+
+		//atomic.AddUint64(&httpRequests, +1)
+		metrics.AddHttpRequests(1)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -1047,8 +1080,10 @@ func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.Han
 				if err != nil {
 					return
 				}
-				atomic.AddUint64(&wssPayloads, +1)
-				atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
+				metrics.AddBytesGenerated(len(buf))
+				metrics.AddWSPayloads(1)
+				//atomic.AddUint64(&wssPayloads, +1)
+				//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 				//rng.DecreaseActiveInstances(-1)
 			default:
 				{
@@ -1062,20 +1097,27 @@ func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.Han
 
 func metricsHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		metrics := d.GetMetadata()
+		metricsaa := d.GetMetadata()
 
-		bytes := atomic.LoadUint64(&rngBytesGenerated) / 1024 / 1024
-		reseeds := atomic.LoadUint64(&rngReseeds)
+		//bytes := atomic.LoadUint64(&rngBytesGenerated) / 1024 / 1024
+		bytes := metrics.BytesGenerated() / 1024 / 1024
+		//reseeds := atomic.LoadUint64(&rngReseeds)
+		reseeds := metrics.Reseeds()
 		//age := metrics.ReseedAgeMs
 		age := d.ReseedAge().Milliseconds()
-		bufBytes := metrics.EntropyBufferedBytes / 1024
-		bufCap := metrics.EntropyFillPct
-		reqs := atomic.LoadUint64(&httpRequests)
-		payloads := atomic.LoadUint64(&wssPayloads)
-		entropy := atomic.LoadUint64(&rngBytesBuffered)
-		entropyA := atomic.LoadUint64(&rngBytesTestA)
-		entropyB := atomic.LoadUint64(&rngBytesTestB)
-		DRBGcnt := metrics.DRBGInstanceCnt
+		bufBytes := metricsaa.EntropyBufferedBytes / 1024
+		bufCap := metricsaa.EntropyFillPct
+		//reqs := atomic.LoadUint64(&httpRequests)
+		reqs := metrics.NumHttpRequests()
+		//payloads := atomic.LoadUint64(&wssPayloads)
+		payloads := metrics.NumWSPayloads()
+		//entropy := atomic.LoadUint64(&rngBytesBuffered)
+		entropy := metrics.BufferedBytes()
+		//entropyA := atomic.LoadUint64(&rngBytesTestA)
+		entropyA := metrics.TestA()
+		//entropyB := atomic.LoadUint64(&rngBytesTestB)
+		entropyB := metrics.TestB()
+		DRBGcnt := metricsaa.DRBGInstanceCnt
 
 		fmt.Fprintf(w,
 			`# HELP rng_bytes_generated_total Total bytes generated by DRBG
@@ -1249,7 +1291,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *q
 	//ln, err := net.Listen("tcp", addr)
 	//if err != nil { return nil, err }
 	//tln := newTunedListener(ln)
-	ln, err := newTunedListener(addr, 4<<20)
+	ln, err := protocol.newTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -1300,7 +1342,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *q
 }
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *qrng.DRBG) (*http.Server, error) {
-	ln, err := newTunedListener(addr, 4<<20)
+	ln, err := protocol.newTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -1370,7 +1412,7 @@ func main() {
 	)
 	defer stop()
 
-	cfg := ParseConfig()
+	cfg := config.ParseConfig()
 
 	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10001 {
 		panic("reseed-ms must be between 1 and 10000 ms")

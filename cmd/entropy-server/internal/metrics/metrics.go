@@ -11,27 +11,78 @@ var (
 	rngBytesTestA     uint64
 	rngBytesTestB     uint64
 	httpRequests      uint64
-	wssPayloads       uint64
+	wsPayloads        uint64
 )
+
+
+func AddBufferedBytes(n uint64) {
+	atomic.AddUint64(&rngBytesBuffered, n)
+}
+
+func AddReseeds(n int) {
+	atomic.AddUint64(&rngReseeds, uint64(n))
+}
+
+func AddBytesGenerated(n int) {
+	atomic.AddUint64(&rngBytesGenerated, uint64(n))
+}
+
+func AddHttpRequests(n int) {
+	atomic.AddUint64(&httpRequests, uint64(n))
+}
+
+func AddWSPayloads(n int) {
+	atomic.AddUint64(&wsPayloads, uint64(n))
+}
+
+func AddTestA(n int) {
+	atomic.AddUint64(&rngBytesTestA, uint64(n))
+}
+
+func AddTestB(n int) {
+	atomic.AddUint64(&rngBytesTestB, uint64(n))
+}
+
+func BufferedBytes() uint64 {
+    return atomic.LoadUint64(&rngBytesBuffered)
+}
+
+func Reseeds() uint64 {
+    return atomic.LoadUint64(&rngReseeds)
+}
+
+func BytesGenerated() uint64 {
+    return atomic.LoadUint64(&rngBytesGenerated)
+}
+
+func NumHttpRequests() uint64 {
+    return atomic.LoadUint64(&httpRequests)
+}
+
+func NumWSPayloads() uint64 {
+    return atomic.LoadUint64(&wsPayloads)
+}
+
+func TestA() uint64 {
+    return atomic.LoadUint64(&rngBytesTestA)
+}
+
+func TestB() uint64 {
+    return atomic.LoadUint64(&rngBytesTestB)
+}
+
+
+/*
+func incReseed() {
+	atomic.AddUint64(&rngReseeds, 1)
+}
 
 func incRNGBytes(n int) {
 	atomic.AddUint64(&rngBytesGenerated, uint64(n))
 }
 
-func incReseed() {
-	atomic.AddUint64(&rngReseeds, 1)
-}
-
 func incBuffer() {
 	atomic.AddUint64(&rngBytesBuffered, 1)
-}
-
-func incTestA(m int) {
-	atomic.AddUint64(&rngBytesTestA, uint64(m))
-}
-
-func incTestB(y int) {
-	atomic.AddUint64(&rngBytesTestB, uint64(y))
 }
 
 func incHTTP() {
@@ -39,5 +90,7 @@ func incHTTP() {
 }
 
 func incWSS() {
-	atomic.AddUint64(&wssPayloads, 1)
+	atomic.AddUint64(&wsPayloads, 1)
 }
+*/
+
