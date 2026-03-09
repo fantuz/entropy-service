@@ -150,31 +150,31 @@ Regular HTTP
 
 ### Screenshots
 
-- entropy-client interface, ntop-style
+- ntop-style entropy-client interface (cmd/entropy-client/entropy-client.go)
 
 <img width="640" height="360" alt="Screenshot From 2026-03-08 14-16-42" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
 
-- WSS Endpoint /stream.html
+- WSS Endpoint STREAM: real-time entropy quality monitor (/stream.html + /data)
 
 <img width="640" height="360" alt="Screenshot From 2026-03-08 14-32-49" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
 
-- WSS Endpoint /words.html
-
-<img width="640" height="360" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
-
-- WSS Endpoint /bytes.html
+- WSS Endpoint BYTES: Websocket streamer, byte generator (/bytes.html + /bytes)
 
 <img width="640" height="360" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
 
-- WSS Endpoint /colors.html
+- WSS Endpoint WORDS: Websocket streamer, word generator (/words.html + /words)
+
+<img width="640" height="360" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
+
+- WSS Endpoint COLORS: Websocket streamer, color generator (/colors.html + /colors)
 
 <img width="640" height="360" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
 
-- File upload & analysis interface
+- File upload & analysis interface (upload.html)
 
 <img width="600" height="600" alt="Screenshot From 2026-03-09 19-31-49" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
 
-- Metrics
+- Metrics (/metrics))
 
 <img width="647" height="755" alt="Screenshot From 2026-03-09 19-32-00" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
 
