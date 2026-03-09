@@ -22,8 +22,9 @@ import (
 	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
 	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
 	"github.com/fantuz/entropy-service/entropy-server/internal/config"
-	"github.com/fantuz/entropy-service/entropy-server/internal/transport"
 	"github.com/fantuz/entropy-service/entropy-server/internal/listener"
+	"github.com/fantuz/entropy-service/entropy-server/internal/transport"
+	//"github.com/fantuz/entropy-service/entropy-server/internal/protocol"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"
@@ -1291,7 +1292,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *q
 	//ln, err := net.Listen("tcp", addr)
 	//if err != nil { return nil, err }
 	//tln := newTunedListener(ln)
-	ln, err := listener.newTunedListener(addr, 4<<20)
+	ln, err := listener.NewTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -1342,7 +1343,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *q
 }
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *qrng.DRBG) (*http.Server, error) {
-	ln, err := listener.newTunedListener(addr, 4<<20)
+	ln, err := listener.NewTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -1493,7 +1494,7 @@ func main() {
 	drbg.SetEntropyBuffer(qrngBuf)
 
 	//tln := newTunedListener(ln)
-	tlsCfg := newTLSConfig(cfg.CertFile, cfg.KeyFile)
+	tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 	if crterr != nil {
 		log.Fatal(crterr)

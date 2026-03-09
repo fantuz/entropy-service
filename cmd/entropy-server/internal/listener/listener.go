@@ -51,7 +51,7 @@ func (l *tunedListener) Accept() (net.Conn, error) {
 	return c, nil
 }
 
-func newTunedListener(addr string, sndBuf int) (net.Listener, error) {
+func NewTunedListener(addr string, sndBuf int) (net.Listener, error) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			var ctrlErr error
