@@ -123,7 +123,7 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 func main() {
 
 	writeOut := flag.Bool("write-out", false, "write out the received entropy back to local /dev/urandom (useful for low-entropy or isolated systems)")
-	slice := flag.Int("slice", 2097152, "amount of entropy pre fetch")
+	slice := flag.Int64("slice", 2097152, "amount of entropy pre fetch")
 	showDebug := flag.Bool("debug", false, "print debug information")
 	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
 	showMatrix := flag.Bool("matrix", false, "print 64x64 matrix ")
@@ -171,7 +171,7 @@ func main() {
 	fmt.Println("Program mode         :", *mode)
 	fmt.Println("----------------------------------------------")
 	fmt.Printf("Bitrate         : %f\n", result.Rate)
-	//fmt.Printf("Chunks          : %.0f\n", int(*slice))
+	fmt.Printf("Slice           : %d\n", int(*slice))
 	fmt.Printf("Bytes           : %d\n", result.N)
 	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
 	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
@@ -203,7 +203,7 @@ func main() {
 
 	// TODO: add exit here if tests FAIL
 
-	// number of lines, also 120 is OK
+	// number of columns, also 120 is OK
 	graph := diag.NewEntropyGraph(80)
 	dashboard := diag.NewDashboard(80)
 
@@ -221,12 +221,12 @@ func main() {
 	}
 
 	for {
-		//httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 		start := time.Now()
 
-		data, err := client.FetchEntropySimple(url, slice)
-		//data, err := client.FetchEntropy(httpCtx, *url, *slice)
+		//data, err := client.FetchEntropySimple(url, slice)
+		data, err := client.FetchEntropy(httpCtx, *url, *slice)
 
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
@@ -241,7 +241,7 @@ func main() {
 			//fmt.Println("real HTTP:", htot)
 		}
 
-		//defer httpCancel()
+		defer httpCancel()
 		//httpCancel()
 
 		/*
@@ -280,23 +280,27 @@ func main() {
 
 			for stdata := range stream {
 				drawUI(&stats, start, stdata)
-				//diag.RunDiagnostics(data)
-				r := diag.RunDiagnostics(stdata)
-				//diag.BuildTransitionMatrix(data)
-
-				dashboard.Add(r)
-				dashboard.Render()
-				graph.Add(r.Shannon)
-				graph.Render()
+				//r := diag.RunDiagnostics(stdata)
 				//tm := diag.BuildTransitionMatrix(data)
-				//tm.PrintHeatmap()
 
+				//dashboard.Add(r)
+				//dashboard.Render()
+				//graph.Add(r.Shannon)
+				//graph.Render()
+				//tm.PrintHeatmap()
 				hrtot := time.Since(startprg).Milliseconds()
 				fmt.Println("Program runtime      :", hrtot, "ms")
 				fmt.Println("WS Routine runtime   :", hrinside, "ms")
 			}
 		} else {
 			drawUI(&stats, start, data)
+			//r := diag.RunDiagnostics(data)
+			
+			//dashboard.Add(r)
+			//dashboard.Render()
+			//graph.Add(r.Shannon)
+			//graph.Render()
+
 			hrtot := time.Since(startprg).Milliseconds()
 			fmt.Println("Program runtime      :", hrtot, "ms")
 			fmt.Println("HTTP Routine runtime :", hrinside, "ms")
@@ -313,7 +317,7 @@ func main() {
 		if *showMatrix && len(data) > 0 {
 			tm := diag.BuildTransitionMatrix(data)
 			tm.PrintHeatmap()
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 		}
 
 		if *showPreview && len(data) > 0 {
@@ -338,7 +342,7 @@ func main() {
 			r := diag.RunDiagnostics(data)
 			graph.Add(r.Shannon)
 			graph.Render()
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		if *showDashboard && len(data) > 0 {

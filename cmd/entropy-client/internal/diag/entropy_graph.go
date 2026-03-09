@@ -31,7 +31,7 @@ func (g *EntropyGraph) Render() {
 	fmt.Println("\nEntropy monitor")
 	fmt.Println("----------------")
 
-	fmt.Print("                     ")
+	fmt.Print("Entropy quality      ")
 	for _, v := range g.values {
 
 		level := int((v / 8.0) * 8)

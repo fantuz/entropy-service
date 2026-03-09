@@ -161,7 +161,7 @@ WSS Endpoint /bytes.html
 WSS Endpoint /colors.html
 <img width="2560" height="1440" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
 
-## Build & run
+## Build
 
 ### Prerequisites
 Once cloned the repository via Github, go through the below steps to freshly build your entropy-service.
@@ -174,7 +174,8 @@ sudo apt-get install golang
 sudo apt-get install wrk dieharder rng-tools
 ```
 ### Preliminary and preparation steps
-- Ensure all go dependencies are satisfied. Follow on-screen instructions in case of issues.
+Ensure all go dependencies are satisfied. Follow on-screen instructions in case of issues.
+
 - build entropy-server
 ```
 go build cmd/entropy-server/entropy-server.go
@@ -183,11 +184,14 @@ go build cmd/entropy-server/entropy-server.go
 ```
 go build cmd/entropy-client/entropy-client.go
 ```
-### Runtime
+## Run
+- entropy-server
 We are now ready to start both HTTP & HTTPS listeners, respectively on ports 8080 and 8443 by default, on all available inet interfaces.
 SUDO command may be necessary to access the xRNG devices on different platforms (e. including symbolic links under /dev).
+The 'cd' command helps serving the ./web contents, residing in cmd/entropy-server/web. For simplicity you can create a symlink within the execution directory, or copy the whole ./web directory.
 ```
-max@iMac:~/entropy-service$ sudo go run entropy-service -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/chaoskey1 -words 8 -max-bytes 2097152
+cd entropy-server
+sudo go run entropy-server.go -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/urandom -words 8 -max-bytes 2097152 -refresh-ms '50ms' -refresh-colors-ms '50ms' -refresh 1 -cert-file cert.pem -key-file key.pem
 ---
 HTTP port: :8080
 HTTPS port: :8443
@@ -207,7 +211,17 @@ Reseed Buffer size: 2
 2026/02/25 20:35:31 HTTP server running on :8080
 2026/02/25 20:35:31 HTTPS server running on :8443
 ```
+- entropy-client
+Invoke the command as described below, to fetch entropy via a GO CLI client, instead of launching a browser. Also usefult to monitor the entropy-source itself, and for testing.
+```
+cd entropy-client
 
+## stream mode (Websockets)
+go run entropy-client.go -refresh '50ms' -mode stream -wsurl "ws://127.0.0.1:8080/stream?bytes=2057152&refresh=50" -url "http://127.0.0.1:8080/v1/data/random?bytes=2057152"
+
+## pull mode (HTTP)
+go run entropy-client.go -refresh '50ms' -mode pull -wsurl ws://127.0.0.1:8080/stream?bytes=2057152 -url http://127.0.0.1:8080/v1/data/random?bytes=2057152
+```
 ## Performances
 
 ### Results

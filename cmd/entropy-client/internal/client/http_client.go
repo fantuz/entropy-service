@@ -23,7 +23,7 @@ func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
 	return data, err
 }
 
-func FetchEntropySimple(endpoint *string, quantity *int) ([]byte, error) {
+func FetchEntropySimple(endpoint *string, quantity *int64) ([]byte, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
     defer cancel()
     return FetchEntropy(ctx, *endpoint, *quantity)
@@ -31,7 +31,7 @@ func FetchEntropySimple(endpoint *string, quantity *int) ([]byte, error) {
 
 // FetchEntropy requests `quantity` bytes from `endpoint` and returns the raw bytes.
 // The function takes a context so caller can cancel / set a deadline.
-func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, error) {
+func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte, error) {
 	// Build URL: if endpoint already includes a query param for bytes, you can skip formatting;
 	// This example appends "?bytes=" if endpoint doesn't already contain "bytes=".
 	url := endpoint
