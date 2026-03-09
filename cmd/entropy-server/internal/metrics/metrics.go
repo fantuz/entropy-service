@@ -14,7 +14,6 @@ var (
 	wsPayloads        uint64
 )
 
-
 func AddBufferedBytes(n uint64) {
 	atomic.AddUint64(&rngBytesBuffered, n)
 }
@@ -44,33 +43,32 @@ func AddTestB(n int) {
 }
 
 func BufferedBytes() uint64 {
-    return atomic.LoadUint64(&rngBytesBuffered)
+	return atomic.LoadUint64(&rngBytesBuffered)
 }
 
 func Reseeds() uint64 {
-    return atomic.LoadUint64(&rngReseeds)
+	return atomic.LoadUint64(&rngReseeds)
 }
 
 func BytesGenerated() uint64 {
-    return atomic.LoadUint64(&rngBytesGenerated)
+	return atomic.LoadUint64(&rngBytesGenerated)
 }
 
 func NumHttpRequests() uint64 {
-    return atomic.LoadUint64(&httpRequests)
+	return atomic.LoadUint64(&httpRequests)
 }
 
 func NumWSPayloads() uint64 {
-    return atomic.LoadUint64(&wsPayloads)
+	return atomic.LoadUint64(&wsPayloads)
 }
 
 func TestA() uint64 {
-    return atomic.LoadUint64(&rngBytesTestA)
+	return atomic.LoadUint64(&rngBytesTestA)
 }
 
 func TestB() uint64 {
-    return atomic.LoadUint64(&rngBytesTestB)
+	return atomic.LoadUint64(&rngBytesTestB)
 }
-
 
 /*
 func incReseed() {
@@ -93,4 +91,3 @@ func incWSS() {
 	atomic.AddUint64(&wsPayloads, 1)
 }
 */
-

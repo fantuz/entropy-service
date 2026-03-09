@@ -1,10 +1,10 @@
 package qrng
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"time"
-	"errors"
 	//"sync/atomic"
 )
 
@@ -37,14 +37,13 @@ func (q *QRNGCard) Read(p []byte) error {
 
 // QRNGBuffer holds bytes read asynchronously from a QRNG device
 type QRNGBuffer struct {
-	buf       []byte       // the current entropy buffer
-	mu        sync.Mutex   // protects buf
-	capacity  int          // max buffer size in bytes
+	buf       []byte        // the current entropy buffer
+	mu        sync.Mutex    // protects buf
+	capacity  int           // max buffer size in bytes
 	fillDelay time.Duration // small delay to avoid busy-wait
-	devPath   string       // path to QRNG device, e.g., /dev/qrandom0
+	devPath   string        // path to QRNG device, e.g., /dev/qrandom0
 	stop      chan struct{} // used to signal background goroutine to exit
 }
-
 
 // NewQRNGBuffer creates a new buffered QRNG reader
 func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
@@ -114,7 +113,9 @@ func (q *QRNGBuffer) fillLoop() {
 		total := 0
 		for total < free {
 			m, err := f.Read(tmp[total:])
-			if err != nil { break }
+			if err != nil {
+				break
+			}
 			total += m
 			//incTest(m)
 		}
@@ -128,4 +129,3 @@ func (q *QRNGBuffer) fillLoop() {
 		q.mu.Unlock()
 	}
 }
-

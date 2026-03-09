@@ -9,23 +9,23 @@ import (
 
 // Diagnostics is the summary returned by RunDiagnostics.
 type Diagnostics struct {
-	N            int
-	Chi2         float64
-	Chi2P        float64
-	Shannon      float64
-	MonobitP     float64
-	SerialR      float64
-	SerialP      float64
-	Rate	     float64
-	TMatrix      TransitionMatrix
-	Pass         bool
-	Notes        string
+	N        int
+	Chi2     float64
+	Chi2P    float64
+	Shannon  float64
+	MonobitP float64
+	SerialR  float64
+	SerialP  float64
+	Rate     float64
+	TMatrix  TransitionMatrix
+	Pass     bool
+	Notes    string
 }
 
 var (
 	BytesFetched  uint64
 	httpCRequests uint64
-	Timer	      uint64
+	Timer         uint64
 )
 
 func incBytes(n int) {
@@ -81,7 +81,7 @@ func RunDiagnostics(data []byte) Diagnostics {
 		SerialP:  serialP,
 		TMatrix:  tm,
 		Pass:     pass,
-		Rate:	  rate.RateMbps(),
+		Rate:     rate.RateMbps(),
 	}
 }
 
@@ -136,7 +136,7 @@ func monobitPvalue(data []byte) float64 {
 	if totalBits == 0 {
 		return 1.0
 	}
-	s := float64(ones - (totalBits-ones))
+	s := float64(ones - (totalBits - ones))
 	// p = erfc(|s|/sqrt(2n))
 	return math.Erfc(math.Abs(s) / math.Sqrt(2*float64(totalBits)))
 }

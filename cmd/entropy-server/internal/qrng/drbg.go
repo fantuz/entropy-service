@@ -1,21 +1,21 @@
 package qrng
 
 import (
-	"golang.org/x/crypto/chacha20"
 	"crypto/cipher"
 	"crypto/sha512"
+	"golang.org/x/crypto/chacha20"
 	//"crypto/sha256"
-	"sync/atomic"
+	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
-	"net/http"
 	//"io"
 )
 
 // DRBG represents a deterministic random byte generator with observability metadata
 type DRBG struct {
-	mu sync.Mutex
+	mu     sync.Mutex
 	stream cipher.Stream
 	// Crypto state
 	key      [32]byte
@@ -33,41 +33,41 @@ type DRBG struct {
 
 	// optional: pointer to external entropy buffer
 	entropyBuf *QRNGBuffer
-	
+
 	// counter for number of DRBG instances
-	DRBGInstanceCnt      int64
+	DRBGInstanceCnt int64
 }
 
 // Metadata contains all info needed for headers / JSON
 type Metadata struct {
-	Version			string
-	Source			string
-	DRBG			string
-	ReseedAgeMs		time.Duration
-	ReseedIntervalMs	int64
-	ReseedSizeBits		int
-	EntropyBufferedBytes	int
-	EntropyFillPct		int
-	DRBGInstanceCnt         int64
+	Version              string
+	Source               string
+	DRBG                 string
+	ReseedAgeMs          time.Duration
+	ReseedIntervalMs     int64
+	ReseedSizeBits       int
+	EntropyBufferedBytes int
+	EntropyFillPct       int
+	DRBGInstanceCnt      int64
 }
 
 // HealthInfo contains all info needed to generate JSON
 type HealthInfo struct {
-	Status			string `json:"status"`
-	Version			string `json:"rng_version"`
-	Source			string `json:"rng_source"`
-	DRBG			string `json:"drbg"`
-	ReseedAgeMs		int64  `json:"reseed_age_ms"`
-	ReseedIntervalMs	int64  `json:"reseed_interval_ms"`
-	ReseedSizeBits		int    `json:"reseed_size_bits"`
-	EntropyBufferedBytes	int    `json:"entropy_buffered_kb"`
-	EntropyFillPct		int    `json:"entropy_buffered_pct"`
+	Status               string `json:"status"`
+	Version              string `json:"rng_version"`
+	Source               string `json:"rng_source"`
+	DRBG                 string `json:"drbg"`
+	ReseedAgeMs          int64  `json:"reseed_age_ms"`
+	ReseedIntervalMs     int64  `json:"reseed_interval_ms"`
+	ReseedSizeBits       int    `json:"reseed_size_bits"`
+	EntropyBufferedBytes int    `json:"entropy_buffered_kb"`
+	EntropyFillPct       int    `json:"entropy_buffered_pct"`
 }
 
 var activeDRBG atomic.Int64
 
-//func DecreaseActiveInstances() int64
-func DecreaseActiveInstances (quantity int64) {
+// func DecreaseActiveInstances() int64
+func DecreaseActiveInstances(quantity int64) {
 	activeDRBG.Add(-1)
 }
 
@@ -83,7 +83,9 @@ func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
 
 // NewDRBG creates a new DRBG instance from a seed
 func NewDRBG(seed []byte) (*DRBG, error) {
-	if len(seed) < 32 { panic("seed too short") }
+	if len(seed) < 32 {
+		panic("seed too short")
+	}
 	h := sha512.Sum512(seed)
 	//n := sha256.Sum256(noncee)
 
@@ -98,7 +100,9 @@ func NewDRBG(seed []byte) (*DRBG, error) {
 	//copy(nonce[:], n[:12])
 
 	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	//activeDRBG.Add(1)
 	return &DRBG{
@@ -112,7 +116,9 @@ func NewDRBG(seed []byte) (*DRBG, error) {
 // DRBG per-connection seed
 func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
 	seed, err := d.Derive(32) // 256-bit seed
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	//nonce := make([]byte, 12) // 96-bit nonce
 	//copy(nonce, seed[:12])
@@ -224,43 +230,43 @@ func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration,
 
 // GetMetadata returns a snapshot of metadata
 func (d *DRBG) GetMetadata() Metadata {
-    bufKB := 0
-    bufPct := 0
+	bufKB := 0
+	bufPct := 0
 
-    if d.entropyBuf != nil {
-        //d.mu.Lock()
-        d.entropyBuf.mu.Lock()
-        //defer d.mu.Unlock()
-        bufKB = len(d.entropyBuf.buf)
-        bufPct = len(d.entropyBuf.buf) * 100 / d.entropyBuf.capacity
-        d.entropyBuf.mu.Unlock()
-    }
+	if d.entropyBuf != nil {
+		//d.mu.Lock()
+		d.entropyBuf.mu.Lock()
+		//defer d.mu.Unlock()
+		bufKB = len(d.entropyBuf.buf)
+		bufPct = len(d.entropyBuf.buf) * 100 / d.entropyBuf.capacity
+		d.entropyBuf.mu.Unlock()
+	}
 
-    return Metadata{
-    	Version:		d.version,
-    	Source:			d.source,
-    	DRBG:			d.algo,
-	//ReseedAgeMs:		now.Sub(d.reseeded).Milliseconds(),
-    	ReseedIntervalMs:	d.reseedInterval.Milliseconds(),
-    	ReseedSizeBits:		d.reseedSizeBits,
-    	EntropyBufferedBytes:	bufKB,
-    	EntropyFillPct:		bufPct,
-	//DRBGInstanceCnt:        d.DRBGInstanceCnt,
-	DRBGInstanceCnt:        ActiveInstances(),
-    }
-    
+	return Metadata{
+		Version: d.version,
+		Source:  d.source,
+		DRBG:    d.algo,
+		//ReseedAgeMs:		now.Sub(d.reseeded).Milliseconds(),
+		ReseedIntervalMs:     d.reseedInterval.Milliseconds(),
+		ReseedSizeBits:       d.reseedSizeBits,
+		EntropyBufferedBytes: bufKB,
+		EntropyFillPct:       bufPct,
+		//DRBGInstanceCnt:        d.DRBGInstanceCnt,
+		DRBGInstanceCnt: ActiveInstances(),
+	}
+
 }
 
 func (d *DRBG) ReadInto(dst []byte) {
-    d.mu.Lock()
-    defer d.mu.Unlock()
-    d.stream.XORKeyStream(dst, dst)
-    // update counters, bytes generated, reseed checks, etc
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.stream.XORKeyStream(dst, dst)
+	// update counters, bytes generated, reseed checks, etc
 }
 
 func (d *DRBG) Write(p []byte) (int, error) {
-    d.ReadInto(p)
-    return len(p), nil
+	d.ReadInto(p)
+	return len(p), nil
 }
 
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
@@ -287,4 +293,3 @@ func (d *DRBG) WriteTo(w io.Writer, n int) error {
     return nil
 }
 */
-

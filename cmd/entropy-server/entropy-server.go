@@ -5,23 +5,23 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
+	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"html/template"
-	"math/big"
-	"embed"
 	"fmt"
+	"html/template"
 	"image"
 	"image/color"
 	"image/png"
+	"math/big"
 	"net"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
 	"github.com/8ff/diceware"
-	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
-	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
 	"github.com/fantuz/entropy-service/entropy-server/internal/config"
 	"github.com/fantuz/entropy-service/entropy-server/internal/listener"
+	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
+	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
 	"github.com/fantuz/entropy-service/entropy-server/internal/transport"
 	//"github.com/fantuz/entropy-service/entropy-server/internal/protocol"
 	"github.com/gorilla/websocket"
@@ -731,9 +731,9 @@ func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		
+
 		metrics.AddHttpRequests(1)
-		
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -819,9 +819,9 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
-		
+
 		metrics.AddHttpRequests(1)
-		
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")
@@ -894,7 +894,7 @@ func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.Ha
 					//atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 					//rng.DecreaseActiveInstances(-1)
 					metrics.AddWSPayloads(1)
-					metrics.AddHTTPRequests(1)
+					metrics.AddHttpRequests(1)
 				}
 				w.WriteHeader(http.StatusOK)
 			}
@@ -907,7 +907,7 @@ func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 
 		metrics.AddHttpRequests(1)
-		
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
 			log.Println("ws upgrade failed")

@@ -85,4 +85,3 @@ func (tm *TransitionMatrix) PrintHeatmap() {
 		fmt.Println()
 	}
 }
-

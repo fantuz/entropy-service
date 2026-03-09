@@ -174,23 +174,14 @@ sudo apt-get install golang
 sudo apt-get install wrk dieharder rng-tools
 ```
 ### Preliminary and preparation steps
-- Ensure all go dependencies are satisfied. Follow on-screen instructions to proceed with a "go get" in case any collateral library is missing.
+- Ensure all go dependencies are satisfied. Follow on-screen instructions in case of issues.
+- build entropy-server
 ```
-$ go get github.com/8ff/diceware
-...
-$ go get github.com/gorilla/websocket
-...
-$ go vet
-go: downloading golang.org/x/crypto v0.47.0
-...
+go build cmd/entropy-server/entropy-server.go
 ```
-- go Format
+- build entropy-client
 ```
-go fmt
-```
-- go Build
-```
-go build
+go build cmd/entropy-client/entropy-client.go
 ```
 ### Runtime
 We are now ready to start both HTTP & HTTPS listeners, respectively on ports 8080 and 8443 by default, on all available inet interfaces.
