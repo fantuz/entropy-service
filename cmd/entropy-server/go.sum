@@ -1,7 +1,5 @@
 github.com/8ff/diceware v1.0.0 h1:dgEy6gBXpjt8SzarbX99KvSIwQUM0tVk9CerkrrxQZg=
 github.com/8ff/diceware v1.0.0/go.mod h1:crAgdW1j/tRyFXepOSlC0GUcaYZgI+f53HWRROIBBtA=
-github.com/fantuz/entropy-service/cmd/entropy-server v0.0.0-20260309140804-65352bcfd830 h1:KlRv4HpyQGpQpEyAwyYXdO7vXTKOE2xYSCaEEYlqZHw=
-github.com/fantuz/entropy-service/cmd/entropy-server v0.0.0-20260309140804-65352bcfd830/go.mod h1:243lZnaYD5duqpI1Bc0TC5DO8sdv71j5vd39m42Zoso=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 golang.org/x/crypto v0.48.0 h1:/VRzVqiRSggnhY7gNRxPauEQ5Drw9haKdM0jqfcCFts=

@@ -4,7 +4,6 @@ go 1.24.4
 
 require (
 	github.com/8ff/diceware v1.0.0
-	github.com/fantuz/entropy-service/cmd/entropy-server v0.0.0-20260309140804-65352bcfd830
 	github.com/gorilla/websocket v1.5.3
 	golang.org/x/crypto v0.48.0
 )
