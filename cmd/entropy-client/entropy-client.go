@@ -11,18 +11,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	//"./internal/client"
-	//"internal/device"
-	//"internal/diag"
-	//"internal/tests"
-	//"entropy-service/internal/pipe"
-
-	"github.com/fantuz/entropy-service/entropy-client"
-	//"github.com/fantuz/entropy-service/cmd/internal/device"
-	//"github.com/fantuz/entropy-service/cmd/internal/diag"
-	//"github.com/fantuz/entropy-service/cmd/internal/tests"
+	"github.com/fantuz/entropy-service/entropy-client/internal/client"
+	"github.com/fantuz/entropy-service/entropy-client/internal/device"
+	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/entropy-client/internal/tests"
+	//"github.com/fantuz/entropy-service/entropy-client/internal/pipe"
 	"github.com/gorilla/websocket"
-	//"entropy-service/internal/pipe"
 )
 
 /*
