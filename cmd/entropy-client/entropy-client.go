@@ -11,13 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"internal/client"
-	"internal/device"
-	"internal/diag"
-	"internal/tests"
+	//"./internal/client"
+	//"internal/device"
+	//"internal/diag"
+	//"internal/tests"
 	//"entropy-service/internal/pipe"
 
-	"github.com/fantuz/entropy-service/cmd/internal/client"
+	"github.com/fantuz/entropy-service/entropy-client"
 	//"github.com/fantuz/entropy-service/cmd/internal/device"
 	//"github.com/fantuz/entropy-service/cmd/internal/diag"
 	//"github.com/fantuz/entropy-service/cmd/internal/tests"

@@ -1,0 +1,7 @@
+module github.com/fantuz/entropy-service/cmd/entropy-client
+
+go 1.24.4
+
+require github.com/gorilla/websocket v1.5.3
+
+require github.com/fantuz/entropy-service v0.0.0-20260309130041-e88349cb2b7b // indirect

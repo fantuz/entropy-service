@@ -1,4 +1,4 @@
-module github.com/fantuz/entropy-service/cmd/entropy-client
+module github.com/fantuz/entropy-service/entropy-client
 
 go 1.24.4
 
