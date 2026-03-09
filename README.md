@@ -147,37 +147,6 @@ Regular HTTP
 	/health
 	/metrics
 ```
-
-### Screenshots
-
-- ntop-style entropy-client interface (cmd/entropy-client/entropy-client.go)
-
-<img width="640" height="360" alt="Screenshot From 2026-03-08 14-16-42" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
-
-- WSS Endpoint STREAM: real-time entropy quality monitor (/stream.html + /data)
-
-<img width="640" height="360" alt="Screenshot From 2026-03-08 14-32-49" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
-
-- WSS Endpoint BYTES: Websocket streamer, byte generator (/bytes.html + /bytes)
-
-<img width="640" height="360" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
-
-- WSS Endpoint WORDS: Websocket streamer, word generator (/words.html + /words)
-
-<img width="640" height="360" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
-
-- WSS Endpoint COLORS: Websocket streamer, color generator (/colors.html + /colors)
-
-<img width="640" height="360" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
-
-- File upload & analysis interface (upload.html)
-
-<img width="600" height="600" alt="Screenshot From 2026-03-09 19-31-49" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
-
-- Metrics (/metrics))
-
-<img width="647" height="755" alt="Screenshot From 2026-03-09 19-32-00" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
-
 ## Build
 
 ### Prerequisites
@@ -202,33 +171,15 @@ go build cmd/entropy-server/entropy-server.go
 go build cmd/entropy-client/entropy-client.go
 ```
 ## Run
-- entropy-server
+- **entropy-server**<br/>
 We are now ready to start both HTTP & HTTPS listeners, respectively on ports 8080 and 8443 by default, on all available inet interfaces.
 SUDO command may be necessary to access the xRNG devices on different platforms (e. including symbolic links under /dev).
 The 'cd' command helps serving the ./web contents, residing in cmd/entropy-server/web. For simplicity you can create a symlink within the execution directory, or copy the whole ./web directory.
 ```
 cd entropy-server
 sudo go run entropy-server.go -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/urandom -words 8 -max-bytes 2097152 -refresh-ms '50ms' -refresh-colors-ms '50ms' -refresh 1 -cert-file cert.pem -key-file key.pem
----
-HTTP port: :8080
-HTTPS port: :8443
-CertFile TLS: cert.pem
-KeyFile TLS: key.pem
-EnableHTTPS flag: true
----
-Reseed size: 512
-ReseedMs interval: 2500
-Max request size KB: 2048
-QRNGBuffer size: 2
-Reseed Buffer size: 2
----
-2026/02/25 20:35:28 Entropy mode: hardware device: /dev/chaoskey1
-2026/02/25 20:35:28 Entropy source: /dev/chaoskey1
-2026/02/25 20:35:28 initQRNG() set to 2048 KB
-2026/02/25 20:35:31 HTTP server running on :8080
-2026/02/25 20:35:31 HTTPS server running on :8443
 ```
-- entropy-client
+- **entropy-client**<br/>
 Invoke the command as described below, to fetch entropy via a GO CLI client, instead of launching a browser. Also usefult to monitor the entropy-source itself, and for testing.
 ```
 cd entropy-client
@@ -239,6 +190,29 @@ go run entropy-client.go -refresh '50ms' -mode stream -wsurl "ws://127.0.0.1:808
 ## pull mode (HTTP)
 go run entropy-client.go -refresh '50ms' -mode pull -wsurl ws://127.0.0.1:8080/stream?bytes=2057152 -url http://127.0.0.1:8080/v1/data/random?bytes=2057152
 ```
+
+### Screenshots
+- ntop-style entropy-client interface (cmd/entropy-client/entropy-client.go)<br/>
+<img width="640" height="360" alt="Screenshot From 2026-03-08 14-16-42" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
+
+- WSS Endpoint STREAM: real-time entropy quality monitor (/stream.html + /data)<br/>
+<img width="640" height="360" alt="Screenshot From 2026-03-08 14-32-49" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
+
+- WSS Endpoint BYTES: Websocket streamer, byte generator (/bytes.html + /bytes)<br/>
+<img width="640" height="360" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+
+- WSS Endpoint WORDS: Websocket streamer, word generator (/words.html + /words)<br/>
+<img width="640" height="360" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
+
+- WSS Endpoint COLORS: Websocket streamer, color generator (/colors.html + /colors)<br/>
+<img width="640" height="360" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
+
+- File upload & analysis interface (upload.html)<br/>
+<img width="600" height="600" alt="Screenshot From 2026-03-09 19-31-49" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
+
+- Metrics (/metrics)<br/>
+<img width="647" height="755" alt="Screenshot From 2026-03-09 19-32-00" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
+
 ## Performances
 
 ### Results
