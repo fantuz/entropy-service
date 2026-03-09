@@ -1561,3 +1561,22 @@ type EntropyFrame struct {
 	Hash  string `json:"hash"`
 }
 */
+
+/*
+func main() {
+
+    cfg := config.Load()
+
+    qrngDev := qrng.NewDevice(cfg.QRNGDevice)
+
+    drbg := drbg.NewChaCha()
+
+    svc := entropyservice.New(qrngDev, drbg)
+
+    server := transport.NewHTTPServer(cfg.ListenAddr)
+
+    server.Handle("/entropy", svc.FetchHandler)
+
+    log.Fatal(server.Start())
+}
+*/

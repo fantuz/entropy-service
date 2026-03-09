@@ -56,7 +56,6 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, e
 			IdleConnTimeout:     60 * time.Second,
 			TLSHandshakeTimeout: 5 * time.Second,
 			//TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-
 		},
 	}
 

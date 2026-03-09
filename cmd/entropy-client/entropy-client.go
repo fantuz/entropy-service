@@ -122,6 +122,7 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 func main() {
 
+	writeOut := flag.Bool("write-out", false, "write out the received entropy back to local /dev/urandom (useful for low-entropy or isolated systems)")
 	slice := flag.Int("slice", 1048576, "amount of entropy pre fetch")
 	showDebug := flag.Bool("debug", false, "print debug information")
 	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
@@ -136,6 +137,7 @@ func main() {
 	url := flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
 	wsurl := flag.String("wsurl", "ws://127.0.0.1:8080/stream?bytes=1048576", "entropy endpoint")
 	fps := strconv.FormatInt(refresh.Milliseconds(), 10)
+
 	var refwsurl = *wsurl + "&refresh=" + fps
 
 	flag.Parse()
@@ -149,12 +151,15 @@ func main() {
 	testdata, _ := client.FetchEntropySimple(url, slice)
 	result := diag.RunDiagnostics(testdata)
 
+	var fpsdigit int
+	fpsdigit = 1000 / int(refresh.Milliseconds())
+
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
-	fmt.Println("FPS             : 1 frame per " + fps + "ms")
+	fmt.Println("Framerate       : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(refresh.Milliseconds())) + "ms)")
 	fmt.Println("HTTP URL        : " + *url)
 	fmt.Println("WS URL          : " + *wsurl)
 	fmt.Println("WS URL with REF : " + refwsurl)
@@ -176,7 +181,8 @@ func main() {
 
 	time.Sleep(5 * time.Second)
 
-	//wsconn, _, wscerr := websocket.DefaultDialer.Dial(*wsurl, nil)
+	startprg := time.Now()
+
 	wsconn, _, wscerr := websocket.DefaultDialer.Dial(refwsurl, nil)
 	if wscerr != nil {
 		fmt.Fprintf(os.Stderr, "fetch error: %v\n", wscerr)
@@ -207,11 +213,15 @@ func main() {
 		}
 	}
 
+	hrtot := time.Since(startprg).Milliseconds()
+
 	for {
 		httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-		data, err := client.FetchEntropy(httpCtx, *url, *slice)
+		start := time.Now()
+
 		//data, err := client.FetchEntropySimple(url, slice)
+		data, err := client.FetchEntropy(httpCtx, *url, *slice)
 
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
@@ -243,14 +253,7 @@ func main() {
 		// ... call your diag / tests / UI code here
 		//_ = data
 
-		// optional device write
-		deverr := device.Write("/dev/urandom", data)
-		if deverr != nil {
-			fmt.Println("device write error:", deverr)
-		}
-
 		stats := Stats{}
-		start := time.Now()
 
 		stats.TotalBytes += len(data)
 
@@ -261,6 +264,8 @@ func main() {
 
 		wsctx, wscancel := context.WithCancel(context.Background())
 		defer wscancel()
+
+		hrinside := time.Since(start).Milliseconds()
 
 		if *mode == "stream" {
 			stream, sterr := client.StreamEntropy(wsctx, refwsurl, 32)
@@ -282,11 +287,22 @@ func main() {
 				//tm.PrintHeatmap()
 				//fmt.Printf("MSG: %v\n", len(stdata))
 				//time.Sleep(50 * time.Millisecond)
-				hr := time.Since(start).Milliseconds()
-				fmt.Println("runtime:", hr, "ms")
+
+				fmt.Println("Program runtime      :", hrtot, "ms")
+				fmt.Println("WS Routine runtime   :", hrinside, "ms")
 			}
 		} else {
 			drawUI(&stats, start, data)
+			fmt.Println("Program runtime      :", hrtot, "ms")
+			fmt.Println("HTTP Routine runtime :", hrinside, "ms")
+		}
+
+		// optional device write
+		if *writeOut && len(data) > 0 {
+			deverr := device.Write("/dev/urandom", data)
+			if deverr != nil {
+				fmt.Println("device write error:", deverr)
+			}
 		}
 
 		if *showMatrix && len(data) > 0 {
@@ -340,9 +356,6 @@ func main() {
 		//time.Sleep(50 * time.Millisecond)
 		//time.Sleep(refresh)
 		//time.Sleep(time.Duration(*refresh * (time.Millisecond)))
-
-		hr := time.Since(start).Milliseconds()
-		fmt.Println("runtime:", hr, "ms")
 
 		//time.Sleep(time.Duration(*refresh))
 	}
