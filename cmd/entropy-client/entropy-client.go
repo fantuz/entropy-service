@@ -171,7 +171,7 @@ func main() {
 	fmt.Println("Program mode         :", *mode)
 	fmt.Println("----------------------------------------------")
 	fmt.Printf("Bitrate         : %f\n", result.Rate)
-	fmt.Printf("Chunks          : %d\n", slice)
+	//fmt.Printf("Chunks          : %.0f\n", int(*slice))
 	fmt.Printf("Bytes           : %d\n", result.N)
 	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
 	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)

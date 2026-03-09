@@ -1,4 +1,4 @@
-package rng
+package qrng
 
 import (
 	"golang.org/x/crypto/chacha20"

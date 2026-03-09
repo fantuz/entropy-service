@@ -18,7 +18,8 @@ import (
 	"image/png"
 	"net"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
-	"entropy-server/rng"
+	//"cmd/entropy-server/rng"
+	"entropy-server/qrng"
 	"github.com/8ff/diceware"
 	"github.com/gorilla/websocket"
 	"io"
@@ -303,7 +304,7 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 }
 
 // reseed loop
-func reseedLoop(ctx context.Context, d *rng.DRBG, interval int, dev string, bufferlen int, reseedbuf int) {
+func reseedLoop(ctx context.Context, d *qrng.DRBG, interval int, dev string, bufferlen int, reseedbuf int) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
 
@@ -328,7 +329,7 @@ func reseedLoop(ctx context.Context, d *rng.DRBG, interval int, dev string, buff
 	}
 }
 
-func entropyHeatmapHandler(d *rng.DRBG) http.HandlerFunc {
+func entropyHeatmapHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		width := 1024
 		height := 1024
@@ -417,7 +418,7 @@ func main() {
 }
 */
 
-func randomImageHandler(d *rng.DRBG) http.HandlerFunc {
+func randomImageHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		width := 1024
 		height := 1024
@@ -446,7 +447,7 @@ func randomImageHandler(d *rng.DRBG) http.HandlerFunc {
 	}
 }
 
-func randomHandler(d *rng.DRBG) http.HandlerFunc {
+func randomHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n := 1024
 		if q := r.URL.Query().Get("bytes"); q != "" {
@@ -491,7 +492,7 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
+func wsWordsHandler(d *qrng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		atomic.AddUint64(&httpRequests, +1)
@@ -593,7 +594,7 @@ func wsWordsHandler(d *rng.DRBG, quantity int, refresh time.Duration) http.Handl
 	}
 }
 
-func entropyWordHandler(d *rng.DRBG, quantity int, refreshRate int) http.HandlerFunc {
+func entropyWordHandler(d *qrng.DRBG, quantity int, refreshRate int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		words := diceware.GetWords()
 		randomWords := diceware.GetRandomWords()
@@ -680,7 +681,7 @@ body {
 	}
 }
 
-func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
+func randomBytesHandler(d *qrng.DRBG, maxSize int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -689,7 +690,7 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 		seed, _ := d.Derive(32)
 
 		// Create per-request DRBG
-		child, _ := rng.NewDRBG(seed)
+		child, _ := qrng.NewDRBG(seed)
 		//child, _ := rng.Context().Value("conn_drbg").(*rng.DRBG)
 
 		size := 65536
@@ -718,7 +719,7 @@ func randomBytesHandler(d *rng.DRBG, maxSize int) http.HandlerFunc {
 	}
 }
 
-func fileAnalyzeHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
+func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -804,7 +805,7 @@ func fileAnalyzeHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) htt
 	}
 }
 
-func uploadHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
+func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -898,7 +899,7 @@ func uploadHandler(d *rng.DRBG, fingerprint int, refresh time.Duration) http.Han
 	}
 }
 
-func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
+func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		atomic.AddUint64(&httpRequests, +1)
@@ -991,7 +992,7 @@ func wsBytesHandler(d *rng.DRBG, refresh time.Duration) http.HandlerFunc {
 	}
 }
 
-func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
+func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		atomic.AddUint64(&httpRequests, +1)
@@ -1059,7 +1060,7 @@ func wsBinaryHandler(d *rng.DRBG, refresh time.Duration, quantity int) http.Hand
 	}
 }
 
-func metricsHandler(d *rng.DRBG) http.HandlerFunc {
+func metricsHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metrics := d.GetMetadata()
 
@@ -1136,7 +1137,7 @@ drbg_instance_count %d
 	}
 }
 
-func healthHandler(d *rng.DRBG) http.HandlerFunc {
+func healthHandler(d *qrng.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		meta := d.GetMetadata()
@@ -1244,7 +1245,7 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 	return path, nil
 }
 
-func startHTTP(ctx context.Context, addr string, handler http.Handler, master *rng.DRBG) (*http.Server, error) {
+func startHTTP(ctx context.Context, addr string, handler http.Handler, master *qrng.DRBG) (*http.Server, error) {
 	//ln, err := net.Listen("tcp", addr)
 	//if err != nil { return nil, err }
 	//tln := newTunedListener(ln)
@@ -1263,8 +1264,8 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 			//seed, _ := master.Derive(32)
 			//nonce, _ := master.Derive(12)
 			// derive per-connection DRBG from master
-			//childDRBG, _ := rng.NewDRBG(seed)
-			childDRBG, childerr := rng.NewConnectionDRBG(master) // (DRBG)
+			//childDRBG, _ := qrng.NewDRBG(seed)
+			childDRBG, childerr := qrng.NewConnectionDRBG(master) // (DRBG)
 			if childerr != nil {
 				return ctx
 			}
@@ -1298,7 +1299,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *r
 	return srv, nil
 }
 
-func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *rng.DRBG) (*http.Server, error) {
+func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *qrng.DRBG) (*http.Server, error) {
 	ln, err := newTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -1317,7 +1318,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		Handler:      handler,
 		TLSConfig:    tlsConfig,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			childDRBG, cerr := rng.NewConnectionDRBG(master) // (DRBG)
+			childDRBG, cerr := qrng.NewConnectionDRBG(master) // (DRBG)
 			if cerr != nil {
 				return ctx
 			}
@@ -1425,7 +1426,7 @@ func main() {
 	// Initialize QRNG buffer
 	//entropy := NewEntropySource(cfg.DevicePath)
 	//qrngBuf := rng.NewQRNGBuffer(entropy, cfg.BufferKB*1024)
-	qrngBuf := rng.NewQRNGBuffer(dev, cfg.QRNGBuffer*1024)
+	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer*1024)
 
 	// pass entropy along
 	//master := NewMasterDRBG(entropy)
@@ -1438,7 +1439,7 @@ func main() {
 	}
 
 	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
-	drbg, derr := rng.NewDRBG(seed)
+	drbg, derr := qrng.NewDRBG(seed)
 	if derr != nil {
 		log.Fatal(derr)
 	}
@@ -1458,7 +1459,7 @@ func main() {
 	tlsCfg.Certificates = []tls.Certificate{cert}
 	tlsCfg.ClientAuth = tls.NoClientCert
 
-	masterDRBG, _ := rng.NewDRBG(seed)
+	masterDRBG, _ := qrng.NewDRBG(seed)
 
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()

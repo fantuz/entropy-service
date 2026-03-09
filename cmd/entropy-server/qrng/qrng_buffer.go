@@ -1,4 +1,4 @@
-package rng
+package qrng
 
 import (
 	"os"
