@@ -1,4 +1,4 @@
-module entropy-server
+module github.com/fantuz/entropy-service/cmd/entropy-server
 
 go 1.24.4
 
