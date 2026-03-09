@@ -35,12 +35,16 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, e
 	// Build URL: if endpoint already includes a query param for bytes, you can skip formatting;
 	// This example appends "?bytes=" if endpoint doesn't already contain "bytes=".
 	url := endpoint
+	//fmt.Println("BASE-FETCH-ENTROPY", url)
 	if quantity > 0 && !containsBytesParam(endpoint) {
+		//fmt.Println("PRE-FETCH-ENTROPY", url)
 		sep := "?"
 		if hasQuery(endpoint) {
 			sep = "&"
 		}
 		url = fmt.Sprintf("%s%sbytes=%d", endpoint, sep, quantity)
+		//fmt.Println("POST-FETCH-ENTROPY", url)
+		//time.Sleep(500 * time.Millisecond)
 	}
 
 	// Create a client with a conservative timeout bound (per request).
@@ -82,6 +86,8 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
+
+	//time.Sleep(500 * time.Millisecond)
 
 	return data, nil
 }

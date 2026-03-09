@@ -18,7 +18,7 @@ import (
 	"image/png"
 	"net"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
-	"entropy-service/rng"
+	"entropy-server/rng"
 	"github.com/8ff/diceware"
 	"github.com/gorilla/websocket"
 	"io"
@@ -1372,7 +1372,7 @@ func main() {
 	cfg := ParseConfig()
 
 	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10001 {
-		panic("reseed-ms must be between 1 and 10000 msec")
+		panic("reseed-ms must be between 1 and 10000 ms")
 	}
 
 	if cfg.MaxBytes > 2097153 {

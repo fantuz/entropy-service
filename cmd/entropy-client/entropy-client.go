@@ -123,7 +123,7 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 func main() {
 
 	writeOut := flag.Bool("write-out", false, "write out the received entropy back to local /dev/urandom (useful for low-entropy or isolated systems)")
-	slice := flag.Int("slice", 1048576, "amount of entropy pre fetch")
+	slice := flag.Int("slice", 2097152, "amount of entropy pre fetch")
 	showDebug := flag.Bool("debug", false, "print debug information")
 	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
 	showMatrix := flag.Bool("matrix", false, "print 64x64 matrix ")
@@ -144,7 +144,9 @@ func main() {
 
 	// create a cancellable context (useful for timeouts / graceful shutdown)
 	timeoutctx, timeoutcancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	defer timeoutcancel()
+	//timeoutcancel()
 
 	fmt.Print("\033[H\033[2J") // clear screen
 
@@ -163,14 +165,19 @@ func main() {
 	fmt.Println("HTTP URL        : " + *url)
 	fmt.Println("WS URL          : " + *wsurl)
 	fmt.Println("WS URL with REF : " + refwsurl)
-	fmt.Println("-------------------")
+	fmt.Println("----------------------------------------------")
+	//fmt.Println("Program runtime      :", hrtot, "ms")
+	fmt.Println("Write-out to /dev    :", *writeOut)
+	fmt.Println("Program mode         :", *mode)
+	fmt.Println("----------------------------------------------")
 	fmt.Printf("Bitrate         : %f\n", result.Rate)
+	fmt.Printf("Chunks          : %d\n", slice)
 	fmt.Printf("Bytes           : %d\n", result.N)
 	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
 	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
 	fmt.Printf("Monobit p-value : %.6f\n", result.MonobitP)
 	fmt.Printf("Serial ratio    : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
-	fmt.Println("-------------------")
+	fmt.Println("----------------------------------------------")
 	fmt.Println()
 
 	if result.Pass == true {
@@ -203,7 +210,7 @@ func main() {
 	select {
 	case <-timeoutctx.Done():
 		{
-			fmt.Println("HERE-CASE-CTX-DONE:")
+			//fmt.Println("HERE-CASE-CTX-DONE:")
 			timeoutcancel()
 			//return
 		}
@@ -213,15 +220,13 @@ func main() {
 		}
 	}
 
-	hrtot := time.Since(startprg).Milliseconds()
-
 	for {
-		httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		//httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 		start := time.Now()
 
-		//data, err := client.FetchEntropySimple(url, slice)
-		data, err := client.FetchEntropy(httpCtx, *url, *slice)
+		data, err := client.FetchEntropySimple(url, slice)
+		//data, err := client.FetchEntropy(httpCtx, *url, *slice)
 
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
@@ -236,8 +241,8 @@ func main() {
 			//fmt.Println("real HTTP:", htot)
 		}
 
-		//defer iterCancel()
-		httpCancel()
+		//defer httpCancel()
+		//httpCancel()
 
 		/*
 			_, msg, wserr := wsconn.ReadMessage()
@@ -285,14 +290,14 @@ func main() {
 				graph.Render()
 				//tm := diag.BuildTransitionMatrix(data)
 				//tm.PrintHeatmap()
-				//fmt.Printf("MSG: %v\n", len(stdata))
-				//time.Sleep(50 * time.Millisecond)
 
+				hrtot := time.Since(startprg).Milliseconds()
 				fmt.Println("Program runtime      :", hrtot, "ms")
 				fmt.Println("WS Routine runtime   :", hrinside, "ms")
 			}
 		} else {
 			drawUI(&stats, start, data)
+			hrtot := time.Since(startprg).Milliseconds()
 			fmt.Println("Program runtime      :", hrtot, "ms")
 			fmt.Println("HTTP Routine runtime :", hrinside, "ms")
 		}
@@ -353,10 +358,8 @@ func main() {
 			time.Sleep(200 * time.Millisecond)
 		}
 
-		//time.Sleep(50 * time.Millisecond)
-		//time.Sleep(refresh)
 		//time.Sleep(time.Duration(*refresh * (time.Millisecond)))
-
 		//time.Sleep(time.Duration(*refresh))
+		//time.Sleep(50 * time.Millisecond)
 	}
 }
