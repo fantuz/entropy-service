@@ -104,19 +104,32 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
 
-	fmt.Printf("Rate    : %.2f MB/s\n", stats.Rate/1024/1024)
-	fmt.Printf("Fetched : %d KB\n", stats.TotalBytes/1024)
-	fmt.Printf("Entropy : %.4f bits/byte\n", stats.Entropy)
+	//t := (*diag.RateMeter).RateMbps()
+	t := diag.NewRateMeter() // ex diag.Dashboard
+	t.Update(int(stats.Rate))
+
+	//fmt.Printf("Dashboard : %v MB/s\n", t)
+	//fmt.Printf("Dashboard : %q MB/s\n", t)
+	fmt.Printf("Rate      : %.3f MB/s\n", stats.Rate/1024/1024)
+	fmt.Printf("Fetched   : %d KB\n", stats.TotalBytes/1024)
+	//fmt.Printf("Meter     : %d MB/s\n", &t.Meter)
+	//fmt.Printf("Rate      : %d MB/s\n", &t.Rate)
+	//fmt.Printf("Fetched R : %d MB/s\n", &t.Bytes)
+	fmt.Printf("Entropy   : %.4f bits/byte\n", stats.Entropy)
 
 	status := Green + "OK" + Reset
 	if stats.Entropy < 7.9 {
 		status = Red + "WARN" + Reset
 	}
 
-	fmt.Printf("Status  : %s\n", status)
+	fmt.Printf("Status    : %s\n", status)
 	fmt.Println()
 
-	//(*diag.RateMeter).Update(diag.RateMeter, 1024)
+	//(*diag.RateMeter).Update(diag.RateMeter.rate, 1024)
+	//t.Update(int(t.Rate)/1024/1024)
+	//t.Update(int(t.Rate))
+
+	t.Update(len(data))
 	tests.RunAll(data)
 }
 
@@ -152,6 +165,7 @@ func main() {
 
 	testdata, _ := client.FetchEntropySimple(url, slice)
 	result := diag.RunDiagnostics(testdata)
+	//test := diag.NewRateMeter
 
 	var fpsdigit int
 	fpsdigit = 1000 / int(refresh.Milliseconds())
@@ -170,7 +184,8 @@ func main() {
 	fmt.Println("Write-out to /dev    :", *writeOut)
 	fmt.Println("Program mode         :", *mode)
 	fmt.Println("----------------------------------------------")
-	fmt.Printf("Bitrate         : %f\n", result.Rate)
+	//fmt.Printf("Bitrate         : %d\n", test)
+	//fmt.Printf("Bitrate         : %f\n", result.Rate)
 	fmt.Printf("Slice           : %d\n", int(*slice))
 	fmt.Printf("Bytes           : %d\n", result.N)
 	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
@@ -234,11 +249,7 @@ func main() {
 			//panic(err)
 		} else {
 			atomic.AddUint64(&diag.BytesFetched, uint64(len(data)))
-			//addplusbytes := diag.incBytes(len(data))
 			//atomic.AddUint64(&diag.httpCRequests, +1)
-			//htot := atomic.LoadUint64(&diag.httpCRequests)
-			//htot := diag.incHTTP(1)
-			//fmt.Println("real HTTP:", htot)
 		}
 
 		defer httpCancel()
@@ -280,15 +291,17 @@ func main() {
 
 			for stdata := range stream {
 				drawUI(&stats, start, stdata)
-				//r := diag.RunDiagnostics(stdata)
+				r := diag.RunDiagnostics(stdata)
 				//tm := diag.BuildTransitionMatrix(data)
 
-				//dashboard.Add(r)
-				//dashboard.Render()
+				dashboard.Add(r)
+				dashboard.Render()
 				//graph.Add(r.Shannon)
 				//graph.Render()
 				//tm.PrintHeatmap()
 				hrtot := time.Since(startprg).Milliseconds()
+				//fmt.Println("Program notes        :", r.Notes, "ms")
+				//fmt.Println("Program rate         :", r.Rate, "ms")
 				fmt.Println("Program runtime      :", hrtot, "ms")
 				fmt.Println("WS Routine runtime   :", hrinside, "ms")
 			}
@@ -302,6 +315,8 @@ func main() {
 			//graph.Render()
 
 			hrtot := time.Since(startprg).Milliseconds()
+			//fmt.Println("Program notes        :", r.Notes, "ms")
+			//fmt.Println("Program rate         :", r.Rate, "ms")
 			fmt.Println("Program runtime      :", hrtot, "ms")
 			fmt.Println("HTTP Routine runtime :", hrinside, "ms")
 		}
@@ -328,7 +343,6 @@ func main() {
 			fmt.Println("preview (hex):", hex.EncodeToString(data[:n]))
 			fmt.Println(hex.EncodeToString(data[:32]))
 			//fmt.Println(hex.Dump(data[:32]))
-			// pause slightly so user sees preview in TTY
 			time.Sleep(500 * time.Millisecond)
 		}
 
@@ -362,8 +376,5 @@ func main() {
 			time.Sleep(200 * time.Millisecond)
 		}
 
-		//time.Sleep(time.Duration(*refresh * (time.Millisecond)))
-		//time.Sleep(time.Duration(*refresh))
-		//time.Sleep(50 * time.Millisecond)
 	}
 }

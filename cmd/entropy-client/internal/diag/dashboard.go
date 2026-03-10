@@ -39,9 +39,11 @@ func (d *Dashboard) Add(r Diagnostics) {
 	d.chiP = push(d.chiP, r.Chi2P, d.width)
 	d.monoP = push(d.monoP, r.MonobitP, d.width)
 	d.serial = push(d.serial, r.SerialR, d.width)
+
 	d.rate.Update(r.N)
-	//d.rate.Update(len(r.N))
 	//d.rate.Update(int(math.Round(d.rate.RateMbps())))
+	//d.rate.Update(int(r.Rate))
+	//d.rate.Update(len(r.N))
 }
 
 func spark(v float64, min float64, max float64) rune {
@@ -91,7 +93,6 @@ func renderSeries(series []float64, min float64, max float64) string {
 func (d *Dashboard) Render() {
 
 	//fmt.Print("\033[H\033[2J")
-
 	fmt.Println("Entropy Health Monitor")
 	fmt.Println("----------------------")
 	fmt.Printf(
@@ -100,7 +101,7 @@ func (d *Dashboard) Render() {
 	)
 	fmt.Printf(
 		"Entropy              %s\n",
-		renderSeries(d.entropy, 7.5, 8.0),
+		renderSeries(d.entropy, 7.995, 8.0),
 	)
 
 	fmt.Printf(
@@ -115,7 +116,7 @@ func (d *Dashboard) Render() {
 
 	fmt.Printf(
 		"Serial corr          %s\n",
-		renderSeries(d.serial, -0.1, 0.1),
+		renderSeries(d.serial, -0.02, 0.02), //0.1
 	)
 	//fmt.Println("----------------------")
 }

@@ -1,7 +1,7 @@
-// internal/diag/diag.go
 package diag
 
 import (
+	//"fmt"
 	"math"
 	"math/bits"
 	"sync/atomic"
@@ -16,7 +16,7 @@ type Diagnostics struct {
 	MonobitP float64
 	SerialR  float64
 	SerialP  float64
-	Rate     float64
+	Rate     *RateMeter
 	TMatrix  TransitionMatrix
 	Pass     bool
 	Notes    string
@@ -28,6 +28,7 @@ var (
 	Timer         uint64
 )
 
+/*
 func incBytes(n int) {
 	atomic.AddUint64(&BytesFetched, uint64(n))
 }
@@ -39,6 +40,7 @@ func incTimer() {
 func incHTTP() {
 	atomic.AddUint64(&httpCRequests, 1)
 }
+*/
 
 // RunDiagnostics computes a small battery of tests on the provided bytes.
 // It is intentionally small and self-contained so you can call it from a worker or CLI.
@@ -65,11 +67,10 @@ func RunDiagnostics(data []byte) Diagnostics {
 	}
 
 	atomic.AddUint64(&BytesFetched, uint64(n))
-	atomic.AddUint64(&httpCRequests, uint64(n))
+	//atomic.AddUint64(&httpCRequests, uint64(n))
 
 	rate := NewRateMeter()
-	rate.Update(len(data))
-	//fmt.Println("real rate", rate.RateMbps())
+	//rate.Update(len(data))
 
 	return Diagnostics{
 		N:        n,
@@ -81,7 +82,8 @@ func RunDiagnostics(data []byte) Diagnostics {
 		SerialP:  serialP,
 		TMatrix:  tm,
 		Pass:     pass,
-		Rate:     rate.RateMbps(),
+		Rate:     rate,
+		//Notes:    "ciao",
 	}
 }
 
