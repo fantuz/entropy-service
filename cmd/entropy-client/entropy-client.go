@@ -105,16 +105,17 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	fmt.Println()
 
 	//t := (*diag.RateMeter).RateMbps()
-	t := diag.NewRateMeter() // ex diag.Dashboard
+	//ex diag.Dashboard
+	t := diag.NewRateMeter()
 	t.Update(int(stats.Rate))
 
-	//fmt.Printf("Dashboard : %v MB/s\n", t)
-	//fmt.Printf("Dashboard : %q MB/s\n", t)
-	fmt.Printf("Rate      : %.3f MB/s\n", stats.Rate/1024/1024)
+	//fmt.Printf("Dashboard : %v\n", t)
+	//fmt.Printf("Dashboard : %q\n", t)
+	fmt.Printf("Rate      : %.6f MB/s\n", stats.Rate/1024/1024)
 	fmt.Printf("Fetched   : %d KB\n", stats.TotalBytes/1024)
-	//fmt.Printf("Meter     : %d MB/s\n", &t.Meter)
-	//fmt.Printf("Rate      : %d MB/s\n", &t.Rate)
-	//fmt.Printf("Fetched R : %d MB/s\n", &t.Bytes)
+	//fmt.Printf("Meter     : %d\n", &t.Meter)
+	//fmt.Printf("Rate      : %d\n", &t.Rate)
+	//fmt.Printf("Fetched R : %d\n", &t.Bytes)
 	fmt.Printf("Entropy   : %.4f bits/byte\n", stats.Entropy)
 
 	status := Green + "OK" + Reset
@@ -126,9 +127,6 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	fmt.Println()
 
 	//(*diag.RateMeter).Update(diag.RateMeter.rate, 1024)
-	//t.Update(int(t.Rate)/1024/1024)
-	//t.Update(int(t.Rate))
-
 	t.Update(len(data))
 	tests.RunAll(data)
 }
@@ -231,150 +229,233 @@ func main() {
 		}
 	default:
 		{
-			//fmt.Println("HERE-CASE-CTX-CONTINUE:")
+			//continue
+
+			/*
+				dataone, msg, wserr := wsconn.ReadMessage()
+				if wserr != nil {
+					fmt.Fprintf(os.Stderr, "fetch error: %v\n", wserr)
+					os.Exit(1)
+					//panic(err)
+				} else {
+					fmt.Printf("MSG : %v\n", len(msg))
+					fmt.Printf("DATA: %v\n", dataone)
+				}
+				//fmt.Println("HERE-CASE-CTX-CONTINUE:")
+				wsconn.Close()
+			*/
 		}
 	}
 
+	ticker := time.NewTicker(time.Duration(5) * time.Millisecond)
+
 	for {
-		httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
-
 		start := time.Now()
-
-		//data, err := client.FetchEntropySimple(url, slice)
-		data, err := client.FetchEntropy(httpCtx, *url, *slice)
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
-			os.Exit(1)
-			//panic(err)
-		} else {
-			atomic.AddUint64(&diag.BytesFetched, uint64(len(data)))
-			//atomic.AddUint64(&diag.httpCRequests, +1)
-		}
-
-		defer httpCancel()
-		//httpCancel()
-
-		/*
-			_, msg, wserr := wsconn.ReadMessage()
-			if wserr != nil {
-				fmt.Fprintf(os.Stderr, "fetch error: %v\n", wserr)
-				os.Exit(1)
-				//panic(err)
-			} else {
-				fmt.Printf("MSG: %v\n", len(msg))
-			}
-		*/
-
-		// ... call your diag / tests / UI code here
-		//_ = data
 
 		stats := Stats{}
 
-		stats.TotalBytes += len(data)
-
-		stats.Entropy = computeEntropy(data, &stats.Hist)
-
-		elapsed := time.Since(start).Seconds()
-		stats.Rate = float64(stats.TotalBytes) / elapsed
+		httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer httpCancel()
+		//httpCancel()
 
 		wsctx, wscancel := context.WithCancel(context.Background())
 		defer wscancel()
+		// wscancel()
 
-		hrinside := time.Since(start).Milliseconds()
+		//defer wsconn.Close()
+		//defer wsconn.Close()
+		defer ticker.Stop()
 
+		//elapsed := time.Since(start).Seconds()
+		//stats.Rate = float64(stats.TotalBytes) / elapsed
 		if *mode == "stream" {
 			stream, sterr := client.StreamEntropy(wsctx, refwsurl, 32)
 			if sterr != nil {
 				panic(sterr)
 			}
+			startws := time.Now()
 
-			for stdata := range stream {
-				drawUI(&stats, start, stdata)
-				r := diag.RunDiagnostics(stdata)
-				//tm := diag.BuildTransitionMatrix(data)
+			select {
+			case <-httpCtx.Done():
+				return
+				continue
+			case <-wsctx.Done():
+				//return
+				continue
+			case <-ticker.C:
+				for stdata := range stream {
+					stats.TotalBytes += len(stdata)
+					stats.Entropy = computeEntropy(stdata, &stats.Hist)
 
-				dashboard.Add(r)
-				dashboard.Render()
-				//graph.Add(r.Shannon)
-				//graph.Render()
-				//tm.PrintHeatmap()
-				hrtot := time.Since(startprg).Milliseconds()
+					drawUI(&stats, startws, stdata)
+
+					// optional device write
+					if *writeOut && len(stdata) > 0 {
+						deverr := device.Write("/dev/urandom", stdata)
+						if deverr != nil {
+							fmt.Println("device write error:", deverr)
+						}
+					}
+
+					if *showMatrix && len(stdata) > 0 {
+						tm := diag.BuildTransitionMatrix(stdata)
+						tm.PrintHeatmap()
+						time.Sleep(200 * time.Millisecond)
+					}
+
+					if *showPreview && len(stdata) > 0 {
+						n := 64
+						if len(stdata) < n {
+							n = len(stdata)
+						}
+						fmt.Println("preview (hex):", hex.EncodeToString(stdata[:n]))
+						fmt.Println(hex.EncodeToString(stdata[:32]))
+						//fmt.Println(hex.Dump(stdata[:32]))
+						time.Sleep(500 * time.Millisecond)
+					}
+
+					if *showDebug && len(stdata) > 0 {
+						fmt.Printf("received %d bytes\n", len(stdata))
+						btot := atomic.LoadUint64(&diag.BytesFetched)
+						fmt.Println("real RECV:", btot)
+					}
+
+					if *showGraph && len(stdata) > 0 {
+						r := diag.RunDiagnostics(stdata)
+						graph.Add(r.Shannon)
+						graph.Render()
+						time.Sleep(100 * time.Millisecond)
+					}
+
+					if *showDashboard && len(stdata) > 0 {
+						r := diag.RunDiagnostics(stdata)
+						dashboard.Add(r)
+						dashboard.Render()
+						time.Sleep(100 * time.Millisecond)
+					}
+
+					if *showHistogram && len(stdata) > 0 {
+						fmt.Println("\nHistogram (top 16)")
+						drawHistogram(&stats.Hist)
+						//bgraph := diag.PrintHistogram64(, stdata)
+						//bgraph.Render()
+						diag.PrintHistogram64(32, stdata) // TODO: fix bucketsize
+						time.Sleep(200 * time.Millisecond)
+					}
+
+					hrtot := time.Since(startprg).Milliseconds()
+					elapsedws := time.Since(startws).Milliseconds()
+					stats.Rate = float64(stats.TotalBytes) / float64(elapsedws)
+					//fmt.Println("Program rate       :", r.Rate, "MB/s")
+					//fmt.Println("Program rate         :", r.Rate, "MB/s")
+					fmt.Println("WS Routine runtime   :", hrtot-elapsedws, "ms")
+					//fmt.Println("Program notes        :", r.Notes, "ms")
+					//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
+					continue
+				}
+			default:
+				{
+					continue
+				}
+			}
+		}
+
+		if *mode == "pull" {
+			//data, err := client.FetchEntropySimple(url, slice)
+			data, err := client.FetchEntropy(httpCtx, *url, *slice)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
+				os.Exit(1)
+				//panic(err)
+			} else {
+				atomic.AddUint64(&diag.BytesFetched, uint64(len(data)))
+				//atomic.AddUint64(&diag.httpCRequests, +1)
+			}
+
+			select {
+			case <-httpCtx.Done():
+				//return
+				//continue
+			case <-wsctx.Done():
+				//return
+				continue
+			case <-ticker.C:
+
+				stats.TotalBytes += len(data)
+				elapsed := time.Since(start).Seconds()
+				stats.Rate = float64(stats.TotalBytes) / elapsed
+				stats.Entropy = computeEntropy(data, &stats.Hist)
+				drawUI(&stats, start, data)
+	
+				// optional device write
+				if *writeOut && len(data) > 0 {
+					deverr := device.Write("/dev/urandom", data)
+					if deverr != nil {
+						fmt.Println("device write error:", deverr)
+					}
+				}
+	
+				if *showMatrix && len(data) > 0 {
+					tm := diag.BuildTransitionMatrix(data)
+					tm.PrintHeatmap()
+					time.Sleep(200 * time.Millisecond)
+				}
+	
+				if *showPreview && len(data) > 0 {
+					n := 64
+					if len(data) < n {
+						n = len(data)
+					}
+					fmt.Println("preview (hex):", hex.EncodeToString(data[:n]))
+					fmt.Println(hex.EncodeToString(data[:32]))
+					//fmt.Println(hex.Dump(data[:32]))
+					time.Sleep(500 * time.Millisecond)
+				}
+	
+				if *showDebug && len(data) > 0 {
+					fmt.Printf("received %d bytes\n", len(data))
+					btot := atomic.LoadUint64(&diag.BytesFetched)
+					fmt.Println("real RECV:", btot)
+				}
+	
+				if *showGraph && len(data) > 0 {
+					r := diag.RunDiagnostics(data)
+					graph.Add(r.Shannon)
+					graph.Render()
+					time.Sleep(100 * time.Millisecond)
+				}
+	
+				if *showDashboard && len(data) > 0 {
+					r := diag.RunDiagnostics(data)
+					dashboard.Add(r)
+					dashboard.Render()
+					time.Sleep(100 * time.Millisecond)
+				}
+	
+				if *showHistogram && len(data) > 0 {
+					fmt.Println("\nHistogram (top 16)")
+					drawHistogram(&stats.Hist)
+					//bgraph := diag.PrintHistogram64(, data)
+					//bgraph.Render()
+					diag.PrintHistogram64(32, data) // TODO: fix bucketsize
+					time.Sleep(200 * time.Millisecond)
+				}
+	
+				hrinside := time.Since(start).Milliseconds()
+				//hrtot := time.Since(startprg).Milliseconds()
 				//fmt.Println("Program notes        :", r.Notes, "ms")
 				//fmt.Println("Program rate         :", r.Rate, "ms")
-				fmt.Println("Program runtime      :", hrtot, "ms")
-				fmt.Println("WS Routine runtime   :", hrinside, "ms")
-			}
-		} else {
-			drawUI(&stats, start, data)
-			//r := diag.RunDiagnostics(data)
-			
-			//dashboard.Add(r)
-			//dashboard.Render()
-			//graph.Add(r.Shannon)
-			//graph.Render()
-
-			hrtot := time.Since(startprg).Milliseconds()
-			//fmt.Println("Program notes        :", r.Notes, "ms")
-			//fmt.Println("Program rate         :", r.Rate, "ms")
-			fmt.Println("Program runtime      :", hrtot, "ms")
-			fmt.Println("HTTP Routine runtime :", hrinside, "ms")
-		}
-
-		// optional device write
-		if *writeOut && len(data) > 0 {
-			deverr := device.Write("/dev/urandom", data)
-			if deverr != nil {
-				fmt.Println("device write error:", deverr)
+				//fmt.Println("Program runtime      :", hrtot, "ms")
+				//fmt.Println("Program rate         :", r.Rate, "MB/s")
+				fmt.Println("HTTP Routine runtime :", hrinside, "ms")
+				//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
+				//continue
+			default:
+				{
+				continue
+				}
 			}
 		}
-
-		if *showMatrix && len(data) > 0 {
-			tm := diag.BuildTransitionMatrix(data)
-			tm.PrintHeatmap()
-			time.Sleep(200 * time.Millisecond)
-		}
-
-		if *showPreview && len(data) > 0 {
-			n := 64
-			if len(data) < n {
-				n = len(data)
-			}
-			fmt.Println("preview (hex):", hex.EncodeToString(data[:n]))
-			fmt.Println(hex.EncodeToString(data[:32]))
-			//fmt.Println(hex.Dump(data[:32]))
-			time.Sleep(500 * time.Millisecond)
-		}
-
-		if *showDebug && len(data) > 0 {
-			fmt.Printf("received %d bytes\n", len(data))
-			btot := atomic.LoadUint64(&diag.BytesFetched)
-			fmt.Println("real RECV:", btot)
-		}
-
-		if *showGraph && len(data) > 0 {
-			r := diag.RunDiagnostics(data)
-			graph.Add(r.Shannon)
-			graph.Render()
-			time.Sleep(100 * time.Millisecond)
-		}
-
-		if *showDashboard && len(data) > 0 {
-			q := diag.RunDiagnostics(data)
-			dashboard.Add(q)
-			dashboard.Render()
-			time.Sleep(100 * time.Millisecond)
-		}
-
-		if *showHistogram && len(data) > 0 {
-			fmt.Println("\nHistogram (top 16)")
-			drawHistogram(&stats.Hist)
-
-			//bgraph := diag.PrintHistogram64(, data)
-			//bgraph.Render()
-			diag.PrintHistogram64(32, data) // TODO: fix bucketsize
-			time.Sleep(200 * time.Millisecond)
-		}
-
 	}
 }
