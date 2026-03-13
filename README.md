@@ -4,9 +4,6 @@
 entropy-service is a GO-based software intended to let users fetch an amount randomness via simple API(s). Useful in daily cryptographic operations, where the randomness source may be "staving" or being tampered-with.
 In my demonstrative setup, real-time entropy is backed by a real QRNG (Quantum Random Number Generator), a PCI card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of entropy source, using well-known algorithms as ChaCha20 or AES-CRT.
 
-## Project goals
-The software has been adapted to fetch entropy from etherogeneous sources, as the Linux CSPRNG itself (/dev/urandom, for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam, mouse, or radio-wave, your imagination is the limit !
-
 ## Practical implementations
 With this powerful software, users can setup their own "cryptographically-strong entropy source" and use simple APIs to retrieve chunks of randomness, either in form of:
  - a binary stream
@@ -117,6 +114,7 @@ Supported client protocols
 - abstraction and reorganization of code in line with GO guidelines. DRBG, transport, service and domain are now located in more canonical project structure (for example: domain/ rng/ service/ transport/ /cmd)
 
 ### Hardware already supported, more to be added soon
+The software has been adapted to fetch entropy from etherogeneous sources, as the Linux CSPRNG itself (/dev/urandom, for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam, mouse, or radio-wave, your imagination is the limit !
 ```
  - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
  - Quantis PCI by ID Quantique
@@ -177,18 +175,18 @@ SUDO command may be necessary to access the xRNG devices on different platforms 
 The 'cd' command helps serving the ./web contents, residing in cmd/entropy-server/web. For simplicity you can create a symlink within the execution directory, or copy the whole ./web directory.
 ```
 cd entropy-server
-sudo go run entropy-server.go -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/urandom -words 8 -max-bytes 2097152 -refresh-ms '50ms' -refresh-colors-ms '50ms' -refresh 1 -cert-file cert.pem -key-file key.pem
+sudo go run . -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/urandom -words 8 -max-bytes 2097152 -refresh-ms '50ms' -refresh-colors-ms '50ms' -refresh 1 -cert-file cert.pem -key-file key.pem
 ```
 - **entropy-client**<br/>
-Invoke the command as described below, to fetch entropy via a GO CLI client, instead of launching a browser. Also usefult to monitor the entropy-source itself, and for testing.
+If you want fetch entropy using a dedicated GO-CLI client with multiple capabilities, instead of the classic web broser, you need to invoke the following command as described below, instead of launching a browser. Also usefult to monitor the entropy-source itself, or to locally attach remote source of entropy.
 ```
 cd entropy-client
 
-## stream mode (Websockets)
-go run entropy-client.go -refresh '50ms' -mode stream -wsurl "ws://127.0.0.1:8080/stream?bytes=2057152&refresh=50" -url "http://127.0.0.1:8080/v1/data/random?bytes=2057152"
+### stream mode (Websockets)
+go run . -refresh '50ms' -mode stream -wsurl "ws://127.0.0.1:8080/stream?bytes=2057152&refresh=50" -url "http://127.0.0.1:8080/v1/data/random?bytes=2057152"
 
-## pull mode (HTTP)
-go run entropy-client.go -refresh '50ms' -mode pull -wsurl ws://127.0.0.1:8080/stream?bytes=2057152 -url http://127.0.0.1:8080/v1/data/random?bytes=2057152
+### pull mode (HTTP)
+go run . -refresh '50ms' -mode pull -wsurl ws://127.0.0.1:8080/stream?bytes=2057152 -url http://127.0.0.1:8080/v1/data/random?bytes=2057152
 ```
 
 ### Screenshots

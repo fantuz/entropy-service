@@ -25,6 +25,7 @@ type Diagnostics struct {
 var (
 	BytesFetched  uint64
 	httpCRequests uint64
+	wsCRequests uint64
 	Timer         uint64
 )
 

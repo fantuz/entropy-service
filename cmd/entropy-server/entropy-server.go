@@ -1431,7 +1431,8 @@ func main() {
 
 	// Initialize QRNG buffer
 	//entropy := NewEntropySource(cfg.DevicePath)
-	//qrngBuf := rng.NewQRNGBuffer(entropy, cfg.BufferKB*1024)
+	//entropy := NewEntropySource(dev,cfg.RequireDevice)
+	//qrngBuf := qrng.NewQRNGBuffer(entropy, cfg.BufferKB*1024)
 	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer*1024)
 
 	// pass entropy along

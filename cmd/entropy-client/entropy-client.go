@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fantuz/entropy-service/entropy-client/internal/client"
+	"github.com/fantuz/entropy-service/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/entropy-client/internal/device"
 	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/entropy-client/internal/tests"
@@ -133,23 +134,61 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 func main() {
 
-	writeOut := flag.Bool("write-out", false, "write out the received entropy back to local /dev/urandom (useful for low-entropy or isolated systems)")
-	slice := flag.Int64("slice", 2097152, "amount of entropy pre fetch")
-	showDebug := flag.Bool("debug", false, "print debug information")
-	showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
-	showMatrix := flag.Bool("matrix", false, "print 64x64 matrix ")
-	showGraph := flag.Bool("graph", false, "print distribution graph")
-	showDashboard := flag.Bool("dashboard", false, "print dashboard summaries")
-	showHistogram := flag.Bool("histogram", false, "print extended histogram")
-	refresh := flag.Duration("refresh", 50*time.Millisecond, "refresh interval for both HTTP and WS")
-	mode := flag.String("mode", "pull", "pull|stream")
+	cfg := config.ParseConfig()
+
+	//if cfg.WriteOut == false {
+	//	panic("Write Out Device issue")
+	//}
+
+	if cfg.ShowDebug == true {
+		//panic("Debug forbidden ;)")
+		//continue
+	}
+
+	/*
+		if cfg.Slice < 10 || cfg.Slice > 4097 {
+			panic("Slice of data fetched through websocket shall be between 2 and 4096 KB")
+		}
+	*/
+
+	fmt.Println("---")
+	fmt.Println("Debug         : ", cfg.ShowDebug)
+	fmt.Println("Write to /dev : ", cfg.WriteOut)
+	//fmt.Println(" flag:", cfg.EnableHTTPS)
+	fmt.Println("CertFile TLS:", cfg.CertFile)
+	fmt.Println("KeyFile TLS:", cfg.KeyFile)
+	fmt.Println("---")
+	//fmt.Println("Max request size KB:", cfg.MaxBytes/1024)
+	//fmt.Println("Max number of Bytes:", cfg.MaxBytes)
+	fmt.Println("Slice", cfg.Slice) // 2097152
+	fmt.Println("---")
+	//fmt.Println("Maximum number of Words:", cfg.MaxWords)
+	fmt.Println("---")
+	fmt.Println("Refresh Rate (seconds) value:", cfg.RefreshRate)
+	//fmt.Println("RefreshMs (ms) value:", cfg.RefreshRateMs)
+	fmt.Println("---")
+
+	//slice := flag.Int64("slice", 2097152, "amount of entropy pre fetch")
+	//showDebug := flag.Bool("debug", false, "print debug information")
+	//showPreview := flag.Bool("preview", false, "print hex preview of first 64 bytes")
+	//showMatrix := flag.Bool("matrix", false, "print 64x64 matrix ")
+	//showGraph := flag.Bool("graph", false, "print distribution graph")
+	//showDashboard := flag.Bool("dashboard", false, "print dashboard summaries")
+
+	//showHistogram := flag.Bool("histogram", false, "print extended histogram")
+	//refresh := flag.Duration("refresh", 50*time.Millisecond, "refresh interval for both HTTP and WS")
+	//mode := flag.String("mode", "pull", "pull|stream")
 
 	//var size = flag.Int("bytes", 1048576, "bytes to fetch")
-	url := flag.String("url", "http://127.0.0.1:8080/v1/data/random?bytes=1048576", "entropy endpoint")
-	wsurl := flag.String("wsurl", "ws://127.0.0.1:8080/stream?bytes=1048576", "entropy endpoint")
-	fps := strconv.FormatInt(refresh.Milliseconds(), 10)
+	url := flag.String("url", "http://127.0.0.1:8080/v1/data/random", "entropy endpoint")
+	wsurl := flag.String("wsurl", "ws://127.0.0.1:8080/stream", "entropy endpoint")
+	fps := strconv.FormatInt(cfg.Refresh.Milliseconds(), 10)
+	rbytes := strconv.FormatInt(cfg.Slice, 10)
 
-	var refwsurl = *wsurl + "&refresh=" + fps
+	var refwsurl = *wsurl + "?bytes=" + rbytes + "&refresh=" + fps
+	var refhttpurl = *url + "?bytes=" + rbytes + "&refresh=" + fps
+	var fpsdigit int
+	fpsdigit = 1000 / int(cfg.Refresh.Milliseconds())
 
 	flag.Parse()
 
@@ -161,30 +200,29 @@ func main() {
 
 	fmt.Print("\033[H\033[2J") // clear screen
 
-	testdata, _ := client.FetchEntropySimple(url, slice)
+	testdata, _ := client.FetchEntropySimple(url, &cfg.Slice)
 	result := diag.RunDiagnostics(testdata)
 	//test := diag.NewRateMeter
 
-	var fpsdigit int
-	fpsdigit = 1000 / int(refresh.Milliseconds())
-
+	// writeout debug slice preview graph matrix dashboard
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
-	fmt.Println("Framerate       : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(refresh.Milliseconds())) + "ms)")
+	fmt.Println("Framerate       : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh.Milliseconds())) + "ms)")
 	fmt.Println("HTTP URL        : " + *url)
+	fmt.Println("HTTP URL        : " + refhttpurl)
 	fmt.Println("WS URL          : " + *wsurl)
 	fmt.Println("WS URL with REF : " + refwsurl)
 	fmt.Println("----------------------------------------------")
 	//fmt.Println("Program runtime      :", hrtot, "ms")
-	fmt.Println("Write-out to /dev    :", *writeOut)
-	fmt.Println("Program mode         :", *mode)
+	fmt.Println("Write-out to /dev    :", cfg.WriteOut)
+	fmt.Println("Program mode         :", cfg.Mode)
 	fmt.Println("----------------------------------------------")
 	//fmt.Printf("Bitrate         : %d\n", test)
 	//fmt.Printf("Bitrate         : %f\n", result.Rate)
-	fmt.Printf("Slice           : %d\n", int(*slice))
+	fmt.Printf("Slice           : %d\n", int(cfg.Slice))
 	fmt.Printf("Bytes           : %d\n", result.N)
 	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
 	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
@@ -268,42 +306,45 @@ func main() {
 
 		//elapsed := time.Since(start).Seconds()
 		//stats.Rate = float64(stats.TotalBytes) / elapsed
-		if *mode == "stream" {
+		if cfg.Mode == "stream" {
 			stream, sterr := client.StreamEntropy(wsctx, refwsurl, 32)
 			if sterr != nil {
 				panic(sterr)
+			} else {
+				//atomic.AddUint64(&diag.wsCRequests, +1)
 			}
 			startws := time.Now()
 
 			select {
 			case <-httpCtx.Done():
 				return
-				continue
+				//continue
 			case <-wsctx.Done():
 				//return
 				continue
 			case <-ticker.C:
 				for stdata := range stream {
+					atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
 					stats.TotalBytes += len(stdata)
 					stats.Entropy = computeEntropy(stdata, &stats.Hist)
 
 					drawUI(&stats, startws, stdata)
 
 					// optional device write
-					if *writeOut && len(stdata) > 0 {
+					if cfg.WriteOut && len(stdata) > 0 {
 						deverr := device.Write("/dev/urandom", stdata)
 						if deverr != nil {
 							fmt.Println("device write error:", deverr)
 						}
 					}
 
-					if *showMatrix && len(stdata) > 0 {
+					if cfg.ShowMatrix && len(stdata) > 0 {
 						tm := diag.BuildTransitionMatrix(stdata)
 						tm.PrintHeatmap()
 						time.Sleep(200 * time.Millisecond)
 					}
 
-					if *showPreview && len(stdata) > 0 {
+					if cfg.ShowPreview && len(stdata) > 0 {
 						n := 64
 						if len(stdata) < n {
 							n = len(stdata)
@@ -314,27 +355,27 @@ func main() {
 						time.Sleep(500 * time.Millisecond)
 					}
 
-					if *showDebug && len(stdata) > 0 {
+					if cfg.ShowDebug && len(stdata) > 0 {
 						fmt.Printf("received %d bytes\n", len(stdata))
 						btot := atomic.LoadUint64(&diag.BytesFetched)
 						fmt.Println("real RECV:", btot)
 					}
 
-					if *showGraph && len(stdata) > 0 {
+					if cfg.ShowGraph && len(stdata) > 0 {
 						r := diag.RunDiagnostics(stdata)
 						graph.Add(r.Shannon)
 						graph.Render()
 						time.Sleep(100 * time.Millisecond)
 					}
 
-					if *showDashboard && len(stdata) > 0 {
+					if cfg.ShowDashboard && len(stdata) > 0 {
 						r := diag.RunDiagnostics(stdata)
 						dashboard.Add(r)
 						dashboard.Render()
 						time.Sleep(100 * time.Millisecond)
 					}
 
-					if *showHistogram && len(stdata) > 0 {
+					if cfg.ShowHistogram && len(stdata) > 0 {
 						fmt.Println("\nHistogram (top 16)")
 						drawHistogram(&stats.Hist)
 						//bgraph := diag.PrintHistogram64(, stdata)
@@ -351,7 +392,7 @@ func main() {
 					fmt.Println("WS Routine runtime   :", hrtot-elapsedws, "ms")
 					//fmt.Println("Program notes        :", r.Notes, "ms")
 					//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
-					continue
+					//continue
 				}
 			default:
 				{
@@ -360,9 +401,9 @@ func main() {
 			}
 		}
 
-		if *mode == "pull" {
+		if cfg.Mode == "pull" {
 			//data, err := client.FetchEntropySimple(url, slice)
-			data, err := client.FetchEntropy(httpCtx, *url, *slice)
+			data, err := client.FetchEntropy(httpCtx, refhttpurl, cfg.Slice)
 
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
@@ -376,10 +417,10 @@ func main() {
 			select {
 			case <-httpCtx.Done():
 				//return
-				//continue
-			case <-wsctx.Done():
-				//return
 				continue
+			case <-wsctx.Done():
+				return
+				//continue
 			case <-ticker.C:
 
 				stats.TotalBytes += len(data)
@@ -387,22 +428,22 @@ func main() {
 				stats.Rate = float64(stats.TotalBytes) / elapsed
 				stats.Entropy = computeEntropy(data, &stats.Hist)
 				drawUI(&stats, start, data)
-	
+
 				// optional device write
-				if *writeOut && len(data) > 0 {
+				if cfg.WriteOut && len(data) > 0 {
 					deverr := device.Write("/dev/urandom", data)
 					if deverr != nil {
 						fmt.Println("device write error:", deverr)
 					}
 				}
-	
-				if *showMatrix && len(data) > 0 {
+
+				if cfg.ShowMatrix && len(data) > 0 {
 					tm := diag.BuildTransitionMatrix(data)
 					tm.PrintHeatmap()
 					time.Sleep(200 * time.Millisecond)
 				}
-	
-				if *showPreview && len(data) > 0 {
+
+				if cfg.ShowPreview && len(data) > 0 {
 					n := 64
 					if len(data) < n {
 						n = len(data)
@@ -412,28 +453,28 @@ func main() {
 					//fmt.Println(hex.Dump(data[:32]))
 					time.Sleep(500 * time.Millisecond)
 				}
-	
-				if *showDebug && len(data) > 0 {
+
+				if cfg.ShowDebug && len(data) > 0 {
 					fmt.Printf("received %d bytes\n", len(data))
 					btot := atomic.LoadUint64(&diag.BytesFetched)
 					fmt.Println("real RECV:", btot)
 				}
-	
-				if *showGraph && len(data) > 0 {
+
+				if cfg.ShowGraph && len(data) > 0 {
 					r := diag.RunDiagnostics(data)
 					graph.Add(r.Shannon)
 					graph.Render()
 					time.Sleep(100 * time.Millisecond)
 				}
-	
-				if *showDashboard && len(data) > 0 {
+
+				if cfg.ShowDashboard && len(data) > 0 {
 					r := diag.RunDiagnostics(data)
 					dashboard.Add(r)
 					dashboard.Render()
 					time.Sleep(100 * time.Millisecond)
 				}
-	
-				if *showHistogram && len(data) > 0 {
+
+				if cfg.ShowHistogram && len(data) > 0 {
 					fmt.Println("\nHistogram (top 16)")
 					drawHistogram(&stats.Hist)
 					//bgraph := diag.PrintHistogram64(, data)
@@ -441,7 +482,7 @@ func main() {
 					diag.PrintHistogram64(32, data) // TODO: fix bucketsize
 					time.Sleep(200 * time.Millisecond)
 				}
-	
+
 				hrinside := time.Since(start).Milliseconds()
 				//hrtot := time.Since(startprg).Milliseconds()
 				//fmt.Println("Program notes        :", r.Notes, "ms")
@@ -453,7 +494,7 @@ func main() {
 				//continue
 			default:
 				{
-				continue
+					continue
 				}
 			}
 		}
