@@ -38,4 +38,5 @@ func (r *RateMeter) Update(n int) {
 
 func (r *RateMeter) RateMbps() float64 {
 	return r.Rate / 1_000_000
+	//return r.Rate
 }

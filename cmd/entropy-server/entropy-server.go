@@ -1124,7 +1124,7 @@ entropy_buffer_capacity_kb_A %d
 # TYPE entropy_buffer_capacity_kb_B gauge
 entropy_buffer_capacity_kb_B %d
 
-# HELP drbg_instance_count Total number of DBGG instances 
+# HELP drbg_instance_count Total number of DBRG instances 
 # TYPE drbg_instance_count counter
 drbg_instance_count %d
 `,

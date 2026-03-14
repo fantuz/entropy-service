@@ -52,7 +52,7 @@ func RunAll(data []byte) {
 	fmt.Println("Entropy diagnostics")
 	fmt.Println("-------------------")
 
-	fmt.Printf("bytes              : %d\n", result.N)
+	fmt.Printf("histogram bytes    : %d\n", result.N)
 	fmt.Printf("shannon entropy    : %.5f / 8\n", result.Shannon)
 	fmt.Printf("chi-square         : %.3f (p=%.5f)\n", result.Chi2, result.Chi2P)
 	fmt.Printf("monobit p-value    : %.5f\n", result.MonobitP)
