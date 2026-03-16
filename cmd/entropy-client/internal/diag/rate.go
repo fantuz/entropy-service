@@ -4,21 +4,26 @@ import "time"
 
 type RateMeter struct {
 	start time.Time
-	Bytes int
+	//Bytes int
 	Rate  float64
 	Meter int64
-	rate *RateMeter
+	//rate *RateMeter
+	rate float64
+	last time.Time
+	bytes int
+	total     uint64
+}
+
+func (r *RateMeter) Bytes() int {
+    return r.bytes
 }
 
 func NewRateMeter() *RateMeter {
-
-	return &RateMeter{
-		start: time.Now(),
-	}
+	return &RateMeter{last: time.Now()}
 }
 
 func (r *RateMeter) Update(n int) {
-
+/*
 	//delta := r.Bytes - n
 	delta := r.Bytes - int(r.Meter)
 
@@ -34,9 +39,28 @@ func (r *RateMeter) Update(n int) {
 	r.Bytes += n
 	r.Meter = int64(r.Bytes -n)
 	r.start = now
+*/
+	r.bytes += n
+	r.total += uint64(n)
+	now := time.Now()
+	elapsed := now.Sub(r.last).Seconds()
+	if elapsed < 1 {
+		return
+	}
+	r.rate = float64(r.bytes*8) / elapsed // bits/sec
+	r.bytes = 0
+	r.last = now
 }
 
+func (r *RateMeter) RateMbps() float64 { return r.rate / 1_000_000 }
+
+func (r *RateMeter) Total() uint64 {
+	return r.total
+}
+
+/*
 func (r *RateMeter) RateMbps() float64 {
 	return r.Rate / 1_000_000
 	//return r.Rate
 }
+*/

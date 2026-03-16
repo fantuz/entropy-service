@@ -4,7 +4,11 @@ import (
 	"time"
 	"context"
 	"github.com/gorilla/websocket"
+	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
 )
+
+//var ClientRateMeter = diag.NewRateMeter()
 
 func StreamEntropy(ctx context.Context, url string, quantity int) (<-chan []byte, error) {
 
@@ -33,17 +37,17 @@ func StreamEntropy(ctx context.Context, url string, quantity int) (<-chan []byte
 		for {
 
 			select {
-
 			case <-ctx.Done():
 				return
-
 			default:
+			}
 
 				_, msg, err := conn.ReadMessage()
 				if err != nil {
 					return
 				}
 
+				/*
 				select {
 
 				case out <- msg:
@@ -51,6 +55,25 @@ func StreamEntropy(ctx context.Context, url string, quantity int) (<-chan []byte
 				case <-ctx.Done():
 					return
 				}
+				*/
+			//}
+
+			//diag.ClientRateMeter.Update(len(msg))
+			if diag.ClientRateMeter != nil {
+				diag.ClientRateMeter.Update(len(msg))
+			}
+
+			// instrumentation: increment counters on successful read
+			metrics.AddClientBytesReceived(uint64(len(msg)))
+			metrics.IncClientWSSMessages() // optional counter for messages received
+
+		//}
+
+		// push into channel (non-blocking if buffered)
+			select {
+			case out <- msg:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()

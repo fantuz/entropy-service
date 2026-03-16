@@ -47,6 +47,8 @@ const Cyan = "\033[36m"
 const Gray = "\033[37m"
 const White = "\033[97m"
 
+//var ClientRateMeter = NewRateMeter()
+
 func computeEntropy(data []byte, hist *[256]int) float64 {
 
 	for i := range hist {
@@ -111,12 +113,12 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 	//fmt.Printf("Dashboard : %v\n", t)
 	//fmt.Printf("Dashboard : %q\n", t)
-	fmt.Printf("Rate      : %.6f MB/s\n", stats.Rate)
-	fmt.Printf("Fetched   : %d KB\n", stats.TotalBytes/1024/1024)
+	fmt.Printf("Rate               : %.6f MB/s\n", stats.Rate)
+	fmt.Printf("Fetched            : %d KB\n", stats.TotalBytes/1024/1024)
 	//fmt.Printf("Meter     : %d\n", &t.Meter)
 	//fmt.Printf("Rate      : %d\n", &t.Rate)
 	//fmt.Printf("Fetched R : %d\n", &t.Bytes)
-	fmt.Printf("Entropy   : %.4f bits/byte\n", stats.Entropy)
+	fmt.Printf("Entropy            : %.4f bits/byte\n", stats.Entropy)
 
 	status := Green + "OK" + Reset
 	if stats.Entropy < 7.9 {
@@ -181,44 +183,49 @@ func main() {
 
 	fmt.Print("\033[H\033[2J") // clear screen
 
-	testdata, _ := client.FetchEntropySimple(&cfg.HTTPUrl, &cfg.Slice)
+	//testdata, _ := client.FetchEntropySimple(&cfg.HTTPUrl, &cfg.Slice)
+	testdata, _ := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
 	result := diag.RunDiagnostics(testdata)
 	//test := diag.NewRateMeter
 
-	// writeout debug slice preview graph matrix dashboard
+	// preview graph matrix dashboard
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
-	fmt.Println("Framerate : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh)) + "ms)")
-	//fmt.Println("HTTP URL        : " + *url)
+	fmt.Println("Framerate : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh.Milliseconds())) + "ms)")
 	fmt.Println("HTTP URL  : " + refhttpurl)
-	//fmt.Println("WS URL          : " + *wsurl)
 	fmt.Println("WS URL    : " + refwsurl)
 	fmt.Println("----------------------------------------------")
 	//fmt.Println("Program runtime      :", hrtot, "ms")
-	fmt.Println("Write-out to /dev    :", cfg.WriteOut)
 	fmt.Println("Program mode         :", cfg.Mode)
+	fmt.Println("Write-out to /dev    :", cfg.WriteOut)
+	fmt.Println("Debug                :", cfg.ShowDebug)
 	fmt.Println("----------------------------------------------")
+	fmt.Println("Show Dashboard       :", cfg.ShowDashboard)
+	fmt.Println("Show Matrix 64x64    :", cfg.ShowMatrix)
+	fmt.Println("Show Graph           :", cfg.ShowGraph)
+	fmt.Println("Data Preview         :", cfg.ShowPreview)
 	//fmt.Printf("Bitrate         : %d\n", test)
 	//fmt.Printf("Bitrate         : %f\n", result.Rate)
-	fmt.Printf("Test fetch      : %d\n", result.N)
-	fmt.Printf("Regular Slice   : %d\n", int(cfg.Slice))
-	fmt.Printf("Shannon entropy : %.6f bits/byte\n", result.Shannon)
-	fmt.Printf("Chi²            : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
-	fmt.Printf("Monobit p-value : %.6f\n", result.MonobitP)
-	fmt.Printf("Serial ratio    : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
 	fmt.Println("----------------------------------------------")
-	fmt.Println()
+	fmt.Printf("Test fetch Sise      : %d\n", result.N)
+	fmt.Printf("Expected Slice       : %d\n", int(cfg.Slice))
+	fmt.Printf("Shannon entropy      : %.6f bits/byte\n", result.Shannon)
+	fmt.Printf("Chi²                 : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
+	fmt.Printf("Monobit p-value      : %.6f\n", result.MonobitP)
+	fmt.Printf("Serial ratio         : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
+	fmt.Println("----------------------------------------------")
+	//fmt.Println()
 
 	if result.Pass == true {
-		fmt.Printf("PASS            : "+Green+"%v"+Reset+"\n", result.Pass)
+		fmt.Printf("PASS                 : "+Green+"%v"+Reset+"\n", result.Pass)
 	} else {
-		fmt.Printf("PASS            : "+Red+"%v"+Reset+"\n", result.Pass)
+		fmt.Printf("PASS                 : "+Red+"%v"+Reset+"\n", result.Pass)
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	stats := Stats{}
 
@@ -305,9 +312,9 @@ func main() {
 			//case <-httpCtx.Done():
 			//	return
 			//	//continue
-			case <-wsctx.Done():
-				//return
-				continue
+			//case <-wsctx.Done():
+			//	//return
+			//	continue
 			case <-tickerw.C:
 				for stdata := range stream {
 					atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
@@ -341,12 +348,6 @@ func main() {
 						time.Sleep(500 * time.Millisecond)
 					}
 
-					if cfg.ShowDebug && len(stdata) > 0 {
-						fmt.Printf("received %d bytes\n", len(stdata))
-						btot := atomic.LoadUint64(&diag.BytesFetched)
-						fmt.Println("real RECV:", btot)
-					}
-
 					if cfg.ShowGraph && len(stdata) > 0 {
 						r := diag.RunDiagnostics(stdata)
 						graph.Add(r.Shannon)
@@ -378,7 +379,12 @@ func main() {
 					//fmt.Println("Program notes        :", r.Notes, "ms")
 					//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
 					//continue
-					fmt.Println("WS Routine runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
+					if cfg.ShowDebug && len(stdata) > 0 {
+						fmt.Printf("received           : %d bytes\n", len(stdata))
+						btot := atomic.LoadUint64(&diag.BytesFetched)
+						fmt.Println("real RECV          :", btot)
+						fmt.Println("WS cycle runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
+					}
 				}
 			default:
 				{
@@ -393,9 +399,9 @@ func main() {
 			//	//httpCancel()
 			//	//return
 			//	continue
-			case <-wsctx.Done():
-				return
-				//continue
+			//case <-wsctx.Done():
+			//	return
+			//	//continue
 			case <-tickerh.C:
 
 				data, err := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
@@ -445,12 +451,6 @@ func main() {
 					time.Sleep(500 * time.Millisecond)
 				}
 
-				if cfg.ShowDebug && len(data) > 0 {
-					fmt.Printf("received %d bytes\n", len(data))
-					btot := atomic.LoadUint64(&diag.BytesFetched)
-					fmt.Println("real RECV:", btot)
-				}
-
 				if cfg.ShowGraph && len(data) > 0 {
 					r := diag.RunDiagnostics(data)
 					graph.Add(r.Shannon)
@@ -480,7 +480,12 @@ func main() {
 				//fmt.Println("Program rate         :", r.Rate, "ms")
 				//fmt.Println("Program runtime      :", hrtot, "ms")
 				//fmt.Println("Program rate         :", r.Rate, "MB/s")
-				fmt.Println("HTTP Routine runtime :", hrinside, "ms")
+				if cfg.ShowDebug && len(data) > 0 {
+					fmt.Printf("received           : %d bytes\n", len(data))
+					btot := atomic.LoadUint64(&diag.BytesFetched)
+					fmt.Println("real RECV          :", btot)
+					fmt.Println("HTTP cycle runtime :", hrinside, "ms")
+				}
 				//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
 				//continue
 			default:

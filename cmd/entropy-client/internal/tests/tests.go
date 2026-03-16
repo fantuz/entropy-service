@@ -3,7 +3,6 @@ package tests
 
 import (
 	"fmt"
-	//"strconv"
 	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
 )
 
@@ -53,6 +52,7 @@ func RunAll(data []byte) {
 	fmt.Println("-------------------")
 
 	fmt.Printf("histogram bytes    : %d\n", result.N)
+	fmt.Printf("histogram rate     : %v\n", result.Rate)
 	fmt.Printf("shannon entropy    : %.5f / 8\n", result.Shannon)
 	fmt.Printf("chi-square         : %.3f (p=%.5f)\n", result.Chi2, result.Chi2P)
 	fmt.Printf("monobit p-value    : %.5f\n", result.MonobitP)
@@ -68,7 +68,7 @@ func RunAll(data []byte) {
 	if result.Pass {
 		fmt.Println("RESULT             : " + Green + "OK" + Reset)
 	} else {
-		fmt.Println("RESULT             : " + Red + "WARNING" + Reset)
+		fmt.Println("RESULT             : " + Red + "WARN" + Reset)
 	}
 
 	fmt.Println()

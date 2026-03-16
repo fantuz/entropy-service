@@ -1,12 +1,15 @@
 package client
 
 import (
-	"io"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
+	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
 )
 
 func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
@@ -32,10 +35,8 @@ func FetchEntropySimple(endpoint *string, quantity *int64) ([]byte, error) {
 // FetchEntropy requests `quantity` bytes from `endpoint` and returns the raw bytes.
 // The function takes a context so caller can cancel / set a deadline.
 func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte, error) {
-	// Build URL: if endpoint already includes a query param for bytes, you can skip formatting;
-	// This example appends "?bytes=" if endpoint doesn't already contain "bytes=".
 	url := endpoint
-	//fmt.Println("BASE-FETCH-ENTROPY", url)
+	/*
 	if quantity > 0 && !containsBytesParam(endpoint) {
 		//fmt.Println("PRE-FETCH-ENTROPY", url)
 		sep := "?"
@@ -46,11 +47,12 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 		//fmt.Println("POST-FETCH-ENTROPY", url)
 		//time.Sleep(500 * time.Millisecond)
 	}
+	*/
 
 	// Create a client with a conservative timeout bound (per request).
 	// Caller can still use ctx to cancel earlier.
 	httpClient := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 20 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -75,19 +77,24 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	}
 	defer resp.Body.Close()
 
-	// Best-effort guard: if server returns an error code, surface it
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
 		return nil, fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	// We read the body fully. If you expect very large responses, consider streaming/chunking.
+	// consider streaming/chunking.
+	// Read fully (for small samples). If you need streaming, replace with io.Copy and counting writer.
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	//time.Sleep(500 * time.Millisecond)
+	metrics.AddClientBytesReceived(uint64(len(data)))
+
+	//diag.ClientRateMeter.Update(len(data))
+	if diag.ClientRateMeter != nil {
+		diag.ClientRateMeter.Update(len(data))
+	}
 
 	return data, nil
 }
@@ -115,3 +122,4 @@ func hasQuery(u string) bool {
 	}
 	return false
 }
+

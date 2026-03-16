@@ -1,7 +1,6 @@
 package diag
 
 import (
-	//"fmt"
 	"math"
 	"math/bits"
 	"sync/atomic"
@@ -25,23 +24,9 @@ type Diagnostics struct {
 var (
 	BytesFetched  uint64
 	httpCRequests uint64
-	wsCRequests uint64
+	wsCRequests   uint64
 	Timer         uint64
 )
-
-/*
-func incBytes(n int) {
-	atomic.AddUint64(&BytesFetched, uint64(n))
-}
-
-func incTimer() {
-	atomic.AddUint64(&Timer, 1)
-}
-
-func incHTTP() {
-	atomic.AddUint64(&httpCRequests, 1)
-}
-*/
 
 // RunDiagnostics computes a small battery of tests on the provided bytes.
 // It is intentionally small and self-contained so you can call it from a worker or CLI.
@@ -68,13 +53,14 @@ func RunDiagnostics(data []byte) Diagnostics {
 	}
 
 	atomic.AddUint64(&BytesFetched, uint64(n))
-	//atomic.AddUint64(&httpCRequests, uint64(n))
+	//atomic.AddUint64(&httpCRequests, 1)
 
 	rate := NewRateMeter()
 	//rate.Update(len(data))
 
 	return Diagnostics{
 		N:        n,
+		//Update(len(data)),
 		Chi2:     chi2,
 		Chi2P:    chi2p,
 		Shannon:  shannon,

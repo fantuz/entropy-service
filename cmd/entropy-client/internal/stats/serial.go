@@ -1,3 +1,40 @@
+package stats
+
+import "math"
+
+/*
+func Serial(data []byte) Result {
+
+	if len(data) < 2 {
+		return Result{Name: "serial", Passed: false}
+	}
+
+	counts := make([]int, 256)
+
+	for i := 0; i < len(data)-1; i++ {
+		v := int(data[i])
+		counts[v]++
+	}
+
+	expected := float64(len(data)-1) / 256
+	chi := 0.0
+
+	for _, c := range counts {
+		diff := float64(c) - expected
+		chi += diff * diff / expected
+	}
+
+	p := math.Exp(-chi / 2)
+
+	return Result{
+		Name:      "serial",
+		Statistic: chi,
+		PValue:    p,
+		Passed:    p > 0.01,
+	}
+}
+*/
+
 //r = covariance / variance
 
 func SerialCorrelation(data []byte) Result {
@@ -28,6 +65,6 @@ func SerialCorrelation(data []byte) Result {
 
 	return Result{
 		Statistic: r,
-		Pass: math.Abs(r) < 0.05,
+		Passed: math.Abs(r) < 0.05,
 	}
 }

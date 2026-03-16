@@ -3,6 +3,7 @@ package diag
 import (
 	"fmt"
 	//"math"
+	//"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
 )
 
 type Dashboard struct {
@@ -92,6 +93,11 @@ func renderSeries(series []float64, min float64, max float64) string {
 
 func (d *Dashboard) Render() {
 
+	total := ClientRateMeter.Total()
+	rate := ClientRateMeter.RateMbps()
+	fmt.Printf("Rate   : %.2f Mbps\n", rate)
+	fmt.Printf("Total  : %d MB\n", total)
+	
 	//fmt.Print("\033[H\033[2J")
 	fmt.Println("Entropy Health Monitor")
 	fmt.Println("----------------------")
