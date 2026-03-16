@@ -10,8 +10,7 @@ import (
 
 func TestEntropyWS(ctx context.Context, endpoint string) error {
 
-	refwsurl := "ws://127.0.0.1:8080/stream"
-	//conn, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
+	refwsurl := "ws://127.0.0.1:8080/stream?bytes=524288"
 	conn, _, err := websocket.DefaultDialer.Dial(refwsurl, nil)
 	if err != nil {
 		return err
@@ -29,6 +28,7 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 		select {
 
 		case <-ctx.Done():
+			fmt.Println("Finished WebSocket entropy streaming test")
 			return nil
 
 		default:
@@ -44,6 +44,7 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 
 			tester.Add(data)
 
+			//if tester.Total-lastReport >= 1<<20
 			if tester.Total-lastReport >= 1<<20 {
 
 				res := tester.Result()
@@ -54,5 +55,6 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 			}
 		}
 	}
+
 }
 

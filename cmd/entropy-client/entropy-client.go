@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"math"
 	"os"
+	//"os/signal"
+	//"syscall"
 	"strconv"
 	"sync/atomic"
 	"time"
+	"log"
 
 	"github.com/fantuz/entropy-service/entropy-client/internal/client"
 	"github.com/fantuz/entropy-service/entropy-client/internal/config"
@@ -135,6 +138,15 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 
 func main() {
 
+	/*
+	rctx, rstop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer rstop()
+	*/
+
 	cfg := config.ParseConfig()
 	//flag.Parse()
 
@@ -225,31 +237,7 @@ func main() {
 		fmt.Printf("PASS                 : "+Red+"%v"+Reset+"\n", result.Pass)
 	}
 
-	time.Sleep(5 * time.Second)
-
-	/*
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	
-	err := client.TestEntropyHTTP(ctx, refhttpurl)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	
-	err := client.TestEntropyWS(ctx, refwsurl)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	time.Sleep(5 * time.Second)
-	*/
-
-	stats := Stats{}
-
-	startprg := time.Now()
+	time.Sleep(3 * time.Second)
 
 	wsconn, _, wscerr := websocket.DefaultDialer.Dial(refwsurl, nil)
 	if wscerr != nil {
@@ -263,6 +251,34 @@ func main() {
 	defer wsconn.Close()
 
 	// TODO: add exit here if tests FAIL
+	fmt.Println("\n----------------------------------------------")
+	ctxA, cancelA := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelA()
+	
+	errA := client.TestEntropyHTTP(ctxA, refhttpurl)
+	if errA != nil {
+		log.Fatal(errA)
+	}
+
+	fmt.Println("----------------------------------------------")
+
+	ctxB, cancelB := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancelB()
+	
+	errB := client.TestEntropyWS(ctxB, refwsurl)
+	if errB != nil {
+		log.Fatal(errB)
+		time.Sleep(5 * time.Second)
+	}
+	fmt.Println("----------------------------------------------")
+
+	time.Sleep(3 * time.Second)
+	cancelB()
+	cancelB()
+
+	stats := Stats{}
+
+	startprg := time.Now()
 
 	// number of columns, also 120 is OK
 	graph := diag.NewEntropyGraph(80)
@@ -318,7 +334,6 @@ func main() {
 	defer tickerw.Stop()
 
 	for {
-
 		start := time.Now()
 
 		//defer wsconn.Close()
@@ -406,6 +421,11 @@ func main() {
 						fmt.Println("WS cycle runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
 					}
 				}
+			/*
+			case <-rctx.Done():
+				log.Println("shutdown signal received")
+				log.Println("shutdown complete")
+			*/
 			default:
 				{
 					//continue
@@ -508,6 +528,11 @@ func main() {
 				}
 				//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
 				//continue
+			/*
+			case <-rctx.Done():
+				log.Println("shutdown signal received")
+				log.Println("shutdown complete")
+			*/
 			default:
 				{
 					//continue
