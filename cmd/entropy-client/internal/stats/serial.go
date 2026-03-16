@@ -2,7 +2,6 @@ package stats
 
 import "math"
 
-/*
 func Serial(data []byte) Result {
 
 	if len(data) < 2 {
@@ -33,7 +32,6 @@ func Serial(data []byte) Result {
 		Passed:    p > 0.01,
 	}
 }
-*/
 
 //r = covariance / variance
 

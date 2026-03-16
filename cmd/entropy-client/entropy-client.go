@@ -227,6 +227,26 @@ func main() {
 
 	time.Sleep(5 * time.Second)
 
+	/*
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	
+	err := client.TestEntropyHTTP(ctx, refhttpurl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	
+	err := client.TestEntropyWS(ctx, refwsurl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	time.Sleep(5 * time.Second)
+	*/
+
 	stats := Stats{}
 
 	startprg := time.Now()
