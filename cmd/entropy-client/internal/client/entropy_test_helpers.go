@@ -10,7 +10,7 @@ import (
 func reportStats(prefix string, r stats.StreamResult) {
 
 	fmt.Printf(
-		"%s bytes=%d  H=%.4f  chi2p=%.6f  monobit=%.6f  serialR=%.6f\n",
+		"%s bytes=%d	H=%.4f	chi2p=%.6f	monobit=%.6f	serialR=%.6f\n",
 		prefix,
 		r.TotalBytes,
 		r.Shannon,

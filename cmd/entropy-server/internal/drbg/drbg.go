@@ -1,4 +1,4 @@
-package qrng
+package drbg
 
 import (
 	"crypto/cipher"
@@ -11,17 +11,22 @@ import (
 	"sync/atomic"
 	"time"
 	//"io"
+	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
 )
+
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
 
 // DRBG represents a deterministic random byte generator with observability metadata
 type DRBG struct {
-	mu     sync.Mutex
-	stream cipher.Stream
+	Mu     sync.Mutex
+	Stream cipher.Stream
 	// Crypto state
 	key      [32]byte
 	nonce    [12]byte
 	cipher   *chacha20.Cipher
-	reseeded time.Time
+	Reseeded time.Time
 
 	// Observability / header metadata
 	version        string
@@ -32,7 +37,8 @@ type DRBG struct {
 	reseedSizeBits int
 
 	// optional: pointer to external entropy buffer
-	entropyBuf *QRNGBuffer
+	//entropyBuf *QRNGBuffer
+	entropyBuf qrng.QRNGBuffer
 
 	// counter for number of DRBG instances
 	DRBGInstanceCnt int64
@@ -75,14 +81,19 @@ func ActiveInstances() int64 {
 	return activeDRBG.Load()
 }
 
-func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+//func (d *DRBG) SetEntropyBuffer(q *QRNGBuffer)
+func (d DRBG) SetEntropyBuffer(q qrng.QRNGBuffer) {
+	d.Mu.Lock()
+	//b := d
+	defer d.Mu.Unlock()
+	//d.Mu = sync.Mutex{}
+	//b.Mu = sync.Mutex{}
 	d.entropyBuf = q
 }
 
 // NewDRBG creates a new DRBG instance from a seed
-func NewDRBG(seed []byte) (*DRBG, error) {
+//func NewDRBG(seed []byte) (*DRBG, error)
+func NewDRBG(seed []byte) (DRBG, error) {
 	if len(seed) < 32 {
 		panic("seed too short")
 	}
@@ -99,26 +110,36 @@ func NewDRBG(seed []byte) (*DRBG, error) {
 	copy(nonce[:], h[32:44])
 	//copy(nonce[:], n[:12])
 
-	c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
+	//c, err := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
+	c, _ := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
+
+	/*
 	if err != nil {
 		return nil, err
 	}
+	*/
 
 	//activeDRBG.Add(1)
-	return &DRBG{
+	//return &DRBG
+	return DRBG{
 		key:      key,
 		nonce:    nonce,
 		cipher:   c,
-		reseeded: time.Now(),
+		Reseeded: time.Now(),
 	}, nil
 }
 
 // DRBG per-connection seed
-func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
-	seed, err := d.Derive(32) // 256-bit seed
+//func NewConnectionDRBG(d *DRBG) (*DRBG, error)
+func NewConnectionDRBG(d DRBG) (DRBG, error) {
+	//seed, err := d.Derive(32) // 256-bit seed
+	seed, _ := d.Derive(32) // 256-bit seed
+
+	/*
 	if err != nil {
 		return nil, err
 	}
+	*/
 
 	//nonce := make([]byte, 12) // 96-bit nonce
 	//copy(nonce, seed[:12])
@@ -127,9 +148,9 @@ func NewConnectionDRBG(d *DRBG) (*DRBG, error) {
 }
 
 // Reseed mixes new entropy into the DRBG
-func (d *DRBG) Reseed(seed []byte) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func (d DRBG) Reseed(seed []byte) error {
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
 
 	h := sha512.Sum512(append(d.key[:], seed...))
 	copy(d.key[:], h[:32])
@@ -140,24 +161,34 @@ func (d *DRBG) Reseed(seed []byte) error {
 		return err
 	}
 	d.cipher = c
-	d.reseeded = time.Now()
+	d.Reseeded = time.Now()
 	//activeDRBG.Add(-1)
 	return nil
 }
 
 // Read fills p with pseudo-random bytes
 func (d *DRBG) Read(p []byte) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
 	d.cipher.XORKeyStream(p, p)
 }
 
-// for later fix
 /*
 func (d *DRBG) Read(p []byte) (int, error) {
-    // fill p
-    return len(p), nil
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
+	
+	// Fill p with pseudorandom data
+	err := d.generate(p)
+	if err != nil {
+	    return 0, err
+	}
+	
+	return len(p), nil
 }
+*/
+
+/*
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
 	_, err := d.Read(seed)
@@ -170,15 +201,15 @@ func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 
 // ReseedAge returns how long since last reseed
 func (d *DRBG) ReseedAge() time.Duration {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return time.Since(d.reseeded)
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
+	return time.Since(d.Reseeded)
 }
 
 // WriteHeaders writes all observability headers to an http.ResponseWriter
 func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
 
 	now := time.Now()
 
@@ -188,7 +219,7 @@ func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
 
 	w.Header().Set(
 		"X-RNG-Reseed-Age-ms",
-		strconv.FormatInt(now.Sub(d.reseeded).Milliseconds(), 10),
+		strconv.FormatInt(now.Sub(d.Reseeded).Milliseconds(), 10),
 	)
 
 	w.Header().Set(
@@ -204,20 +235,23 @@ func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
 	bufKB := 0
 	bufPct := 0
 
-	if d.entropyBuf != nil {
-		d.entropyBuf.mu.Lock()
-		bufKB = len(d.entropyBuf.buf) / 1024
-		bufPct = (len(d.entropyBuf.buf) * 100) / d.entropyBuf.capacity
-		d.entropyBuf.mu.Unlock()
-	}
+	//if d.entropyBuf != nil {
+		d.entropyBuf.Mu.Lock()
+		//*qrng.QRNGBuffer.Mu.Lock()
+		bufKB = len(d.entropyBuf.Buf) / 1024
+		bufPct = (len(d.entropyBuf.Buf) * 100) / d.entropyBuf.Capacity
+		d.entropyBuf.Mu.Unlock()
+	//}
+
 	w.Header().Set("X-RNG-Entropy-Buffered-kB", strconv.Itoa(bufKB))
 	w.Header().Set("X-RNG-Entropy-Buffered-%", strconv.Itoa(bufPct))
 }
 
 // SetMetadata sets all DRBG metadata
-func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration, sizeBits int, buf *QRNGBuffer) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+//func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration, sizeBits int, buf *QRNGBuffer)
+func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration, sizeBits int, buf qrng.QRNGBuffer) {
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
 
 	d.version = version
 	d.source = source
@@ -233,14 +267,14 @@ func (d *DRBG) GetMetadata() Metadata {
 	bufKB := 0
 	bufPct := 0
 
-	if d.entropyBuf != nil {
-		//d.mu.Lock()
-		d.entropyBuf.mu.Lock()
-		//defer d.mu.Unlock()
-		bufKB = len(d.entropyBuf.buf)
-		bufPct = len(d.entropyBuf.buf) * 100 / d.entropyBuf.capacity
-		d.entropyBuf.mu.Unlock()
-	}
+	//if d.entropyBuf != nil {
+		//d.Mu.Lock()
+		d.entropyBuf.Mu.Lock()
+		//defer d.Mu.Unlock()
+		bufKB = len(d.entropyBuf.Buf)
+		bufPct = len(d.entropyBuf.Buf) * 100 / d.entropyBuf.Capacity
+		d.entropyBuf.Mu.Unlock()
+	//}
 
 	return Metadata{
 		Version: d.version,
@@ -258,9 +292,9 @@ func (d *DRBG) GetMetadata() Metadata {
 }
 
 func (d *DRBG) ReadInto(dst []byte) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.stream.XORKeyStream(dst, dst)
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
+	d.Stream.XORKeyStream(dst, dst)
 	// update counters, bytes generated, reseed checks, etc
 }
 
@@ -277,8 +311,9 @@ func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 
 /*
 func (d *DRBG) WriteTo(w io.Writer, n int) error {
+    buf := d.entropyBuf.Get(n).([]byte)
     //buf := d.bufPool.Get().([]byte)
-    buf := d.entropyBuf.Get()
+    //buf := d.entropyBuf.Get()
     defer d.bufPool.Put(buf)
 
     for n > 0 {

@@ -94,17 +94,18 @@ func renderSeries(series []float64, min float64, max float64) string {
 func (d *Dashboard) Render() {
 
 	total := ClientRateMeter.Total()
-	rate := ClientRateMeter.RateMbps()
-	fmt.Printf("Rate   : %.2f Mbps\n", rate)
-	fmt.Printf("Total  : %d MB\n", total)
+	rate := ClientRateMeter.RateMbps()/8
+	fmt.Println("\nEntropy Health Monitor")
+	fmt.Println("----------------------------")
+	fmt.Printf("Total              : %d MB\n", total/1024/1024)
+	fmt.Printf("Rate               : %.3f MB/S\n", rate)
 	
-	//fmt.Print("\033[H\033[2J")
-	fmt.Println("Entropy Health Monitor")
-	fmt.Println("----------------------")
+	/*
 	fmt.Printf(
 		"Entropy rate       : %.2f Mbit/s\n",
 		d.rate.RateMbps(),
 	)
+	*/
 	fmt.Printf(
 		"Entropy              %s\n",
 		renderSeries(d.entropy, 7.995, 8.0),

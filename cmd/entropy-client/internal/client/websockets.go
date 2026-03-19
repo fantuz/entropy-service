@@ -3,6 +3,7 @@ package client
 import (
 	"time"
 	"context"
+	//"strconv"
 	"github.com/gorilla/websocket"
 	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
@@ -10,24 +11,29 @@ import (
 
 //var ClientRateMeter = diag.NewRateMeter()
 
-func StreamEntropy(ctx context.Context, url string, quantity int) (<-chan []byte, error) {
+//func StreamEntropy(ctx context.Context, url string, quantity int, refresh int) (<-chan []byte, error)
+func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 
+	//url = fmt.Sprintf("%s%sbytes=%d", url, sep, quantity)
+	//var wsurl = url + "?bytes=" + strconv.Itoa(quantity) + "&refresh=" + fps
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	conn.SetReadLimit(4 << 20)
+	conn.SetReadLimit(1 << 23)
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		//panic("critical read deadline reached")
 		return nil
 	})
 
 	conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
 	
-	out := make(chan []byte, 32) // 16 is safe
+	//out := make([]byte, 1<<16)
+	out := make(chan []byte, 1<<23) // 16 is safe
 
 	go func() {
 
@@ -69,10 +75,11 @@ func StreamEntropy(ctx context.Context, url string, quantity int) (<-chan []byte
 
 		//}
 
-		// push into channel (non-blocking if buffered)
+			// push into channel (non-blocking if buffered)
 			select {
 			case out <- msg:
 			case <-ctx.Done():
+				panic("critical end of ws context reached")
 				return
 			}
 		}

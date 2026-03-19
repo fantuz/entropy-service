@@ -47,12 +47,13 @@ func RunAll(data []byte) {
 
 	//t := diag.NewRateMeter()
 	//t.Rate = t.Update(result)
+	//t.Update(int(stats.Rate))
 
 	fmt.Println("Entropy diagnostics")
-	fmt.Println("-------------------")
+	fmt.Println("---------------------------")
 
-	fmt.Printf("histogram bytes    : %d\n", result.N)
-	fmt.Printf("histogram rate     : %v\n", result.Rate)
+	fmt.Printf("payload size       : %d\n", result.N)
+	//fmt.Printf("histogram rate     : %v\n", result.Rate)
 	fmt.Printf("shannon entropy    : %.5f / 8\n", result.Shannon)
 	fmt.Printf("chi-square         : %.3f (p=%.5f)\n", result.Chi2, result.Chi2P)
 	fmt.Printf("monobit p-value    : %.5f\n", result.MonobitP)
@@ -66,11 +67,9 @@ func RunAll(data []byte) {
 	//fmt.Printf("array t            : %v\n", t)
 
 	if result.Pass {
-		fmt.Println("RESULT             : " + Green + "OK" + Reset)
+		fmt.Println("result             : " + Green + "OK" + Reset)
 	} else {
-		fmt.Println("RESULT             : " + Red + "WARN" + Reset)
+		fmt.Println("result             : " + Red + "WARN" + Reset)
 	}
-
-	fmt.Println()
 
 }

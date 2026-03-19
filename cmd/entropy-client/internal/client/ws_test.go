@@ -31,12 +31,13 @@ func TestStreamEntropyWS(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	//wsURL := "ws://127.0.0.1:8080/stream?bytes=65536"
 	wsURL := "ws" + srv.URL[4:]
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	ch, err := StreamEntropy(ctx, wsURL, 16)
+	ch, err := StreamEntropy(ctx, wsURL) // 2097152
 	if err != nil {
 		t.Fatal(err)
 	}

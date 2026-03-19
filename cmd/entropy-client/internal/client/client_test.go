@@ -14,7 +14,7 @@ func TestFetchEntropyHTTP(t *testing.T) {
 
 	// fake entropy server
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data := make([]byte, 1024)
+		data := make([]byte, 65536)
 		w.Write(data)
 	}))
 	defer srv.Close()
@@ -24,13 +24,14 @@ func TestFetchEntropyHTTP(t *testing.T) {
 	//diag.ClientRateMeter.Update(len(data))
 	before := diag.ClientRateMeter.Bytes()
 	//fmt.Println("before: ", diag.ClientRateMeter.Update(len(msg)))
-	data, err := FetchEntropy(ctx, srv.URL, 1024)
+	//data, err := FetchEntropy(ctx, srv.URL, 65536)
+	data, err := FetchEntropy(ctx, srv.URL, 65536)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(data) != 1024 {
-		t.Fatalf("expected 1024 bytes, got %d", len(data))
+	if len(data) != 65536 {
+		t.Fatalf("expected 65536 bytes, got %d", len(data))
 	}
 
 	//diag.ClientRateMeter.Update(len(data))

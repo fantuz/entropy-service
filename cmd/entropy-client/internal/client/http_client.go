@@ -35,8 +35,8 @@ func FetchEntropySimple(endpoint *string, quantity *int64) ([]byte, error) {
 // FetchEntropy requests `quantity` bytes from `endpoint` and returns the raw bytes.
 // The function takes a context so caller can cancel / set a deadline.
 func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte, error) {
-	url := endpoint
 	/*
+	url := endpoint
 	if quantity > 0 && !containsBytesParam(endpoint) {
 		//fmt.Println("PRE-FETCH-ENTROPY", url)
 		sep := "?"
@@ -59,14 +59,14 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 				Timeout:   5 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
-			IdleConnTimeout:     60 * time.Second,
+			IdleConnTimeout:     30 * time.Second,
 			TLSHandshakeTimeout: 5 * time.Second,
 			//TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
 
-	// Build request with context
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	//fmt.Println("ENTROPY from", endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -89,8 +89,7 @@ h3 {
 
 <div class="panel">
     <h3>Shannon Entropy Index: <span id="entropy">0</span></h3>
-    </br>
-    <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br></br>
+    <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br>
 	<canvas id="histogram" width="800" height="75"></canvas>
     </div>
     </br>
@@ -99,7 +98,7 @@ h3 {
     </div>
     </br>
     <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
-    <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br></br>
+    <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br>
 	<canvas id="pie" width="150" height="170"></canvas>
     </div>
     </br>
@@ -107,7 +106,7 @@ h3 {
 	<canvas id="wave" width="800" height="200"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br></br>
+    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br>
 	<canvas id="fft" width="800" height="50"></canvas>
     </div>
     </br>
@@ -216,7 +215,8 @@ function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
 	//const percentText = percentages[i].toFixed(2) + "%";
 	//const percentText = percentages[i] + "%";
 	//const percentText = values[i] + "%";
-	const percentText = values[i];
+	//const percentText = values[i];
+	const percentText = values[1-i];
         const fullText = `${label} — ${percentText}`;
         ctx.fillText(fullText, startX + 20, y);
         //ctx.fillText(label, startX + 20, y);
@@ -226,7 +226,7 @@ function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
 function generateByteRangeLabels(bucketSize) {
     const labels = [];
 
-    for (let i = 0; i < 2; i += bucketSize) {
+    for (let i = 0; i <= 1; i += bucketSize) {
         //labels.push(`${i}-${i + bucketSize - 1}`);
         labels.push(`# of ${i}`);
     }

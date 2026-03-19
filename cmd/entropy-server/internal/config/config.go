@@ -44,7 +44,7 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
 	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
 	flag.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Size of QRNG buffer in KB")
-	flag.IntVar(&cfg.MaxBytes, "max-bytes", 2097152, "Maximum bytes per request")
+	flag.IntVar(&cfg.MaxBytes, "max-bytes", 16777216, "Maximum bytes per request")
 	flag.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")

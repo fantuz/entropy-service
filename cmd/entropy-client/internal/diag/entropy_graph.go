@@ -27,6 +27,7 @@ func (g *EntropyGraph) Add(v float64) {
 func (g *EntropyGraph) Render() {
 
 	//fmt.Print("\033[H\033[2J") // clear screen
+	//fmt.Print("\a")
 
 	fmt.Println("\nEntropy monitor")
 	fmt.Println("----------------")
@@ -63,6 +64,5 @@ func (g *EntropyGraph) Render() {
 			fmt.Print("█")
 		}
 	}
-
 	fmt.Println()
 }

@@ -46,7 +46,7 @@ func (l *tunedListener) Accept() (net.Conn, error) {
 	}
 
 	c.SetNoDelay(true)
-	c.SetWriteBuffer(4 << 20)
+	c.SetWriteBuffer(1 << 24)
 
 	return c, nil
 }

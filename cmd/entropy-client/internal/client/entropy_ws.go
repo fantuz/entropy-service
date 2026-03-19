@@ -3,15 +3,15 @@ package client
 import (
 	"context"
 	"fmt"
-
+	//"strings"
 	"github.com/gorilla/websocket"
 	"github.com/fantuz/entropy-service/entropy-client/internal/stats"
 )
 
 func TestEntropyWS(ctx context.Context, endpoint string) error {
 
-	refwsurl := "ws://127.0.0.1:8080/stream?bytes=524288"
-	conn, _, err := websocket.DefaultDialer.Dial(refwsurl, nil)
+	//refwsurl := "ws://127.0.0.1:8080/stream?bytes=2097152"
+	conn, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -28,7 +28,7 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 		select {
 
 		case <-ctx.Done():
-			fmt.Println("Finished WebSocket entropy streaming test")
+			//fmt.Println("Finished WebSocket entropy streaming test")
 			return nil
 
 		default:
@@ -37,18 +37,17 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 			if err != nil {
 				return err
 			}
-
+			
 			if msgType != websocket.BinaryMessage {
 				continue
 			}
 
 			tester.Add(data)
 
-			//if tester.Total-lastReport >= 1<<20
-			if tester.Total-lastReport >= 1<<20 {
+			if tester.Total-lastReport >= 1<<18 {
 
 				res := tester.Result()
-
+				//var text = strings.ReplaceAll(res, " ", "	")
 				reportStats("WS", res)
 
 				lastReport = tester.Total

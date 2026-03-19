@@ -132,7 +132,7 @@ h3 {
     </div>
     </br>
     <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
-    <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br></br>
+    <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br>
 	<canvas id="pie" width="150" height="170"></canvas>
     </div>
     </br>
@@ -156,6 +156,7 @@ const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
     + location.host + "/files?refresh=" + refresh
 );
+//+ location.host + "/files
 ws.binaryType = "arraybuffer";
 
 function computeEntropy(histogram, total) {
@@ -195,7 +196,7 @@ function uploadFileBytes(bytes) {
         renderFileHistogram(data.histogram, data.totalBytes);
         document.getElementById('entropy').textContent = data.entropy.toFixed(4);
     });
-        console.log("inside uploadFilesBytes routine");
+    //console.log("inside uploadFilesBytes routine");
 }
 
 function renderHistogram() {
