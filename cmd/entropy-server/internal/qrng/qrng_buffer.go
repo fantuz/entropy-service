@@ -2,11 +2,13 @@ package qrng
 
 import (
 	"errors"
-	"os"
 	"log"
-	"sync"
+	"os"
 	"time"
+	//"sync"
 	//"sync/atomic"
+	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
+	//"github.com/fantuz/entropy-service/entropy-server/internal/drbg"
 )
 
 // QRNG represents hardware or networked QRNG. Supports fallback to default Linux CSPRNG
@@ -38,17 +40,18 @@ func (q *QRNGCard) Read(p []byte) error {
 
 // QRNGBuffer holds bytes read asynchronously from a QRNG device
 type QRNGBuffer struct {
-	Buf       []byte        // the current entropy buffer
-	Mu        sync.Mutex    // protects buf
+	Buf []byte // the current entropy buffer
+	//Mu        sync.Mutex    // protects buf
 	Capacity  int           // max buffer size in bytes
 	fillDelay time.Duration // small delay to avoid busy-wait
 	devPath   string        // path to QRNG device, e.g., /dev/qrandom0
 	StopR     chan struct{} // used to signal background goroutine to exit
+	CH        chan []byte
 }
 
 func InitQRNGBuffer(dev string, l int) {
 	// report in KB
-	log.Printf("initQRNG() set qrngBuffer to %v KB", l*1024*1024)
+	log.Printf("initQRNG() set qrngBuffer to %v ", l)
 
 	// size in MB
 	//qrngBuffer = NewQRNGBuffer(dev, l*1024*1024)
@@ -60,9 +63,7 @@ func InitQRNGBuffer(dev string, l int) {
 }
 
 // NewQRNGBuffer creates a new buffered QRNG reader
-//func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer
 func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
-	//q := &QRNGBuffer{
 	q := &QRNGBuffer{
 		Buf:       make([]byte, 0, capacity),
 		Capacity:  capacity,
@@ -74,12 +75,12 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 	// Start the background goroutine to fill the buffer
 	go q.fillLoop()
 
+	//metrics.AddBufferedBytes(uint64(m))
 	//metrics.AddBufferedBytes(uint64(q.capacity))
 	//incBuffer()
 
 	return q
 }
-
 
 // Stop signals the background goroutine to exit
 func (q *QRNGBuffer) Stop() {
@@ -88,20 +89,34 @@ func (q *QRNGBuffer) Stop() {
 
 // Get returns n bytes from the buffer, blocking if necessary
 func (q QRNGBuffer) Get(n int) ([]byte, error) {
-	q.Mu.Lock()
-	defer q.Mu.Unlock()
+	//q.Mu.Lock()
+	//defer q.Mu.Unlock()
 
 	// Wait until enough bytes are available
-	for len(q.Buf) < n {
-		q.Mu.Unlock()
-		time.Sleep(q.fillDelay)
-		q.Mu.Lock()
-	}
+	/*
+		for len(q.Buf) < n {
+			//q.Mu.Unlock()
+			time.Sleep(q.fillDelay)
+			//q.Mu.Lock()
+		}
+	*/
 
 	// Take the first n bytes
-	out := q.Buf[:n]
-	q.Buf = q.Buf[n:]
-	return out, nil
+	//out := q.Buf[:n]
+
+	select {
+	case out := <-q.CH:
+		// TODO: fix this mess
+		q.Buf = q.Buf[n:]
+		//q.Buf = q.Buf[:n]
+		return out, nil
+	default:
+		// fallback or non-blocking path
+		time.Sleep(q.fillDelay)
+		return nil, nil
+	}
+	//q.Buf = q.Buf[n:]
+	//return out, nil
 }
 
 // fillLoop continuously fills the buffer from the QRNG device
@@ -114,9 +129,9 @@ func (q QRNGBuffer) fillLoop() {
 		default:
 		}
 
-		q.Mu.Lock()
+		//q.Mu.Lock()
 		free := q.Capacity - len(q.Buf)
-		q.Mu.Unlock()
+		//q.Mu.Unlock()
 
 		if free <= 0 {
 			// Buffer is full, sleep a little
@@ -126,12 +141,14 @@ func (q QRNGBuffer) fillLoop() {
 
 		tmp := make([]byte, free)
 		f, err := os.Open(q.devPath)
-		
+
 		if err != nil {
 			// Could not open QRNG device, retry after short sleep
-			time.Sleep(50 * time.Millisecond)
-			fail++ 
-			if fail > 3 { panic("QRNG device unavailable")}
+			time.Sleep(25 * time.Millisecond)
+			fail++
+			if fail > 3 {
+				panic("QRNG device unavailable")
+			}
 			//continue
 		}
 
@@ -143,14 +160,15 @@ func (q QRNGBuffer) fillLoop() {
 			}
 			total += m
 			//incTest(m)
+			metrics.AddBufferedBytes(uint64(m))
 		}
 		//atomic.AddUint64(&rngBytesBuffered, uint64(total))
 		//atomic.AddUint64(&rngBufferSize, uint64(len(total)))
 		f.Close()
 
 		// Append new entropy to the buffer
-		q.Mu.Lock()
+		//q.Mu.Lock()
 		q.Buf = append(q.Buf, tmp[:total]...)
-		q.Mu.Unlock()
+		//q.Mu.Unlock()
 	}
 }

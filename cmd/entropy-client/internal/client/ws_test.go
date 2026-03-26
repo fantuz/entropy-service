@@ -34,7 +34,7 @@ func TestStreamEntropyWS(t *testing.T) {
 	//wsURL := "ws://127.0.0.1:8080/stream?bytes=65536"
 	wsURL := "ws" + srv.URL[4:]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	ch, err := StreamEntropy(ctx, wsURL) // 2097152

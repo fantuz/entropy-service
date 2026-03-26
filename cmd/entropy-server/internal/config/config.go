@@ -26,6 +26,7 @@ type Config struct {
 	DevicePath       string
 	EnableHTTPS      bool
 	RequireDevice    bool
+	ShowDebug        bool
 }
 
 func ParseConfig() *Config {
@@ -48,6 +49,7 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
+	flag.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Entropy Server\n\n")

@@ -110,7 +110,7 @@ func drawUI(stats *Stats, start time.Time, data []byte) {
 	//fmt.Printf("Entropy            : %.4f bits/byte\n", stats.Entropy)
 
 	status := Green + "OK" + Reset
-	if stats.Entropy < 7.9 {
+	if stats.Entropy < 7.999 {
 		status = Red + "WARN" + Reset
 	}
 
@@ -144,8 +144,8 @@ func main() {
 		//panic("Debug forbidden ;)")
 	}
 
-	if cfg.Slice < 1 || cfg.Slice > 16777216 {
-		panic("Slice of data fetched through websocket shall be between 1B and 16MB")
+	if cfg.Slice < 1 || cfg.Slice > 33554432 {
+		panic("Slice of data fetched through websocket shall be between 1B and 32 MB")
 	}
 
 	fps := strconv.FormatInt(cfg.Refresh.Milliseconds(), 10)
@@ -155,30 +155,43 @@ func main() {
 	var refwsurl = cfg.WSUrl + "?bytes=" + rbytes + "&refresh=" + fps
 	var fpsdigit = 1000 / int(cfg.Refresh.Milliseconds())
 	var expectedbr = (int(cfg.Slice) * fpsdigit) / 1024 / 1024
-	timeoutctx, timeoutcancel := context.WithTimeout(context.Background(), 3*time.Second)
+	var opt int = 0
 
+	timeoutctx, timeoutcancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer timeoutcancel()
-	//timeoutcancel()
 
 	fmt.Print("\033[H\033[2J") // clear screen
 	fmt.Print("\a")
 
 	//testdata, _ := client.FetchEntropySimple(&cfg.HTTPUrl, &cfg.Slice)
 	testdata, _ := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
+
+	/*
+	for i:=0; i < 10; i++ {
+		result := diag.RunDiagnostics(testdata)
+		if result.Pass == true {
+			fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", result.Pass)
+		} else {
+			fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", result.Pass)
+		}
+	}
+	*/
+
 	result := diag.RunDiagnostics(testdata)
+
 	//test := diag.NewRateMeter
+
+	timeoutcancel()
 
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
-	fmt.Println("CertFile TLS         :", cfg.CertFile)
-	fmt.Println("KeyFile TLS          :", cfg.KeyFile)
 	fmt.Println("Framerate            : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh.Milliseconds())) + "ms)")
-	fmt.Println("Refresh (seconds)    :", cfg.RefreshRate)
-	fmt.Println("HTTP URL  : " + refhttpurl)
-	fmt.Println("WS URL    : " + refwsurl)
+	fmt.Println("Refresh (seconds)    :", cfg.Refresh)
+	fmt.Println("HTTP URL             : " + Cyan + refhttpurl + Reset)
+	fmt.Println("WS URL               : " + Cyan + refwsurl + Reset)
 	fmt.Println("----------------------------------------------")
 	fmt.Println("Program mode         :", cfg.Mode)
 	fmt.Println("Write-out to /dev    :", cfg.WriteOut)
@@ -189,27 +202,29 @@ func main() {
 	fmt.Println("Show Graph           :", cfg.ShowGraph)
 	fmt.Println("Data Preview         :", cfg.ShowPreview)
 	fmt.Println("----------------------------------------------")
-	fmt.Printf("Expected Bitrate     : %d MB/s\n", expectedbr) // test
+	fmt.Printf("Expected Slice       : " + Yellow + "%d" + Reset + "\n", cfg.Slice)
+	fmt.Printf("Fetched Size         : " + Yellow + "%d" + Reset + "\n", result.N)
+	fmt.Println("----------------------------------------------")
+	fmt.Printf("Expected Bitrate     : " + Green + "%d MB/s" + Reset + "\n", expectedbr)
 	//fmt.Printf("Bitrate              : %f\n", result.Rate)
-	fmt.Println("----------------------------------------------")
-	fmt.Printf("Test fetch Size      : %d\n", result.N)
-	fmt.Println("Expected Slice       :", cfg.Slice)
-	fmt.Printf("Shannon entropy      : %.6f bits/byte\n", result.Shannon)
-	fmt.Printf("Chi²                 : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
-	fmt.Printf("Monobit p-value      : %.6f\n", result.MonobitP)
-	fmt.Printf("Serial ratio         : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
-	fmt.Println("----------------------------------------------")
+	//fmt.Printf("Shannon entropy      : %.6f bits/byte\n", result.Shannon)
+	//fmt.Printf("Chi²                 : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
+	//fmt.Printf("Monobit p-value      : %.6f\n", result.MonobitP)
+	//fmt.Printf("Serial ratio         : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
+	//fmt.Println("TLS Certificate      :", cfg.CertFile)
+	//fmt.Println("TLS Key              :", cfg.KeyFile)
+	//fmt.Println("----------------------------------------------")
 
-	//var size = flag.Int("bytes", 1048576, "bytes to fetch")
-
-	if result.Pass == true {
-		fmt.Printf("PASS                 : "+Green+"%v"+Reset, result.Pass)
+	if result.N > 0 {
+		fmt.Printf("PASS                 : " + Green + "Link Established" + Reset + "\n")
 	} else {
-		fmt.Printf("PASS                 : "+Red+"%v"+Reset, result.Pass)
+		fmt.Printf("PASS                 : " + Red + "Link down / No data fetched"+ Reset + "\n")
 	}
 
+	fmt.Println("----------------------------------------------")
+
 	time.Sleep(3 * time.Second)
-	fmt.Print("\033[H\033[2J") // clear screen
+	fmt.Print("\033[H\033[2J")
 
 	wsconn, _, wscerr := websocket.DefaultDialer.Dial(refwsurl, nil)
 	if wscerr != nil {
@@ -223,12 +238,15 @@ func main() {
 	defer wsconn.Close()
 
 	fmt.Println("\n----------------------------------------------")
+
 	ctxA, cancelA := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancelA()
 
 	errA := client.TestEntropyHTTP(ctxA, refhttpurl)
 	if errA != nil {
+		fmt.Fprintf(os.Stderr, "fetch error: %v\n", errA)
 		log.Fatal(errA)
+		time.Sleep(3 * time.Second)
 	}
 
 	fmt.Println("----------------------------------------------")
@@ -238,19 +256,33 @@ func main() {
 
 	errB := client.TestEntropyWS(ctxB, refwsurl)
 	if errB != nil {
+		fmt.Fprintf(os.Stderr, "fetch error: %v\n", errB)
 		log.Fatal(errB)
-		time.Sleep(5 * time.Second)
+		time.Sleep(3 * time.Second)
 	}
+
 	fmt.Println("----------------------------------------------")
 
 	fmt.Print("\a")
 	time.Sleep(2 * time.Second)
-	cancelB()
+
+	/*
+	resultA := diag.RunDiagnostics(testdata)
+	if resultA.Pass == true {
+		fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", resultA.Pass)
+	} else {
+		fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", resultA.Pass)
+	}
+	*/
+
+	cancelA()
 	cancelB()
 
 	select {
 	case <-timeoutctx.Done():
 		{
+			cancelA()
+			cancelB()
 			timeoutcancel()
 			//fmt.Println("HERE-CASE-CTX-CONTINUE:")
 			//return
@@ -295,7 +327,7 @@ func main() {
 	defer wscancel()
 	// wscancel()
 
-	stream, sterr := client.StreamEntropy(wsctx, cfg.WSUrl) //, int(cfg.Slice), fps)
+	stream, sterr := client.StreamEntropy(wsctx, cfg.WSUrl)
 	if sterr != nil {
 		panic(sterr)
 	}
@@ -319,18 +351,18 @@ func main() {
 
 			select {
 			case <-wsctx.Done():
-				//	//return
+				//return
 				panic("critical point reached")
-				continue
+				//continue
 			case <-tickerw.C:
 				for stdata := range stream {
+
 					atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
 					stats.TotalBytes += len(stdata)
 					stats.Entropy = computeEntropy(stdata, &stats.Hist)
 
 					drawUI(&stats, startws, stdata)
 
-					// optional device write
 					if cfg.WriteOut && len(stdata) > 0 {
 						deverr := device.Write("/dev/urandom", stdata)
 						if deverr != nil {
@@ -341,7 +373,7 @@ func main() {
 					if cfg.ShowMatrix && len(stdata) > 0 {
 						tm := diag.BuildTransitionMatrix(stdata)
 						tm.PrintHeatmap()
-						time.Sleep(200 * time.Millisecond)
+						opt++
 					}
 
 					if cfg.ShowPreview && len(stdata) > 0 {
@@ -352,21 +384,21 @@ func main() {
 						fmt.Println("preview (hex):", hex.EncodeToString(stdata[:n]))
 						fmt.Println(hex.EncodeToString(stdata[:32]))
 						//fmt.Println(hex.Dump(stdata[:32]))
-						time.Sleep(500 * time.Millisecond)
+						opt++
 					}
 
 					if cfg.ShowGraph && len(stdata) > 0 {
 						r := diag.RunDiagnostics(stdata)
 						graph.Add(r.Shannon)
 						graph.Render()
-						time.Sleep(100 * time.Millisecond)
+						opt++
 					}
 
 					if cfg.ShowDashboard && len(stdata) > 0 {
 						r := diag.RunDiagnostics(stdata)
 						dashboard.Add(r)
 						dashboard.Render()
-						//time.Sleep(100 * time.Millisecond)
+						opt++
 					}
 
 					if cfg.ShowHistogram && len(stdata) > 0 {
@@ -375,25 +407,27 @@ func main() {
 						//bgraph := diag.PrintHistogram64(, stdata)
 						//bgraph.Render()
 						diag.PrintHistogram64(32, stdata) // TODO: fix bucketsize
-						time.Sleep(200 * time.Millisecond)
+						opt++
 					}
 
 					hrtot := time.Since(startprg).Milliseconds()
 					hrreal := time.Since(startout).Milliseconds()
 					elapsedws := time.Since(startws).Milliseconds()
 					stats.Rate = float64(stats.TotalBytes) / float64(elapsedws)
-					//fmt.Println("Program rate       :", r.Rate, "MB/s")
 					//fmt.Println("Program rate         :", r.Rate, "MB/s")
 					//fmt.Println("Program notes        :", r.Notes, "ms")
 					//fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
 
 					if cfg.ShowDebug && len(stdata) > 0 {
 						fmt.Printf("received           : %d bytes\n", len(stdata))
-						btot := atomic.LoadUint64(&diag.BytesFetched)
-						fmt.Println("real RECV          :", (btot/3)+uint64(len(stdata)))
+						//btot := atomic.LoadUint64(&diag.BytesFetched)
+						//fmt.Println("real RECV          :", (btot/3)+uint64(len(stdata)))
+						//fmt.Println("WS cycle runtime   :", hrtot-elapsedws, "ms")
 						fmt.Println("WS cycle runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
 						fmt.Println("Total runtime      :", hrreal, "ms")
-						//time.Sleep(50 * time.Millisecond)
+					}
+					if opt > 0 {
+						time.Sleep(cfg.Refresh/2 ) //* time.Millisecond)
 					}
 				}
 			/*
@@ -441,7 +475,6 @@ func main() {
 				stats.Entropy = computeEntropy(data, &stats.Hist)
 				drawUI(&stats, start, data)
 
-				// optional device write
 				if cfg.WriteOut && len(data) > 0 {
 					deverr := device.Write("/dev/urandom", data)
 					if deverr != nil {
@@ -452,7 +485,7 @@ func main() {
 				if cfg.ShowMatrix && len(data) > 0 {
 					tm := diag.BuildTransitionMatrix(data)
 					tm.PrintHeatmap()
-					time.Sleep(200 * time.Millisecond)
+					opt++
 				}
 
 				if cfg.ShowPreview && len(data) > 0 {
@@ -463,21 +496,21 @@ func main() {
 					fmt.Println("preview (hex):", hex.EncodeToString(data[:n]))
 					fmt.Println(hex.EncodeToString(data[:32]))
 					//fmt.Println(hex.Dump(data[:32]))
-					time.Sleep(500 * time.Millisecond)
+					opt++
 				}
 
 				if cfg.ShowGraph && len(data) > 0 {
 					r := diag.RunDiagnostics(data)
 					graph.Add(r.Shannon)
 					graph.Render()
-					time.Sleep(100 * time.Millisecond)
+					opt++
 				}
 
 				if cfg.ShowDashboard && len(data) > 0 {
 					r := diag.RunDiagnostics(data)
 					dashboard.Add(r)
 					dashboard.Render()
-					time.Sleep(100 * time.Millisecond)
+					opt++
 				}
 
 				if cfg.ShowHistogram && len(data) > 0 {
@@ -486,24 +519,26 @@ func main() {
 					//bgraph := diag.PrintHistogram64(, data)
 					//bgraph.Render()
 					diag.PrintHistogram64(32, data) // TODO: fix bucketsize
-					time.Sleep(200 * time.Millisecond)
+					opt++
 				}
 
 				hrinside := time.Since(start).Milliseconds()
 				hrreal := time.Since(startout).Milliseconds()
 				//hrtot := time.Since(startprg).Milliseconds()
 				//fmt.Println("Program notes        :", r.Notes, "ms")
-				//fmt.Println("Program rate         :", r.Rate, "ms")
-				//fmt.Println("Program runtime      :", hrtot, "ms")
 				//fmt.Println("Program rate         :", r.Rate, "MB/s")
 				if cfg.ShowDebug && len(data) > 0 {
 					fmt.Printf("received           : %d bytes\n", len(data))
-					btot := atomic.LoadUint64(&diag.BytesFetched)
-					fmt.Println("real RECV          :", btot/3)
+					//btot := atomic.LoadUint64(&diag.BytesFetched)
+					//fmt.Println("real RECV          :", btot/3)
 					fmt.Println("HTTP cycle runtime :", hrinside, "ms")
 					fmt.Println("Total runtime      :", hrreal, "ms")
+					opt++
 				}
-				//continue
+
+				if opt > 0 {
+					time.Sleep(cfg.Refresh/2 ) //* time.Millisecond)
+				}
 			/*
 				case <-rctx.Done():
 					log.Println("shutdown signal received")

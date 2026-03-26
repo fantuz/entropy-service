@@ -52,14 +52,14 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	// Create a client with a conservative timeout bound (per request).
 	// Caller can still use ctx to cancel earlier.
 	httpClient := &http.Client{
-		Timeout: 20 * time.Second,
+		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
-			IdleConnTimeout:     30 * time.Second,
+			IdleConnTimeout:     60 * time.Second,
 			TLSHandshakeTimeout: 5 * time.Second,
 			//TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},

@@ -40,13 +40,16 @@ func (r *RateMeter) Update(n int) {
 	r.Meter = int64(r.Bytes -n)
 	r.start = now
 */
-	r.bytes += n
-	r.total += uint64(n)
 	now := time.Now()
 	elapsed := now.Sub(r.last).Seconds()
+
+	r.bytes += n
+	r.total += uint64(n)
+
 	if elapsed < 1 {
 		return
 	}
+
 	r.rate = float64(r.bytes*8) / elapsed // bits/sec
 	r.bytes = 0
 	r.last = now
@@ -57,10 +60,3 @@ func (r *RateMeter) RateMbps() float64 { return r.rate / 1_000_000 }
 func (r *RateMeter) Total() uint64 {
 	return r.total
 }
-
-/*
-func (r *RateMeter) RateMbps() float64 {
-	return r.Rate / 1_000_000
-	//return r.Rate
-}
-*/

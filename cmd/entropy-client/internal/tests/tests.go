@@ -44,7 +44,6 @@ func RunAll(data []byte) {
 func RunAll(data []byte) {
 
 	result := diag.RunDiagnostics(data)
-
 	//t := diag.NewRateMeter()
 	//t.Rate = t.Update(result)
 	//t.Update(int(stats.Rate))

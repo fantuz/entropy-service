@@ -43,6 +43,7 @@ func ParseConfig() *Config {
 	flag.BoolVar(&cfg.ShowGraph, "graph", false, "print distribution graph")
 	flag.BoolVar(&cfg.ShowDashboard, "dashboard", false, "print dashboard summaries")
 	flag.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
+
 	flag.DurationVar(&cfg.Refresh, "refresh", 1000, "refresh interval for both HTTP and WS")
 	flag.StringVar(&cfg.Mode, "mode", "pull", "Preferred mode: pull|stream (HTTP vs websocket)")
 

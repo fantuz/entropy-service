@@ -29,7 +29,7 @@ var (
 )
 
 // RunDiagnostics computes a small battery of tests on the provided bytes.
-// It is intentionally small and self-contained so you can call it from a worker or CLI.
+// It is intentionally small and self-contained so it can be called from a worker or CLI.
 func RunDiagnostics(data []byte) Diagnostics {
 	n := len(data)
 	if n == 0 {

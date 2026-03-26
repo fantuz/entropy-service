@@ -44,7 +44,7 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 
 			tester.Add(data)
 
-			if tester.Total-lastReport >= 1<<18 {
+			if tester.Total-lastReport >= 1<<20 {
 
 				res := tester.Result()
 				//var text = strings.ReplaceAll(res, " ", "	")
@@ -54,6 +54,5 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 			}
 		}
 	}
-
 }
 

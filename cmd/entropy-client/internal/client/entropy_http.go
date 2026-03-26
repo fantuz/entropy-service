@@ -36,7 +36,7 @@ func TestEntropyHTTP(ctx context.Context, endpoint string) error {
 		ctx,
 		resp.Body,
 		4096,
-		1<<18, // 1 MB checkpoints changed to 1/4 MB
+		1<<20, // 1 MB checkpoints
 		func(r stats.StreamResult) {
 			reportStats("HTTP", r)
 		},

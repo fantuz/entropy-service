@@ -1,6 +1,7 @@
 package main
 
 import (
+	//_ "net/http/pprof"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -16,6 +17,7 @@ import (
 	"image/png"
 	"math/big"
 	"net"
+	"net/http/pprof"
 	//"golang.org/x/net/http2" // remove comment to enable HTTP/2
 	"github.com/8ff/diceware"
 	"github.com/fantuz/entropy-service/entropy-server/internal/config"
@@ -37,13 +39,19 @@ import (
 	"time"
 )
 
+type ClientPrefs struct {
+    Bytes   int
+    Refresh int
+    Words   int
+}
+
 type EntropyPool struct {
 	buf      []byte
 	size     int
 	readPos  int
 	writePos int
-	mu       sync.Mutex
-	cond     *sync.Cond
+	//mu       sync.Mutex
+	cond *sync.Cond
 }
 
 type EntropySource interface {
@@ -96,7 +104,7 @@ var entropyPool EntropyPool
 
 var bufPool = sync.Pool{
 	New: func() any {
-		return make([]byte, 1<<24) // 2 MB
+		return make([]byte, 1<<25) // 32 MB
 	},
 }
 
@@ -105,6 +113,72 @@ func ActiveInstances() int64 {
 	return activeDRBG.Load()
 }
 */
+
+func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
+    data, err := json.Marshal(prefs)
+    if err != nil {
+        return err
+    }
+
+    cookie := &http.Cookie{
+        Name:     "entropy_prefs",
+        Value:    base64.StdEncoding.EncodeToString(data),
+        Path:     "/",
+        HttpOnly: true,
+        MaxAge:   3600, // 1 hour
+    }
+
+    http.SetCookie(w, cookie)
+    return nil
+}
+
+func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
+    c, err := r.Cookie("entropy_prefs")
+    if err != nil {
+        return nil, err
+    }
+
+    raw, err := base64.StdEncoding.DecodeString(c.Value)
+    if err != nil {
+        return nil, err
+    }
+
+    var prefs ClientPrefs
+    if err := json.Unmarshal(raw, &prefs); err != nil {
+        return nil, err
+    }
+
+    return &prefs, nil
+}
+
+func extractPrefs(r *http.Request) ClientPrefs {
+    q := r.URL.Query()
+
+    prefs := ClientPrefs{
+        Bytes:   65536, // defaults
+        Refresh: 500,
+        Words:   2,
+    }
+
+    // try cookie first
+    if c, err := getPrefsCookie(r); err == nil {
+        prefs = *c
+    }
+
+    // override with query params if present
+    if v := q.Get("bytes"); v != "" {
+        prefs.Bytes, _ = strconv.Atoi(v)
+    }
+    if v := q.Get("refresh"); v != "" {
+        prefs.Refresh, _ = strconv.Atoi(v)
+    }
+    if v := q.Get("words"); v != "" {
+        prefs.Words, _ = strconv.Atoi(v)
+    }
+
+    log.Printf("cookie: %q\n",prefs)
+    return prefs
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
@@ -138,14 +212,6 @@ func abs(x float64) float64 {
 /*
 func fetchEntropy(n int) ([]byte, error) {
     b := make([]byte, n)
-    _, err := rand.Read(b) // replace with QRNG logic
-    return b, err
-}
-*/
-
-/*
-func fetchEntropy(n int) ([]byte, error) {
-    b := make([]byte, n)
 
     f, err := os.Open("/dev/qrandom0")
     if err != nil { return nil, err }
@@ -153,6 +219,7 @@ func fetchEntropy(n int) ([]byte, error) {
 
     total := 0
     for total < n {
+    	//_, err := rand.Read(b) // replace with QRNG logic
         m, err := f.Read(b[total:])
         if err != nil { return nil, err }
         total += m
@@ -197,20 +264,22 @@ func fetchEntropy(n int) ([]byte, error) {
 
 func NewEntropyPool(size int) EntropyPool {
 
-	p := &EntropyPool{
+	//p := &EntropyPool{
+	p := EntropyPool{
 		buf:  make([]byte, size),
 		size: size,
 	}
 
-	p.cond = sync.NewCond(&p.mu)
+	//p.cond = sync.NewCond(&p.mu)
 
-	return *p
+	//return *p
+	return p
 }
 
 func (p *EntropyPool) Write(data []byte) {
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	//p.mu.Lock()
+	//defer p.mu.Unlock()
 
 	for _, b := range data {
 
@@ -233,8 +302,8 @@ func (p EntropyPool) Read(n int) []byte {
 
 	out := make([]byte, n)
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	//p.mu.Lock()
+	//defer p.mu.Unlock()
 
 	for i := 0; i < n; i++ {
 
@@ -260,7 +329,6 @@ func startEntropyProducer(pool EntropyPool, dev string, quantity int) {
 		for {
 
 			generateEntropy(tmp, dev, quantity)
-
 			pool.Write(tmp)
 		}
 	}()
@@ -291,10 +359,8 @@ func initQRNGBuffer(dev string, l int) {
 	// size in MB
 	//qrngBuffer = NewQRNGBuffer(dev, l*1024*1024)
 	qrngBuffer = qrng.NewQRNGBuffer(dev, l)
-
 	// report in KB
 	log.Printf("initQRNG() set qrngBuffer to %v KB", l*1024*1024)
-
 	// Attach it to DRBG
 	//SetEntropyBuffer(qrngBuffer)
 }
@@ -322,21 +388,16 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 }
 */
 
-// Stops the background fill goroutine
-func (q *QRNGBuffer) Stop() {
-	close(q.stop)
-}
-
-// Get returns n bytes from the buffer, blocking if necessary
+// Get returns n bytes from the buffer (blocking if necessary)
 func (q *QRNGBuffer) Get(n int) ([]byte, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	// Wait for buffer to fill if necessary
 	for len(q.buf) < n {
-		q.mu.Unlock()
+		//q.mu.Unlock()
 		time.Sleep(q.fillDelay)
-		q.mu.Lock()
+		//q.mu.Lock()
 	}
 
 	out := q.buf[:n]
@@ -349,14 +410,13 @@ func (q *QRNGBuffer) Get(n int) ([]byte, error) {
 func generateEntropy(buf []byte, dev string, quantity int) {
 
 	//_, err := io.ReadFull(drbgreal, buf)
-
 	//if err != nil {
 	//    log.Printf("entropy error: %v", err)
 	//}
-	fmt.Println("entropy fetch before")
+
 	data, err := fetchEntropy(len(buf), dev, quantity)
 	//data, err := fetchEntropy(len(buf),DefaultCSPRNG,quantity)
-	fmt.Println("entropy fetch after:")
+	//fmt.Println("entropy fetch after:")
 	if err != nil {
 		log.Printf("entropy error: %v", err)
 		return
@@ -364,6 +424,7 @@ func generateEntropy(buf []byte, dev string, quantity int) {
 	copy(buf, data)
 }
 
+/*
 // fillLoop continuously fills the buffer from the QRNG device
 func (q *QRNGBuffer) fillLoop() {
 	for {
@@ -406,6 +467,7 @@ func (q *QRNGBuffer) fillLoop() {
 		q.mu.Unlock()
 	}
 }
+*/
 
 // fetchEntropy reads n bytes from the buffered QRNG
 func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
@@ -416,7 +478,8 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 		log.Println("entropy fetch inside 2")
 
 		// Attach it to DRBG
-		//SetEntropyBuffer(qrngBuffer)
+		//SetEntropyBuffer(&qrngBuffer)
+		//SetEntropyBuffer(qrng.QRNGBuffer)
 	}
 	// TODO: fix here
 	//metrics.AddBufferedBytes(uint64(q.capacity))
@@ -424,8 +487,6 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	return qrngBuffer.Get(n)
 }
 
-// reseed loop
-// func reseedLoop(ctx context.Context, d *qrng.DRBG, interval int, dev string, bufferlen int, reseedbuf int)
 func reseedLoop(ctx context.Context, d drbg.DRBG, interval int, dev string, bufferlen int, reseedbuf int) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
@@ -452,7 +513,6 @@ func reseedLoop(ctx context.Context, d drbg.DRBG, interval int, dev string, buff
 	}
 }
 
-// func entropyHeatmapHandler(d *qrng.DRBG) http.HandlerFunc
 func entropyHeatmapHandler(d drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		width := 1024
@@ -542,7 +602,6 @@ func main() {
 }
 */
 
-// func randomImageHandler(d *qrng.DRBG) http.HandlerFunc
 func randomImageHandler(d drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		width := 1024
@@ -572,7 +631,6 @@ func randomImageHandler(d drbg.DRBG) http.HandlerFunc {
 	}
 }
 
-// func randomHandler(d *qrng.DRBG) http.HandlerFunc
 func randomHandler(d drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n := 1024
@@ -618,8 +676,7 @@ func projectWords(n *big.Int, count int) []string {
 }
 */
 
-// func wsWordsHandler(d *qrng.DRBG, quantity int, refresh time.Duration) http.HandlerFunc
-func wsWordsHandler(d drbg.DRBG, quantity int, refresh time.Duration) http.HandlerFunc {
+func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		metrics.AddHttpRequests(1)
@@ -678,7 +735,9 @@ func wsWordsHandler(d drbg.DRBG, quantity int, refresh time.Duration) http.Handl
 
 			hash := sha256.Sum256(randomBytes) // Optional scramble layer (sha256 calculator)
 			n := new(big.Int).SetBytes(hash[:])
-			var wordsout []string // Extract words
+
+			// Extract words
+			var wordsout []string
 			zero := big.NewInt(0)
 			counter := 0
 
@@ -714,14 +773,13 @@ func wsWordsHandler(d drbg.DRBG, quantity int, refresh time.Duration) http.Handl
 				metrics.AddBytesGenerated(len(wordsout))
 				metrics.AddWSPayloads(1)
 			default:
-				continue
 				//log.Println("Nothing to see here")
+				continue
 			}
 		}
 	}
 }
 
-// func entropyWordHandler(d *qrng.DRBG, quantity int, refreshRate int) http.HandlerFunc
 func entropyWordHandler(d drbg.DRBG, quantity int, refreshRate int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		words := diceware.GetWords()
@@ -809,9 +867,12 @@ body {
 	}
 }
 
-// func randomBytesHandler(d *qrng.DRBG, maxSize int) http.HandlerFunc
 func randomBytesHandler(d drbg.DRBG, maxSize int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		prefs := extractPrefs(r)
+		setPrefsCookie(w, prefs)
+
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
@@ -827,9 +888,12 @@ func randomBytesHandler(d drbg.DRBG, maxSize int) http.HandlerFunc {
 			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<24 {
 				size = v
 			}
+		} else {
+			size = prefs.Bytes
 		}
 
 		buf := make([]byte, size)
+
 		//buf := bufPool.Get().([]byte)
 		//defer bufPool.Put(buf)
 		//data := d.ReadInto(buf[:size]) //n
@@ -839,15 +903,23 @@ func randomBytesHandler(d drbg.DRBG, maxSize int) http.HandlerFunc {
 		//io.Copy(w, buf)
 		//w.Write(data)
 
-		child.Read(buf[:size])
-		//entropyPool.Read(size)
+		//child.Read(buf[:size])
+		//x := child.Read(buf[:size])
+		//w.Write(aa)
+
+		//d.Read(buf[size:])
+		io.ReadFull(&child, buf)
+
+		//aa := entropyPool.Read(size)
+		//d.Read(aa)
+		//w.Write(buf[size:])
 		w.Write(buf)
+
 		metrics.AddBytesGenerated(len(buf))
 		metrics.AddHttpRequests(1)
 	}
 }
 
-// func fileAnalyzeHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc
 func fileAnalyzeHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -936,7 +1008,6 @@ func fileAnalyzeHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) htt
 	}
 }
 
-// func uploadHandler(d *qrng.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc
 func uploadHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -955,7 +1026,7 @@ func uploadHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) http.Han
 		defer ticker.Stop()
 
 		if r.Method != http.MethodPost {
-			// TODO: fix here to avoid hijacking
+			// TODO: fix here
 			// http: response.WriteHeader on hijacked connection from main.main.uploadHandler.func6 (entropy-server.go:936)
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -1026,7 +1097,6 @@ func uploadHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) http.Han
 	}
 }
 
-// func wsBytesHandler(d *qrng.DRBG, refresh time.Duration) http.HandlerFunc
 func wsBytesHandler(d drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -1071,32 +1141,36 @@ func wsBytesHandler(d drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 			}
 		}()
 
-		for {
-			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			/*
-				if n < 64 { return }
-				if first == 1 { first = 0 }
-				if buf == nil {
-					http.Error(w, "failed to create buf", http.StatusInternalServerError)
-					return
-				}
-			*/
+		//buf := make([]byte, n)
+		buf := bufPool.Get().([]byte)
 
+		if buf == nil {
+			http.Error(w, "failed to create buf", http.StatusInternalServerError)
+			return
+		}
+
+		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				buf := bufPool.Get().([]byte)
-				defer bufPool.Put(buf)
-				//buf := make([]byte, n)
-				d.Read(buf[:n])
+				//bufPool.Put(buf)
+				//defer bufPool.Put(buf)
+				io.ReadFull(&d, buf)
+				
+				//d.Read(buf[:n]) // n
+				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+			
+				//entropy, _ := io.ReadFull(&d, buf)
+
 				// two options available here, raw encode or b64 encode
-				base64 := base64.StdEncoding.EncodeToString(buf[:n])
+				base64 := base64.StdEncoding.EncodeToString(buf[:n]) // n
+				//base64 := base64.StdEncoding.EncodeToString(entropy) //buf[:n])
 				//conv := hex.EncodeToString(buf)
 				hash := sha256.Sum256(buf)
 
 				frame := EntropyDataFrame{
-					Hex:    hex.EncodeToString(buf[:n]),
+					Hex:    hex.EncodeToString(buf[:n]), // [;n}
 					Base64: base64,
 					Hash:   hex.EncodeToString(hash[:]),
 				}
@@ -1115,8 +1189,8 @@ func wsBytesHandler(d drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 				//rng.DecreaseActiveInstances(-1)
 			default:
 				{
-					continue
 					//log.Println("Nothing to see here")
+					//continue
 				}
 
 			}
@@ -1124,7 +1198,6 @@ func wsBytesHandler(d drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 	}
 }
 
-// func wsBinaryHandler(d *qrng.DRBG, refresh time.Duration, quantity int) http.HandlerFunc
 func wsBinaryHandler(d drbg.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -1168,56 +1241,63 @@ func wsBinaryHandler(d drbg.DRBG, refresh time.Duration, quantity int) http.Hand
 			}
 		}()
 
+		//io.Copy(buf, d)
+		//buf := io.Reader(&d)
 		buf := make([]byte, quantity)
-		d.Read(buf[:quantity])
-		//d.Read(buf)
 
 		for {
-			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			//buf := make([]byte, quantity)
 
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				io.ReadFull(&d, buf)
+				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 				//d.Read(buf[:quantity])
+				//d.Read(buf[quantity:])
 				//d.Read(buf)
+				
 				err := conn.WriteMessage(websocket.BinaryMessage, buf)
 				if err != nil {
 					return
 				}
+				
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
 				//rng.DecreaseActiveInstances(-1)
 			default:
 				{
-					d.Read(buf[:quantity])
+					//d.Read(buf[:quantity])
+					//d.Read(buf[quantity:])
+					//io.ReadFull(&d, buf)
 					//d.Read(buf)
-					continue
 					//log.Println("Nothing to see here")
+					continue
 				}
 			}
 		}
 	}
 }
 
-// func metricsHandler(d *qrng.DRBG) http.HandlerFunc
 func metricsHandler(d drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		metricsaa := d.GetMetadata()
+		meta := d.GetMetadata()
 
 		bytes := metrics.BytesGenerated() / 1024 / 1024
 		reseeds := metrics.Reseeds()
-		//age := metrics.ReseedAgeMs
-		age := d.ReseedAge().Milliseconds()
-		bufBytes := metricsaa.EntropyBufferedBytes / 1024
-		bufCap := metricsaa.EntropyFillPct
 		reqs := metrics.NumHttpRequests()
 		payloads := metrics.NumWSPayloads()
 		entropy := metrics.BufferedBytes()
 		entropyA := metrics.TestA()
 		entropyB := metrics.TestB()
-		DRBGcnt := metricsaa.DRBGInstanceCnt
+
+		//age := metrics.ReseedAgeMs
+		age := d.ReseedAge().Milliseconds()
+
+		bufBytes := meta.EntropyBufferedBytes / 1024
+		bufCap := meta.EntropyFillPct
+		DRBGcnt := meta.DRBGInstanceCnt
 
 		fmt.Fprintf(w,
 			`# HELP rng_bytes_generated_total Total bytes generated by DRBG
@@ -1279,7 +1359,6 @@ drbg_instance_count %d
 	}
 }
 
-// func healthHandler(d *qrng.DRBG) http.HandlerFunc
 func healthHandler(d drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -1298,6 +1377,7 @@ func healthHandler(d drbg.DRBG) http.HandlerFunc {
 		}
 
 		d.WriteHeaders(w)
+		//w.WriteHeader(http.StatusOK)
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(health); err != nil {
@@ -1388,7 +1468,6 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 	return path, nil
 }
 
-// func startHTTP(ctx context.Context, addr string, handler http.Handler, master *qrng.DRBG) (*http.Server, error)
 func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error) {
 	//ln, err := net.Listen("tcp", addr)
 	//if err != nil { return nil, err }
@@ -1443,7 +1522,6 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master dr
 	return srv, nil
 }
 
-// func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *qrng.DRBG) (*http.Server, error)
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error) {
 	ln, err := listener.NewTunedListener(addr, 1<<24)
 	if err != nil {
@@ -1517,7 +1595,7 @@ func main() {
 
 	cfg := config.ParseConfig()
 
-	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10001 {
+	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10000 {
 		panic("reseed-ms must be between 1 and 10000 ms")
 	}
 
@@ -1529,26 +1607,26 @@ func main() {
 		panic("QRNG buffer size KB must be between 1 and 4096 KB")
 	}
 
-	fmt.Println("---")
-	fmt.Println("HTTP port:", cfg.HTTPAddr)
-	fmt.Println("HTTPS port:", cfg.HTTPSAddr)
-	fmt.Println("CertFile TLS:", cfg.CertFile)
-	fmt.Println("KeyFile TLS:", cfg.KeyFile)
-	fmt.Println("EnableHTTPS flag:", cfg.EnableHTTPS)
-	fmt.Println("---")
-	fmt.Println("Reseed size:", cfg.ReseedSize)
-	fmt.Println("ReseedMs interval:", cfg.ReseedMs)
-	fmt.Println("Max request size KB:", cfg.MaxBytes/1024)
-	fmt.Println("QRNGBuffer size:", cfg.QRNGBuffer)
-	fmt.Println("Reseed Buffer size:", cfg.SeedBuffer)
-	fmt.Println("---")
-	fmt.Println("Max number of Bytes:", cfg.MaxBytes)
-	fmt.Println("Maximum number of Words:", cfg.MaxWords)
-	fmt.Println("---")
-	fmt.Println("Refresh Rate (seconds) value:", cfg.RefreshRate)
-	fmt.Println("RefreshMs (ms) value:", cfg.RefreshRateMs)
-	fmt.Println("RefreshColorMs (ms) value:", cfg.RefreshColorMs)
-	fmt.Println("---")
+	fmt.Println("-------------------------------------------------")
+	fmt.Println("HTTP port                    :", cfg.HTTPAddr)
+	fmt.Println("HTTPS port                   :", cfg.HTTPSAddr)
+	fmt.Println("CertFile TLS                 :", cfg.CertFile)
+	fmt.Println("KeyFile TLS                  :", cfg.KeyFile)
+	fmt.Println("EnableHTTPS flag             :", cfg.EnableHTTPS)
+	fmt.Println("-------------------------------------------------")
+	fmt.Println("Reseed size                  :", cfg.ReseedSize)
+	fmt.Println("ReseedMs interval            :", cfg.ReseedMs)
+	fmt.Println("Max request size KB          :", cfg.MaxBytes/1024)
+	fmt.Println("QRNGBuffer size              :", cfg.QRNGBuffer)
+	fmt.Println("Reseed Buffer size           :", cfg.SeedBuffer)
+	fmt.Println("-------------------------------------------------")
+	fmt.Println("Max number of Bytes          :", cfg.MaxBytes)
+	fmt.Println("Maximum number of Words      :", cfg.MaxWords)
+	fmt.Println("-------------------------------------------------")
+	fmt.Println("Refresh Rate (seconds) value :", cfg.RefreshRate)
+	fmt.Println("RefreshMs (ms) value         :", cfg.RefreshRateMs)
+	fmt.Println("RefreshColorMs (ms) value    :", cfg.RefreshColorMs)
+	fmt.Println("-------------------------------------------------")
 
 	//check for entropy source availability and access rights
 	dev, err := ResolveEntropyDevice(cfg.DevicePath, cfg.RequireDevice)
@@ -1568,15 +1646,12 @@ func main() {
 	}
 	log.Printf("Entropy source: %s\n", dev)
 
-	fmt.Println("-1-")
-	// Initialize QRNG buffer
-	//entropy := NewEntropySource(cfg.DevicePath)
+	fmt.Println("1) initialize entropy device as buffer source")
 	qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
-	//qrngBuf := qrng.NewQRNGBuffer(entropy, 65536)
-	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer)
+	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) //65536
 
-	fmt.Println("-2-")
-	// Initialize seed space (in bytes here)
+	fmt.Println("2) initialize seed space (needs fix)")
+
 	/*
 		seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
 		//seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
@@ -1585,50 +1660,57 @@ func main() {
 			log.Fatal(serr)
 		}
 	*/
-	//entropy := entropyPool.Read(seed)
-	//entropy := entropyPool.Read(2097152)
-	g := make([]byte, 65536)
-	//entropy , _  := qrngdev.Read(g)
-	qrngdev.Read(g)
-	fmt.Println("-3-")
-	entropyPool = NewEntropyPool(8 * 1024 * 1024) // 8 MB pool
-	//entropyPool.Write(entropy.Read)
-	entropyPool.Write(g)
 
-	fmt.Println("-4-")
+	g := make([]byte, 65536)
+	entropy, _ := qrngdev.Read(g)
+	//qrngdev.Read(g)
+
+	fmt.Println("3) initialize the entropy read pool (check size in config.go configuration file)")
+	entropyPool = NewEntropyPool(entropy) // 8 MB pool
+	// test write
+	//entropyPool.Write(g)
+	//entropyPool.Write(entropy.Read)
+
+	fmt.Println("4) start the entropy producer pool with given 64 KB of buffer")
 	startEntropyProducer(entropyPool, dev, 65536)
 
 	//resp := handler(pool)
 	//assert(len(resp) == expected)
 
-	// Initialize DRBG. Note that multiple instances of DRBG are created on a per-connection basis
-	fmt.Println("-5-")
-	// pass entropy along
-	//master := NewMasterDRBG(entropy)
-	//drbgmain, derr := drbg.NewDRBG(seed)
+	// Initialize DRBG instance and pass entropy along. Note that multiple instances of DRBG are created on a per-connection basis
+	fmt.Println("5) write the entropy out to DRBG buffer")
 	drbgmain, derr := drbg.NewDRBG(entropyPool.buf)
 	if derr != nil {
 		log.Fatal(derr)
 	}
 
-	fmt.Println("-6-")
-	//drbg.SetMetadata("1.0.0", "QRNG-idQuantique-QuantisPCI", "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, qrngBuf)
+	fmt.Println("6) set DRBG metadata (optional)") // "QRNG-idQuantique-QuantisPCI"
 	drbgmain.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
+	fmt.Println("7) attach the QRNG buffer to DRBG")
 	drbgmain.SetEntropyBuffer(*qrngBuf)
 
+	fmt.Println("8) start network listener(s)")
 	//tln := newTunedListener(ln)
 	tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-	if crterr != nil {
-		log.Fatal(crterr)
-	}
+	if crterr != nil { log.Fatal(crterr) }
 	tlsCfg.Certificates = []tls.Certificate{cert}
 	tlsCfg.ClientAuth = tls.NoClientCert
 
-	//masterDRBG, _ := drbg.NewDRBG(seed)
+	/*
+		fmt.Println("9) setup the masterDRBG")
+		e := make([]byte, 65536)
+		entropy2, _ := qrngdev.Read(e)
+	*/
+
+	//f := entropyPool.Read(e)
+	//entropy := entropyPool.Read(2097152)
 	//drbgmaster, _ := drbg.NewDRBG(entropy)
+	//master := NewMasterDRBG(entropy)
+	//masterDRBG, _ := drbg.NewDRBG(entropy2)
+	masterDRBG, _ := drbg.NewDRBG(g)
 
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
@@ -1637,15 +1719,21 @@ func main() {
 	//http.Handle("/", http.FileServer(fs))
 	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
 
+	mux.Handle("/", http.FileServer(http.Dir("./web")))
+	mux.Handle("/metrics-1", metricsHandler(drbgmain))
+	mux.Handle("/metrics-2", metricsHandler(masterDRBG))
+
+	mux.HandleFunc("/health", healthHandler(drbgmain))
+
+	mux.HandleFunc("/stream", wsBinaryHandler(masterDRBG, cfg.RefreshColorMs, 2048))
+
+	mux.HandleFunc("/colors", wsBytesHandler(drbgmain, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsBytesHandler(drbgmain, cfg.RefreshRateMs))
-	mux.HandleFunc("/stream", wsBinaryHandler(drbgmain, cfg.RefreshColorMs, 2048))
 	mux.HandleFunc("/files", uploadHandler(drbgmain, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 	//mux.HandleFunc("/files", fileAnalyzeHandler(drbg, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
-	mux.HandleFunc("/colors", wsBytesHandler(drbgmain, cfg.RefreshColorMs))
-	mux.HandleFunc("/words", wsWordsHandler(drbgmain, cfg.MaxWords, cfg.RefreshColorMs))
-	mux.Handle("/", http.FileServer(http.Dir("./web")))
+	mux.HandleFunc("/words", wsWordsHandler(cfg.MaxWords, cfg.RefreshColorMs))
 
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(drbgmain, cfg.MaxBytes))
+	mux.HandleFunc("/v1/data/random", randomBytesHandler(masterDRBG, cfg.MaxBytes))
 	mux.HandleFunc("/v1/data/test", randomHandler(drbgmain))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(drbgmain))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(drbgmain))
@@ -1655,8 +1743,6 @@ func main() {
 	//mux.HandleFunc("/v1/qr/random", healthHandler(drbg))
 	// placeholder for public/private key generation
 	//mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
-	mux.HandleFunc("/health", healthHandler(drbgmain))
-	mux.Handle("/metrics", metricsHandler(drbgmain))
 
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
 	//time.Sleep(time.Duration(cfg.ReseedMs))
@@ -1664,14 +1750,13 @@ func main() {
 	// TODO: fix logic here
 	// Run permanent reseed loop
 	//go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.BufferSize, cfg.SeedBuffer)
-	fmt.Println("---")
+	fmt.Printf("9) start reseed loop every %d ms\n", cfg.ReseedMs)
 	go reseedLoop(ctx, drbgmain, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
 	//go reseedLoop(ctx, drbgmaster, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
 
 	// context was here
 	//ctx, cancel := context.WithCancel(context.Background())
 	//defer cancel()
-	fmt.Println("---")
 
 	var httpSrv *http.Server
 	var httpsSrv *http.Server
@@ -1695,6 +1780,22 @@ func main() {
 	log.Println("HTTP server running on", cfg.HTTPAddr)
 	if cfg.EnableHTTPS == true {
 		log.Println("HTTPS server running on", cfg.HTTPSAddr)
+	}
+
+	if cfg.ShowDebug == true {
+		go func() {
+			muxdebug := http.NewServeMux()
+
+			muxdebug.HandleFunc("/debug/pprof/", pprof.Index)
+			muxdebug.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			muxdebug.HandleFunc("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+			muxdebug.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			muxdebug.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			muxdebug.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+			http.ListenAndServe("127.0.0.1:6060", muxdebug)
+		}()
+		log.Println("Debug server running on 127.0.0.1:6060/debug/pprof")
 	}
 
 	<-ctx.Done()

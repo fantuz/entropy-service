@@ -21,7 +21,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 		return nil, err
 	}
 
-	conn.SetReadLimit(1 << 23)
+	conn.SetReadLimit(1 << 25) // 32 MB
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	conn.SetPongHandler(func(string) error {
@@ -33,7 +33,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 	conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
 	
 	//out := make([]byte, 1<<16)
-	out := make(chan []byte, 1<<23) // 16 is safe
+	out := make(chan []byte, 1<<25) // 16 is safe
 
 	go func() {
 

@@ -95,17 +95,17 @@ func (d *Dashboard) Render() {
 
 	total := ClientRateMeter.Total()
 	rate := ClientRateMeter.RateMbps()/8
+
 	fmt.Println("\nEntropy Health Monitor")
 	fmt.Println("----------------------------")
 	fmt.Printf("Total              : %d MB\n", total/1024/1024)
-	fmt.Printf("Rate               : %.3f MB/S\n", rate)
+	fmt.Printf("Transfer Rate      : %.3f MB/S\n", rate)
 	
-	/*
 	fmt.Printf(
-		"Entropy rate       : %.2f Mbit/s\n",
-		d.rate.RateMbps(),
+		"Entropy Rate       : %.3f MB/s\n",
+		d.rate.RateMbps()/8,
 	)
-	*/
+
 	fmt.Printf(
 		"Entropy              %s\n",
 		renderSeries(d.entropy, 7.995, 8.0),
@@ -122,8 +122,8 @@ func (d *Dashboard) Render() {
 	)
 
 	fmt.Printf(
-		"Serial corr          %s\n",
+		"Serial correlation   %s\n",
 		renderSeries(d.serial, -0.02, 0.02), //0.1
 	)
-	//fmt.Println("----------------------")
+	fmt.Println("----------------------------")
 }
