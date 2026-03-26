@@ -176,7 +176,7 @@ func extractPrefs(r *http.Request) ClientPrefs {
         prefs.Words, _ = strconv.Atoi(v)
     }
 
-    log.Printf("cookie: %q\n",prefs)
+    //log.Printf("cookie: %q\n",prefs)
     return prefs
 }
 
