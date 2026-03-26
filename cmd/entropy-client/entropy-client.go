@@ -145,7 +145,7 @@ func main() {
 	}
 
 	if cfg.Slice < 1 || cfg.Slice > 33554432 {
-		panic("Slice of data fetched through websocket shall be between 1B and 32 MB")
+		panic(Red + "Slice of data fetched through websocket shall be between 1B and 32 MB" + Reset)
 	}
 
 	fps := strconv.FormatInt(cfg.Refresh.Milliseconds(), 10)

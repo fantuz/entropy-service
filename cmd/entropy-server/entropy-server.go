@@ -93,6 +93,16 @@ type EntropyDataFrame struct {
 
 const DefaultCSPRNG = "/dev/urandom"
 
+const Reset = "\033[0m"
+const Red = "\033[31m"
+const Green = "\033[32m"
+const Yellow = "\033[33m"
+const Blue = "\033[34m"
+const Magenta = "\033[35m"
+const Cyan = "\033[36m"
+const Gray = "\033[37m"
+const White = "\033[97m"
+
 //go:embed web/*
 var webFS embed.FS
 
@@ -635,7 +645,7 @@ func randomHandler(d drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n := 1024
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<24 {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
 				n = v
 			}
 		}
@@ -697,7 +707,7 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 		}
 
 		if x := r.URL.Query().Get("refresh"); x != "" {
-			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<24 {
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<25 {
 				dtime := time.Duration(z)
 				refresh = dtime
 			}
@@ -885,7 +895,7 @@ func randomBytesHandler(d drbg.DRBG, maxSize int) http.HandlerFunc {
 
 		size := 2097152
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<24 {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
 				size = v
 			}
 		} else {
@@ -938,7 +948,7 @@ func fileAnalyzeHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) htt
 		defer ticker.Stop()
 
 		if x := r.URL.Query().Get("refresh"); x != "" {
-			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<24 {
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<25 {
 				dtime := time.Duration(z)
 				refresh = dtime
 				//log.Printf("Nothing to see here: %d", dtime)
@@ -1032,7 +1042,7 @@ func uploadHandler(d drbg.DRBG, fingerprint int, refresh time.Duration) http.Han
 			return
 		}
 
-		err := r.ParseMultipartForm(1 << 24) // 16MB max
+		err := r.ParseMultipartForm(1 << 25) // 32 MB max
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -1116,7 +1126,7 @@ func wsBytesHandler(d drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 		n := 2048
 
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<24 {
+			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<25 {
 				v = n
 			}
 		}
@@ -1216,7 +1226,7 @@ func wsBinaryHandler(d drbg.DRBG, refresh time.Duration, quantity int) http.Hand
 		defer ticker.Stop()
 
 		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<24 {
+			if v, verr := strconv.Atoi(q); verr == nil && v > 0 && v <= 1<<25 {
 				quantity = v
 			}
 		}
@@ -1453,7 +1463,7 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 		if require {
 			return "", fmt.Errorf("required device not available: %w", err)
 		}
-		log.Printf("Device %s unavailable, falling back to /dev/urandom\n", path)
+		log.Printf(Red + "Device %s unavailable, falling back to /dev/urandom" + Reset, path)
 		return DefaultCSPRNG, nil
 	}
 
@@ -1472,7 +1482,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master dr
 	//ln, err := net.Listen("tcp", addr)
 	//if err != nil { return nil, err }
 	//tln := newTunedListener(ln)
-	ln, err := listener.NewTunedListener(addr, 1<<24)
+	ln, err := listener.NewTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -1523,7 +1533,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master dr
 }
 
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error) {
-	ln, err := listener.NewTunedListener(addr, 1<<24)
+	ln, err := listener.NewTunedListener(addr, 4<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -1556,7 +1566,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 			MaxConcurrentStreams: 1024,
 			//InitialWindowSize:    1 << 20,
 			//InitialConnWindowSize: 4 << 20,
-			MaxReadFrameSize:     1 << 20,
+			MaxReadFrameSize:     1 << 25,
 		})
 	*/
 
@@ -1599,14 +1609,16 @@ func main() {
 		panic("reseed-ms must be between 1 and 10000 ms")
 	}
 
-	if cfg.MaxBytes > 16777216 {
-		panic("max-bytes should be < 16777216 (16 MB)")
+	if cfg.MaxBytes > 33554432 {
+		panic(Red + "max-bytes should be < 33554432 (32 MB)" + Reset)
 	}
 
 	if cfg.QRNGBuffer < 1 || cfg.QRNGBuffer > 4096 {
 		panic("QRNG buffer size KB must be between 1 and 4096 KB")
 	}
 
+	fmt.Println("\n-------------------------------------------------")
+	fmt.Println(Gray + "       Entropy Server Pre-Flight Checks" + Reset)
 	fmt.Println("-------------------------------------------------")
 	fmt.Println("HTTP port                    :", cfg.HTTPAddr)
 	fmt.Println("HTTPS port                   :", cfg.HTTPSAddr)
@@ -1626,7 +1638,7 @@ func main() {
 	fmt.Println("Refresh Rate (seconds) value :", cfg.RefreshRate)
 	fmt.Println("RefreshMs (ms) value         :", cfg.RefreshRateMs)
 	fmt.Println("RefreshColorMs (ms) value    :", cfg.RefreshColorMs)
-	fmt.Println("-------------------------------------------------")
+	fmt.Println("-------------------------------------------------\n")
 
 	//check for entropy source availability and access rights
 	dev, err := ResolveEntropyDevice(cfg.DevicePath, cfg.RequireDevice)
@@ -1640,17 +1652,17 @@ func main() {
 		log.Fatal("Entropy device validation failed: ", verr)
 	}
 	if dev == "/dev/urandom" {
-		log.Println("Entropy mode: kernel CSPRNG fallback")
+		log.Println(Yellow + "Entropy mode: \"weak\" kernel CSPRNG fallback" + Reset)
 	} else {
-		log.Println("Entropy mode: hardware device:", dev)
+		log.Println(Green + "Entropy mode: robust RNG hardware device:", dev + Reset)
 	}
 	log.Printf("Entropy source: %s\n", dev)
 
-	fmt.Println("1) initialize entropy device as buffer source")
+	fmt.Println("	1) initialize entropy device as buffer source")
 	qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
 	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) //65536
 
-	fmt.Println("2) initialize seed space (needs fix)")
+	fmt.Println("	2) initialize seed space (needs fix)")
 
 	/*
 		seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
@@ -1665,33 +1677,33 @@ func main() {
 	entropy, _ := qrngdev.Read(g)
 	//qrngdev.Read(g)
 
-	fmt.Println("3) initialize the entropy read pool (check size in config.go configuration file)")
+	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file)")
 	entropyPool = NewEntropyPool(entropy) // 8 MB pool
 	// test write
 	//entropyPool.Write(g)
 	//entropyPool.Write(entropy.Read)
 
-	fmt.Println("4) start the entropy producer pool with given 64 KB of buffer")
+	fmt.Println("	4) start the entropy producer pool with given 64 KB of buffer")
 	startEntropyProducer(entropyPool, dev, 65536)
 
 	//resp := handler(pool)
 	//assert(len(resp) == expected)
 
 	// Initialize DRBG instance and pass entropy along. Note that multiple instances of DRBG are created on a per-connection basis
-	fmt.Println("5) write the entropy out to DRBG buffer")
+	fmt.Println("	5) write the entropy out to DRBG buffer")
 	drbgmain, derr := drbg.NewDRBG(entropyPool.buf)
 	if derr != nil {
 		log.Fatal(derr)
 	}
 
-	fmt.Println("6) set DRBG metadata (optional)") // "QRNG-idQuantique-QuantisPCI"
+	fmt.Println("	6) set DRBG metadata (optional)") // "QRNG-idQuantique-QuantisPCI"
 	drbgmain.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
-	fmt.Println("7) attach the QRNG buffer to DRBG")
+	fmt.Println("	7) attach the QRNG buffer to DRBG")
 	drbgmain.SetEntropyBuffer(*qrngBuf)
 
-	fmt.Println("8) start network listener(s)")
+	fmt.Println("	8) start network listener(s)")
 	//tln := newTunedListener(ln)
 	tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
@@ -1750,7 +1762,7 @@ func main() {
 	// TODO: fix logic here
 	// Run permanent reseed loop
 	//go reseedLoop(ctx, drbg, cfg.ReseedMs, dev, cfg.BufferSize, cfg.SeedBuffer)
-	fmt.Printf("9) start reseed loop every %d ms\n", cfg.ReseedMs)
+	fmt.Printf("	9) start reseed loop every %d ms\n", cfg.ReseedMs)
 	go reseedLoop(ctx, drbgmain, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
 	//go reseedLoop(ctx, drbgmaster, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
 
@@ -1777,9 +1789,9 @@ func main() {
 		}
 	}
 
-	log.Println("HTTP server running on", cfg.HTTPAddr)
+	log.Println(Green + "HTTP server running on", cfg.HTTPAddr + Reset)
 	if cfg.EnableHTTPS == true {
-		log.Println("HTTPS server running on", cfg.HTTPSAddr)
+		log.Println(Green + "HTTPS server running on", cfg.HTTPSAddr + Reset)
 	}
 
 	if cfg.ShowDebug == true {
@@ -1797,6 +1809,7 @@ func main() {
 		}()
 		log.Println("Debug server running on 127.0.0.1:6060/debug/pprof")
 	}
+	log.Println(Gray + "Entropy Server startup sequence completed successfully\n" + Reset)
 
 	<-ctx.Done()
 
