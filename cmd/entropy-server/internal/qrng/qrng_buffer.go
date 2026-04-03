@@ -51,7 +51,7 @@ type QRNGBuffer struct {
 
 func InitQRNGBuffer(dev string, l int) {
 	// report in KB
-	log.Printf("initQRNG() set qrngBuffer to %v ", l)
+	log.Printf("InitQRNG() set qrngBuffer to %v ", l)
 
 	// size in MB
 	//qrngBuffer = NewQRNGBuffer(dev, l*1024*1024)
@@ -144,7 +144,7 @@ func (q QRNGBuffer) fillLoop() {
 
 		if err != nil {
 			// Could not open QRNG device, retry after short sleep
-			time.Sleep(25 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			fail++
 			if fail > 3 {
 				panic("QRNG device unavailable")

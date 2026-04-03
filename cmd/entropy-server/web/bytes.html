@@ -137,14 +137,43 @@ h3 {
 <script>
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
-const bytes = urlParams.get('bytes')
-const refresh = urlParams.get('refresh')
+//const bytes = urlParams.get('bytes')
+//const refresh = urlParams.get('refresh')
 //console.log(queryString);
+var count = 0;
 
+if (typeof urlParams.get('bytes') === 'undefined') {
+	var bytes = 4096
+} else {
+	var bytes = urlParams.get('bytes')
+	count++
+}
+
+if (typeof urlParams.get('refresh') === 'undefined') {
+	var refresh = 500
+} else {
+	var refresh = urlParams.get('refresh')
+	count++
+}
+
+//console.log(count)
+if (count > 0) {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/bytes?bytes=" + bytes + "&refresh=" + refresh
+);
+} else {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/bytes"
+);
+}
+/*
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
     + location.host + "/bytes?bytes=" + bytes + "&refresh=" + refresh
 );
+*/
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);

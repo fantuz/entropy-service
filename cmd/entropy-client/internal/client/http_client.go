@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"encoding/json"
 	"net"
+	"net/url"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
-
 	"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
 	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
 )
@@ -49,9 +52,35 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	}
 	*/
 
+	var cookies []*http.Cookie
+
+	// create instance
+	jar, _ := cookiejar.New(nil)
+
+	// read on startup
+	file, _ := os.ReadFile("cookies.json")
+
+	// parse
+	json.Unmarshal(file, &cookies)
+	u, _ := url.Parse(endpoint)
+	jar.SetCookies(u, cookies)
+
+	// store
+	object, _ := json.Marshal(cookies)
+	os.WriteFile("cookies.json", object, 0600)
+
+	// parse
+	//parsedc := jar.Cookies(u)
+	//fmt.Printf(" --> %q\n", jar)
+	//fmt.Printf(" --> %q\n", parsedc)
+	//fmt.Printf(" --> %q\n", cookies)
+	//fmt.Printf(" --> %q\n", u)
+	//fmt.Printf(" --> %q\n", object)
+
 	// Create a client with a conservative timeout bound (per request).
 	// Caller can still use ctx to cancel earlier.
 	httpClient := &http.Client{
+		Jar: jar,
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,

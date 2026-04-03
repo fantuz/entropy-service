@@ -92,13 +92,29 @@ h3 {
 <script>
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
-const refresh = urlParams.get('refresh')
+//const refresh = urlParams.get('refresh')
 //console.log(queryString);
+var count = 0;
 
-const ws = new WebSocket(
+if (typeof urlParams.get('refresh') === 'undefined') {
+	var refresh = 500
+} else {
+	var refresh = urlParams.get('refresh')
+	count++
+}
+
+//console.log(count)
+if (count > 0) {
+var ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
     + location.host + "/colors?refresh=" + refresh
 );
+} else {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/colors"
+);
+}
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);

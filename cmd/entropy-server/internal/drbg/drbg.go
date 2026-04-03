@@ -141,7 +141,8 @@ func NewConnectionDRBG(d DRBG) (DRBG, error) {
 }
 
 // Reseed mixes new entropy into the DRBG
-func (d DRBG) Reseed(seed []byte) error {
+//func (d DRBG) Reseed(seed []byte) error
+func (d *DRBG) Reseed(seed []byte) error {
 	//d.Mu.Lock()
 	//defer d.Mu.Unlock()
 
@@ -160,7 +161,6 @@ func (d DRBG) Reseed(seed []byte) error {
 }
 
 // Read fills p with pseudo-random bytes
-// func (d *DRBG) Read(p []byte)
 func (d *DRBG) Read(p []byte) (int, error) {
 	//d.Mu.Lock()
 	//defer d.Mu.Unlock()
@@ -182,7 +182,7 @@ func (d *DRBG) Read(p []byte) (int, error) {
 
 	//return d.cipher.XORKeyStream(p, p), nil
 	return len(p), nil
-	//return p, nil
+	//return int(p), nil
 }
 
 // ReseedAge returns how long since last reseed
@@ -306,7 +306,11 @@ func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
-	d.Read(seed)
+	//d.Read(seed)
+	_, err := d.Read(seed)
+	if err != nil {
+		return nil, err
+	}
 	return seed, nil
 }
 

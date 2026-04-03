@@ -154,31 +154,29 @@ func main() {
 	var refhttpurl = cfg.HTTPUrl + "?bytes=" + rbytes + "&refresh=" + fps
 	var refwsurl = cfg.WSUrl + "?bytes=" + rbytes + "&refresh=" + fps
 	var fpsdigit = 1000 / int(cfg.Refresh.Milliseconds())
-	var expectedbr = (int(cfg.Slice) * fpsdigit) / 1024 / 1024
+	var expectedbr float64 = (float64(cfg.Slice) * float64(fpsdigit)) / 1024 / 1024
 	var opt int = 0
 
 	timeoutctx, timeoutcancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer timeoutcancel()
 
-	fmt.Print("\033[H\033[2J") // clear screen
+	fmt.Print("\033[H\033[2J")
 	fmt.Print("\a")
 
-	//testdata, _ := client.FetchEntropySimple(&cfg.HTTPUrl, &cfg.Slice)
 	testdata, _ := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
 
 	/*
-	for i:=0; i < 10; i++ {
-		result := diag.RunDiagnostics(testdata)
-		if result.Pass == true {
-			fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", result.Pass)
-		} else {
-			fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", result.Pass)
+		for i:=0; i < 10; i++ {
+			result := diag.RunDiagnostics(testdata)
+			if result.Pass == true {
+				fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", result.Pass)
+			} else {
+				fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", result.Pass)
+			}
 		}
-	}
 	*/
 
 	result := diag.RunDiagnostics(testdata)
-
 	//test := diag.NewRateMeter
 
 	timeoutcancel()
@@ -194,7 +192,11 @@ func main() {
 	fmt.Println("WS URL               : " + Cyan + refwsurl + Reset)
 	fmt.Println("----------------------------------------------")
 	fmt.Println("Program mode         :", cfg.Mode)
-	fmt.Println("Write-out to /dev    :", cfg.WriteOut)
+	if cfg.WriteOut {
+		fmt.Println("Write-out to /dev    : " + Green + "enabled" + Reset)
+	} else {
+		fmt.Println("Write-out to /dev    : " + Red + "disabled" + Reset)
+	}
 	fmt.Println("Debug                :", cfg.ShowDebug)
 	fmt.Println("----------------------------------------------")
 	fmt.Println("Show Dashboard       :", cfg.ShowDashboard)
@@ -202,10 +204,16 @@ func main() {
 	fmt.Println("Show Graph           :", cfg.ShowGraph)
 	fmt.Println("Data Preview         :", cfg.ShowPreview)
 	fmt.Println("----------------------------------------------")
-	fmt.Printf("Expected Slice       : " + Yellow + "%d" + Reset + "\n", cfg.Slice)
-	fmt.Printf("Fetched Size         : " + Yellow + "%d" + Reset + "\n", result.N)
+	if int(cfg.Slice) == result.N {
+		fmt.Printf("Expected Slice       : "+Green+"%d"+Reset+"\n", cfg.Slice)
+		fmt.Printf("Fetched Size         : "+Green+"%d"+Reset+"\n", result.N)
+	} else {
+		fmt.Printf("Expected Slice       : "+Red+"%d"+Reset+"\n", cfg.Slice)
+		fmt.Printf("Fetched Size         : "+Red+"%d"+Reset+"\n", result.N)
+	}
 	fmt.Println("----------------------------------------------")
-	fmt.Printf("Expected Bitrate     : " + Green + "%d MB/s" + Reset + "\n", expectedbr)
+	fmt.Printf("Expected Bitrate     : "+Green+"%.3f MB/s"+Reset+"\n", expectedbr)
+
 	//fmt.Printf("Bitrate              : %f\n", result.Rate)
 	//fmt.Printf("Shannon entropy      : %.6f bits/byte\n", result.Shannon)
 	//fmt.Printf("Chi²                 : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
@@ -218,7 +226,7 @@ func main() {
 	if result.N > 0 {
 		fmt.Printf("PASS                 : " + Green + "Link Established" + Reset + "\n")
 	} else {
-		fmt.Printf("PASS                 : " + Red + "Link down / No data fetched"+ Reset + "\n")
+		fmt.Printf("PASS                 : " + Red + "Link down / No data fetched" + Reset + "\n")
 	}
 
 	fmt.Println("----------------------------------------------")
@@ -263,20 +271,20 @@ func main() {
 
 	fmt.Println("----------------------------------------------")
 
+	cancelA()
+	cancelB()
+
 	fmt.Print("\a")
 	time.Sleep(2 * time.Second)
 
 	/*
-	resultA := diag.RunDiagnostics(testdata)
-	if resultA.Pass == true {
-		fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", resultA.Pass)
-	} else {
-		fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", resultA.Pass)
-	}
+		resultA := diag.RunDiagnostics(testdata)
+		if resultA.Pass == true {
+			fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", resultA.Pass)
+		} else {
+			fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", resultA.Pass)
+		}
 	*/
-
-	cancelA()
-	cancelB()
 
 	select {
 	case <-timeoutctx.Done():
@@ -284,6 +292,7 @@ func main() {
 			cancelA()
 			cancelB()
 			timeoutcancel()
+			wsconn.Close()
 			//fmt.Println("HERE-CASE-CTX-CONTINUE:")
 			//return
 		}
@@ -312,7 +321,6 @@ func main() {
 
 	startprg := time.Now()
 
-	// number of columns, also 120 is OK
 	graph := diag.NewEntropyGraph(60)
 	dashboard := diag.NewDashboard(60)
 
@@ -427,7 +435,7 @@ func main() {
 						fmt.Println("Total runtime      :", hrreal, "ms")
 					}
 					if opt > 0 {
-						time.Sleep(cfg.Refresh/2 ) //* time.Millisecond)
+						time.Sleep(cfg.Refresh / 2) //* time.Millisecond)
 					}
 				}
 			/*
@@ -437,7 +445,7 @@ func main() {
 			*/
 			default:
 				{
-					//continue
+					continue
 				}
 			}
 		}
@@ -537,16 +545,19 @@ func main() {
 				}
 
 				if opt > 0 {
-					time.Sleep(cfg.Refresh/2 ) //* time.Millisecond)
+					time.Sleep(cfg.Refresh / 2) //* time.Millisecond)
 				}
+
 			/*
 				case <-rctx.Done():
 					log.Println("shutdown signal received")
 					log.Println("shutdown complete")
 			*/
+
 			default:
 				{
-					//continue
+					wscancel()
+					continue
 				}
 			}
 		}

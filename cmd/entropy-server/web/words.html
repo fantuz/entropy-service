@@ -103,15 +103,45 @@ h3 {
 <script>
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
-const length = urlParams.get('words')
-const refresh = urlParams.get('refresh')
+//const length = urlParams.get('words')
+//const refresh = urlParams.get('refresh')
 //console.log(queryString);
 //console.log(length);
+var count = 0;
 
+if (typeof urlParams.get('words') === 'undefined') {
+	var words = 3
+} else {
+	var words = urlParams.get('words')
+	count++
+}
+
+if (typeof urlParams.get('refresh') === 'undefined') {
+	var refresh = 500
+} else {
+	var refresh = urlParams.get('refresh')
+	count++
+}
+
+//console.log(count)
+if (count > 0) {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/words?words=" + words + "&refresh=" + refresh
+);
+} else {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/words"
+);
+}
+
+/*
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") 
     + location.host + "/words?words=" + length + "&refresh=" + refresh
 );
+*/
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);

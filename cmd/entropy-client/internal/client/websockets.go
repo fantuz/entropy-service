@@ -11,7 +11,6 @@ import (
 
 //var ClientRateMeter = diag.NewRateMeter()
 
-//func StreamEntropy(ctx context.Context, url string, quantity int, refresh int) (<-chan []byte, error)
 func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 
 	//url = fmt.Sprintf("%s%sbytes=%d", url, sep, quantity)
@@ -23,15 +22,13 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 
 	conn.SetReadLimit(1 << 25) // 32 MB
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	//conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		//panic("critical read deadline reached")
 		return nil
 	})
 
-	conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
-	
 	//out := make([]byte, 1<<16)
 	out := make(chan []byte, 1<<25) // 16 is safe
 
@@ -47,33 +44,22 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 				return
 			default:
 			}
+			
+			//conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
 
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					return
-				}
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
 
-				/*
-				select {
-
-				case out <- msg:
-
-				case <-ctx.Done():
-					return
-				}
-				*/
-			//}
-
-			//diag.ClientRateMeter.Update(len(msg))
 			if diag.ClientRateMeter != nil {
 				diag.ClientRateMeter.Update(len(msg))
 			}
 
+			//diag.ClientRateMeter.Update(len(msg))
 			// instrumentation: increment counters on successful read
 			metrics.AddClientBytesReceived(uint64(len(msg)))
 			metrics.IncClientWSSMessages() // optional counter for messages received
-
-		//}
 
 			// push into channel (non-blocking if buffered)
 			select {
