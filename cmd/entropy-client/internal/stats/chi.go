@@ -31,7 +31,6 @@ func ChiSquare(data []byte) Result {
 }
 */
 
-
 // χ² = Σ (O - E)² / E
 
 /*
@@ -41,7 +40,7 @@ type Result struct {
 }
 */
 
-//func ChiSquare(data []byte)
+// func ChiSquare(data []byte)
 func ChiSquare(data []byte) Result {
 
 	var hist [256]int
@@ -63,7 +62,7 @@ func ChiSquare(data []byte) Result {
 
 	pass := chi2 < 293.24 // approx threshold
 
-	return Result {
+	return Result{
 		Name:      "chi-square",
 		Statistic: chi2,
 		//PValue:    p,

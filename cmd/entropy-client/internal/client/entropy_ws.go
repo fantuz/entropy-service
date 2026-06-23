@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	//"strings"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/stats"
 	"github.com/gorilla/websocket"
-	"github.com/fantuz/entropy-service/entropy-client/internal/stats"
 )
 
 func TestEntropyWS(ctx context.Context, endpoint string) error {
@@ -37,7 +37,7 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 			if err != nil {
 				return err
 			}
-			
+
 			if msgType != websocket.BinaryMessage {
 				continue
 			}
@@ -55,4 +55,3 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 		}
 	}
 }
-

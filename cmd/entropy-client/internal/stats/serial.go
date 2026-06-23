@@ -63,6 +63,6 @@ func SerialCorrelation(data []byte) Result {
 
 	return Result{
 		Statistic: r,
-		Passed: math.Abs(r) < 0.05,
+		Passed:    math.Abs(r) < 0.05,
 	}
 }

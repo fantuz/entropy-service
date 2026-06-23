@@ -1,9 +1,8 @@
 package tests
 
-
 import (
 	"fmt"
-	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 )
 
 const Reset = "\033[0m"

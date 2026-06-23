@@ -1,8 +1,9 @@
 package client
+
 import (
-	"time"
 	"context"
 	"testing"
+	"time"
 )
 
 func TestEntropyEndpoint(t *testing.T) {

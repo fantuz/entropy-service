@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 	//"io"
-	"github.com/fantuz/entropy-service/entropy-server/internal/qrng"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
 )
 
 type Reader interface {
@@ -141,7 +141,7 @@ func NewConnectionDRBG(d DRBG) (DRBG, error) {
 }
 
 // Reseed mixes new entropy into the DRBG
-//func (d DRBG) Reseed(seed []byte) error
+// func (d DRBG) Reseed(seed []byte) error
 func (d *DRBG) Reseed(seed []byte) error {
 	//d.Mu.Lock()
 	//defer d.Mu.Unlock()

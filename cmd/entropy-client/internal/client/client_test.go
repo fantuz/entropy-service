@@ -7,7 +7,7 @@ import (
 	"testing"
 	//"fmt"
 
-	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 )
 
 func TestFetchEntropyHTTP(t *testing.T) {

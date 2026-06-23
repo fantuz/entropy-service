@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fantuz/entropy-service/entropy-client/internal/stats"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/stats"
 )
 
 func TestEntropyHTTP(ctx context.Context, endpoint string) error {
@@ -44,4 +44,3 @@ func TestEntropyHTTP(ctx context.Context, endpoint string) error {
 
 	return err
 }
-

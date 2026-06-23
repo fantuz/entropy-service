@@ -51,7 +51,7 @@ func Monobit(data []byte) Result {
 	return Result{
 		Name:      "monobit",
 		Statistic: stat,
-		PValue: p,
-		Passed: p > 0.01,
+		PValue:    p,
+		Passed:    p > 0.01,
 	}
 }

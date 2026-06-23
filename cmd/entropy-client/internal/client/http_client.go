@@ -2,17 +2,17 @@ package client
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"os"
 	"encoding/json"
+	"fmt"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
+	"io"
 	"net"
-	"net/url"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
+	"os"
 	"time"
-	"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
-	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
 )
 
 func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
@@ -30,26 +30,26 @@ func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
 }
 
 func FetchEntropySimple(endpoint *string, quantity *int64) ([]byte, error) {
-    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-    defer cancel()
-    return FetchEntropy(ctx, *endpoint, *quantity)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	return FetchEntropy(ctx, *endpoint, *quantity)
 }
 
 // FetchEntropy requests `quantity` bytes from `endpoint` and returns the raw bytes.
 // The function takes a context so caller can cancel / set a deadline.
 func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte, error) {
 	/*
-	url := endpoint
-	if quantity > 0 && !containsBytesParam(endpoint) {
-		//fmt.Println("PRE-FETCH-ENTROPY", url)
-		sep := "?"
-		if hasQuery(endpoint) {
-			sep = "&"
+		url := endpoint
+		if quantity > 0 && !containsBytesParam(endpoint) {
+			//fmt.Println("PRE-FETCH-ENTROPY", url)
+			sep := "?"
+			if hasQuery(endpoint) {
+				sep = "&"
+			}
+			url = fmt.Sprintf("%s%sbytes=%d", endpoint, sep, quantity)
+			//fmt.Println("POST-FETCH-ENTROPY", url)
+			//time.Sleep(500 * time.Millisecond)
 		}
-		url = fmt.Sprintf("%s%sbytes=%d", endpoint, sep, quantity)
-		//fmt.Println("POST-FETCH-ENTROPY", url)
-		//time.Sleep(500 * time.Millisecond)
-	}
 	*/
 
 	var cookies []*http.Cookie
@@ -80,7 +80,7 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	// Create a client with a conservative timeout bound (per request).
 	// Caller can still use ctx to cancel earlier.
 	httpClient := &http.Client{
-		Jar: jar,
+		Jar:     jar,
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -130,17 +130,17 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 
 // small helpers to avoid clobbering the endpoint if caller gave "/entropy?bytes=..."
 func containsBytesParam(u string) bool {
-	return (len(u) >= 6 && (                   // trivial check for "bytes="
-		// quick substring search
-		// avoid importing strings for tiny helper; but using strings is ok — keep it simple:
-		func() bool {
-			for i := 0; i+6 <= len(u); i++ {
-				if u[i:i+6] == "bytes=" {
-					return true
-				}
+	return (len(u) >= 6 && ( // trivial check for "bytes="
+	// quick substring search
+	// avoid importing strings for tiny helper; but using strings is ok — keep it simple:
+	func() bool {
+		for i := 0; i+6 <= len(u); i++ {
+			if u[i:i+6] == "bytes=" {
+				return true
 			}
-			return false
-		}()))
+		}
+		return false
+	}()))
 }
 
 func hasQuery(u string) bool {
@@ -151,4 +151,3 @@ func hasQuery(u string) bool {
 	}
 	return false
 }
-

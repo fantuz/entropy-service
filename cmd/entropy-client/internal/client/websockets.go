@@ -1,12 +1,12 @@
 package client
 
 import (
-	"time"
 	"context"
+	"time"
 	//"strconv"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 	"github.com/gorilla/websocket"
-	"github.com/fantuz/entropy-service/entropy-client/internal/diag"
-	"github.com/fantuz/entropy-service/entropy-client/internal/metrics"
 )
 
 //var ClientRateMeter = diag.NewRateMeter()
@@ -44,7 +44,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 				return
 			default:
 			}
-			
+
 			//conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
 
 			_, msg, err := conn.ReadMessage()
@@ -66,7 +66,6 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 			case out <- msg:
 			case <-ctx.Done():
 				panic("critical end of ws context reached")
-				return
 			}
 		}
 	}()

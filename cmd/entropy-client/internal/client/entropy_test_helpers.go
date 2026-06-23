@@ -4,7 +4,7 @@ import (
 	//"context"
 	"fmt"
 
-	"github.com/fantuz/entropy-service/entropy-client/internal/stats"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/stats"
 )
 
 func reportStats(prefix string, r stats.StreamResult) {
@@ -19,4 +19,3 @@ func reportStats(prefix string, r stats.StreamResult) {
 		r.SerialR,
 	)
 }
-

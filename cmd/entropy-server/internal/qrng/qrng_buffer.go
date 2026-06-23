@@ -7,8 +7,8 @@ import (
 	"time"
 	//"sync"
 	//"sync/atomic"
-	"github.com/fantuz/entropy-service/entropy-server/internal/metrics"
-	//"github.com/fantuz/entropy-service/entropy-server/internal/drbg"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
+	//"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
 
 // QRNG represents hardware or networked QRNG. Supports fallback to default Linux CSPRNG

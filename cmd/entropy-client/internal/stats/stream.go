@@ -224,4 +224,3 @@ func chi2PValue(chi2 float64, df int) float64 {
 	z := (term - (1.0 - 2.0/(9.0*float64(df)))) / math.Sqrt(2.0/(9.0*float64(df)))
 	return 1 - normalCDF(z)
 }
-

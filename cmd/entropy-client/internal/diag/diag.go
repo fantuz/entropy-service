@@ -59,7 +59,7 @@ func RunDiagnostics(data []byte) Diagnostics {
 	//rate.Update(len(data))
 
 	return Diagnostics{
-		N:        n,
+		N: n,
 		//Update(len(data)),
 		Chi2:     chi2,
 		Chi2P:    chi2p,

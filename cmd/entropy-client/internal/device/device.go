@@ -2,7 +2,6 @@ package device
 
 import (
 	"os"
-
 	//"net/http"
 	//"io"
 )
