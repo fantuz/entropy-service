@@ -10,15 +10,13 @@ type TransitionMatrix struct {
 }
 
 func BuildTransitionMatrix(data []byte) TransitionMatrix {
-
 	var tm TransitionMatrix
 
 	if len(data) < 2 {
 		return tm
 	}
 
-	for i := 0; i < len(data)-1; i++ {
-
+	for i := range len(data) - 1 {
 		a := int(data[i]) / 4
 		b := int(data[i+1]) / 4
 
@@ -30,7 +28,6 @@ func BuildTransitionMatrix(data []byte) TransitionMatrix {
 }
 
 func (tm *TransitionMatrix) Probability(i, j int) float64 {
-
 	if tm.Total == 0 {
 		return 0
 	}
@@ -39,33 +36,30 @@ func (tm *TransitionMatrix) Probability(i, j int) float64 {
 }
 
 func (tm *TransitionMatrix) PrintHeatmap() {
+	peak := 0
 
-	max := 0
-
-	for i := 0; i < 64; i++ {
-		for j := 0; j < 64; j++ {
-			if tm.Matrix[i][j] > max {
-				max = tm.Matrix[i][j]
+	for i := range 64 {
+		for j := range 64 {
+			if tm.Matrix[i][j] > peak {
+				peak = tm.Matrix[i][j]
 			}
 		}
 	}
 
-	if max == 0 {
-		max = 1
+	if peak == 0 {
+		peak = 1
 	}
 
 	fmt.Println("\nTransition Matrix (64x64)")
 	fmt.Println("--------------------------")
 
-	for i := 0; i < 32; i++ {
-
+	for i := range 32 {
 		fmt.Print("                 ")
-		for j := 0; j < 64; j++ {
 
-			v := float64(tm.Matrix[i][j]) / float64(max)
+		for j := range 64 {
+			v := float64(tm.Matrix[i][j]) / float64(peak)
 
 			switch {
-
 			case v > 0.75:
 				fmt.Print("█")
 
@@ -84,6 +78,6 @@ func (tm *TransitionMatrix) PrintHeatmap() {
 		}
 
 		fmt.Println()
-		//fmt.Println("          ")
+		// fmt.Println("          ")
 	}
 }

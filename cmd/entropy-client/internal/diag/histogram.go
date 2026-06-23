@@ -3,7 +3,6 @@ package diag
 import "fmt"
 
 func Histogram64(buckets int, data []byte) [32]int {
-
 	var bins [32]int
 
 	for _, b := range data {
@@ -15,25 +14,23 @@ func Histogram64(buckets int, data []byte) [32]int {
 }
 
 func PrintHistogram64(buckets int, data []byte) {
-
 	bins := Histogram64(32, data)
 
-	max := 0
+	peak := 0
 	for _, v := range bins {
-		if v > max {
-			max = v
+		if v > peak {
+			peak = v
 		}
 	}
 
-	scale := float64(max) / 50.0
+	scale := float64(peak) / 50.0
 	if scale == 0 {
 		scale = 1
 	}
 
 	fmt.Println("\nByte distribution (32 bins)")
 
-	for i := 0; i < buckets; i++ {
-
+	for i := range buckets {
 		barLen := int(float64(bins[i]) / scale)
 
 		fmt.Printf("%02x-%02x | ",
@@ -41,7 +38,7 @@ func PrintHistogram64(buckets int, data []byte) {
 			i*4+3,
 		)
 
-		for j := 0; j < barLen; j++ {
+		for range barLen {
 			fmt.Print("█")
 		}
 

@@ -3,14 +3,13 @@ package stats
 import "math"
 
 func Serial(data []byte) Result {
-
 	if len(data) < 2 {
 		return Result{Name: "serial", Passed: false}
 	}
 
 	counts := make([]int, 256)
 
-	for i := 0; i < len(data)-1; i++ {
+	for i := range len(data) - 1 {
 		v := int(data[i])
 		counts[v]++
 	}
@@ -33,18 +32,17 @@ func Serial(data []byte) Result {
 	}
 }
 
-//r = covariance / variance
-
+// r = covariance / variance.
 func SerialCorrelation(data []byte) Result {
-
 	n := len(data)
 
-	var sum float64
-	var sumSq float64
-	var sumProd float64
+	var (
+		sum     float64
+		sumSq   float64
+		sumProd float64
+	)
 
-	for i := 0; i < n-1; i++ {
-
+	for i := range n - 1 {
 		x := float64(data[i])
 		y := float64(data[i+1])
 

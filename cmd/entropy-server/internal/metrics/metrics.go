@@ -5,69 +5,69 @@ import (
 )
 
 var (
-	rngBytesGenerated uint64
-	rngReseeds        uint64
-	rngBytesBuffered  uint64
-	rngBytesTestA     uint64
-	rngBytesTestB     uint64
-	httpRequests      uint64
-	wsPayloads        uint64
+	rngBytesGenerated atomic.Uint64
+	rngReseeds        atomic.Uint64
+	rngBytesBuffered  atomic.Uint64
+	rngBytesTestA     atomic.Uint64
+	rngBytesTestB     atomic.Uint64
+	httpRequests      atomic.Uint64
+	wsPayloads        atomic.Uint64
 )
 
 func AddBufferedBytes(n uint64) {
-	atomic.AddUint64(&rngBytesBuffered, n)
+	rngBytesBuffered.Add(n)
 }
 
 func AddReseeds(n int) {
-	atomic.AddUint64(&rngReseeds, uint64(n))
+	rngReseeds.Add(uint64(n))
 }
 
 func AddBytesGenerated(n int) {
-	atomic.AddUint64(&rngBytesGenerated, uint64(n))
+	rngBytesGenerated.Add(uint64(n))
 }
 
-func AddHttpRequests(n int) {
-	atomic.AddUint64(&httpRequests, uint64(n))
+func AddHTTPRequests(n int) {
+	httpRequests.Add(uint64(n))
 }
 
 func AddWSPayloads(n int) {
-	atomic.AddUint64(&wsPayloads, uint64(n))
+	wsPayloads.Add(uint64(n))
 }
 
 func AddTestA(n int) {
-	atomic.AddUint64(&rngBytesTestA, uint64(n))
+	rngBytesTestA.Add(uint64(n))
 }
 
 func AddTestB(n int) {
-	atomic.AddUint64(&rngBytesTestB, uint64(n))
+	rngBytesTestB.Add(uint64(n))
 }
 
 func BufferedBytes() uint64 {
-	return atomic.LoadUint64(&rngBytesBuffered)
+	return rngBytesBuffered.Load()
 }
 
 func Reseeds() uint64 {
-	return atomic.LoadUint64(&rngReseeds)
+	return rngReseeds.Load()
 }
 
 func BytesGenerated() uint64 {
-	return atomic.LoadUint64(&rngBytesGenerated)
+	return rngBytesGenerated.Load()
 }
 
-func NumHttpRequests() uint64 {
-	return atomic.LoadUint64(&httpRequests)
+func NumHTTPRequests() uint64 {
+	return httpRequests.Load()
 }
 
 func NumWSPayloads() uint64 {
-	return atomic.LoadUint64(&wsPayloads)
+	return wsPayloads.Load()
 }
 
 func TestA() uint64 {
-	return atomic.LoadUint64(&rngBytesTestA)
+	return rngBytesTestA.Load()
 }
 
 func TestB() uint64 {
-	return atomic.LoadUint64(&rngBytesTestB)
+	return rngBytesTestB.Load()
 }
 
 /*

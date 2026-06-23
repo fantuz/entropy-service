@@ -2,8 +2,7 @@ package diag
 
 import (
 	"fmt"
-	//"math"
-	//"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
+	"strings"
 )
 
 type Dashboard struct {
@@ -18,7 +17,6 @@ type Dashboard struct {
 }
 
 func NewDashboard(width int) *Dashboard {
-
 	return &Dashboard{
 		width: width,
 		rate:  NewRateMeter(),
@@ -26,7 +24,6 @@ func NewDashboard(width int) *Dashboard {
 }
 
 func push(series []float64, v float64, width int) []float64 {
-
 	if len(series) >= width {
 		series = series[1:]
 	}
@@ -35,32 +32,29 @@ func push(series []float64, v float64, width int) []float64 {
 }
 
 func (d *Dashboard) Add(r Diagnostics) {
-
 	d.entropy = push(d.entropy, r.Shannon, d.width)
 	d.chiP = push(d.chiP, r.Chi2P, d.width)
 	d.monoP = push(d.monoP, r.MonobitP, d.width)
 	d.serial = push(d.serial, r.SerialR, d.width)
 
 	d.rate.Update(r.N)
-	//d.rate.Update(int(math.Round(d.rate.RateMbps())))
-	//d.rate.Update(int(r.Rate))
-	//d.rate.Update(len(r.N))
+	// d.rate.Update(int(math.Round(d.rate.RateMbps())))
+	// d.rate.Update(int(r.Rate))
+	// d.rate.Update(len(r.N))
 }
 
-func spark(v float64, min float64, max float64) rune {
-
-	if v < min {
-		v = min
+func spark(v float64, lo float64, hi float64) rune {
+	if v < lo {
+		v = lo
 	}
 
-	if v > max {
-		v = max
+	if v > hi {
+		v = hi
 	}
 
-	n := int((v - min) / (max - min) * 7)
+	n := int((v - lo) / (hi - lo) * 7)
 
 	switch n {
-
 	case 0:
 		return '▁'
 	case 1:
@@ -80,19 +74,17 @@ func spark(v float64, min float64, max float64) rune {
 	}
 }
 
-func renderSeries(series []float64, min float64, max float64) string {
-
-	out := ""
+func renderSeries(series []float64, lo float64, hi float64) string {
+	var outSb82 strings.Builder
 
 	for _, v := range series {
-		out += string(spark(v, min, max))
+		outSb82.WriteRune(spark(v, lo, hi))
 	}
 
-	return out
+	return outSb82.String()
 }
 
 func (d *Dashboard) Render() {
-
 	total := ClientRateMeter.Total()
 	rate := ClientRateMeter.RateMbps() / 8
 
@@ -123,7 +115,7 @@ func (d *Dashboard) Render() {
 
 	fmt.Printf(
 		"Serial correlation   %s\n",
-		renderSeries(d.serial, -0.02, 0.02), //0.1
+		renderSeries(d.serial, -0.02, 0.02), // 0.1
 	)
 	fmt.Println("----------------------------")
 }

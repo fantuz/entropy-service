@@ -8,12 +8,12 @@ import (
 )
 
 type Config struct {
-	//ReseedMs         int
-	//ReseedSize       int
-	//MaxBytes         int
+	// ReseedMs         int
+	// ReseedSize       int
+	// MaxBytes         int
 	MaxWords    int
 	RefreshRate int
-	//BytesFingerprint int
+	// BytesFingerprint int
 	Refresh       time.Duration
 	HTTPUrl       string
 	WSUrl         string

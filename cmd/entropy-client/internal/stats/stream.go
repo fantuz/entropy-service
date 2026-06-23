@@ -5,7 +5,6 @@ import (
 	"io"
 	"math"
 	"math/bits"
-	//"time"
 )
 
 // StreamResult summarizes computed live metrics.
@@ -52,7 +51,7 @@ func (t *StreamTester) Add(b []byte) {
 	}
 
 	// Update histogram and bit counts
-	for i := 0; i < n; i++ {
+	for i := range n {
 		v := b[i]
 		t.Hist[v]++
 		t.BitOnes += uint64(bits.OnesCount8(v))
@@ -66,6 +65,7 @@ func (t *StreamTester) Add(b []byte) {
 			t.sumProd += float64(t.prev) * x
 			t.pairs++
 		}
+
 		t.prev = v
 		t.havePrev = true
 	}
@@ -78,16 +78,21 @@ func (t *StreamTester) computeShannon() float64 {
 	if t.Total == 0 {
 		return 0
 	}
+
 	total := float64(t.Total)
+
 	var H float64
-	for i := 0; i < 256; i++ {
+
+	for i := range 256 {
 		c := t.Hist[i]
 		if c == 0 {
 			continue
 		}
+
 		p := float64(c) / total
 		H -= p * math.Log2(p)
 	}
+
 	return H
 }
 
@@ -96,13 +101,15 @@ func (t *StreamTester) computeChi2() (chi2 float64, pval float64) {
 	if t.Total == 0 {
 		return 0, 1.0
 	}
+
 	expected := float64(t.Total) / 256.0
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		diff := float64(t.Hist[i]) - expected
 		chi2 += diff * diff / expected
 	}
 	// df = 255
 	p := chi2PValue(chi2, 256-1)
+
 	return chi2, p
 }
 
@@ -112,10 +119,12 @@ func (t *StreamTester) computeMonobit() float64 {
 	if totalBits == 0 {
 		return 1.0
 	}
+
 	ones := float64(t.BitOnes)
 	zeros := totalBits - ones
 	S := ones - zeros
 	p := erfc(math.Abs(S) / math.Sqrt(2*totalBits))
+
 	return p
 }
 
@@ -129,25 +138,30 @@ func (t *StreamTester) computeSerial() (r float64, pval float64) {
 	// Use sums we collected: sum = Σ x_i, sumSq = Σ x_i^2, sumProd = Σ x_i * x_{i+1}
 	// We compute r ≈ ( Σ x_i x_{i+1} - (Σ x_i)^2 / N ) / ( Σ x_i^2 - (Σ x_i)^2 / N )
 	total := float64(N)
-	//nPairs := float64(t.pairs)
+	// nPairs := float64(t.pairs)
 
 	numerator := t.sumProd - (t.sum*t.sum)/total
+
 	denominator := t.sumSq - (t.sum*t.sum)/total
 	if denominator == 0 {
 		return 0, 1.0
 	}
+
 	r = numerator / denominator
 	// fisher z-transform for p-value approximate:
 	if r >= 1.0 {
 		r = 0.999999
 	}
+
 	if r <= -1.0 {
 		r = -0.999999
 	}
+
 	zprime := 0.5 * math.Log((1+r)/(1-r))
 	sigma := 1.0 / math.Sqrt(total-3.0)
 	Z := zprime / sigma
 	pval = 2 * (1 - normalCDF(math.Abs(Z)))
+
 	return r, pval
 }
 
@@ -174,30 +188,38 @@ func (t *StreamTester) Result() StreamResult {
 func RunFromReader(ctx context.Context, r io.Reader, chunkSize int, callbackInterval uint64, cb func(StreamResult)) error {
 	buf := make([]byte, chunkSize)
 	tester := NewStreamTester()
-	var nextCallback uint64 = callbackInterval
+
+	nextCallback := callbackInterval
 	if nextCallback == 0 {
 		nextCallback = uint64(chunkSize) // default: every chunk
 	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
+
 		n, err := r.Read(buf)
 		if n > 0 {
 			tester.Add(buf[:n])
+
 			if tester.Total >= nextCallback {
 				cb(tester.Result())
+
 				nextCallback += callbackInterval
 			}
 		}
+
 		if err != nil {
 			if err == io.EOF {
 				// final callback
 				cb(tester.Result())
+
 				return nil
 			}
+
 			return err
 		}
 	}
@@ -209,18 +231,20 @@ func normalCDF(x float64) float64 {
 	return 0.5 * (1 + math.Erf(x/math.Sqrt2))
 }
 
-// complementary error function (Abramowitz & Stegun approximation)
+// complementary error function (Abramowitz & Stegun approximation).
 func erfc(x float64) float64 {
 	// using math.Erfc is available starting Go 1.10; use it if you prefer:
 	return math.Erfc(x)
 }
 
-// chi2 p-value approximate (Wilson–Hilferty)
+// chi2 p-value approximate (Wilson–Hilferty).
 func chi2PValue(chi2 float64, df int) float64 {
 	if df <= 0 {
 		return math.NaN()
 	}
+
 	term := math.Pow(chi2/float64(df), 1.0/3.0)
 	z := (term - (1.0 - 2.0/(9.0*float64(df)))) / math.Sqrt(2.0/(9.0*float64(df)))
+
 	return 1 - normalCDF(z)
 }

@@ -3,11 +3,10 @@ package diag
 import "time"
 
 type RateMeter struct {
-	start time.Time
-	//Bytes int
+	// Bytes int
 	Rate  float64
 	Meter int64
-	//rate *RateMeter
+	// rate *RateMeter
 	rate  float64
 	last  time.Time
 	bytes int

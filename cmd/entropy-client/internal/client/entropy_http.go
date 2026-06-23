@@ -10,8 +10,7 @@ import (
 )
 
 func TestEntropyHTTP(ctx context.Context, endpoint string) error {
-
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return err
 	}

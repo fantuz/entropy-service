@@ -11,11 +11,9 @@ import (
 )
 
 func TestStreamEntropyWS(t *testing.T) {
-
 	upgrader := websocket.Upgrader{}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -25,13 +23,13 @@ func TestStreamEntropyWS(t *testing.T) {
 
 		data := make([]byte, 512)
 
-		for i := 0; i < 5; i++ {
-			conn.WriteMessage(websocket.BinaryMessage, data)
+		for range 5 {
+			_ = conn.WriteMessage(websocket.BinaryMessage, data)
 		}
 	}))
 	defer srv.Close()
 
-	//wsURL := "ws://127.0.0.1:8080/stream?bytes=65536"
+	// wsURL := "ws://127.0.0.1:8080/stream?bytes=65536"
 	wsURL := "ws" + srv.URL[4:]
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
