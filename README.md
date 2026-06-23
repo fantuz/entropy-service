@@ -244,11 +244,13 @@ If you want fetch entropy using a dedicated GO-CLI client with multiple capabili
 cd entropy-client
 
 ### stream mode (Websockets)
-go run . -refresh '50ms' -mode stream -wsurl "ws://127.0.0.1:8080/stream?bytes=2057152&refresh=50" -url "http://127.0.0.1:8080/v1/data/random?bytes=2057152"
+go run . -refresh '50ms' -mode stream -slice 2097152 -wsurl ws://127.0.0.1:8080/stream -url http://127.0.0.1:8080/v1/data/random
 
 ### pull mode (HTTP)
-go run . -refresh '50ms' -mode pull -wsurl ws://127.0.0.1:8080/stream?bytes=2057152 -url http://127.0.0.1:8080/v1/data/random?bytes=2057152
+go run . -refresh '50ms' -mode pull -slice 2097152 -wsurl ws://127.0.0.1:8080/stream -url http://127.0.0.1:8080/v1/data/random
 ```
+
+> Important: pass **bare** endpoints to `-wsurl` and `-url` (no `?query` string). The client automatically appends `?bytes=<slice>&refresh=<refresh>` to both URLs. If you add your own query string, you get a malformed double-query URL (e.g. `.../stream?bytes=...&refresh=...?bytes=...&refresh=...`) and the stream silently produces no data. Control the request size with `-slice` and the rate with `-refresh` instead.
 
 ### Screenshots
 
