@@ -135,7 +135,7 @@ func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 	// Non-sensitive UI preferences. Secure is intentionally left unset so the
 	// cookie also works when the server is reached over plain HTTP (the
 	// default when -enable-https=false).
-	cookie := &http.Cookie{ //nolint:gosec // G124: prefs cookie is non-sensitive and must survive plain HTTP
+	cookie := &http.Cookie{
 		Name:     "entropy_prefs",
 		Value:    base64.StdEncoding.EncodeToString(data),
 		Path:     "/",
@@ -1087,7 +1087,7 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 		// Bound the request body before parsing to avoid memory exhaustion.
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<25) // 32 MB max
 
-		err := r.ParseMultipartForm(1 << 25) //nolint:gosec // G120: body already bounded by MaxBytesReader above
+		err := r.ParseMultipartForm(1 << 25) // 32 MB max
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 

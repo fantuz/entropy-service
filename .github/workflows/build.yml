@@ -39,7 +39,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           # renovate: depName=golangci/golangci-lint datasource=github-releases
-          version: v2.5.0
+          version: v2.12.2
           args: --timeout=3m0s
       - name: Build with Goreleaser
         uses: goreleaser/goreleaser-action@v6.2.1

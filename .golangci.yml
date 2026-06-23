@@ -11,6 +11,9 @@ linters:
     - maintidx
     - mnd
     - wsl
+    # Deprecated in golangci-lint v2.12 (replaced by gomodguard_v2); we use
+    # depguard for import bans, so leave gomodguard off to avoid the warning.
+    - gomodguard
     # durationcheck flags the pre-existing pattern of multiplying a
     # Duration-typed millisecond count by time.Millisecond (refresh intervals);
     # it is intentional and has no other findings in this tree.
@@ -48,6 +51,13 @@ linters:
         # All G115 findings are int->uint64 conversions of lengths/counts that
         # are provably non-negative (len(), byte counts); not real overflows.
         - G115
+        # G120: the only multipart handler bounds r.Body via MaxBytesReader
+        # before ParseMultipartForm, so parsing is already limited.
+        - G120
+        # G124: the prefs cookie holds non-sensitive UI settings and must work
+        # over plain HTTP (default when -enable-https=false); Secure is omitted
+        # deliberately while HttpOnly + SameSite=Lax are set.
+        - G124
     depguard:
       rules:
         main:
