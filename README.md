@@ -225,6 +225,53 @@ go build cmd/entropy-server/entropy-server.go
 go build cmd/entropy-client/entropy-client.go
 ```
 
+### Using the Makefile
+
+A `Makefile` wraps the common workflows so you don't have to remember the individual commands:
+
+```
+make build            # build both binaries into ./bin
+make build-server     # build only entropy-server
+make build-client     # build only entropy-client
+make test             # go test ./...
+make lint             # run golangci-lint
+make fmt              # run golangci-lint fmt (gofmt/gofumpt/goimports/gci)
+make release-snapshot # build a local snapshot release (archives + deb/rpm) into ./dist
+make clean            # remove ./bin and ./dist
+```
+
+The `lint`, `fmt` and `release-snapshot` targets need two extra dev tools:
+
+```
+# macOS (Homebrew)
+brew install golangci-lint goreleaser
+
+# Linux: see https://golangci-lint.run/ and https://goreleaser.com/install/
+```
+
+Continuous integration mirrors this: `.github/workflows/build.yml` runs the tests, linters and a snapshot build on every push/PR, while `.github/workflows/release.yml` runs GoReleaser to publish artifacts whenever a `vX.Y.Z` tag is pushed.
+
+## Install (packages)
+
+Tagged releases publish `.deb` and `.rpm` packages (built by GoReleaser) for `linux/amd64`, `linux/armv7` and `linux/arm64`. Grab the package matching your distro and architecture from the [Releases](https://github.com/fantuz/entropy-service/releases) page and install it:
+
+```
+# Debian / Ubuntu
+sudo dpkg -i entropy-service_*_linux_amd64.deb
+
+# RHEL / Fedora / openSUSE
+sudo rpm -i entropy-service_*_linux_amd64.rpm
+```
+
+The package installs both `entropy-server` and `entropy-client` into `/usr/bin` and registers a `entropy-server` systemd service (enabled and started automatically). By default the service starts on HTTP `:8080` with HTTPS disabled, using `/var/lib/entropy-service` as its working directory:
+
+```
+sudo systemctl status entropy-server
+sudo journalctl -u entropy-server -f
+```
+
+To enable TLS or change flags, edit `/usr/lib/systemd/system/entropy-server.service` (or a drop-in under `/etc/systemd/system/entropy-server.service.d/`), then `sudo systemctl daemon-reload && sudo systemctl restart entropy-server`.
+
 ## Run
 
 - **entropy-server**<br/>
@@ -378,7 +425,7 @@ The whole project is just a showcase and PoC built around the use of a rather ol
 - add GO build tags for PROD and for DEMO modes
 - define and implement GO tests
 - replace Diceware dependency with local dictionary, only used for /words endpoint
-- systemd implementation, allowing control of entropy-service startup, only after probing respective kernel module if existing (i.e. for Quantis PCI QNRG cards)
+- conditional systemd startup, probing the respective kernel module if existing (i.e. for Quantis PCI QRNG cards) before starting (a basic systemd unit is already shipped via the deb/rpm packages)
 - CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
 - ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
 - random sound generator

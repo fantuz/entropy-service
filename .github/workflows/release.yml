@@ -1,0 +1,27 @@
+---
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v5.3.0
+        with:
+          go-version-file: go.mod
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6.2.1
+        with:
+          version: v2.7.0
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

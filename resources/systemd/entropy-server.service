@@ -1,0 +1,20 @@
+[Unit]
+Description=Entropy Server
+After=network.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+WorkingDirectory=/var/lib/entropy-service
+# HTTPS is disabled by default so the service starts without pre-provisioned
+# certificates. To enable TLS, drop a cert/key into the working directory and
+# replace the line below with:
+#   ExecStart=/usr/bin/entropy-server -cert-file /var/lib/entropy-service/cert.pem -key-file /var/lib/entropy-service/key.pem
+ExecStart=/usr/bin/entropy-server -enable-https=false
+SyslogIdentifier=entropy-server
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
