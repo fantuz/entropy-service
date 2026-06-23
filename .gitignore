@@ -1,0 +1,33 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Build output
+/bin/
+/dist/
+
+# Editor / OS files
+.DS_Store
+*.swp
+
+# Claude
+.claude
+
+# Project binaries
+/entropy-server
+/entropy-client
+
+# Runtime-generated files
+cookies.json
