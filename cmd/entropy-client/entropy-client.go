@@ -79,13 +79,13 @@ func drawHistogram(hist *[256]int) {
 			barLen = hist[i] * 8 / peak
 		}
 
-		var barSb86 strings.Builder
+		var bar strings.Builder
 
 		for range barLen {
-			barSb86.WriteString("█")
+			bar.WriteString("█")
 		}
 
-		fmt.Printf("%02X %-10s\n", i, barSb86.String())
+		fmt.Printf("%02X %-10s\n", i, bar.String())
 	}
 }
 

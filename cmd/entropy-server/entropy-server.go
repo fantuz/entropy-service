@@ -777,17 +777,17 @@ func randomHandler(d *drbg.DRBG) http.HandlerFunc {
 }
 
 func join(words []string, sep string) string {
-	var resultSb768 strings.Builder
+	var result strings.Builder
 
 	for i, w := range words {
 		if i > 0 {
-			resultSb768.WriteString(sep)
+			result.WriteString(sep)
 		}
 
-		resultSb768.WriteString(w)
+		result.WriteString(w)
 	}
 
-	return resultSb768.String()
+	return result.String()
 }
 
 /*

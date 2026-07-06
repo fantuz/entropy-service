@@ -75,13 +75,13 @@ func spark(v float64, lo float64, hi float64) rune {
 }
 
 func renderSeries(series []float64, lo float64, hi float64) string {
-	var outSb82 strings.Builder
+	var out strings.Builder
 
 	for _, v := range series {
-		outSb82.WriteRune(spark(v, lo, hi))
+		out.WriteRune(spark(v, lo, hi))
 	}
 
-	return outSb82.String()
+	return out.String()
 }
 
 func (d *Dashboard) Render() {
