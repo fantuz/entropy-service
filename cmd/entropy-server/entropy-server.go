@@ -516,6 +516,11 @@ func fetchEntropySimple(n int, dev string, bufferlen int) ([]byte, error) {
 func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	log.Println("entropy fetch start")
 
+	// NOTE: previously this init was wrapped in `if &qrngBuffer != nil { ... }`.
+	// That guard was dead code: qrngBuffer is a package-level variable, so its
+	// address is never nil and the check was always true (staticcheck SA4022).
+	// The guard was removed; the init below runs unconditionally, exactly as it
+	// did before.
 	// init QRNG
 	log.Println("entropy fetch inside 1")
 	qrng.InitQRNGBuffer(dev, bufferlen)
@@ -1058,6 +1063,11 @@ func randomBytesHandler(d *drbg.DRBG, _ int) http.HandlerFunc {
 	}
 }
 
+// NOTE: the drbg.DRBG and fingerprint parameters are currently blanked (_)
+// because this handler's body does not use them yet. They were named before,
+// which the linter flagged as unused parameters. The signature is kept intact
+// (rather than dropping the params) so the /files call site and the
+// http.HandlerFunc shape stay unchanged for when they get wired in.
 func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
