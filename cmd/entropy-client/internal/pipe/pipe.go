@@ -9,3 +9,21 @@ func WriteStdout(data []byte) error {
 
 	return err
 }
+
+// Kept for reference (requires "io" and "net/http" imports):
+// func pipe(server string) error {
+// 	for {
+// 		resp, err := http.Get(server)
+// 		if err != nil {
+// 			return err
+// 		}
+//
+// 		_, err = io.Copy(os.Stdout, resp.Body)
+//
+// 		resp.Body.Close()
+//
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
+// }

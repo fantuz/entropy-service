@@ -35,6 +35,23 @@ func (l *tunedListener) Accept() (net.Conn, error) {
 }
 */
 
+// Kept for reference:
+// type tunedListener struct {
+// 	*net.TCPListener
+// }
+//
+// func (l *tunedListener) Accept() (net.Conn, error) {
+// 	c, err := l.TCPListener.AcceptTCP()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	c.SetNoDelay(true)
+// 	c.SetWriteBuffer(1 << 24)
+//
+// 	return c, nil
+// }
+
 func NewTunedListener(ctx context.Context, addr string, sndBuf int) (net.Listener, error) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {

@@ -131,6 +131,14 @@ func main() {
 	*/
 	cfg := config.ParseConfig()
 	// flag.Parse()
+	//
+	// if cfg.WriteOut {
+	// 	//panic("Write Out Device issue")
+	// }
+	//
+	// if cfg.ShowDebug {
+	// 	//panic("Debug forbidden ;)")
+	// }
 
 	if cfg.Slice < 1 || cfg.Slice > 33554432 {
 		panic(Red + "Slice of data fetched through websocket shall be between 1B and 32 MB" + Reset)

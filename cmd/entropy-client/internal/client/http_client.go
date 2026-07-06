@@ -16,6 +16,20 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
+// Original simple fetch helper, kept for reference:
+// func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
+// 	resp, err := http.Get(*endpoint)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	defer resp.Body.Close()
+//
+// 	data, err := io.ReadAll(resp.Body)
+//
+// 	return data, err
+// }
+
 func FetchEntropySimple(endpoint *string, quantity *int64) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -118,3 +132,28 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 
 	return data, nil
 }
+
+// small helpers to avoid clobbering the endpoint if caller gave "/entropy?bytes=..."
+// Kept for reference:
+// func containsBytesParam(u string) bool {
+// 	return (len(u) >= 6 && ( // trivial check for "bytes="
+// 	// quick substring search
+// 	// avoid importing strings for tiny helper; but using strings is ok — keep it simple:
+// 	func() bool {
+// 		for i := 0; i+6 <= len(u); i++ {
+// 			if u[i:i+6] == "bytes=" {
+// 				return true
+// 			}
+// 		}
+// 		return false
+// 	}()))
+// }
+//
+// func hasQuery(u string) bool {
+// 	for i := 0; i < len(u); i++ {
+// 		if u[i] == '?' {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }

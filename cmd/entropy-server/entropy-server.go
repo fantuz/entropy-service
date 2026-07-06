@@ -1466,6 +1466,31 @@ func deviceExists(path string) error {
 	return nil
 }
 
+// Kept for reference:
+// func validateDevice(path string) error {
+// 	info, err := os.Stat(path)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	mode := info.Mode()
+//
+// 	if mode&os.ModeDevice == 0 {
+// 		return fmt.Errorf("%s exists but is not a device file", path)
+// 	}
+//
+// 	return nil
+// }
+//
+// func testDeviceReadable(path string) error {
+// 	f, err := os.Open(path)
+// 	if err != nil {
+// 		return fmt.Errorf("cannot open device %s: %w", path, err)
+// 	}
+// 	defer f.Close()
+// 	return nil
+// }
+
 func validateEntropyDevice(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {

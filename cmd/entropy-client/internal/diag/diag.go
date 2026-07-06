@@ -23,7 +23,9 @@ type Diagnostics struct {
 
 var (
 	BytesFetched uint64
-	Timer        uint64
+	// httpCRequests uint64
+	// wsCRequests   uint64
+	Timer uint64
 )
 
 // RunDiagnostics computes a small battery of tests on the provided bytes.

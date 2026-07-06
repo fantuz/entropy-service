@@ -82,6 +82,9 @@ func ActiveInstances() int64 {
 }
 
 func (d *DRBG) SetEntropyBuffer(q qrng.QRNGBuffer) {
+	// d.Mu.Lock()
+	// defer d.Mu.Unlock()
+	// d.Mu = sync.Mutex{}
 	d.entropyBuf = q
 }
 
