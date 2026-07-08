@@ -35,26 +35,28 @@ func (l *tunedListener) Accept() (net.Conn, error) {
 }
 */
 
-type tunedListener struct {
-	*net.TCPListener
-}
+// Kept for reference:
+// type tunedListener struct {
+// 	*net.TCPListener
+// }
+//
+// func (l *tunedListener) Accept() (net.Conn, error) {
+// 	c, err := l.TCPListener.AcceptTCP()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	c.SetNoDelay(true)
+// 	c.SetWriteBuffer(1 << 24)
+//
+// 	return c, nil
+// }
 
-func (l *tunedListener) Accept() (net.Conn, error) {
-	c, err := l.TCPListener.AcceptTCP()
-	if err != nil {
-		return nil, err
-	}
-
-	c.SetNoDelay(true)
-	c.SetWriteBuffer(1 << 24)
-
-	return c, nil
-}
-
-func NewTunedListener(addr string, sndBuf int) (net.Listener, error) {
+func NewTunedListener(ctx context.Context, addr string, sndBuf int) (net.Listener, error) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			var ctrlErr error
+
 			err := c.Control(func(fd uintptr) {
 				// Disable Nagle (TCP_NODELAY)
 				ctrlErr = syscall.SetsockoptInt(
@@ -80,11 +82,12 @@ func NewTunedListener(addr string, sndBuf int) (net.Listener, error) {
 			if err != nil {
 				return err
 			}
+
 			return ctrlErr
 		},
 	}
 
-	return lc.Listen(context.Background(), "tcp", addr)
+	return lc.Listen(ctx, "tcp", addr)
 }
 
 /*

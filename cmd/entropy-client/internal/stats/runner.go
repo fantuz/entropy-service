@@ -7,5 +7,6 @@ func RunAll(data []byte) []Result {
 		ChiSquare(data),
 		Serial(data),
 	}
+
 	return results
 }

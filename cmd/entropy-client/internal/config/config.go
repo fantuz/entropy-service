@@ -8,27 +8,27 @@ import (
 )
 
 type Config struct {
-	//ReseedMs         int
-	//ReseedSize       int
-	//MaxBytes         int
-	MaxWords         int
-	RefreshRate      int
-	//BytesFingerprint int
-	Refresh          time.Duration
-	HTTPUrl          string
-	WSUrl            string
-	Mode             string
-	CertFile         string
-	KeyFile          string
-	LogLevel         string
-	WriteOut         bool
-	ShowDebug        bool
-	ShowPreview      bool
-	ShowGraph        bool
-	ShowMatrix       bool
-	ShowDashboard    bool
-	ShowHistogram    bool
-	Slice            int64
+	// ReseedMs         int
+	// ReseedSize       int
+	// MaxBytes         int
+	MaxWords    int
+	RefreshRate int
+	// BytesFingerprint int
+	Refresh       time.Duration
+	HTTPUrl       string
+	WSUrl         string
+	Mode          string
+	CertFile      string
+	KeyFile       string
+	LogLevel      string
+	WriteOut      bool
+	ShowDebug     bool
+	ShowPreview   bool
+	ShowGraph     bool
+	ShowMatrix    bool
+	ShowDashboard bool
+	ShowHistogram bool
+	Slice         int64
 }
 
 func ParseConfig() *Config {
@@ -51,8 +51,8 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.WSUrl, "wsurl", "ws://127.0.0.1:8080/stream", "WS entropy endpoint")
 
 	/*
-	flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of words presented by /words endpoint (maximum 20)")
-	fps := strconv.FormatInt(refresh.Milliseconds(), 10)
+		flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of words presented by /words endpoint (maximum 20)")
+		fps := strconv.FormatInt(refresh.Milliseconds(), 10)
 	*/
 
 	flag.Usage = func() {

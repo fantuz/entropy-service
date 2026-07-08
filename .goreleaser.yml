@@ -1,0 +1,121 @@
+version: 2
+project_name: entropy-service
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: entropy-server
+    main: ./cmd/entropy-server
+    binary: entropy-server
+    ldflags:
+      - -s -w
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - "7"
+
+  - id: entropy-client
+    main: ./cmd/entropy-client
+    binary: entropy-client
+    ldflags:
+      - -s -w
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - "7"
+
+archives:
+  - id: entropy-service-archive
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- with .Arm }}v{{ . }}{{ end }}
+      {{- with .Mips }}_{{ . }}{{ end }}
+      {{- if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}
+    ids:
+      - entropy-server
+      - entropy-client
+    files:
+      - LICENSE
+      - README.md
+
+nfpms:
+  - id: entropy-service
+    package_name: entropy-service
+    bindir: /usr/bin
+    vendor: https://github.com/fantuz/entropy-service
+    homepage: https://github.com/fantuz/entropy-service
+    license: MIT
+    maintainer: Massimiliano Fantuzzi <hb9gus@example.com>
+    section: misc
+    description: |-
+      Entropy service providing a quantum/CSPRNG-backed entropy server and client.
+      Ships the entropy-server (HTTP/WebSocket entropy source with DRBG support)
+      and the entropy-client (consumer with diagnostics and statistical tests).
+    formats:
+      - deb
+      - rpm
+    ids:
+      - entropy-server
+      - entropy-client
+    contents:
+      - src: ./resources/systemd/entropy-server.service
+        dst: /usr/lib/systemd/system/entropy-server.service
+        file_info:
+          owner: root
+          group: root
+          mode: 0644
+      - src: ./LICENSE
+        dst: /usr/share/doc/entropy-service/copyright
+        file_info:
+          owner: root
+          group: root
+          mode: 0644
+    scripts:
+      preinstall: resources/scripts/pre-install.sh
+      postinstall: resources/scripts/post-install.sh
+      preremove: resources/scripts/pre-remove.sh
+      postremove: resources/scripts/post-remove.sh
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+        - changelog-file-missing-in-native-package
+        - no-manual-page
+        # Probably won't be implemented: https://github.com/goreleaser/nfpm/issues/15#issuecomment-830816661
+        - maintainer-script-calls-systemctl
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^build(\(.+\))?:'
+      - '^chore(\(.+\))?:'
+      - '^cd(\(.+\))?:'
+      - '^ci(\(.+\))?:'
+      - '^cicd(\(.+\))?:'
+      - '^docker(\(.+\))?:'
+      - '^docs(\(.+\))?:'
+      - '^refactor(\(.+\))?:'
+      - '^test(\(.+\))?:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy

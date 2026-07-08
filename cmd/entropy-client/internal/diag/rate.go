@@ -3,19 +3,18 @@ package diag
 import "time"
 
 type RateMeter struct {
-	start time.Time
-	//Bytes int
+	// Bytes int
 	Rate  float64
 	Meter int64
-	//rate *RateMeter
-	rate float64
-	last time.Time
+	// rate *RateMeter
+	rate  float64
+	last  time.Time
 	bytes int
-	total     uint64
+	total uint64
 }
 
 func (r *RateMeter) Bytes() int {
-    return r.bytes
+	return r.bytes
 }
 
 func NewRateMeter() *RateMeter {
@@ -23,23 +22,23 @@ func NewRateMeter() *RateMeter {
 }
 
 func (r *RateMeter) Update(n int) {
-/*
-	//delta := r.Bytes - n
-	delta := r.Bytes - int(r.Meter)
+	/*
+		//delta := r.Bytes - n
+		delta := r.Bytes - int(r.Meter)
 
-	now := time.Now()
-	elapsed := now.Sub(r.start).Seconds()
+		now := time.Now()
+		elapsed := now.Sub(r.start).Seconds()
 
-	if elapsed < 1 {
-		return
-	}
+		if elapsed < 1 {
+			return
+		}
 
-	//r.Rate = float64(r.Bytes*8) / elapsed
-	r.Rate = float64(delta*8) / elapsed
-	r.Bytes += n
-	r.Meter = int64(r.Bytes -n)
-	r.start = now
-*/
+		//r.Rate = float64(r.Bytes*8) / elapsed
+		r.Rate = float64(delta*8) / elapsed
+		r.Bytes += n
+		r.Meter = int64(r.Bytes -n)
+		r.start = now
+	*/
 	now := time.Now()
 	elapsed := now.Sub(r.last).Seconds()
 

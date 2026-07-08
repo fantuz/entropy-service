@@ -1,0 +1,125 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - err113
+    - exhaustruct
+    - forbidigo
+    - funlen
+    - gochecknoglobals
+    - ireturn
+    - maintidx
+    - mnd
+    - wsl
+    # Deprecated in golangci-lint v2.12 (replaced by gomodguard_v2); we use
+    # depguard for import bans, so leave gomodguard off to avoid the warning.
+    - gomodguard
+    # durationcheck flags the pre-existing pattern of multiplying a
+    # Duration-typed millisecond count by time.Millisecond (refresh intervals);
+    # it is intentional and has no other findings in this tree.
+    - durationcheck
+    # Opinionated style linters intentionally left off: they would force
+    # pervasive churn without improving correctness.
+    - cyclop
+    - funcorder
+    - gocognit
+    - gocyclo
+    - godoclint
+    - nestif
+    - noinlineerr
+    - godot
+    - godox
+    - lll
+    - nlreturn
+    - nonamedreturns
+    - varnamelen
+    - wrapcheck
+    # Test-organization opinions: these tests share global mutable state
+    # (e.g. diag.ClientRateMeter), so t.Parallel() would be racy.
+    - paralleltest
+    - testpackage
+  enable:
+    - wsl_v5
+  settings:
+    gocritic:
+      disabled-checks:
+        # log.Fatal at startup intentionally skips deferred signal-context
+        # cleanup; restructuring main()'s fatal path adds no value.
+        - exitAfterDefer
+    gosec:
+      excludes:
+        # All G115 findings are int->uint64 conversions of lengths/counts that
+        # are provably non-negative (len(), byte counts); not real overflows.
+        - G115
+        # G120: the only multipart handler bounds r.Body via MaxBytesReader
+        # before ParseMultipartForm, so parsing is already limited.
+        - G120
+        # G124: the prefs cookie holds non-sensitive UI settings and must work
+        # over plain HTTP (default when -enable-https=false); Secure is omitted
+        # deliberately while HttpOnly + SameSite=Lax are set.
+        - G124
+    depguard:
+      rules:
+        main:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: io/ioutil
+              desc: 'replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil'
+    revive:
+      rules:
+        - name: var-naming
+          disabled: true
+    staticcheck:
+      checks:
+        - all
+        # Allow unit-suffixed names (e.g. RefreshRateMs, ReseedAgeMs); they map
+        # directly to CLI flags and JSON fields and renaming would be churn.
+        - -ST1011
+    tagliatelle:
+      case:
+        rules:
+          # The JSON API deliberately uses snake_case on the wire (e.g.
+          # rng_version, reseed_age_ms); do not flag it as camelCase.
+          json: snake
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - goconst
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+    goimports:
+      local-prefixes:
+        - github.com/fantuz/entropy-service
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

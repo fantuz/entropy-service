@@ -1,0 +1,10 @@
+{
+  // Long prose lines and URLs are fine in this README.
+  "MD013": false,
+  // Inline HTML (<img>, <br/>) is required for the GitHub screenshot layout.
+  "MD033": false,
+  // Many fenced blocks are ASCII diagrams or raw console output with no language.
+  "MD040": false,
+  // Hard tabs appear inside console-output code blocks; allow them there.
+  "MD010": { "code_blocks": false }
+}

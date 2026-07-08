@@ -5,7 +5,7 @@ import (
 	"math/bits"
 )
 
-//S = (#1 − #0)
+// S = (#1 − #0)
 
 /*
 func Monobit(data []byte) Result {
@@ -32,7 +32,6 @@ func Monobit(data []byte) Result {
 */
 
 func Monobit(data []byte) Result {
-
 	var ones int
 
 	for _, b := range data {
@@ -51,7 +50,7 @@ func Monobit(data []byte) Result {
 	return Result{
 		Name:      "monobit",
 		Statistic: stat,
-		PValue: p,
-		Passed: p > 0.01,
+		PValue:    p,
+		Passed:    p > 0.01,
 	}
 }

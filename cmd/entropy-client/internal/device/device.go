@@ -2,13 +2,9 @@ package device
 
 import (
 	"os"
-
-	//"net/http"
-	//"io"
 )
 
 func Write(path string, data []byte) error {
-
 	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
 		return err
@@ -16,6 +12,7 @@ func Write(path string, data []byte) error {
 	defer f.Close()
 
 	_, err = f.Write(data)
+
 	return err
 }
 

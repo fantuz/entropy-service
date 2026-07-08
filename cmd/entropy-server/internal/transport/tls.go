@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-// newTLSConfig builds a TLS 1.3–only config suitable for high-throughput APIs
+// newTLSConfig builds a TLS 1.3–only config suitable for high-throughput APIs.
 func NewTLSConfig(certFile, keyFile string) *tls.Config {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
@@ -17,7 +17,7 @@ func NewTLSConfig(certFile, keyFile string) *tls.Config {
 
 		// TLS 1.3 handles cipher selection internally
 		Certificates: []tls.Certificate{cert},
-		//ClientAuth: tls.VerifyClientCertIfGiven,
+		// ClientAuth: tls.VerifyClientCertIfGiven,
 		ClientAuth: tls.NoClientCert,
 
 		// Fast, modern curves
@@ -27,7 +27,7 @@ func NewTLSConfig(certFile, keyFile string) *tls.Config {
 		},
 
 		// remove below comment to enable HTTP/2
-		//NextProtos: []string{"h2", "http/1.1"},
+		// NextProtos: []string{"h2", "http/1.1"},
 
 		// Enable session resumption (important for API workloads)
 		SessionTicketsDisabled: true,

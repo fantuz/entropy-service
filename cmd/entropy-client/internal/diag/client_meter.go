@@ -1,9 +1,13 @@
 package diag
 
-// Global meter used by entropy client code
-var ClientRateMeter *RateMeter
-//var ClientRateMeter = NewRateMeter()
+// ClientRateMeter is the global meter used by entropy client code.
+var ClientRateMeter = NewRateMeter()
 
-func init() {
-    ClientRateMeter = NewRateMeter()
-}
+// Previous initialisation, kept for reference:
+// var ClientRateMeter *RateMeter
+//
+// //var ClientRateMeter = NewRateMeter()
+//
+// func init() {
+// 	ClientRateMeter = NewRateMeter()
+// }

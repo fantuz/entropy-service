@@ -17,6 +17,7 @@ func TestRunFromReader(t *testing.T) {
 	defer cancel()
 
 	called := 0
+
 	err := RunFromReader(ctx, bytes.NewReader(buf), 4096, 16*4096, func(r StreamResult) {
 		called++
 		// expect some entropy > 7.5 for crypto/rand
@@ -27,6 +28,7 @@ func TestRunFromReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run failed: %v", err)
 	}
+
 	if called == 0 {
 		t.Fatalf("callback not invoked")
 	}

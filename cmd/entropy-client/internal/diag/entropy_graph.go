@@ -8,7 +8,6 @@ type EntropyGraph struct {
 }
 
 func NewEntropyGraph(width int) *EntropyGraph {
-
 	return &EntropyGraph{
 		values: make([]float64, 0, width),
 		width:  width,
@@ -16,7 +15,6 @@ func NewEntropyGraph(width int) *EntropyGraph {
 }
 
 func (g *EntropyGraph) Add(v float64) {
-
 	if len(g.values) >= g.width {
 		g.values = g.values[1:]
 	}
@@ -25,19 +23,15 @@ func (g *EntropyGraph) Add(v float64) {
 }
 
 func (g *EntropyGraph) Render() {
-
-	//fmt.Print("\033[H\033[2J") // clear screen
-	//fmt.Print("\a")
-
+	// fmt.Print("\033[H\033[2J") // clear screen
+	// fmt.Print("\a")
 	fmt.Println("\nEntropy quality histogram")
 	fmt.Println("----------------")
 
 	for _, v := range g.values {
-
 		level := int((v / 8.0) * 8)
 
 		switch level {
-
 		case 0, 1:
 			fmt.Print("▁")
 
@@ -63,5 +57,6 @@ func (g *EntropyGraph) Render() {
 			fmt.Print("█")
 		}
 	}
+
 	fmt.Println()
 }

@@ -1,6 +1,6 @@
 package stats
 
-//import "math"
+// import "math"
 
 /*
 func ChiSquare(data []byte) Result {
@@ -31,7 +31,6 @@ func ChiSquare(data []byte) Result {
 }
 */
 
-
 // χ² = Σ (O - E)² / E
 
 /*
@@ -41,9 +40,8 @@ type Result struct {
 }
 */
 
-//func ChiSquare(data []byte)
+// func ChiSquare(data []byte).
 func ChiSquare(data []byte) Result {
-
 	var hist [256]int
 
 	for _, b := range data {
@@ -56,17 +54,16 @@ func ChiSquare(data []byte) Result {
 	var chi2 float64
 
 	for _, o := range hist {
-
 		diff := float64(o) - expected
 		chi2 += (diff * diff) / expected
 	}
 
 	pass := chi2 < 293.24 // approx threshold
 
-	return Result {
+	return Result{
 		Name:      "chi-square",
 		Statistic: chi2,
-		//PValue:    p,
+		// PValue:    p,
 		Passed: pass,
 	}
 }
