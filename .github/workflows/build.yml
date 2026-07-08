@@ -42,7 +42,7 @@ jobs:
           version: v2.12.2
           args: --timeout=3m0s
       - name: Build with Goreleaser
-        uses: goreleaser/goreleaser-action@v6.2.1
+        uses: goreleaser/goreleaser-action@v7.2.3
         with:
-          version: v2.7.0
+          version: v2.17.0
           args: release --snapshot --skip=publish --clean
