@@ -6,9 +6,15 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: read
+
 jobs:
   release:
     runs-on: ubuntu-24.04
+    # goreleaser needs write access to create the GitHub release and upload assets
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.0
