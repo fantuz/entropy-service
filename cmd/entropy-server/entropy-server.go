@@ -1068,6 +1068,11 @@ func randomBytesHandler(d *drbg.DRBG, _ int) http.HandlerFunc {
 // which the linter flagged as unused parameters. The signature is kept intact
 // (rather than dropping the params) so the /files call site and the
 // http.HandlerFunc shape stay unchanged for when they get wired in.
+// fileAnalyzeHandler is the WebSocket-based alternative to uploadHandler for the
+// /files route (see the commented-out mux registration in main). It is kept for
+// reference while the upload analysis path is finalized.
+//
+//nolint:unused // retained deliberately; wired via the commented-out /files route.
 func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
@@ -1130,7 +1135,7 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 
 				// frame := processBytes(bytes)
 				frame := EntropyDataFrame{
-					Hex:    hex.EncodeToString(buf[:]),
+					Hex:    hex.EncodeToString(buf),
 					Base64: b64,
 					Hash:   hex.EncodeToString(hash[:]),
 				}
@@ -1142,6 +1147,7 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 				if cnerr != nil {
 					return
 				}
+
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
 				// rng.DecreaseActiveInstances(-1)
