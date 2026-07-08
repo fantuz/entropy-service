@@ -1068,6 +1068,94 @@ func randomBytesHandler(d *drbg.DRBG, _ int) http.HandlerFunc {
 // which the linter flagged as unused parameters. The signature is kept intact
 // (rather than dropping the params) so the /files call site and the
 // http.HandlerFunc shape stay unchanged for when they get wired in.
+func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ticker := time.NewTicker(refresh * time.Millisecond)
+
+		metrics.AddHTTPRequests(1)
+
+		conn, cerr := upgrader.Upgrade(w, r, nil)
+		if cerr != nil {
+			log.Println("ws upgrade failed")
+
+			return
+		}
+
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+		defer conn.Close()
+		defer ticker.Stop()
+
+		if x := r.URL.Query().Get("refresh"); x != "" {
+			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<25 {
+				refresh = time.Duration(z)
+				// log.Printf("Nothing to see here: %d", refresh)
+			}
+		}
+
+		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		conn.SetPongHandler(func(string) error {
+			return conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		})
+		_ = conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			{
+				bytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "Failed to read bytes", http.StatusBadRequest)
+
+					return
+				}
+
+				// TODO: add upload limiter, i.e. 50MB
+				// r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
+
+				buf := make([]byte, len(bytes))
+				_, _ = d.Read(bytes)
+
+				// two options available here, raw encode or b64 encode
+				b64 := base64.StdEncoding.EncodeToString(buf)
+				// conv := hex.EncodeToString(buf)
+				hash := sha256.Sum256(buf)
+
+				// w.Header().Set("Content-Type", "application/octet-stream")
+				// w.Header().Set("X-Entropy-Metric", "random-data-websocket")
+				// w.Header().Set("X-RNG-Reseed-Age-ms-test",
+				//	strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+
+				// frame := processBytes(bytes)
+				frame := EntropyDataFrame{
+					Hex:    hex.EncodeToString(buf[:]),
+					Base64: b64,
+					Hash:   hex.EncodeToString(hash[:]),
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(frame)
+
+				cnerr := conn.WriteJSON(frame)
+				if cnerr != nil {
+					return
+				}
+				metrics.AddBytesGenerated(len(buf))
+				metrics.AddWSPayloads(1)
+				// rng.DecreaseActiveInstances(-1)
+				// continue
+				// log.Println("Nothing to see here")
+			}
+
+		default:
+			{
+			}
+		}
+	}
+}
+
 func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
