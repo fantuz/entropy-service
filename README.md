@@ -1,6 +1,6 @@
 # entropy-service
 
-[![Go report card](https://goreportcard.com/badge/github.com/fantuz/entropy-service)](https://goreportcard.com/report/github.com/fantuz/entropy-service)
+[![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go)](https://golangci-lint.run/)
 [![build](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml)
 ![Latest GitHub release](https://img.shields.io/github/release/fantuz/entropy-service.svg)
 [![GitHub license](https://img.shields.io/github/license/fantuz/entropy-service)](https://github.com/fantuz/entropy-service/blob/main/LICENSE)
