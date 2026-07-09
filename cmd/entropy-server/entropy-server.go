@@ -1966,7 +1966,6 @@ func main() {
 	)
 
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
-
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	} else {
@@ -1975,7 +1974,6 @@ func main() {
 
 	if cfg.EnableHTTPS {
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
-
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
 		} else {
