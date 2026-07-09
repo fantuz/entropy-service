@@ -930,6 +930,7 @@ func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie b
 	return func(w http.ResponseWriter, r *http.Request) {
 		// max 20 words
 		maxWords := quantity
+
 		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
@@ -1030,6 +1031,7 @@ func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// max 2MB
 		size := 2097152
+
 		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
