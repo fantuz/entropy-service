@@ -1953,6 +1953,10 @@ func main() {
 	// context was here
 	// ctx, cancel := context.WithCancel(context.Background())
 	// defer cancel()
+	// start HTTP & HTTPS servers on the same mux
+	// os.Getenv("TLS") == "1"
+
+	fmt.Printf("	9) start HTTP server(s)\n")
 
 	var (
 		httpSrv  *http.Server
@@ -1961,24 +1965,21 @@ func main() {
 		httpsErr error
 	)
 
-	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
 
 	if httpErr != nil {
 		log.Fatal(httpErr)
+	} else {
+		log.Println(Green+"HTTP server running on", cfg.HTTPAddr+Reset)
 	}
-
-	fmt.Printf("	9) start HTTP server(s)\n")
-	log.Println(Green+"HTTP server running on", cfg.HTTPAddr+Reset)
-
-	// if os.Getenv("TLS") == "1"
 
 	if cfg.EnableHTTPS {
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
-		log.Println(Green+"HTTPS server running on", cfg.HTTPSAddr+Reset)
 
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
+		} else {
+			log.Println(Green+"HTTPS server running on", cfg.HTTPSAddr+Reset)
 		}
 	}
 
