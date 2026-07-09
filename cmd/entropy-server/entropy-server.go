@@ -1964,7 +1964,7 @@ func main() {
 	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
 
-	if httpErr {
+	if httpErr != nil {
 		log.Fatal(httpErr)
 	}
 
