@@ -149,7 +149,7 @@ func main() {
 
 	refhttpurl := cfg.HTTPUrl + "?bytes=" + rbytes + "&refresh=" + fps
 	refwsurl := cfg.WSUrl + "?bytes=" + rbytes + "&refresh=" + fps
-	fpsdigit := 1000 / int(cfg.Refresh.Milliseconds())
+	fpsdigit := 1000 / float64(cfg.Refresh.Milliseconds())
 
 	var (
 		expectedbr = (float64(cfg.Slice) * float64(fpsdigit)) / 1024 / 1024
@@ -185,8 +185,9 @@ func main() {
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
-	fmt.Println("Framerate            : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh.Milliseconds())) + "ms)")
-	fmt.Println("Refresh (seconds)    :", cfg.Refresh)
+	// fmt.Println("Framerate            : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh.Milliseconds())) + "ms)")
+	fmt.Printf("Framerate            : %.2f FPS (1 frame every %dms)\n", float64(fpsdigit), int(cfg.Refresh.Milliseconds()))
+	fmt.Println("Refresh (ms)         :", cfg.Refresh)
 	fmt.Println("HTTP URL             : " + Cyan + refhttpurl + Reset)
 	fmt.Println("WS URL               : " + Cyan + refwsurl + Reset)
 	fmt.Println("----------------------------------------------")
@@ -437,7 +438,7 @@ func main() {
 					}
 
 					if opt > 0 {
-						time.Sleep(cfg.Refresh / 2) // * time.Millisecond)
+						time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
 					}
 				}
 			/*
@@ -548,7 +549,7 @@ func main() {
 				}
 
 				if opt > 0 {
-					time.Sleep(cfg.Refresh / 2) // * time.Millisecond)
+					time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
 				}
 
 			/*

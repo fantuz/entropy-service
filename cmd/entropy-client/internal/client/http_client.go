@@ -2,14 +2,14 @@ package client
 
 import (
 	"context"
-	"encoding/json"
+	// "encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
-	"net/url"
-	"os"
+	// "net/http/cookiejar"
+	// "net/url"
+	// "os"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
@@ -53,6 +53,8 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 			//time.Sleep(500 * time.Millisecond)
 		}
 	*/
+
+	/*
 	var cookies []*http.Cookie
 
 	// create instance
@@ -72,6 +74,7 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	if err == nil {
 		_ = os.WriteFile("cookies.json", object, 0o600)
 	}
+	*/
 
 	// parse
 	// parsedc := jar.Cookies(u)
@@ -84,7 +87,7 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	// Create a client with a conservative timeout bound (per request).
 	// Caller can still use ctx to cancel earlier.
 	httpClient := &http.Client{
-		Jar:     jar,
+		// Jar:     jar,
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,

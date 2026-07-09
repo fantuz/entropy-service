@@ -66,7 +66,7 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 	q := &QRNGBuffer{
 		Buf:       make([]byte, 0, capacity),
 		Capacity:  capacity,
-		fillDelay: 10 * time.Millisecond,
+		fillDelay: 5 * time.Millisecond,
 		devPath:   dev,
 		StopR:     make(chan struct{}),
 	}
@@ -75,8 +75,8 @@ func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
 	go q.fillLoop()
 
 	// metrics.AddBufferedBytes(uint64(m))
-	// metrics.AddBufferedBytes(uint64(q.capacity))
 	// incBuffer()
+	metrics.AddBufferedBytes(uint64(q.Capacity))
 
 	return q
 }
@@ -104,6 +104,7 @@ func (q *QRNGBuffer) Get(_ int) ([]byte, error) {
 	// out := q.Buf[:n]
 	select {
 	case out := <-q.CH:
+		// q.Buf = q.Buf[n:]
 		return out, nil
 	default:
 		// fallback or non-blocking path
@@ -112,6 +113,7 @@ func (q *QRNGBuffer) Get(_ int) ([]byte, error) {
 		return nil, nil
 	}
 	// q.Buf = q.Buf[n:]
+	// out := <-q.CH
 	// return out, nil
 }
 

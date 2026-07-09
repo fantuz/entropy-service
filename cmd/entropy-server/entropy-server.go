@@ -818,7 +818,7 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
-			log.Println("ws upgrade failed")
+			log.Println("ws upgrade failed (wsWordsHandler)")
 
 			return
 		}
@@ -1019,8 +1019,8 @@ body {
 
 func randomBytesHandler(d *drbg.DRBG, _ int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		prefs := extractPrefs(r)
-		_ = setPrefsCookie(w, prefs)
+		// prefs := extractPrefs(r)
+		// _ = setPrefsCookie(w, prefs)
 
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -1039,7 +1039,8 @@ func randomBytesHandler(d *drbg.DRBG, _ int) http.HandlerFunc {
 				size = v
 			}
 		} else {
-			size = prefs.Bytes
+			size = 65536
+			// size = prefs.Bytes
 		}
 
 		buf := make([]byte, size)
@@ -1081,7 +1082,7 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
-			log.Println("ws upgrade failed")
+			log.Println("ws upgrade failed (fileAnalyzeHandler)")
 
 			return
 		}
@@ -1135,6 +1136,7 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 
 				// frame := processBytes(bytes)
 				frame := EntropyDataFrame{
+					// Hex:    hex.EncodeToString(buf[:]),
 					Hex:    hex.EncodeToString(buf),
 					Base64: b64,
 					Hash:   hex.EncodeToString(hash[:]),
@@ -1170,8 +1172,8 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
-			log.Println("ws upgrade failed")
-
+			log.Println("ws upgrade failed (uploadHandler)")
+			log.Println(cerr)
 			return
 		}
 
@@ -1271,8 +1273,8 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
-			log.Println("ws upgrade failed")
-
+			log.Println("ws upgrade failed (wsBytesHandler)")
+			log.Println(cerr)
 			return
 		}
 
@@ -1340,7 +1342,7 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 				hash := sha256.Sum256(buf)
 
 				frame := EntropyDataFrame{
-					Hex:    hex.EncodeToString(buf[:n]), // [;n}
+					Hex:    hex.EncodeToString(buf[:n]),
 					Base64: base64,
 					Hash:   hex.EncodeToString(hash[:]),
 				}
@@ -1374,10 +1376,17 @@ func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.Han
 
 		metrics.AddHTTPRequests(1)
 
+		// ua := r.Header.Get("Connection")
+		// log.Println(ua)
+		// w.Header().Del("Connection")
+		// w.Header().Set("Connection", "Upgrade")
+		// w.Header().Set("Upgrade", "websocket")
+		// log.Println(ua)
+
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
-			log.Println("ws upgrade failed")
-
+			log.Println("ws upgrade failed (wsBinaryHandler)")
+			log.Println(cerr)
 			return
 		}
 
@@ -1570,31 +1579,6 @@ func deviceExists(path string) error {
 	return nil
 }
 
-// Kept for reference:
-// func validateDevice(path string) error {
-// 	info, err := os.Stat(path)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	mode := info.Mode()
-//
-// 	if mode&os.ModeDevice == 0 {
-// 		return fmt.Errorf("%s exists but is not a device file", path)
-// 	}
-//
-// 	return nil
-// }
-//
-// func testDeviceReadable(path string) error {
-// 	f, err := os.Open(path)
-// 	if err != nil {
-// 		return fmt.Errorf("cannot open device %s: %w", path, err)
-// 	}
-// 	defer f.Close()
-// 	return nil
-// }
-
 func validateEntropyDevice(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -1604,6 +1588,12 @@ func validateEntropyDevice(path string) error {
 	// if mode&os.ModeCharDevice == 0
 	if info.Mode()&os.ModeCharDevice == 0 {
 		return fmt.Errorf("%s is not a character device", path)
+	}
+
+	mode := info.Mode()
+
+	if mode&os.ModeDevice == 0 {
+		return fmt.Errorf("%s exists but is not a device file", path)
 	}
 
 	f, err := os.Open(path)
@@ -1689,6 +1679,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master dr
 		<-ctx.Done()
 
 		shutdownCtx, cancel := context.WithTimeout(
+			// context.Background(),
 			context.WithoutCancel(ctx),
 			5*time.Second,
 		)
@@ -1719,7 +1710,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		Handler:      handler,
 		TLSConfig:    tlsConfig,
 		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			childDRBG, cerr := drbg.NewConnectionDRBG(master) // (DRBG)
+			childDRBG, cerr := drbg.NewConnectionDRBG(master)
 			if cerr != nil {
 				return ctx
 			}
@@ -1751,6 +1742,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		<-ctx.Done()
 
 		shutdownCtx, cancel := context.WithTimeout(
+			// context.Background(),
 			context.WithoutCancel(ctx),
 			5*time.Second,
 		)
@@ -1777,8 +1769,9 @@ func main() {
 		panic("reseed-ms must be between 1 and 10000 ms")
 	}
 
-	if cfg.MaxBytes > 33554432 {
-		panic(Red + "max-bytes should be < 33554432 (32 MB)" + Reset)
+	//if cfg.MaxBytes > 33554432
+	if cfg.MaxBytes > (1 << 25) {
+		panic(Red + "max-bytes should be <= 33554432 (32 MB)" + Reset)
 	}
 
 	if cfg.QRNGBuffer < 1 || cfg.QRNGBuffer > 4096 {
@@ -1879,6 +1872,7 @@ func main() {
 
 	// Attach the QRNG buffer for dynamic header reporting
 	fmt.Println("	7) attach the QRNG buffer to DRBG")
+
 	// Attach it to DRBG
 	backup.SetEntropyBuffer(*qrngBuf)
 
@@ -1920,14 +1914,13 @@ func main() {
 
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
-	mux.HandleFunc("/health-1", healthHandler(&backup))
+	mux.HandleFunc("/health-1", healthHandler(&master))
 	mux.HandleFunc("/health-2", healthHandler(&backup))
 
 	mux.Handle("/metrics-1", metricsHandler(&master))
 	mux.Handle("/metrics-2", metricsHandler(&backup))
 
 	mux.HandleFunc("/stream", wsBinaryHandler(&master, cfg.RefreshColorMs, 2048))
-
 	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs))
 	mux.HandleFunc("/files", uploadHandler(&backup, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
@@ -1965,19 +1958,16 @@ func main() {
 		log.Fatal(httpErr)
 	}
 
-	// if os.Getenv("TLS") == "1"
-	if cfg.EnableHTTPS {
-		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
-		if httpsErr != nil {
-			log.Fatal(httpsErr)
-		}
-	}
-
 	fmt.Printf("	9) start HTTP server(s)\n")
 	log.Println(Green+"HTTP server running on", cfg.HTTPAddr+Reset)
 
+	// if os.Getenv("TLS") == "1"
 	if cfg.EnableHTTPS {
+		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
 		log.Println(Green+"HTTPS server running on", cfg.HTTPSAddr+Reset)
+		if httpsErr != nil {
+			log.Fatal(httpsErr)
+		}
 	}
 
 	if cfg.ShowDebug {

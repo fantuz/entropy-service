@@ -126,10 +126,10 @@ func NewDRBG(seed []byte) (DRBG, error) {
 	}, nil
 }
 
-// DRBG per-connection seed.
+// DRBG per-connection seed
 func NewConnectionDRBG(d DRBG) (DRBG, error) {
 	// seed, err := d.Derive(32) // 256-bit seed
-	seed, _ := d.Derive(32) // 256-bit seed
+	seed, _ := d.Derive(64) // 512-bit seed
 
 	/*
 		if err != nil {
@@ -144,7 +144,6 @@ func NewConnectionDRBG(d DRBG) (DRBG, error) {
 }
 
 // Reseed mixes new entropy into the DRBG
-// func (d DRBG) Reseed(seed []byte) error.
 func (d *DRBG) Reseed(seed []byte) error {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
@@ -314,6 +313,7 @@ func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	}
 
 	return seed, nil
+	// return payload, nil
 }
 
 /*
