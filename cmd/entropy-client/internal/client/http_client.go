@@ -3,12 +3,13 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 	"io"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
 // "encoding/json"

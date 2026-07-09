@@ -1027,7 +1027,6 @@ func randomBytesHandler(d *drbg.DRBG, _ int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// prefs := extractPrefs(r)
 		// _ = setPrefsCookie(w, prefs)
-
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
@@ -1965,7 +1964,7 @@ func main() {
 	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
 
-	if httpErr != nil {
+	if httpErr {
 		log.Fatal(httpErr)
 	}
 
