@@ -126,6 +126,7 @@ func ActiveInstances() int64 {
 }
 */
 
+/*
 func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 	data, err := json.Marshal(prefs)
 	if err != nil {
@@ -148,6 +149,7 @@ func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 
 	return nil
 }
+*/
 
 func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
 	c, err := r.Cookie("entropy_prefs")
@@ -1174,6 +1176,7 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 		if cerr != nil {
 			log.Println("ws upgrade failed (uploadHandler)")
 			log.Println(cerr)
+
 			return
 		}
 
@@ -1275,6 +1278,7 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 		if cerr != nil {
 			log.Println("ws upgrade failed (wsBytesHandler)")
 			log.Println(cerr)
+
 			return
 		}
 
@@ -1387,6 +1391,7 @@ func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.Han
 		if cerr != nil {
 			log.Println("ws upgrade failed (wsBinaryHandler)")
 			log.Println(cerr)
+
 			return
 		}
 
@@ -1954,6 +1959,7 @@ func main() {
 
 	// start HTTP & HTTPS servers on the same mux
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
+
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	}

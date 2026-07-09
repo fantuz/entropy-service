@@ -2,20 +2,21 @@ package client
 
 import (
 	"context"
-	// "encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	// "net/http/cookiejar"
-	// "net/url"
-	// "os"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
+// "encoding/json"
+// "net/http/cookiejar"
+// "net/url"
+// "os"
+	
 // Original simple fetch helper, kept for reference:
 // func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
 // 	resp, err := http.Get(*endpoint)
@@ -54,29 +55,26 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 		}
 	*/
 
-	/*
-	var cookies []*http.Cookie
+	// var cookies []*http.Cookie
 
 	// create instance
-	jar, _ := cookiejar.New(nil)
+	// jar, _ := cookiejar.New(nil)
 
 	// read on startup
-	file, _ := os.ReadFile("cookies.json")
+	// file, _ := os.ReadFile("cookies.json")
 
 	// parse
-	_ = json.Unmarshal(file, &cookies)
+	// _ = json.Unmarshal(file, &cookies)
 
-	u, _ := url.Parse(endpoint)
-	jar.SetCookies(u, cookies)
+	// u, _ := url.Parse(endpoint)
+	// jar.SetCookies(u, cookies)
 
 	// store
-	object, err := json.Marshal(cookies)
-	if err == nil {
-		_ = os.WriteFile("cookies.json", object, 0o600)
-	}
-	*/
+	// object, err := json.Marshal(cookies)
+	// if err == nil {
+	// 	_ = os.WriteFile("cookies.json", object, 0o600)
+	// }
 
-	// parse
 	// parsedc := jar.Cookies(u)
 	// fmt.Printf(" --> %q\n", jar)
 	// fmt.Printf(" --> %q\n", parsedc)
