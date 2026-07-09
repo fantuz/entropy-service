@@ -931,6 +931,10 @@ func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie b
 		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
+			maxWords := prefs.Words
+		} else {
+			// max 20 words
+			maxWords := quantity
 		}
 
 		words := diceware.GetWords()
@@ -961,8 +965,6 @@ func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie b
 
 		zero := big.NewInt(0)
 		counter := 0
-		maxWords := quantity
-		// maxWords := 50
 
 		for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
 			mod := new(big.Int)
@@ -1049,8 +1051,8 @@ func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
 				size = v
 			}
 		} else {
-			size = 65536
-			// size = prefs.Bytes
+			// size = 65536
+			size = prefs.Bytes
 		}
 
 		buf := make([]byte, size)
