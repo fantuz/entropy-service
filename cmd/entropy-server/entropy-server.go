@@ -928,13 +928,12 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 
 func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// max 20 words
+		maxWords := quantity
 		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
-			maxWords := prefs.Words
-		} else {
-			// max 20 words
-			maxWords := quantity
+			maxWords = prefs.Words
 		}
 
 		words := diceware.GetWords()
@@ -1029,9 +1028,12 @@ body {
 
 func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// max 2MB
+		size := 2097152
 		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
+			size = prefs.Bytes
 		}
 
 		d.WriteHeaders(w)
@@ -1044,15 +1046,10 @@ func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
 		child, _ := drbg.NewDRBG(seed)
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
-		size := 2097152
-
 		if q := r.URL.Query().Get("bytes"); q != "" {
 			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
 				size = v
 			}
-		} else {
-			// size = 65536
-			size = prefs.Bytes
 		}
 
 		buf := make([]byte, size)
