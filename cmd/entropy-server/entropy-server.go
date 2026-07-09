@@ -520,7 +520,7 @@ func fetchEntropySimple(n int, dev string, bufferlen int) ([]byte, error) {
 
 // fetchEntropy reads n bytes from the buffered QRNG.
 func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
-	//log.Println("entropy fetch start")
+	// log.Println("entropy fetch start")
 
 	// NOTE: previously this init was wrapped in `if &qrngBuffer != nil { ... }`.
 	// That guard was dead code: qrngBuffer is a package-level variable, so its
@@ -528,7 +528,6 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	// The guard was removed; the init below runs unconditionally, exactly as it
 	// did before.
 	// init QRNG
-
 	qrng.InitQRNGBuffer(dev, bufferlen)
 
 	// TODO: fix here
