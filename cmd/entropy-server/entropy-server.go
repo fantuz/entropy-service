@@ -928,12 +928,11 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 
 func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		if hasCookie == true {
+		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
 		}
-		
+
 		words := diceware.GetWords()
 		randomWords := diceware.GetRandomWords()
 		// wordsMap := diceware.GetWordsMap()
@@ -1028,12 +1027,11 @@ body {
 
 func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		if hasCookie == true {
+		if hasCookie {
 			prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
 		}
-		
+
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
