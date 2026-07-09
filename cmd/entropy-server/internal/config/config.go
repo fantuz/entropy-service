@@ -27,6 +27,7 @@ type Config struct {
 	EnableHTTPS      bool
 	RequireDevice    bool
 	ShowDebug        bool
+	WantsCookie      bool
 }
 
 func ParseConfig() *Config {
@@ -40,7 +41,7 @@ func ParseConfig() *Config {
 	flag.DurationVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default refresh rate (in ms) for data presented over websockets (default: 5 sec)")
 	flag.DurationVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default refresh rate (in ms) for colors-only websocket /colors.html (default: 1.5 sec")
 	flag.IntVar(&cfg.RefreshRate, "refresh", 5, "Default refresh rate (in seconds) of words presented by /v1/words/random endpoint")
-	flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of words presented by /words endpoint (maximum 20)")
+	flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (maximum 20)")
 	flag.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Reseed interval (ms)")
 	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
 	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
@@ -50,6 +51,7 @@ func ParseConfig() *Config {
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
 	flag.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
+	flag.BoolVar(&cfg.WantsCookie, "cookie", false, "store and use HTTP cookies")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Entropy Server\n\n")
