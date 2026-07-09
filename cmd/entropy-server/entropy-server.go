@@ -151,6 +151,7 @@ func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 }
 */
 
+/*
 func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
 	c, err := r.Cookie("entropy_prefs")
 	if err != nil {
@@ -169,7 +170,9 @@ func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
 
 	return &prefs, nil
 }
+*/
 
+/*
 func extractPrefs(r *http.Request) ClientPrefs {
 	q := r.URL.Query()
 
@@ -203,6 +206,7 @@ func extractPrefs(r *http.Request) ClientPrefs {
 	// log.Printf("Cookie Words: %v\n", prefs.Words)
 	return prefs
 }
+*/
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
@@ -1774,7 +1778,8 @@ func main() {
 		panic("reseed-ms must be between 1 and 10000 ms")
 	}
 
-	//if cfg.MaxBytes > 33554432
+	// if cfg.MaxBytes > 33554432
+	
 	if cfg.MaxBytes > (1 << 25) {
 		panic(Red + "max-bytes should be <= 33554432 (32 MB)" + Reset)
 	}
@@ -1968,6 +1973,7 @@ func main() {
 	log.Println(Green+"HTTP server running on", cfg.HTTPAddr+Reset)
 
 	// if os.Getenv("TLS") == "1"
+
 	if cfg.EnableHTTPS {
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
 		log.Println(Green+"HTTPS server running on", cfg.HTTPSAddr+Reset)

@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"time"
-
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
