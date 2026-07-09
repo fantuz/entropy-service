@@ -180,6 +180,7 @@ func main() {
 
 	timeoutcancel()
 
+	fmt.Println()
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
 	fmt.Println("*--------------------------------------------*")

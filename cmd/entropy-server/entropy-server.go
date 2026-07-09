@@ -520,7 +520,7 @@ func fetchEntropySimple(n int, dev string, bufferlen int) ([]byte, error) {
 
 // fetchEntropy reads n bytes from the buffered QRNG.
 func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
-	log.Println("entropy fetch start")
+	//log.Println("entropy fetch start")
 
 	// NOTE: previously this init was wrapped in `if &qrngBuffer != nil { ... }`.
 	// That guard was dead code: qrngBuffer is a package-level variable, so its
@@ -528,9 +528,8 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	// The guard was removed; the init below runs unconditionally, exactly as it
 	// did before.
 	// init QRNG
-	log.Println("entropy fetch inside 1")
+
 	qrng.InitQRNGBuffer(dev, bufferlen)
-	log.Println("entropy fetch inside 2")
 
 	// TODO: fix here
 	// metrics.AddBufferedBytes(uint64(q.capacity))
@@ -862,8 +861,8 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 		}()
 
 		for {
-			randomWords := diceware.GetRandomWords()
 			// base := big.NewInt(int64(len(randomWords)))
+			randomWords := diceware.GetRandomWords()
 
 			if len(randomWords) == 0 {
 				http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
@@ -871,7 +870,8 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 				return
 			}
 
-			randomBytes := make([]byte, 32) // Generate 256 bits entropy (32 * 8)
+			// Generate 256 bits entropy (32 * 8)
+			randomBytes := make([]byte, 32)
 
 			_, err := rand.Read(randomBytes)
 			if err != nil {
@@ -880,7 +880,9 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 				return
 			}
 
-			hash := sha256.Sum256(randomBytes) // Optional scramble layer (sha256 calculator)
+			// Optional scramble layer (sha256 calculator)
+			hash := sha256.Sum256(randomBytes)
+
 			n := new(big.Int).SetBytes(hash[:])
 
 			// Extract words
@@ -930,7 +932,7 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 	}
 }
 
-func entropyWordHandler(_ *drbg.DRBG, quantity int, refreshRate int) http.HandlerFunc {
+func entropyWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		words := diceware.GetWords()
 		randomWords := diceware.GetRandomWords()
@@ -1852,7 +1854,6 @@ func main() {
 
 	g := make([]byte, 65536)
 	entropy, _ := qrngdev.Read(g)
-	// qrngdev.Read(g)
 
 	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file)")
 
@@ -1870,25 +1871,27 @@ func main() {
 	// Initialize DRBG instance and pass entropy along. Note that multiple instances of DRBG are created on a per-connection basis
 	fmt.Println("	5) write the entropy out to DRBG buffer")
 
-	backup, derr := drbg.NewDRBG(entropyPool.buf)
-	if derr != nil {
-		log.Fatal(derr)
+	master, merr := drbg.NewDRBG(g)
+	if merr != nil {
+		log.Fatal(merr)
 	}
 
-	fmt.Println("	6) set DRBG metadata (optional)")
+	backup, berr := drbg.NewDRBG(entropyPool.buf)
+	if berr != nil {
+		log.Fatal(berr)
+	}
+
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI"
+	fmt.Println("	6) set DRBG metadata (optional)")
+	master.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
 	backup.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
 	fmt.Println("	7) attach the QRNG buffer to DRBG")
 
 	// Attach it to DRBG
-	backup.SetEntropyBuffer(*qrngBuf)
-
-	master, _ := drbg.NewDRBG(g)
-	master.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
-	// Attach it to DRBG
 	master.SetEntropyBuffer(*qrngBuf)
+	backup.SetEntropyBuffer(*qrngBuf)
 
 	fmt.Println("	8) start network listener(s)")
 	// tln := newTunedListener(ln)
@@ -1929,7 +1932,7 @@ func main() {
 	mux.Handle("/metrics-1", metricsHandler(&master))
 	mux.Handle("/metrics-2", metricsHandler(&backup))
 
-	mux.HandleFunc("/stream", wsBinaryHandler(&master, cfg.RefreshColorMs, 2048))
+	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048))
 	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs))
 	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs))
 	mux.HandleFunc("/files", uploadHandler(&backup, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
@@ -1937,15 +1940,14 @@ func main() {
 
 	mux.HandleFunc("/words", wsWordsHandler(cfg.MaxWords, cfg.RefreshColorMs))
 
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(&master, cfg.MaxBytes))
+	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes))
 	mux.HandleFunc("/v1/data/test", randomHandler(&backup))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(&backup))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(&backup))
-	mux.HandleFunc("/v1/meta/random", entropyWordHandler(&backup, cfg.MaxWords, cfg.RefreshRate))
-	mux.HandleFunc("/paroleparoleparole", entropyWordHandler(&backup, cfg.MaxWords, cfg.RefreshRate))
+	mux.HandleFunc("/v1/meta/random", entropyWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate))
+	mux.HandleFunc("/v1/qr/random", qrHandler(&backup))
 
-	// placeholder for QR-codes generation
-	mux.HandleFunc("/v1/qr/random", qrHandler(&master))
+	mux.HandleFunc("/paroleparoleparole", entropyWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate))
 
 	// placeholder for public/private key generation
 	// mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
@@ -2004,23 +2006,17 @@ func main() {
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
 	// time.Sleep(time.Duration(cfg.ReseedMs*2))
 
-	// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
-
 	go func() {
 		ticker := time.NewTicker(time.Duration(cfg.ReseedMs) * time.Millisecond)
 		// ticker := time.NewTicker(time.Duration(cfg.ReseedMs))
 		for range ticker.C {
 			// entropy := entropyPool.Read(65536)
 			go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
-			// go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
+			go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
 			// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
-			// go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
-			// go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.SeedBuffer, cfg.SeedBuffer)
+			// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.SeedBuffer, cfg.SeedBuffer)
 		}
 	}()
-
-	// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
-	// go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
 
 	log.Println(Gray + "Entropy Server startup sequence completed successfully\n" + Reset)
 
