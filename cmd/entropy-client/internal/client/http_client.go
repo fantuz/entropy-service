@@ -3,19 +3,19 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 	"io"
 	"net"
 	"net/http"
 	"time"
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
 // "encoding/json"
 // "net/http/cookiejar"
 // "net/url"
 // "os"
-	
+
 // Original simple fetch helper, kept for reference:
 // func fetchEntropy(endpoint *string, quantity *int) ([]byte, error) {
 // 	resp, err := http.Get(*endpoint)

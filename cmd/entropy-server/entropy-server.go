@@ -1779,7 +1779,7 @@ func main() {
 	}
 
 	// if cfg.MaxBytes > 33554432
-	
+
 	if cfg.MaxBytes > (1 << 25) {
 		panic(Red + "max-bytes should be <= 33554432 (32 MB)" + Reset)
 	}
@@ -1977,6 +1977,7 @@ func main() {
 	if cfg.EnableHTTPS {
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
 		log.Println(Green+"HTTPS server running on", cfg.HTTPSAddr+Reset)
+
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
 		}
