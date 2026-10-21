@@ -17,7 +17,7 @@ import (
 	"io"
 	"log"
 	"math/big"
-	"net"
+	// "net"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -1939,21 +1939,23 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *d
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		Handler:      handler,
-		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			// seed, _ := master.Derive(32)
-			// nonce, _ := master.Derive(12)
-			// derive per-connection DRBG from master
-			// childDRBG, _ := qrng.NewDRBG(seed)
-			childDRBG, childerr := drbg.NewConnectionDRBG(master) // (DRBG)
-			if childerr != nil {
-				return ctx
-			}
-			// rng.DecreaseActiveInstances(-1)
+		/*
+			ConnContext: func(cctx context.Context, c net.Conn) context.Context {
+				// seed, _ := master.Derive(32)
+				// nonce, _ := master.Derive(12)
+				// derive per-connection DRBG from master
+				// childDRBG, _ := qrng.NewDRBG(seed)
+				childDRBG, childerr := drbg.NewConnectionDRBG(master) // (DRBG)
+				if childerr != nil {
+					return ctx
+				}
+				// rng.DecreaseActiveInstances(-1)
 
-			// attach to context for handlers
-			// return context.WithValue(cctx, connDRBGKey, childDRBG)
-			return context.WithValue(cctx, connDRBGKey, &childDRBG)
-		},
+				// attach to context for handlers
+				// return context.WithValue(cctx, connDRBGKey, childDRBG)
+				return context.WithValue(cctx, connDRBGKey, &childDRBG)
+			},
+		*/
 	}
 
 	// Serve loop
@@ -2000,15 +2002,17 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		IdleTimeout:  60 * time.Second,
 		Handler:      handler,
 		TLSConfig:    tlsConfig,
-		ConnContext: func(cctx context.Context, c net.Conn) context.Context {
-			childDRBG, cerr := drbg.NewConnectionDRBG(master)
-			if cerr != nil {
-				return ctx
-			}
-			// attach to context for handlers
-			// return context.WithValue(cctx, connDRBGKey, childDRBG)
-			return context.WithValue(cctx, connDRBGKey, &childDRBG)
-		},
+		/*
+			ConnContext: func(cctx context.Context, c net.Conn) context.Context {
+				childDRBG, cerr := drbg.NewConnectionDRBG(master)
+				if cerr != nil {
+					return ctx
+				}
+				// attach to context for handlers
+				// return context.WithValue(cctx, connDRBGKey, childDRBG)
+				return context.WithValue(cctx, connDRBGKey, &childDRBG)
+			},
+		*/
 	}
 
 	// enable HTTP/2
@@ -2088,6 +2092,7 @@ func main() {
 	fmt.Println("\n-------------------------------------------------")
 	fmt.Println(Gray + "       Entropy Server Pre-Flight Checks" + Reset)
 	fmt.Println("-------------------------------------------------")
+	fmt.Println("HTTP cookie support          :", cfg.WantsCookie)
 	fmt.Println("HTTP port                    :", cfg.HTTPAddr)
 	fmt.Println("HTTPS port                   :", cfg.HTTPSAddr)
 	fmt.Println("CertFile TLS                 :", cfg.CertFile)
@@ -2106,8 +2111,6 @@ func main() {
 	fmt.Printf("Refresh Rate (seconds)       : %ds\n", cfg.RefreshRate)
 	fmt.Println("RefreshMs (ms)               :", cfg.RefreshRateMs)
 	fmt.Println("RefreshColorMs (ms)          :", cfg.RefreshColorMs)
-	fmt.Println("-------------------------------------------------")
-	fmt.Println("HTTP cookie support          :", cfg.WantsCookie)
 	fmt.Println("-------------------------------------------------")
 	fmt.Println()
 
@@ -2169,8 +2172,8 @@ func main() {
 	// entropyPool.Write(g)
 	// entropyPool.Write(entropy.Read)
 
-	fmt.Println("	4) start the entropy producer pool with given 64 KB of buffer")
-	startEntropyProducer(entropyPool, dev, 65536)
+	fmt.Println("	4) start the entropy producer pool with given 64 KB of buffer (removed)")
+	//startEntropyProducer(entropyPool, dev, 65536)
 
 	// resp := handler(pool)
 	// assert(len(resp) == expected)

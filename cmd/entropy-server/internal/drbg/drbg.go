@@ -175,6 +175,7 @@ func (d *DRBG) Read(p []byte) (int, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	clear(p)
 	d.cipher.XORKeyStream(p, p)
 	// d.cipher.XORKeyStream(p.CH, p.CH)
 	// d.CH <- generateEntropyChunk()
