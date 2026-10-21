@@ -625,11 +625,11 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 					log.Printf("reseed entropy read failed: %v", err)
 					break
 				}
-				
+
 				if ctx.Err() != nil {
 					return
 				}
-				
+
 				if err := d.Reseed(seed); err != nil {
 					log.Printf("reseed failed: %v", err)
 					continue
@@ -1634,6 +1634,7 @@ func validateEntropyDevice(path string) error {
 	}
 
 	// if mode&os.ModeCharDevice == 0
+
 	if info.Mode()&os.ModeCharDevice == 0 {
 		return fmt.Errorf("%s is not a character device", path)
 	}
@@ -2030,7 +2031,7 @@ func main() {
 		httpsErr error
 	)
 
-	//httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
+	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, &backup)
 	if httpErr != nil {
 		log.Fatal(httpErr)
@@ -2039,7 +2040,7 @@ func main() {
 	}
 
 	if cfg.EnableHTTPS {
-		//httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
+		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, &backup)
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
