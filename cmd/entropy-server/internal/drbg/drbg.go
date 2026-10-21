@@ -152,6 +152,7 @@ func (d *DRBG) Reseed(seed []byte) error {
 	// defer d.Mu.Unlock()
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
 	h := sha512.Sum512(append(d.key[:], seed...))
 	copy(d.key[:], h[:32])
 	copy(d.nonce[:], h[32:44])
@@ -173,6 +174,7 @@ func (d *DRBG) Read(p []byte) (int, error) {
 	// defer d.Mu.Unlock()
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
 	d.cipher.XORKeyStream(p, p)
 	// d.cipher.XORKeyStream(p.CH, p.CH)
 	// d.CH <- generateEntropyChunk()
@@ -200,6 +202,7 @@ func (d *DRBG) ReseedAge() time.Duration {
 	// defer d.Mu.Unlock()
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
 	return time.Since(d.Reseeded)
 }
 
@@ -209,6 +212,7 @@ func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
 	// defer d.Mu.Unlock()
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
 	now := time.Now()
 
 	w.Header().Set("X-RNG-Version", d.version)
@@ -330,8 +334,8 @@ func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 /*
 func (d *DRBG) WriteTo(w io.Writer, n int) error {
     buf := d.entropyBuf.Get(n).([]byte)
-    //buf := d.bufPool.Get().([]byte)
-    //buf := d.entropyBuf.Get()
+    // buf := d.bufPool.Get().([]byte)
+    // buf := d.entropyBuf.Get()
     defer d.bufPool.Put(buf)
 
     for n > 0 {
