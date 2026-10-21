@@ -3,22 +3,22 @@ package diag
 import (
 	"math"
 	"math/bits"
-	"sync/atomic"
 )
 
 // Diagnostics is the summary returned by RunDiagnostics.
 type Diagnostics struct {
-	N        int
-	Chi2     float64
-	Chi2P    float64
-	Shannon  float64
-	MonobitP float64
-	SerialR  float64
-	SerialP  float64
-	Rate     *RateMeter
-	TMatrix  TransitionMatrix
-	Pass     bool
-	Notes    string
+	N         int
+	Histogram [256]int
+	Chi2      float64
+	Chi2P     float64
+	Shannon   float64
+	MonobitP  float64
+	SerialR   float64
+	SerialP   float64
+	Rate      *RateMeter
+	TMatrix   TransitionMatrix
+	Pass      bool
+	Notes     string
 }
 
 var (
@@ -49,14 +49,12 @@ func RunDiagnostics(data []byte) Diagnostics {
 	// simple pass rule (thresholds to be tuned)
 	pass := !(monop < 0.01 || chi2p < 0.01 || shannon < 7.9 || math.Abs(serialR) > 0.05)
 
-	atomic.AddUint64(&BytesFetched, uint64(n))
-	// atomic.AddUint64(&httpCRequests, 1)
-
 	rate := NewRateMeter()
 	// rate.Update(len(data))
 
 	return Diagnostics{
-		N: n,
+		N:         n,
+		Histogram: hist,
 		// Update(len(data)),
 		Chi2:     chi2,
 		Chi2P:    chi2p,

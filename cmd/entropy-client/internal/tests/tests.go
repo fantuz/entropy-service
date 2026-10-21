@@ -45,10 +45,14 @@ func RunAll(data []byte) {
 
 func RunAll(data []byte) {
 	result := diag.RunDiagnostics(data)
+	PrintDiagnostics(&result)
+}
+
+// PrintDiagnostics renders a result without running the analysis again.
+func PrintDiagnostics(result *diag.Diagnostics) {
 	// t := diag.NewRateMeter()
 	// t.Rate = t.Update(result)
 	// t.Update(int(stats.Rate))
-
 	fmt.Println("Entropy diagnostics")
 	fmt.Println("---------------------------")
 

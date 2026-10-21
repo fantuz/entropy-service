@@ -12,6 +12,19 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
+var entropyHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		IdleConnTimeout:     60 * time.Second,
+		TLSHandshakeTimeout: 5 * time.Second,
+	},
+}
+
 // "encoding/json"
 // "net/http/cookiejar"
 // "net/url"
@@ -82,30 +95,13 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	// fmt.Printf(" --> %q\n", u)
 	// fmt.Printf(" --> %q\n", object)
 
-	// Create a client with a conservative timeout bound (per request).
-	// Caller can still use ctx to cancel earlier.
-	httpClient := &http.Client{
-		// Jar:     jar,
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			IdleConnTimeout:     60 * time.Second,
-			TLSHandshakeTimeout: 5 * time.Second,
-			// TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-
 	// fmt.Println("ENTROPY from", endpoint)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := entropyHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
