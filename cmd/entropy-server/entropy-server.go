@@ -2224,19 +2224,19 @@ func main() {
 
 	fmt.Println("	8) start network listener(s)")
 	// tln := newTunedListener(ln)
-	/*
-	tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 
-	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-	if crterr != nil {
-		log.Fatal(crterr)
-	}
-
-	tlsCfg.Certificates = []tls.Certificate{cert}
-	tlsCfg.ClientAuth = tls.NoClientCert
-	*/
-	
 	var tlsCfg *tls.Config
+
+	/*
+		tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
+		cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+		if crterr != nil {
+			log.Fatal(crterr)
+		}
+
+		tlsCfg.Certificates = []tls.Certificate{cert}
+		tlsCfg.ClientAuth = tls.NoClientCert
+	*/
 
 	if cfg.EnableHTTPS {
 		tlsCfg = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
@@ -2385,12 +2385,12 @@ func main() {
 	}
 
 	/*
-	// if cfg.HTTPSAddr != ""
-	if cfg.EnableHTTPS {
-		if httpsErr != nil {
-			_ = httpsSrv.Shutdown(shutdownCtx)
+		// if cfg.HTTPSAddr != ""
+		if cfg.EnableHTTPS {
+			if httpsErr != nil {
+				_ = httpsSrv.Shutdown(shutdownCtx)
+			}
 		}
-	}
 	*/
 
 	log.Println("shutdown complete")

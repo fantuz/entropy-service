@@ -377,81 +377,81 @@ func main() {
 					return
 				}
 				// for stdata := range stream {
-					atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
-					stats.TotalBytes += len(stdata)
-					stats.Entropy = computeEntropy(stdata, &stats.Hist)
+				atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
+				stats.TotalBytes += len(stdata)
+				stats.Entropy = computeEntropy(stdata, &stats.Hist)
 
-					drawUI(&stats, startws, stdata)
+				drawUI(&stats, startws, stdata)
 
-					if cfg.WriteOut && len(stdata) > 0 {
-						deverr := device.Write("/dev/urandom", stdata)
-						if deverr != nil {
-							fmt.Println("device write error:", deverr)
-						}
+				if cfg.WriteOut && len(stdata) > 0 {
+					deverr := device.Write("/dev/urandom", stdata)
+					if deverr != nil {
+						fmt.Println("device write error:", deverr)
 					}
+				}
 
-					if cfg.ShowMatrix && len(stdata) > 0 {
-						tm := diag.BuildTransitionMatrix(stdata)
-						tm.PrintHeatmap()
+				if cfg.ShowMatrix && len(stdata) > 0 {
+					tm := diag.BuildTransitionMatrix(stdata)
+					tm.PrintHeatmap()
 
-						opt++
-					}
+					opt++
+				}
 
-					if cfg.ShowPreview && len(stdata) > 0 {
-						n := min(64, len(stdata))
+				if cfg.ShowPreview && len(stdata) > 0 {
+					n := min(64, len(stdata))
 
-						fmt.Println("preview (hex):", hex.EncodeToString(stdata[:n]))
-						// fmt.Println(hex.EncodeToString(stdata[:32]))
-						// fmt.Println(hex.Dump(stdata[:32]))
-						opt++
-					}
+					fmt.Println("preview (hex):", hex.EncodeToString(stdata[:n]))
+					// fmt.Println(hex.EncodeToString(stdata[:32]))
+					// fmt.Println(hex.Dump(stdata[:32]))
+					opt++
+				}
 
-					if cfg.ShowGraph && len(stdata) > 0 {
-						r := diag.RunDiagnostics(stdata)
-						graph.Add(r.Shannon)
-						graph.Render()
+				if cfg.ShowGraph && len(stdata) > 0 {
+					r := diag.RunDiagnostics(stdata)
+					graph.Add(r.Shannon)
+					graph.Render()
 
-						opt++
-					}
+					opt++
+				}
 
-					if cfg.ShowDashboard && len(stdata) > 0 {
-						r := diag.RunDiagnostics(stdata)
-						dashboard.Add(r)
-						dashboard.Render()
+				if cfg.ShowDashboard && len(stdata) > 0 {
+					r := diag.RunDiagnostics(stdata)
+					dashboard.Add(r)
+					dashboard.Render()
 
-						opt++
-					}
+					opt++
+				}
 
-					if cfg.ShowHistogram && len(stdata) > 0 {
-						fmt.Println("\nHistogram (top 16)")
-						drawHistogram(&stats.Hist)
-						// bgraph := diag.PrintHistogram64(, stdata)
-						// bgraph.Render()
-						diag.PrintHistogram64(32, stdata) // TODO: fix bucketsize
+				if cfg.ShowHistogram && len(stdata) > 0 {
+					fmt.Println("\nHistogram (top 16)")
+					drawHistogram(&stats.Hist)
+					// bgraph := diag.PrintHistogram64(, stdata)
+					// bgraph.Render()
+					diag.PrintHistogram64(32, stdata) // TODO: fix bucketsize
 
-						opt++
-					}
+					opt++
+				}
 
-					hrtot := time.Since(startprg).Milliseconds()
-					hrreal := time.Since(startout).Milliseconds()
-					elapsedws := time.Since(startws).Milliseconds()
-					stats.Rate = float64(stats.TotalBytes) / float64(elapsedws)
-					// fmt.Println("Program rate         :", r.Rate, "MB/s")
-					// fmt.Println("Program notes        :", r.Notes, "ms")
-					// fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
+				hrtot := time.Since(startprg).Milliseconds()
+				hrreal := time.Since(startout).Milliseconds()
+				elapsedws := time.Since(startws).Milliseconds()
+				stats.Rate = float64(stats.TotalBytes) / float64(elapsedws)
+				// fmt.Println("Program rate         :", r.Rate, "MB/s")
+				// fmt.Println("Program notes        :", r.Notes, "ms")
+				// fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
 
-					if cfg.ShowDebug && len(stdata) > 0 {
-						fmt.Printf("received           : %d bytes\n", len(stdata))
-						// btot := atomic.LoadUint64(&diag.BytesFetched)
-						// fmt.Println("real RECV          :", (btot/3)+uint64(len(stdata)))
-						// fmt.Println("WS cycle runtime   :", hrtot-elapsedws, "ms")
-						fmt.Println("WS cycle runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
-						fmt.Println("Total runtime      :", hrreal, "ms")
-					}
+				if cfg.ShowDebug && len(stdata) > 0 {
+					fmt.Printf("received           : %d bytes\n", len(stdata))
+					// btot := atomic.LoadUint64(&diag.BytesFetched)
+					// fmt.Println("real RECV          :", (btot/3)+uint64(len(stdata)))
+					// fmt.Println("WS cycle runtime   :", hrtot-elapsedws, "ms")
+					fmt.Println("WS cycle runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
+					fmt.Println("Total runtime      :", hrreal, "ms")
+				}
 
-					if opt > 0 {
-						time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
-					}
+				if opt > 0 {
+					time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
+				}
 				// }
 			/*
 				case <-rctx.Done():
