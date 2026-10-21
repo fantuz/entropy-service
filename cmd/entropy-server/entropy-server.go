@@ -114,11 +114,13 @@ var qrngBuffer QRNGBuffer
 
 var entropyPool EntropyPool
 
+/*
 var bufPool = sync.Pool{
 	New: func() any {
 		return make([]byte, 1<<25) // 32 MB
 	},
 }
+*/
 
 /*
 func ActiveInstances() int64 {
@@ -1398,6 +1400,84 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 	}
 }
 
+func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		n := 2048
+		refresh := defaultRefresh
+
+		if q := r.URL.Query().Get("bytes"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
+				n = v
+			}
+		}
+
+		if q := r.URL.Query().Get("refresh"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 60000 {
+				refresh = time.Duration(v)
+			}
+		}
+
+		metrics.AddHTTPRequests(1)
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("ws upgrade failed (wsBytesHandler): %v", err)
+
+			return
+		}
+		defer conn.Close()
+
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+
+		ticker := time.NewTicker(refresh * time.Millisecond)
+		defer ticker.Stop()
+
+		go func() {
+			defer cancel()
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		}()
+
+		buf := make([]byte, n)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if _, err := io.ReadFull(d, buf); err != nil {
+					log.Printf("ws entropy read failed: %v", err)
+
+					return
+				}
+
+				hash := sha256.Sum256(buf)
+				frame := EntropyDataFrame{
+					Hex:    hex.EncodeToString(buf),
+					Base64: base64.StdEncoding.EncodeToString(buf),
+					Hash:   hex.EncodeToString(hash[:]),
+				}
+
+				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+
+				if err := conn.WriteJSON(frame); err != nil {
+					return
+				}
+
+				metrics.AddBytesGenerated(len(buf))
+				metrics.AddWSPayloads(1)
+			}
+		}
+	}
+}
+
+/*
+// replaced october 2026
 func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
@@ -1503,7 +1583,79 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 		}
 	}
 }
+*/
 
+func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		quantity := defaultQuantity
+		refresh := defaultRefresh
+
+		if q := r.URL.Query().Get("bytes"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
+				quantity = v
+			}
+		}
+
+		if q := r.URL.Query().Get("refresh"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 60000 {
+				refresh = time.Duration(v)
+			}
+		}
+
+		metrics.AddHTTPRequests(1)
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("ws upgrade failed (wsBinaryHandler): %v", err)
+
+			return
+		}
+		defer conn.Close()
+
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+
+		ticker := time.NewTicker(refresh * time.Millisecond)
+		defer ticker.Stop()
+
+		go func() {
+			defer cancel()
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		}()
+
+		buf := make([]byte, quantity)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if _, err := io.ReadFull(d, buf); err != nil {
+					log.Printf("ws entropy read failed: %v", err)
+
+					return
+				}
+
+				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+
+				if err := conn.WriteMessage(websocket.BinaryMessage, buf); err != nil {
+					return
+				}
+
+				metrics.AddBytesGenerated(len(buf))
+				metrics.AddWSPayloads(1)
+			}
+		}
+	}
+}
+
+/*
+// replaced october 2026
 func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
@@ -1592,6 +1744,7 @@ func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.Han
 		}
 	}
 }
+*/
 
 func metricsHandler(d *drbg.DRBG) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
