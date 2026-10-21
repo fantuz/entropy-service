@@ -1,8 +1,13 @@
 package diag
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type RateMeter struct {
+	mu sync.Mutex
+
 	// Bytes int
 	Rate  float64
 	Meter int64
@@ -14,6 +19,9 @@ type RateMeter struct {
 }
 
 func (r *RateMeter) Bytes() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return r.bytes
 }
 
@@ -22,6 +30,9 @@ func NewRateMeter() *RateMeter {
 }
 
 func (r *RateMeter) Update(n int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	/*
 		//delta := r.Bytes - n
 		delta := r.Bytes - int(r.Meter)
@@ -54,8 +65,16 @@ func (r *RateMeter) Update(n int) {
 	r.last = now
 }
 
-func (r *RateMeter) RateMbps() float64 { return r.rate / 1_000_000 }
+func (r *RateMeter) RateMbps() float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.rate / 1_000_000
+}
 
 func (r *RateMeter) Total() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return r.total
 }
