@@ -32,8 +32,9 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 		return nil
 	})
 
-	// out := make([]byte, 1<<16)
-	out := make(chan []byte, 1<<25) // 16 is safe
+	//out := make([]byte, 1<<16)
+	//out := make(chan []byte, 1<<25) // 16 is safe
+	out := make(chan []byte, 16)
 
 	go func() {
 		defer close(out)
