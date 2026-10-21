@@ -608,6 +608,7 @@ func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, buffe
 func reseedLoop(ctx context.Context, source io.Reader, interval, size int, generators ...*drbg.DRBG) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
+
 	seed := make([]byte, size)
 
 	for {
@@ -633,7 +634,6 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 					log.Printf("reseed failed: %v", err)
 					continue
 				}
-				
 				metrics.AddReseeds(1)
 			}
 		}
@@ -1886,11 +1886,12 @@ func main() {
 
 	fmt.Println("	1) initialize entropy device as buffer source")
 
-	//qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
+	// qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
 	qrngdev, err := NewEntropySource(dev, cfg.RequireDevice)
 	if err != nil {
 		log.Fatalf("open entropy source: %v", err)
 	}
+
 	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) // 65536
 
 	fmt.Println("	2) initialize seed space (needs fix)")
@@ -1905,7 +1906,7 @@ func main() {
 	*/
 
 	g := make([]byte, 65536)
-	//entropy, _ := qrngdev.Read(g)
+	// entropy, _ := qrngdev.Read(g)
 	entropy, err := io.ReadFull(qrngdev, g)
 	if err != nil {
 		log.Fatalf("read master seed: %v", err)
@@ -1932,7 +1933,7 @@ func main() {
 		log.Fatal(merr)
 	}
 
-	//backup, berr := drbg.NewDRBG(entropyPool.buf)
+	// backup, berr := drbg.NewDRBG(entropyPool.buf)
 	backupSeed := make([]byte, 64)
 	if _, err := io.ReadFull(qrngdev, backupSeed); err != nil {
 		log.Fatalf("read backup seed: %v", err)
