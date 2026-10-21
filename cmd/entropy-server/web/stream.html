@@ -131,14 +131,14 @@ const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 var count = 0;
 
-if (typeof urlParams.get('bytes') === 'undefined') {
+if (urlParams.get('bytes') === null) {
 	var bytes = 4096
 } else {
 	var bytes = urlParams.get('bytes')
 	count++
 }
 
-if (typeof urlParams.get('refresh') === 'undefined') {
+if (urlParams.get('refresh') === null) {
 	var refresh = 500
 } else {
 	var refresh = urlParams.get('refresh')
