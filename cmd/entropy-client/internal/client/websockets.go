@@ -14,7 +14,8 @@ import (
 func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 	// url = fmt.Sprintf("%s%sbytes=%d", url, sep, quantity)
 	// var wsurl = url + "?bytes=" + strconv.Itoa(quantity) + "&refresh=" + fps
-	conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
+	// conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, url, nil)
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
@@ -22,6 +23,10 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	stop := context.AfterFunc(ctx, func() {
+		_ = conn.Close()
+	})
 
 	conn.SetReadLimit(1 << 25) // 32 MB
 	_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
@@ -32,13 +37,14 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 		return nil
 	})
 
-	//out := make([]byte, 1<<16)
-	//out := make(chan []byte, 1<<25) // 16 is safe
+	// out := make([]byte, 1<<16)
+	// out := make(chan []byte, 1<<25) // 16 is safe
 	out := make(chan []byte, 16)
 
 	go func() {
 		defer close(out)
 		defer conn.Close()
+		defer stop()
 
 		for {
 			select {
@@ -64,10 +70,12 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 			metrics.IncClientWSSMessages() // optional counter for messages received
 
 			// push into channel (non-blocking if buffered)
+			// Wait for queue space or cancellation
 			select {
 			case out <- msg:
 			case <-ctx.Done():
-				panic("critical end of ws context reached")
+				// panic("critical end of ws context reached")
+				return
 			}
 		}
 	}()

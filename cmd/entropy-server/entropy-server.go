@@ -866,7 +866,13 @@ func randomHandler(d *drbg.DRBG) http.HandlerFunc {
 		buf := make([]byte, n)
 		// TODO: fixme
 		// d.Read(buf[:n])
-		_, _ = d.Read(buf[n:])
+		// _, _ = d.Read(buf[n:])
+
+		if _, err := io.ReadFull(d, buf); err != nil {
+			http.Error(w, "entropy failure", http.StatusInternalServerError)
+
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("X-Entropy-Metric", "random-data")
