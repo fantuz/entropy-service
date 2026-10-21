@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
+	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"io/fs"
 	"log"
 	"math/big"
 	"net/http"
@@ -40,6 +42,9 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/transport"
 )
+
+//go:embed web
+var webFS embed.FS
 
 // "net"
 
@@ -2279,11 +2284,12 @@ func main() {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
-	// fs := http.FS(webFS)
-	// http.Handle("/", http.FileServer(fs))
-	// mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./web/index.html")})
+	webRoot, err := fs.Sub(webFS, "web")
+	if err != nil {
+		log.Fatalf("open embedded web assets: %v", err)
+	}
 
-	mux.Handle("/", http.FileServer(http.Dir("./web")))
+	mux.Handle("/", http.FileServer(http.FS(webRoot)))
 
 	mux.HandleFunc("/health-1", healthHandler(&master))
 	mux.HandleFunc("/health-2", healthHandler(&backup))
