@@ -864,7 +864,6 @@ func randomHandler(d *drbg.DRBG) http.HandlerFunc {
 		}
 
 		buf := make([]byte, n)
-		// TODO: fixme
 		// d.Read(buf[:n])
 		// _, _ = d.Read(buf[n:])
 
