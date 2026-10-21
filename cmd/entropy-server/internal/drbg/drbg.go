@@ -129,7 +129,7 @@ func NewDRBG(seed []byte) (DRBG, error) {
 }
 
 // DRBG per-connection seed
-//func NewConnectionDRBG(d DRBG) (DRBG, error)
+// func NewConnectionDRBG(d DRBG) (DRBG, error)
 func NewConnectionDRBG(d *DRBG) (DRBG, error) {
 	// seed, err := d.Derive(32) // 256-bit seed
 	seed, _ := d.Derive(64) // 512-bit seed

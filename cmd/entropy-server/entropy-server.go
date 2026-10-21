@@ -604,7 +604,7 @@ func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, buffe
 }
 */
 
-//func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, bufferlen int, reseedbuf []byte) {
+// func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, bufferlen int, reseedbuf []byte) {
 func reseedLoop(ctx context.Context, source io.Reader, interval, size int, generators ...*drbg.DRBG) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
@@ -1679,7 +1679,7 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 	return path, nil
 }
 
-//func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error)
+// func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error)
 func startHTTP(ctx context.Context, addr string, handler http.Handler, master *drbg.DRBG) (*http.Server, error) {
 	// ln, err := net.Listen("tcp", addr)
 	// if err != nil { return nil, err }
@@ -1737,7 +1737,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *d
 	return srv, nil
 }
 
-//func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error)
+// func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error)
 func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *drbg.DRBG) (*http.Server, error) {
 	ln, err := listener.NewTunedListener(ctx, addr, 4<<20)
 	if err != nil {
@@ -2067,17 +2067,17 @@ func main() {
 	// time.Sleep(time.Duration(cfg.ReseedMs*2))
 
 	/*
-	go func() {
-		ticker := time.NewTicker(time.Duration(cfg.ReseedMs) * time.Millisecond)
-		// ticker := time.NewTicker(time.Duration(cfg.ReseedMs))
-		for range ticker.C {
-			// entropy := entropyPool.Read(65536)
-			go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
-			go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
-			// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
-			// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.SeedBuffer, cfg.SeedBuffer)
-		}
-	}()
+		go func() {
+			ticker := time.NewTicker(time.Duration(cfg.ReseedMs) * time.Millisecond)
+			// ticker := time.NewTicker(time.Duration(cfg.ReseedMs))
+			for range ticker.C {
+				// entropy := entropyPool.Read(65536)
+				go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
+				go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
+				// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
+				// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.SeedBuffer, cfg.SeedBuffer)
+			}
+		}()
 	*/
 
 	go reseedLoop(ctx, qrngdev, cfg.ReseedMs, cfg.ReseedSize, &master, &backup)
