@@ -168,6 +168,7 @@ func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
 	return &prefs, nil
 }
 
+/*
 func extractPrefs(r *http.Request) ClientPrefs {
 	q := r.URL.Query()
 
@@ -201,6 +202,65 @@ func extractPrefs(r *http.Request) ClientPrefs {
 	log.Printf("Cookie Words: %v\n", prefs.Words)
 
 	return prefs
+}
+*/
+
+func extractPrefs(r *http.Request, maxBytes, maxWords int, hasCookie bool) (ClientPrefs, error) {
+	prefs := ClientPrefs{
+		Bytes:   min(2097152, maxBytes),
+		Refresh: 500,
+		Words:   maxWords,
+	}
+
+	if hasCookie {
+		prefs.Bytes = min(524288, maxBytes)
+		prefs.Words = min(3, maxWords)
+
+		if c, err := getPrefsCookie(r); err == nil {
+			if c.Bytes > 0 && c.Bytes <= maxBytes {
+				prefs.Bytes = c.Bytes
+			}
+
+			if c.Words > 0 && c.Words <= maxWords {
+				prefs.Words = c.Words
+			}
+
+			if c.Refresh > 0 {
+				prefs.Refresh = c.Refresh
+			}
+		}
+	}
+
+	q := r.URL.Query()
+	fields := []struct {
+		name string
+		dst  *int
+		max  int
+	}{
+		{"bytes", &prefs.Bytes, maxBytes},
+		{"words", &prefs.Words, maxWords},
+		{"refresh", &prefs.Refresh, 0},
+	}
+
+	for _, field := range fields {
+		values, present := q[field.name]
+		if !present {
+			continue
+		}
+
+		if len(values) != 1 {
+			return ClientPrefs{}, fmt.Errorf("%s must be supplied once", field.name)
+		}
+
+		v, err := strconv.Atoi(values[0])
+		if err != nil || v <= 0 || (field.max > 0 && v > field.max) {
+			return ClientPrefs{}, fmt.Errorf("invalid %s value", field.name)
+		}
+
+		*field.dst = v
+	}
+
+	return prefs, nil
 }
 
 var upgrader = websocket.Upgrader{
@@ -962,24 +1022,33 @@ func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
 	}
 }
 
-func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie bool) http.HandlerFunc {
+// func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie bool) http.HandlerFunc
+func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, maxBytes int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// max 20 words
-		maxWords := quantity
+		// maxWords := quantity
+		prefs, err := extractPrefs(r, maxBytes, quantity, hasCookie)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 
-		if hasCookie {
-			prefs := extractPrefs(r)
-			_ = setPrefsCookie(w, prefs)
-			maxWords = prefs.Words
+			return
 		}
 
+		if hasCookie {
+			// prefs := extractPrefs(r)
+			_ = setPrefsCookie(w, prefs)
+			// maxWords = prefs.Words
+		}
+
+		maxWords := prefs.Words
 		words := diceware.GetWords()
 		randomWords := diceware.GetRandomWords()
 		// wordsMap := diceware.GetWordsMap()
 
 		randomBytes := make([]byte, 64) // Generate 512 bits random
 
-		_, err := rand.Read(randomBytes)
+		// _, err := rand.Read(randomBytes)
+		_, err = rand.Read(randomBytes)
 		if err != nil {
 			http.Error(w, "entropy failure", http.StatusInternalServerError)
 
@@ -1063,16 +1132,25 @@ body {
 	}
 }
 
-func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
+// func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc
+func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// max 2MB
-		size := 2097152
+		// size := 2097152
+		prefs, err := extractPrefs(r, maxBytes, maxWords, hasCookie)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+
+			return
+		}
 
 		if hasCookie {
-			prefs := extractPrefs(r)
+			// prefs := extractPrefs(r)
 			_ = setPrefsCookie(w, prefs)
-			size = prefs.Bytes
+			// size = prefs.Bytes
 		}
+
+		size := prefs.Bytes
 
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -1084,11 +1162,13 @@ func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc {
 		child, _ := drbg.NewDRBG(seed)
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
-		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
-				size = v
+		/*
+			if q := r.URL.Query().Get("bytes"); q != "" {
+				if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
+					size = v
+				}
 			}
-		}
+		*/
 
 		buf := make([]byte, size)
 
@@ -1829,12 +1909,22 @@ func main() {
 
 	// if cfg.MaxBytes > 33554432
 
-	if cfg.MaxBytes > (1 << 25) {
-		panic(Red + "max-bytes should be <= 33554432 (32 MB)" + Reset)
+	/*
+		if cfg.MaxBytes > (1 << 25) {
+			panic(Red + "max-bytes should be <= 33554432 (32 MB)" + Reset)
+		}
+	*/
+
+	if cfg.MaxBytes < 1 || cfg.MaxBytes > (1<<25) {
+		panic(Red + "max-bytes must be between 1 and 33554432" + Reset)
+	}
+
+	if cfg.MaxWords < 1 {
+		panic(Red + "words must be positive" + Reset)
 	}
 
 	if cfg.QRNGBuffer < 1 || cfg.QRNGBuffer > 4096 {
-		panic("QRNG buffer size KB must be between 1 and 4096 KB")
+		panic(Red + "QRNG buffer size KB must be between 1 and 4096 KB" + Reset)
 	}
 
 	fmt.Println("\n-------------------------------------------------")
@@ -2005,14 +2095,17 @@ func main() {
 
 	mux.HandleFunc("/words", wsWordsHandler(cfg.MaxWords, cfg.RefreshColorMs))
 
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
+	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
+	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie))
 	mux.HandleFunc("/v1/data/test", randomHandler(&backup))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(&backup))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(&backup))
-	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
+	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
+	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.MaxBytes, cfg.WantsCookie))
 	mux.HandleFunc("/v1/qr/random", qrHandler(&backup))
 
-	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
+	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
+	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.MaxBytes, cfg.WantsCookie))
 
 	// placeholder for public/private key generation
 	// mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
