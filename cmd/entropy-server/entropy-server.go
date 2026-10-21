@@ -207,6 +207,24 @@ func extractPrefs(r *http.Request) ClientPrefs {
 }
 */
 
+func extractByteCount(r *http.Request, defaultBytes, maxBytes int) (int, error) {
+	values, present := r.URL.Query()["bytes"]
+	if !present {
+		return min(defaultBytes, maxBytes), nil
+	}
+
+	if len(values) != 1 {
+		return 0, errors.New("bytes must be supplied once")
+	}
+
+	n, err := strconv.Atoi(values[0])
+	if err != nil || n <= 0 || n > maxBytes {
+		return 0, fmt.Errorf("bytes must be between 1 and %d", maxBytes)
+	}
+
+	return n, nil
+}
+
 func extractPrefs(r *http.Request, maxBytes, maxWords int, hasCookie bool) (ClientPrefs, error) {
 	prefs := ClientPrefs{
 		Bytes:   min(2097152, maxBytes),
@@ -233,13 +251,19 @@ func extractPrefs(r *http.Request, maxBytes, maxWords int, hasCookie bool) (Clie
 		}
 	}
 
+	var err error
+
+	prefs.Bytes, err = extractByteCount(r, prefs.Bytes, maxBytes)
+	if err != nil {
+		return ClientPrefs{}, err
+	}
+
 	q := r.URL.Query()
 	fields := []struct {
 		name string
 		dst  *int
 		max  int
 	}{
-		{"bytes", &prefs.Bytes, maxBytes},
 		{"words", &prefs.Words, maxWords},
 		{"refresh", &prefs.Refresh, 0},
 	}
@@ -741,7 +765,7 @@ func entropyHeatmapHandler(d *drbg.DRBG) http.HandlerFunc {
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Refresh", "5")
 		w.Header().Set("X-Entropy-Metric", "bit-popcount")
-		w.Header().Set("X-RNG-Reseed-Age-ms",
+		w.Header().Set("X-Rng-Reseed-Age-Ms",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		_ = png.Encode(w, img)
 	}
@@ -852,7 +876,7 @@ func randomImageHandler(d *drbg.DRBG) http.HandlerFunc {
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Refresh", "5")
 		w.Header().Set("X-Entropy-Metric", "random-image")
-		w.Header().Set("X-RNG-Reseed-Age-ms-test",
+		w.Header().Set("X-Rng-Reseed-Age-Ms-Test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		_ = png.Encode(w, img)
 		metrics.AddBytesGenerated(len(img.Pix))
@@ -860,15 +884,13 @@ func randomImageHandler(d *drbg.DRBG) http.HandlerFunc {
 	}
 }
 
-func randomHandler(d *drbg.DRBG) http.HandlerFunc {
+func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		n := 1024
+		n, err := extractByteCount(r, 1024, maxBytes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 
-		if q := r.URL.Query().Get("bytes"); q != "" {
-			v, verr := strconv.Atoi(q)
-			if verr == nil && v > 0 && v <= 1<<25 {
-				n = v
-			}
+			return
 		}
 
 		buf := make([]byte, n)
@@ -883,7 +905,7 @@ func randomHandler(d *drbg.DRBG) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("X-Entropy-Metric", "random-data")
-		w.Header().Set("X-RNG-Reseed-Age-ms-test",
+		w.Header().Set("X-Rng-Reseed-Age-Ms-Test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		_, _ = w.Write(buf)
 	}
@@ -1406,16 +1428,16 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 	}
 }
 
-func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration) http.HandlerFunc {
+func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		n := 2048
-		refresh := defaultRefresh
+		n, err := extractByteCount(r, 2048, maxBytes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 
-		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
-				n = v
-			}
+			return
 		}
+
+		refresh := defaultRefresh
 
 		if q := r.URL.Query().Get("refresh"); q != "" {
 			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 60000 {
@@ -1591,16 +1613,16 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 }
 */
 
-func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity int) http.HandlerFunc {
+func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity, maxBytes int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		quantity := defaultQuantity
-		refresh := defaultRefresh
+		quantity, err := extractByteCount(r, defaultQuantity, maxBytes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 
-		if q := r.URL.Query().Get("bytes"); q != "" {
-			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 1<<25 {
-				quantity = v
-			}
+			return
 		}
+
+		refresh := defaultRefresh
 
 		if q := r.URL.Query().Get("refresh"); q != "" {
 			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 60000 {
@@ -2269,9 +2291,9 @@ func main() {
 	mux.Handle("/metrics-1", metricsHandler(&master))
 	mux.Handle("/metrics-2", metricsHandler(&backup))
 
-	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048))
-	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs))
-	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs))
+	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes))
+	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes))
+	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs, cfg.MaxBytes))
 	mux.HandleFunc("/files", uploadHandler(&backup, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 	// mux.HandleFunc("/files", fileAnalyzeHandler(drbg, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 
@@ -2279,7 +2301,7 @@ func main() {
 
 	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie))
-	mux.HandleFunc("/v1/data/test", randomHandler(&backup))
+	mux.HandleFunc("/v1/data/test", randomHandler(&backup, cfg.MaxBytes))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(&backup))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(&backup))
 	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
