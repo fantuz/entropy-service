@@ -144,6 +144,10 @@ func main() {
 		panic(Red + "Slice of data fetched through websocket shall be between 1B and 32 MB" + Reset)
 	}
 
+	if cfg.Refresh < time.Millisecond {
+		panic(Red + "refresh must be at least 1ms" + Reset)
+	}
+
 	fps := strconv.FormatInt(cfg.Refresh.Milliseconds(), 10)
 	rbytes := strconv.FormatInt(cfg.Slice, 10)
 
@@ -337,7 +341,8 @@ func main() {
 	defer wscancel()
 	// wscancel()
 
-	stream, sterr := client.StreamEntropy(wsctx, cfg.WSUrl)
+	// stream, sterr := client.StreamEntropy(wsctx, cfg.WSUrl)
+	stream, sterr := client.StreamEntropy(wsctx, refwsurl)
 	if sterr != nil {
 		panic(sterr)
 	}
