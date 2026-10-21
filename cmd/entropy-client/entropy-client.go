@@ -366,11 +366,17 @@ func main() {
 
 			select {
 			case <-wsctx.Done():
-				// return
-				panic("critical point reached")
+				// panic("critical point reached")
 				// continue
-			case <-tickerw.C:
-				for stdata := range stream {
+				return
+
+			// case <-tickerw.C:
+			case stdata, ok := <-stream:
+				if !ok {
+					// Report disconnection and exit, or reconnect deliberately.
+					return
+				}
+				// for stdata := range stream {
 					atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
 					stats.TotalBytes += len(stdata)
 					stats.Entropy = computeEntropy(stdata, &stats.Hist)
@@ -395,7 +401,7 @@ func main() {
 						n := min(64, len(stdata))
 
 						fmt.Println("preview (hex):", hex.EncodeToString(stdata[:n]))
-						fmt.Println(hex.EncodeToString(stdata[:32]))
+						// fmt.Println(hex.EncodeToString(stdata[:32]))
 						// fmt.Println(hex.Dump(stdata[:32]))
 						opt++
 					}
@@ -446,7 +452,7 @@ func main() {
 					if opt > 0 {
 						time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
 					}
-				}
+				// }
 			/*
 				case <-rctx.Done():
 					log.Println("shutdown signal received")
@@ -508,7 +514,7 @@ func main() {
 					n := min(64, len(data))
 
 					fmt.Println("preview (hex):", hex.EncodeToString(data[:n]))
-					fmt.Println(hex.EncodeToString(data[:32]))
+					// fmt.Println(hex.EncodeToString(data[:32]))
 					// fmt.Println(hex.Dump(data[:32]))
 					opt++
 				}

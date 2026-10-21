@@ -2174,6 +2174,10 @@ func main() {
 	//	log.Fatalf("read master seed: %v", err)
 	// }
 
+	if _, err := io.ReadFull(qrngdev, g); err != nil {
+		log.Fatalf("read master seed: %v", err)
+	}
+
 	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file) (removed logic)")
 
 	// entropyPool = NewEntropyPool(entropy) // 8 MB pool
@@ -2220,6 +2224,7 @@ func main() {
 
 	fmt.Println("	8) start network listener(s)")
 	// tln := newTunedListener(ln)
+	/*
 	tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 
 	cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
@@ -2229,6 +2234,13 @@ func main() {
 
 	tlsCfg.Certificates = []tls.Certificate{cert}
 	tlsCfg.ClientAuth = tls.NoClientCert
+	*/
+	
+	var tlsCfg *tls.Config
+
+	if cfg.EnableHTTPS {
+		tlsCfg = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
+	}
 
 	/*
 		fmt.Println("9) setup the masterDRBG")
@@ -2363,16 +2375,23 @@ func main() {
 	defer cancel()
 
 	// Block and wait for shutdown
-	if httpErr != nil {
+	// if httpErr != nil
+	if httpSrv != nil {
 		_ = httpSrv.Shutdown(shutdownCtx)
 	}
 
+	if httpsSrv != nil {
+		_ = httpsSrv.Shutdown(shutdownCtx)
+	}
+
+	/*
 	// if cfg.HTTPSAddr != ""
 	if cfg.EnableHTTPS {
 		if httpsErr != nil {
 			_ = httpsSrv.Shutdown(shutdownCtx)
 		}
 	}
+	*/
 
 	log.Println("shutdown complete")
 }
