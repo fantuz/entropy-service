@@ -634,6 +634,7 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 					log.Printf("reseed failed: %v", err)
 					continue
 				}
+
 				metrics.AddReseeds(1)
 			}
 		}
