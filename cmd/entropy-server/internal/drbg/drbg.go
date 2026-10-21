@@ -5,6 +5,7 @@ import (
 	"crypto/sha512"
 	"net/http"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,7 @@ type Reader interface {
 type DRBG struct {
 	// LOCKS
 	// Mu     sync.Mutex
+	mu     sync.Mutex
 	Stream cipher.Stream
 
 	// Crypto state
@@ -127,7 +129,8 @@ func NewDRBG(seed []byte) (DRBG, error) {
 }
 
 // DRBG per-connection seed
-func NewConnectionDRBG(d DRBG) (DRBG, error) {
+//func NewConnectionDRBG(d DRBG) (DRBG, error)
+func NewConnectionDRBG(d *DRBG) (DRBG, error) {
 	// seed, err := d.Derive(32) // 256-bit seed
 	seed, _ := d.Derive(64) // 512-bit seed
 
@@ -147,6 +150,8 @@ func NewConnectionDRBG(d DRBG) (DRBG, error) {
 func (d *DRBG) Reseed(seed []byte) error {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	h := sha512.Sum512(append(d.key[:], seed...))
 	copy(d.key[:], h[:32])
 	copy(d.nonce[:], h[32:44])
@@ -166,6 +171,8 @@ func (d *DRBG) Reseed(seed []byte) error {
 func (d *DRBG) Read(p []byte) (int, error) {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.cipher.XORKeyStream(p, p)
 	// d.cipher.XORKeyStream(p.CH, p.CH)
 	// d.CH <- generateEntropyChunk()
@@ -191,6 +198,8 @@ func (d *DRBG) Read(p []byte) (int, error) {
 func (d *DRBG) ReseedAge() time.Duration {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	return time.Since(d.Reseeded)
 }
 
@@ -198,6 +207,8 @@ func (d *DRBG) ReseedAge() time.Duration {
 func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	now := time.Now()
 
 	w.Header().Set("X-RNG-Version", d.version)

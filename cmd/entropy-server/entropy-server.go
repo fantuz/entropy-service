@@ -532,6 +532,7 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 }
 
 // func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, dev string, bufferlen int, reseedbuf int).
+/*
 func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, bufferlen int, reseedbuf []byte) {
 	// log.Printf("reseedLoop started for %q", d)
 	// log.Printf("reseedLoop started for %v", d)
@@ -545,20 +546,18 @@ func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, buffe
 	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	// defer cancel()
 
-	/*
-		select {
-			case <-ctx.Done():
-				log.Println("reseedLoop: context already canceled")
-				go func() {
-				    //sig := <-signalChan
-				    //sig := <-ctx
-				    //log.Println("shutting down:", sig)
-				    cancel()
-				}()
-			default:
-				//continue
-		}
-	*/
+//		select {
+//			case <-ctx.Done():
+//				log.Println("reseedLoop: context already canceled")
+//				go func() {
+//				    //sig := <-signalChan
+//				    //sig := <-ctx
+//				    //log.Println("shutting down:", sig)
+//				    cancel()
+//				}()
+//			default:
+//				//continue
+//		}
 
 	for {
 		select {
@@ -571,15 +570,14 @@ func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, buffe
 			// for range ticker.C {
 			// log.Printf("reseedLoop: started, bufferlen: %d, reseedbuf: %d", bufferlen, reseedbuf)
 
-			/*
-				entropy, eerr := fetchEntropy(bufferlen, dev, reseedbuf)
-				//entropy, _ := fetchEntropy(reseedbuf, dev, bufferlen)
+//				entropy, eerr := fetchEntropy(bufferlen, dev, reseedbuf)
+//				//entropy, _ := fetchEntropy(reseedbuf, dev, bufferlen)
+//
+//				if eerr != nil {
+//					log.Println("entropy fetch failed:", eerr)
+//					//continue
+//				}
 
-				if eerr != nil {
-					log.Println("entropy fetch failed:", eerr)
-					//continue
-				}
-			*/
 			ticker.Stop()
 
 			buf := make([]byte, reseedbuf[bufferlen])
@@ -602,6 +600,39 @@ func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, buffe
 			continue
 		}
 		// log.Println("interval:", interval)
+	}
+}
+*/
+
+//func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, bufferlen int, reseedbuf []byte) {
+func reseedLoop(ctx context.Context, source io.Reader, interval, size int, generators ...*drbg.DRBG) {
+	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
+	defer ticker.Stop()
+	seed := make([]byte, size)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			for _, d := range generators {
+				if ctx.Err() != nil {
+					return
+				}
+				if _, err := io.ReadFull(source, seed); err != nil {
+					log.Printf("reseed entropy read failed: %v", err)
+					break
+				}
+				if ctx.Err() != nil {
+					return
+				}
+				if err := d.Reseed(seed); err != nil {
+					log.Printf("reseed failed: %v", err)
+					continue
+				}
+				metrics.AddReseeds(1)
+			}
+		}
 	}
 }
 
@@ -1648,7 +1679,8 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 	return path, nil
 }
 
-func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error) {
+//func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error)
+func startHTTP(ctx context.Context, addr string, handler http.Handler, master *drbg.DRBG) (*http.Server, error) {
 	// ln, err := net.Listen("tcp", addr)
 	// if err != nil { return nil, err }
 	// tln := newTunedListener(ln)
@@ -1675,7 +1707,8 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master dr
 			// rng.DecreaseActiveInstances(-1)
 
 			// attach to context for handlers
-			return context.WithValue(cctx, connDRBGKey, childDRBG)
+			//return context.WithValue(cctx, connDRBGKey, childDRBG)
+			return context.WithValue(cctx, connDRBGKey, &childDRBG)
 		},
 	}
 
@@ -1704,7 +1737,8 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master dr
 	return srv, nil
 }
 
-func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error) {
+//func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error)
+func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *drbg.DRBG) (*http.Server, error) {
 	ln, err := listener.NewTunedListener(ctx, addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -1728,7 +1762,8 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 				return ctx
 			}
 			// attach to context for handlers
-			return context.WithValue(cctx, connDRBGKey, childDRBG)
+			//return context.WithValue(cctx, connDRBGKey, childDRBG)
+			return context.WithValue(cctx, connDRBGKey, &childDRBG)
 		},
 	}
 
@@ -1780,6 +1815,10 @@ func main() {
 
 	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10000 {
 		panic("reseed-ms must be between 1 and 10000 ms")
+	}
+
+	if cfg.ReseedSize < 32 || cfg.ReseedSize > 65536 {
+		log.Fatal("buffer-reseed must be between 32 and 65536 bytes")
 	}
 
 	// if cfg.MaxBytes > 33554432
@@ -1843,7 +1882,11 @@ func main() {
 
 	fmt.Println("	1) initialize entropy device as buffer source")
 
-	qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
+	//qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
+	qrngdev, err := NewEntropySource(dev, cfg.RequireDevice)
+	if err != nil {
+		log.Fatalf("open entropy source: %v", err)
+	}
 	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) // 65536
 
 	fmt.Println("	2) initialize seed space (needs fix)")
@@ -1858,7 +1901,11 @@ func main() {
 	*/
 
 	g := make([]byte, 65536)
-	entropy, _ := qrngdev.Read(g)
+	//entropy, _ := qrngdev.Read(g)
+	entropy, err := io.ReadFull(qrngdev, g)
+	if err != nil {
+		log.Fatalf("read master seed: %v", err)
+	}
 
 	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file)")
 
@@ -1881,7 +1928,13 @@ func main() {
 		log.Fatal(merr)
 	}
 
-	backup, berr := drbg.NewDRBG(entropyPool.buf)
+	//backup, berr := drbg.NewDRBG(entropyPool.buf)
+	backupSeed := make([]byte, 64)
+	if _, err := io.ReadFull(qrngdev, backupSeed); err != nil {
+		log.Fatalf("read backup seed: %v", err)
+	}
+	backup, berr := drbg.NewDRBG(backupSeed)
+
 	if berr != nil {
 		log.Fatal(berr)
 	}
@@ -1972,7 +2025,8 @@ func main() {
 		httpsErr error
 	)
 
-	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
+	//httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
+	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, &backup)
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	} else {
@@ -1980,7 +2034,8 @@ func main() {
 	}
 
 	if cfg.EnableHTTPS {
-		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
+		//httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
+		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, &backup)
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
 		} else {
@@ -2011,6 +2066,7 @@ func main() {
 	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
 	// time.Sleep(time.Duration(cfg.ReseedMs*2))
 
+	/*
 	go func() {
 		ticker := time.NewTicker(time.Duration(cfg.ReseedMs) * time.Millisecond)
 		// ticker := time.NewTicker(time.Duration(cfg.ReseedMs))
@@ -2022,6 +2078,9 @@ func main() {
 			// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.SeedBuffer, cfg.SeedBuffer)
 		}
 	}()
+	*/
+
+	go reseedLoop(ctx, qrngdev, cfg.ReseedMs, cfg.ReseedSize, &master, &backup)
 
 	log.Println(Gray + "Entropy Server startup sequence completed successfully\n" + Reset)
 
