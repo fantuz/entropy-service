@@ -17,7 +17,6 @@ import (
 	"io"
 	"log"
 	"math/big"
-	// "net"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -42,6 +41,8 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/transport"
 )
 
+// "net"
+
 type ClientPrefs struct {
 	Bytes   int `json:"bytes"`
 	Refresh int `json:"refresh"`
@@ -49,9 +50,8 @@ type ClientPrefs struct {
 }
 
 // contextKey is a private type for context keys to avoid collisions.
-type contextKey string
-
-const connDRBGKey contextKey = "conn_drbg"
+// type contextKey string
+// const connDRBGKey contextKey = "conn_drbg"
 
 type EntropyPool struct {
 	buf      []byte
@@ -110,9 +110,9 @@ const (
 	White   = "\033[97m"
 )
 
-var qrngBuffer QRNGBuffer
+// var qrngBuffer QRNGBuffer
 
-var entropyPool EntropyPool
+// var entropyPool EntropyPool
 
 /*
 var bufPool = sync.Pool{
@@ -403,6 +403,7 @@ func (p *EntropyPool) Read(n int) []byte {
 	return out
 }
 
+/*
 func startEntropyProducer(pool EntropyPool, dev string, quantity int) {
 	go func() {
 		tmp := make([]byte, 4096)
@@ -413,6 +414,7 @@ func startEntropyProducer(pool EntropyPool, dev string, quantity int) {
 		}
 	}()
 }
+*/
 
 func NewEntropySource(path string, require bool) (EntropySource, error) {
 	if path == "" {
@@ -491,6 +493,7 @@ func (q *QRNGBuffer) Get(n int) ([]byte, error) {
 	return out, nil
 }
 
+/*
 func generateEntropy(buf []byte, dev string, quantity int) {
 	// _, err := io.ReadFull(drbgreal, buf)
 	// if err != nil {
@@ -508,6 +511,7 @@ func generateEntropy(buf []byte, dev string, quantity int) {
 
 	copy(buf, data)
 }
+*/
 
 /*
 // fillLoop continuously fills the buffer from the QRNG device
@@ -576,6 +580,7 @@ func fetchEntropySimple(n int, dev string, bufferlen int) ([]byte, error) {
 */
 
 // fetchEntropy reads n bytes from the buffered QRNG.
+/*
 func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	// log.Println("entropy fetch start")
 
@@ -592,6 +597,7 @@ func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
 	// atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
 	return qrngBuffer.Get(n)
 }
+*/
 
 // func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, dev string, bufferlen int, reseedbuf int).
 /*
@@ -1924,7 +1930,8 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 }
 
 // func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error)
-func startHTTP(ctx context.Context, addr string, handler http.Handler, master *drbg.DRBG) (*http.Server, error) {
+// func startHTTP(ctx context.Context, addr string, handler http.Handler, master *drbg.DRBG) (*http.Server, error)
+func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Server, error) {
 	// ln, err := net.Listen("tcp", addr)
 	// if err != nil { return nil, err }
 	// tln := newTunedListener(ln)
@@ -1984,7 +1991,8 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler, master *d
 }
 
 // func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error)
-func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *drbg.DRBG) (*http.Server, error) {
+// func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *drbg.DRBG) (*http.Server, error)
+func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config) (*http.Server, error) {
 	ln, err := listener.NewTunedListener(ctx, addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -2160,20 +2168,21 @@ func main() {
 
 	g := make([]byte, 65536)
 	// entropy, _ := qrngdev.Read(g)
-	entropy, err := io.ReadFull(qrngdev, g)
-	if err != nil {
-		log.Fatalf("read master seed: %v", err)
-	}
 
-	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file)")
+	// entropy, err := io.ReadFull(qrngdev, g)
+	// if err != nil {
+	//	log.Fatalf("read master seed: %v", err)
+	// }
 
-	entropyPool = NewEntropyPool(entropy) // 8 MB pool
+	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file) (removed logic)")
+
+	// entropyPool = NewEntropyPool(entropy) // 8 MB pool
 	// test write
 	// entropyPool.Write(g)
 	// entropyPool.Write(entropy.Read)
 
-	fmt.Println("	4) start the entropy producer pool with given 64 KB of buffer (removed)")
-	//startEntropyProducer(entropyPool, dev, 65536)
+	fmt.Println("	4) start the entropy producer pool with given 64 KB of buffer (removed logic)")
+	// startEntropyProducer(entropyPool, dev, 65536)
 
 	// resp := handler(pool)
 	// assert(len(resp) == expected)
@@ -2287,7 +2296,8 @@ func main() {
 	)
 
 	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
-	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, &backup)
+	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, &backup)
+	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux)
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	} else {
@@ -2296,7 +2306,8 @@ func main() {
 
 	if cfg.EnableHTTPS {
 		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
-		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, &backup)
+		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, &backup)
+		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg)
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
 		} else {
