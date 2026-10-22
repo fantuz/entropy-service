@@ -26,6 +26,8 @@ type Config struct {
 	DevicePath       string
 	EnableHTTPS      bool
 	RequireDevice    bool
+	MixRDRAND        bool
+	MixCPU           bool
 	ShowDebug        bool
 	WantsCookie      bool
 }
@@ -50,6 +52,8 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flag.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
+	flag.BoolVar(&cfg.MixRDRAND, "rdrand-mix", false, "Supplement startup/reseed bytes with CPU RDRAND (requires amd64 CPU support)")
+	flag.BoolVar(&cfg.MixCPU, "cpu-mix", false, "Supplement startup/reseed bytes with RDSEED, falling back to RDRAND; takes precedence over -rdrand-mix")
 	flag.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
 	flag.BoolVar(&cfg.WantsCookie, "cookie", false, "store and use HTTP cookies")
 

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+    <title>Dynamic Redirect</title>
+    <script>
+        // Runs immediately when the head parses
+        (function() {
+            // Get the current base URL (e.g., "http://localhost:3000" or "https://192.168.1.5")
+            const currentBase = window.location.origin;
+
+            // Create the meta element
+            const meta = document.createElement('meta');
+            meta.setAttribute('http-equiv', 'refresh');
+
+            // Redirect to the same base URL + a specific path after 5 seconds
+            meta.setAttribute('content', `0; url=${currentBase}/v1/meta/random`);
+
+            document.head.appendChild(meta);
+        })();
+    </script>
+</head>
+<body>
+</body>
+</html>
+

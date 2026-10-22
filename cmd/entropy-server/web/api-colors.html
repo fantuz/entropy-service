@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Entropy Stream Service - Random Colors</title>
+<style>
+body {
+    #margin: 5%;
+    position:relative;
+    margin: auto;
+    font-family: "JetBrains Mono", monospace;
+    #letter-spacing: 0.04em;
+    #font-family: monospace;
+    #display: flex;
+    justify-content: center;
+    text-align: center;
+    align-items: center;
+    #height: 100vh;
+    background: black;
+    color: #00ff88;
+    padding-top: 20%;
+    padding-bottom: 20%;
+    padding-left: 15%;
+    padding-right: 15%;
+    word-wrap: break-word;
+    overflow: hidden;
+    max-width: 100%;
+    transition: background 0.1s ease-in-out;
+}
+
+.section {
+    margin-bottom: 25px;
+}
+
+.panel {
+    position:relative;
+    margin: auto;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.data {
+    color: #00ffcc;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.hash {
+    opacity: 0.3;
+    #font-family: "IBM Plex Mono", monospace;
+    font-family: monospace;
+    text-shadow: 0 0 8px rgba(0,255,200,0.4);
+    #letter-spacing: 0.04em;
+    letter-spacing: 0.1em;
+    transition: opacity 0.2s ease-in-out;
+    backdrop-filter: blur(12px);
+    opacity: 1;
+    margin-top: 5%;
+    margin-bottom: 5%;
+    #margin-top: 20px;
+    #margin-bottom: 20px;
+    font-size: 2rem;
+    color: #444;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    background: rgba(255, 255, 255, 0.65);
+    #padding: 10%;
+    padding: 40px;
+    border-radius: 16px;
+}
+
+.hash.out {
+    opacity: 0;
+}
+
+h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+}
+</style>
+</head>
+<body>
+
+    <div id="hash" class="hash">please wait</div>
+
+<script>
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+//const refresh = urlParams.get('refresh')
+//console.log(queryString);
+var count = 0;
+
+if (typeof urlParams.get('refresh') === 'undefined') {
+	var refresh = 500
+} else {
+	var refresh = urlParams.get('refresh')
+	count++
+}
+
+//console.log(count)
+if (count > 0) {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/colors?refresh=" + refresh
+);
+} else {
+var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") 
+    + location.host + "/colors"
+);
+}
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    const hash = document.getElementById("hash");
+
+    console.log(data);
+    // derive color from first 3 bytes of hex
+    const r = parseInt(data.hash.slice(0,2),16);
+    const g = parseInt(data.hash.slice(2,4),16);
+    const b = parseInt(data.hash.slice(4,6),16);
+
+    //hash.classList.add("out");
+
+    setTimeout(() => {
+        hash.textContent = data.hash;
+        //hash.classList.remove("out");
+        document.body.style.backgroundColor =
+            `rgb(${r/2},${g/2},${b/2})`;
+    }, refresh/4);
+};
+
+</script>
+
+</body>
+</html>

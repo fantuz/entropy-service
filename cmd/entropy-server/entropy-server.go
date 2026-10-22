@@ -40,6 +40,7 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/listener"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/transport"
 )
 
@@ -2178,6 +2179,25 @@ func main() {
 	qrngdev, err := NewEntropySource(dev, cfg.RequireDevice)
 	if err != nil {
 		log.Fatalf("open entropy source: %v", err)
+	}
+
+	if cfg.MixCPU {
+		qrngdev = rdrand.NewCPUMixer(qrngdev, func(err error) {
+			log.Printf("CPU seed mixing unavailable: %v; continuing with configured entropy source", err)
+		})
+
+		log.Printf("Seed source: configured entropy source with optional CPU mixing (supported RDSEED=%t, RDRAND=%t)", rdrand.RDSEEDAvailable(), rdrand.Available())
+	} else if cfg.MixRDRAND {
+		mixed, err := rdrand.NewMixer(qrngdev, func(err error) {
+			log.Printf("RDRAND mixing unavailable: %v; continuing with configured entropy source", err)
+		})
+		if err != nil {
+			log.Fatalf("enable RDRAND mixing: %v", err)
+		}
+
+		qrngdev = mixed
+
+		log.Print("Seed source: configured entropy source with optional RDRAND mixing")
 	}
 
 	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) // 65536
