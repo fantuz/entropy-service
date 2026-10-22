@@ -18,19 +18,16 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"math/big"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	// "golang.org/x/net/http2" // enable HTTP/2.
-	"github.com/8ff/diceware"
 	// "github.com/fantuz/entropy-service/cmd/entropy-server/internal/protocol".
 	"github.com/gorilla/websocket"
 	"github.com/skip2/go-qrcode"
@@ -917,212 +914,95 @@ func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
 	}
 }
 
-func join(words []string, sep string) string {
-	var result strings.Builder
-
-	for i, w := range words {
-		if i > 0 {
-			result.WriteString(sep)
+func wsWordsHandler(source io.Reader, maxWords int, defaultRefresh time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		quantity, refresh := maxWords, int(defaultRefresh)
+		q := r.URL.Query()
+		fields := []struct {
+			name string
+			dst  *int
+			max  int
+		}{
+			{"words", &quantity, maxWords},
+			{"refresh", &refresh, 60000},
 		}
 
-		result.WriteString(w)
-	}
+		for _, field := range fields {
+			values, present := q[field.name]
+			if !present {
+				continue
+			}
 
-	return result.String()
-}
+			if len(values) != 1 {
+				http.Error(w, field.name+" must be supplied once", http.StatusBadRequest)
 
-/*
-func projectWords(n *big.Int, count int) []string {
-    base := big.NewInt(int64(len(dicewareWords)))
-    words := make([]string, 0, count)
+				return
+			}
 
-    for i := 0; i < count; i++ {
-        mod := new(big.Int)
-        n.DivMod(n, base, mod)
-        words = append(words, dicewareWords[mod.Int64()])
-    }
+			v, err := strconv.Atoi(values[0])
+			if err != nil || v <= 0 || v > field.max {
+				http.Error(w, "invalid "+field.name+" value", http.StatusBadRequest)
 
-    return words
-}
-*/
+				return
+			}
 
-func wsWordsHandler(quantity int, refresh time.Duration) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ticker := time.NewTicker(refresh * time.Millisecond)
+			*field.dst = v
+		}
 
 		metrics.AddHTTPRequests(1)
 
-		conn, cerr := upgrader.Upgrade(w, r, nil)
-		if cerr != nil {
-			log.Println("ws upgrade failed (wsWordsHandler)")
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("ws upgrade failed (wsWordsHandler): %v", err)
 
 			return
 		}
+		defer conn.Close()
+
+		conn.SetReadLimit(1024)
 
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
-		defer conn.Close()
+
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
 
-		if q := r.URL.Query().Get("words"); q != "" {
-			v, verr := strconv.Atoi(q)
-			if verr == nil && v > 0 && v <= 7776 {
-				quantity = v
-			}
-		}
-
-		if x := r.URL.Query().Get("refresh"); x != "" {
-			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<25 {
-				dtime := time.Duration(z)
-				refresh = dtime
-			}
-		}
-
-		// read cycle, to detect ghost clients and ensure proper close
 		go func() {
 			defer cancel()
 
 			for {
 				if _, _, err := conn.ReadMessage(); err != nil {
-					// ctx.Done() <- 0
-					break
+					return
 				}
 			}
-			// quit <- 0
 		}()
 
 		for {
-			// base := big.NewInt(int64(len(randomWords)))
-			randomWords := diceware.GetRandomWords()
-
-			if len(randomWords) == 0 {
-				http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
-
-				return
-			}
-
-			// Generate 256 bits entropy (32 * 8)
-			randomBytes := make([]byte, 32)
-
-			_, err := rand.Read(randomBytes)
-			if err != nil {
-				http.Error(w, "entropy failure", http.StatusInternalServerError)
-
-				return
-			}
-
-			// Optional scramble layer (sha256 calculator)
-			hash := sha256.Sum256(randomBytes)
-
-			n := new(big.Int).SetBytes(hash[:])
-
-			// Extract words
-			var wordsout []string
-
-			zero := big.NewInt(0)
-			counter := 0
-
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				// fixed word count
-				for n.Sign() > 0 && n.Cmp(zero) > 0 && counter <= quantity-1 {
-					// mod := new(big.Int)
-					// n.DivMod(n, base, mod)
-					// wordsout = append(wordsout, randomWords[mod.Int64()])
-					wordsout = append(wordsout, randomWords[counter])
-					counter++
-				}
-
-				/*
-					fmt.Println("Number of entries:", len(randomWords))
-					fmt.Println("URL parameter words:", quantity)
-					fmt.Println("Function output words:", counter)
-				*/
-
-				frame := EntropyFrame{
-					Words: join(wordsout, " "),
-					Hash:  hex.EncodeToString(hash[:]),
-				}
-
-				_ = conn.SetWriteDeadline(time.Now().Add((refresh + 2000) * time.Millisecond))
-
-				err := conn.WriteJSON(frame)
+				frame, err := newWordFrame(source, quantity)
 				if err != nil {
+					log.Printf("ws word generation failed: %v", err)
+
 					return
 				}
 
-				metrics.AddBytesGenerated(len(wordsout))
+				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				if err := conn.WriteJSON(frame); err != nil {
+					return
+				}
+
+				metrics.AddBytesGenerated(len(frame.Words))
 				metrics.AddWSPayloads(1)
-			default:
-				// log.Println("Nothing to see here")
-				continue
 			}
 		}
 	}
 }
 
-// func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, hasCookie bool) http.HandlerFunc
-func randomWordsHandler(_ *drbg.DRBG, quantity int, refreshRate int, maxBytes int, hasCookie bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// max 20 words
-		// maxWords := quantity
-		prefs, err := extractPrefs(r, maxBytes, quantity, hasCookie)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-
-			return
-		}
-
-		if hasCookie {
-			// prefs := extractPrefs(r)
-			_ = setPrefsCookie(w, prefs)
-			// maxWords = prefs.Words
-		}
-
-		maxWords := prefs.Words
-		words := diceware.GetWords()
-		randomWords := diceware.GetRandomWords()
-		// wordsMap := diceware.GetWordsMap()
-
-		randomBytes := make([]byte, 64) // Generate 512 bits random
-
-		// _, err := rand.Read(randomBytes)
-		_, err = rand.Read(randomBytes)
-		if err != nil {
-			http.Error(w, "entropy failure", http.StatusInternalServerError)
-
-			return
-		}
-
-		hash := sha256.Sum256(randomBytes) // Optional scramble layer
-
-		if len(words) == 0 {
-			http.Error(w, "wordlist not loaded", http.StatusInternalServerError)
-
-			return
-		}
-
-		n := new(big.Int).SetBytes(hash[:]) // Convert to big.Int
-		base := big.NewInt(int64(len(randomWords)))
-
-		var wordsout []string
-
-		zero := big.NewInt(0)
-		counter := 0
-
-		for n.Sign() > 0 && n.Cmp(zero) > 0 && counter < maxWords {
-			mod := new(big.Int)
-			n.DivMod(n, base, mod)
-
-			wordsout = append(wordsout, randomWords[counter])
-			counter++
-		}
-
-		hashHex := hex.EncodeToString(hash[:]) // Prepare output
-
-		tmpl := `
+func randomWordsHandler(source io.Reader, quantity int, refreshRate int, maxBytes int, hasCookie bool) http.HandlerFunc {
+	page := template.Must(template.New("page").Parse(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -1152,24 +1032,47 @@ body {
 <div class="hash">{{.Hash}}</div>
 </body>
 </html>
-`
+`))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		prefs, err := extractPrefs(r, maxBytes, quantity, hasCookie)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+
+			return
+		}
+
+		if hasCookie {
+			_ = setPrefsCookie(w, prefs)
+		}
+
+		frame, err := newWordFrame(source, prefs.Words)
+		if err != nil {
+			http.Error(w, "word generation failed", http.StatusInternalServerError)
+
+			return
+		}
 
 		data := struct {
 			Words   string
 			Hash    string
 			Refresh int
 		}{
-			Words:   template.HTMLEscapeString(join(wordsout, " ")),
-			Hash:    hashHex,
+			Words:   frame.Words,
+			Hash:    frame.Hash,
 			Refresh: refreshRate,
 		}
 
-		t := template.Must(template.New("page").Parse(tmpl))
-		_ = t.Execute(w, data)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-		metrics.AddBytesGenerated(len(wordsout))
+		if err := page.Execute(w, data); err != nil {
+			log.Printf("word page write failed: %v", err)
+
+			return
+		}
+
+		metrics.AddBytesGenerated(len(frame.Words))
 		metrics.AddHTTPRequests(1)
-		// rng.DecreaseActiveInstances(-1)
 	}
 }
 
@@ -2323,7 +2226,7 @@ func main() {
 	mux.HandleFunc("/files", uploadHandler(&backup, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 	// mux.HandleFunc("/files", fileAnalyzeHandler(drbg, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 
-	mux.HandleFunc("/words", wsWordsHandler(cfg.MaxWords, cfg.RefreshColorMs))
+	mux.HandleFunc("/words", wsWordsHandler(&backup, cfg.MaxWords, cfg.RefreshColorMs))
 
 	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie))
@@ -2333,6 +2236,7 @@ func main() {
 	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
 	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.MaxBytes, cfg.WantsCookie))
 	mux.HandleFunc("/v1/qr/random", qrHandler(&backup))
+	mux.HandleFunc("/sound", randomSoundHandler(&backup))
 
 	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
 	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.MaxBytes, cfg.WantsCookie))
