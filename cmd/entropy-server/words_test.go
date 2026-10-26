@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
 
 type wordTestSource struct{ reads atomic.Int64 }
@@ -106,7 +108,7 @@ func TestWordPageCountAndCookie(t *testing.T) {
 }
 
 func TestWordsRejectInvalidParameters(t *testing.T) {
-	handler := wsWordsHandler(new(wordTestSource), 8, 500)
+	handler := wsWordsHandler(wordTestDRBG(t), 8, 500)
 
 	for _, query := range []string{
 		"words=0", "words=-1", "words=", "words=null", "words=abc", "words=9",
@@ -132,7 +134,7 @@ func TestWordsRejectInvalidParameters(t *testing.T) {
 func TestWordsConcurrentClients(t *testing.T) {
 	// A one-minute default makes receiving frames within three seconds proof
 	// that each request's refresh is applied before ticker creation.
-	server := httptest.NewServer(wsWordsHandler(new(wordTestSource), 8, 60000))
+	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000))
 	defer server.Close()
 
 	var wg sync.WaitGroup
@@ -198,7 +200,8 @@ func TestWordsConcurrentClients(t *testing.T) {
 }
 
 func TestWordsIdleAndDisconnect(t *testing.T) {
-	source := new(wordTestSource)
+	source := wordTestDRBG(t)
+	reference := wordTestDRBG(t)
 	done := make(chan struct{})
 	handler := wsWordsHandler(source, 8, 60000)
 
@@ -222,8 +225,14 @@ func TestWordsIdleAndDisconnect(t *testing.T) {
 
 	time.Sleep(25 * time.Millisecond)
 
-	if source.reads.Load() != 0 {
-		t.Fatal("idle connection generated words before its first tick")
+	got, err := source.Derive(64)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := reference.Derive(64)
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatal("idle connection consumed parent output before its first tick")
 	}
 
 	_ = conn.Close()
@@ -233,4 +242,17 @@ func TestWordsIdleAndDisconnect(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("disconnect did not stop the handler while its ticker was idle")
 	}
+}
+
+func wordTestDRBG(t *testing.T) *drbg.DRBG {
+	t.Helper()
+
+	d, err := drbg.NewDRBG(make([]byte, 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
+
+	return &d
 }

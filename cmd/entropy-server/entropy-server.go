@@ -926,7 +926,7 @@ func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
 	}
 }
 
-func wsWordsHandler(source io.Reader, maxWords int, defaultRefresh time.Duration) http.HandlerFunc {
+func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		quantity, refresh := maxWords, int(defaultRefresh)
 		q := r.URL.Query()
@@ -970,6 +970,9 @@ func wsWordsHandler(source io.Reader, maxWords int, defaultRefresh time.Duration
 			return
 		}
 		defer conn.Close()
+
+		source := drbg.NewConnectionReader(d)
+		defer source.Close()
 
 		conn.SetReadLimit(1024)
 
@@ -1383,6 +1386,9 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) ht
 		}
 		defer conn.Close()
 
+		source := drbg.NewConnectionReader(d)
+		defer source.Close()
+
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 
@@ -1406,7 +1412,7 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) ht
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if _, err := io.ReadFull(d, buf); err != nil {
+				if _, err := io.ReadFull(source, buf); err != nil {
 					log.Printf("ws entropy read failed: %v", err)
 
 					return
@@ -1568,6 +1574,9 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity
 		}
 		defer conn.Close()
 
+		source := drbg.NewConnectionReader(d)
+		defer source.Close()
+
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 
@@ -1591,7 +1600,7 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if _, err := io.ReadFull(d, buf); err != nil {
+				if _, err := io.ReadFull(source, buf); err != nil {
 					log.Printf("ws entropy read failed: %v", err)
 
 					return
@@ -2053,7 +2062,7 @@ func main() {
 	}
 
 	fmt.Println("\n-------------------------------------------------")
-	fmt.Println(Gray + "       Entropy Server Pre-Flight Checks" + Reset)
+	fmt.Println(Cyan + "       Entropy Server Pre-Flight Checks" + Reset)
 	fmt.Println("-------------------------------------------------")
 	fmt.Println("HTTP cookie support          :", cfg.WantsCookie)
 	fmt.Println("HTTP port                    :", cfg.HTTPAddr)
@@ -2130,7 +2139,7 @@ func main() {
 
 	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) // 65536
 
-	fmt.Println("	2) initialize seed space (needs fix)")
+	fmt.Println("	2) initialize seed space")
 
 	/*
 		seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
@@ -2341,11 +2350,11 @@ func main() {
 
 	go reseedLoop(ctx, qrngdev, cfg.ReseedMs, cfg.ReseedSize, &master, &backup)
 
-	log.Println(Gray + "Entropy Server startup sequence completed successfully\n" + Reset)
+	log.Println(Cyan + "Entropy Server startup sequence completed successfully\n" + Reset)
 
 	<-ctx.Done()
 
-	log.Println("shutdown signal received")
+	log.Println(Red + "shutdown signal received" + Reset)
 
 	// shutdownCtx, cancel := context.WithCancel(context.Background())
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

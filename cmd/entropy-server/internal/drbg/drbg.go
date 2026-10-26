@@ -27,12 +27,13 @@ type DRBG struct {
 	Stream cipher.Stream
 
 	// Crypto state
-	key       [32]byte
-	nonce     [aes.BlockSize]byte
-	cipher    cipher.Stream
-	algorithm Algorithm
-	generated uint64
-	Reseeded  time.Time
+	key         [32]byte
+	nonce       [aes.BlockSize]byte
+	cipher      cipher.Stream
+	algorithm   Algorithm
+	generated   uint64
+	Reseeded    time.Time
+	reseedEpoch atomic.Uint64
 
 	// Observability / header metadata
 	version        string
@@ -180,6 +181,7 @@ func (d *DRBG) Reseed(seed []byte) error {
 	d.cipher = c
 	d.generated = 0
 	d.Reseeded = time.Now()
+	d.reseedEpoch.Add(1)
 	// activeDRBG.Add(-1)
 	return nil
 }
@@ -191,6 +193,11 @@ func (d *DRBG) Read(p []byte) (int, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	return d.readLocked(p)
+}
+
+// readLocked requires d.mu; seed derivation also snapshots the reseed epoch.
+func (d *DRBG) readLocked(p []byte) (int, error) {
 	if uint64(len(p)) > maxBytesPerKey-d.generated {
 		return 0, errors.New("DRBG output limit reached: reseed required")
 	}

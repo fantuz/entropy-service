@@ -48,7 +48,7 @@ func TestRandomBytesInheritsBackend(t *testing.T) {
 				t.Fatalf("handler did not use the selected backend: status %d", w.Code)
 			}
 
-			if w.Header().Get("X-RNG-DRBG") != algorithm.String() {
+			if w.Header().Get("X-Rng-Drbg") != algorithm.String() {
 				t.Fatal("response header does not match the selected backend")
 			}
 		})
