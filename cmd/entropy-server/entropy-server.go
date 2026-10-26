@@ -744,7 +744,11 @@ func entropyHeatmapHandler(d *drbg.DRBG) http.HandlerFunc {
 		img := image.NewRGBA(image.Rect(0, 0, width, height))
 
 		buf := make([]byte, width*height)
-		_, _ = d.Read(buf)
+		if _, err := io.ReadFull(d, buf); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			return
+		}
 
 		i := 0
 
@@ -786,7 +790,11 @@ func qrHandler(d *drbg.DRBG) http.HandlerFunc {
 
 		// 1. get entropy
 		buf := make([]byte, 64)
-		_, _ = d.Read(buf)
+		if _, err := io.ReadFull(d, buf); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			return
+		}
 
 		// 2. encode (hex or base64 recommended)
 		data := hex.EncodeToString(buf)
@@ -866,7 +874,11 @@ func randomImageHandler(d *drbg.DRBG) http.HandlerFunc {
 		img := image.NewRGBA(image.Rect(0, 0, width, height))
 
 		// Fill the entire backing buffer with DRBG output
-		_, _ = d.Read(img.Pix)
+		if _, err := io.ReadFull(d, img.Pix); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			return
+		}
 
 		// Force alpha channel to opaque
 		for y := range height {
@@ -1099,11 +1111,13 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 		d.WriteHeaders(w)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
-		// Derive 32 bytes from master
-		seed, _ := d.Derive(64)
+		// Create a per-request DRBG using the parent's selected backend.
+		child, err := drbg.NewConnectionDRBG(d)
+		if err != nil {
+			http.Error(w, "DRBG child creation failed", http.StatusInternalServerError)
 
-		// Create per-request DRBG
-		child, _ := drbg.NewDRBG(seed)
+			return
+		}
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
 		/*
@@ -1127,7 +1141,12 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 		// x := child.Read(buf[:size])
 		// aa := entropyPool.Read(size)
 
-		_, _ = io.ReadFull(&child, buf)
+		if _, err := io.ReadFull(&child, buf); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			return
+		}
+
 		_, _ = w.Write(buf)
 
 		metrics.AddBytesGenerated(len(buf))
@@ -2000,6 +2019,11 @@ func main() {
 
 	cfg := config.ParseConfig()
 
+	algorithm, err := drbg.ParseAlgorithm(cfg.DRBG)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10000 {
 		panic("reseed-ms must be between 1 and 10000 ms")
 	}
@@ -2041,6 +2065,7 @@ func main() {
 	fmt.Println("Reseed size                  :", cfg.ReseedSize)
 	fmt.Println("ReseedMs interval            :", cfg.ReseedMs)
 	fmt.Println("Max request size KB          :", cfg.MaxBytes/1024)
+	fmt.Println("DRBG stream backend          :", algorithm)
 	fmt.Println("QRNGBuffer size              :", cfg.QRNGBuffer)
 	fmt.Println("Reseed Buffer size           :", cfg.SeedBuffer)
 	fmt.Println("-------------------------------------------------")
@@ -2141,10 +2166,10 @@ func main() {
 	// resp := handler(pool)
 	// assert(len(resp) == expected)
 
-	// Initialize DRBG instance and pass entropy along. Note that multiple instances of DRBG are created on a per-connection basis
+	// Initialize the generators from separately read startup seed buffers.
 	fmt.Println("	5) write the entropy out to DRBG buffer")
 
-	master, merr := drbg.NewDRBG(g)
+	master, merr := drbg.NewDRBGWithAlgorithm(g, algorithm)
 	if merr != nil {
 		log.Fatal(merr)
 	}
@@ -2155,15 +2180,15 @@ func main() {
 		log.Fatalf("read backup seed: %v", err)
 	}
 
-	backup, berr := drbg.NewDRBG(backupSeed)
+	backup, berr := drbg.NewDRBGWithAlgorithm(backupSeed, algorithm)
 	if berr != nil {
 		log.Fatal(berr)
 	}
 
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI"
 	fmt.Println("	6) set DRBG metadata (optional)")
-	master.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
-	backup.SetMetadata("1.1.0", dev, "ChaCha20", time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
+	master.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
+	backup.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
 
 	// Attach the QRNG buffer for dynamic header reporting
 	fmt.Println("	7) attach the QRNG buffer to DRBG")

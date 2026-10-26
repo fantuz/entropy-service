@@ -1,15 +1,15 @@
 package drbg
 
 import (
+	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha512"
+	"errors"
 	"net/http"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/crypto/chacha20"
 
 	// "io".
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
@@ -27,10 +27,12 @@ type DRBG struct {
 	Stream cipher.Stream
 
 	// Crypto state
-	key      [32]byte
-	nonce    [12]byte
-	cipher   *chacha20.Cipher
-	Reseeded time.Time
+	key       [32]byte
+	nonce     [aes.BlockSize]byte
+	cipher    cipher.Stream
+	algorithm Algorithm
+	generated uint64
+	Reseeded  time.Time
 
 	// Observability / header metadata
 	version        string
@@ -75,6 +77,10 @@ type HealthInfo struct {
 
 var activeDRBG atomic.Int64
 
+// ChaCha20 has 2^32 blocks of 64 bytes per key. Use the same operational
+// ceiling for both backends; reseeding resets the byte budget.
+const maxBytesPerKey uint64 = 1 << 38
+
 func DecreaseActiveInstances(quantity int64) {
 	activeDRBG.Add(-1)
 }
@@ -92,58 +98,59 @@ func (d *DRBG) SetEntropyBuffer(q qrng.QRNGBuffer) {
 
 // NewDRBG creates a new DRBG instance from a seed.
 func NewDRBG(seed []byte) (DRBG, error) {
+	return NewDRBGWithAlgorithm(seed, ChaCha20)
+}
+
+// NewDRBGWithAlgorithm preserves the existing SHA-512 seed construction.
+// AES-CTR here is a stream backend, not a NIST CTR_DRBG implementation.
+func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
+	if _, err := ParseAlgorithm(string(algorithm)); err != nil {
+		return DRBG{}, err
+	}
+
 	if len(seed) < 32 {
-		panic("seed too short")
+		return DRBG{}, errors.New("seed must contain at least 32 bytes")
 	}
 
 	h := sha512.Sum512(seed)
-	// n := sha256.Sum256(noncee)
-
-	// if _, err := crypto/rand.Read(nonce); err != nil
 
 	var (
 		key   [32]byte
-		nonce [12]byte
+		nonce [aes.BlockSize]byte
 	)
-	// nonce := make([]byte, 12)
 	copy(key[:], h[:32])
-	copy(nonce[:], h[32:44])
-	// copy(nonce[:], n[:12])
+	copy(nonce[:], h[32:48])
 
-	c, _ := chacha20.NewUnauthenticatedCipher(key[:], nonce[:])
-
-	/*
-		if err != nil {
-			return _, err
-		}
-	*/
+	c, err := newCipherStream(algorithm, key, nonce)
+	if err != nil {
+		return DRBG{}, err
+	}
 
 	activeDRBG.Add(1)
-	// return &DRBG
+
 	return DRBG{
-		key:      key,
-		nonce:    nonce,
-		cipher:   c,
-		Reseeded: time.Now(),
+		key:       key,
+		nonce:     nonce,
+		cipher:    c,
+		algorithm: algorithm,
+		algo:      algorithm.String(),
+		Reseeded:  time.Now(),
 	}, nil
 }
 
-// DRBG per-connection seed
-// func NewConnectionDRBG(d DRBG) (DRBG, error)
+// NewConnectionDRBG derives an independent child with its parent's backend.
 func NewConnectionDRBG(d *DRBG) (DRBG, error) {
-	// seed, err := d.Derive(32) // 256-bit seed
-	seed, _ := d.Derive(64) // 512-bit seed
+	seed, err := d.Derive(64)
+	if err != nil {
+		return DRBG{}, err
+	}
 
-	/*
-		if err != nil {
-			return nil, err
-		}
-	*/
+	return NewDRBGWithAlgorithm(seed, d.algorithm)
+}
 
-	// nonce := make([]byte, 12) // 96-bit nonce
-	// copy(nonce, seed[:12])
-
-	return NewDRBG(seed)
+// Algorithm is immutable after construction, including across reseeds.
+func (d *DRBG) Algorithm() Algorithm {
+	return d.algorithm
 }
 
 // Reseed mixes new entropy into the DRBG
@@ -154,15 +161,24 @@ func (d *DRBG) Reseed(seed []byte) error {
 	defer d.mu.Unlock()
 
 	h := sha512.Sum512(append(d.key[:], seed...))
-	copy(d.key[:], h[:32])
-	copy(d.nonce[:], h[32:44])
 
-	c, err := chacha20.NewUnauthenticatedCipher(d.key[:], d.nonce[:])
+	var (
+		key   [32]byte
+		nonce [aes.BlockSize]byte
+	)
+
+	copy(key[:], h[:32])
+	copy(nonce[:], h[32:48])
+
+	c, err := newCipherStream(d.algorithm, key, nonce)
 	if err != nil {
 		return err
 	}
 
+	d.key = key
+	d.nonce = nonce
 	d.cipher = c
+	d.generated = 0
 	d.Reseeded = time.Now()
 	// activeDRBG.Add(-1)
 	return nil
@@ -175,8 +191,13 @@ func (d *DRBG) Read(p []byte) (int, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	if uint64(len(p)) > maxBytesPerKey-d.generated {
+		return 0, errors.New("DRBG output limit reached: reseed required")
+	}
+
 	clear(p)
 	d.cipher.XORKeyStream(p, p)
+	d.generated += uint64(len(p))
 	// d.cipher.XORKeyStream(p.CH, p.CH)
 	// d.CH <- generateEntropyChunk()
 
@@ -253,12 +274,13 @@ func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
 }
 
 // SetMetadata sets all DRBG metadata.
-func (d *DRBG) SetMetadata(version, source, algo string, interval time.Duration, sizeBits int, buf qrng.QRNGBuffer) {
+func (d *DRBG) SetMetadata(version, source, _ string, interval time.Duration, sizeBits int, buf qrng.QRNGBuffer) {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
 	d.version = version
 	d.source = source
-	d.algo = algo
+	// Keep the existing signature; report the actual constructed backend.
+	d.algo = d.algorithm.String()
 	d.reseedInterval = interval
 	d.reseedSizeBits = sizeBits
 	d.entropyBuf = buf

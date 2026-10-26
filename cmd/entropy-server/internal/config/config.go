@@ -24,6 +24,7 @@ type Config struct {
 	KeyFile          string
 	LogLevel         string
 	DevicePath       string
+	DRBG             string
 	EnableHTTPS      bool
 	RequireDevice    bool
 	MixRDRAND        bool
@@ -40,6 +41,7 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
 	flag.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flag.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
+	flag.StringVar(&cfg.DRBG, "drbg", "chacha20", "DRBG stream backend: chacha20 or aes-256-ctr")
 	flag.DurationVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default refresh rate (in ms) for data presented over websockets (default: 5 sec)")
 	flag.DurationVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default refresh rate (in ms) for colors-only websocket /colors.html (default: 1.5 sec")
 	flag.IntVar(&cfg.RefreshRate, "refresh", 5, "Default refresh rate (in seconds) of words presented by /v1/words/random endpoint")
