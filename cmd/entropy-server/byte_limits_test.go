@@ -46,13 +46,16 @@ func TestByteEndpointLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer drbg.DecreaseActiveInstances(1)
+
+	budget := newWebSocketBudget(128, 1<<30)
 
 	handlers := map[string]http.HandlerFunc{
 		"/v1/data/random": randomBytesHandler(&d, maxBytes, 20, false),
 		"/v1/data/test":   randomHandler(&d, maxBytes),
-		"/stream":         wsBinaryHandler(&d, 1, 2048, maxBytes, newWebSocketBudget(128, 1<<30)),
-		"/bytes":          wsBytesHandler(&d, 1, maxBytes, newWebSocketBudget(128, 1<<30)),
-		"/colors":         wsBytesHandler(&d, 1, maxBytes, newWebSocketBudget(128, 1<<30)),
+		"/stream":         wsBinaryHandler(&d, 1, 2048, maxBytes, budget),
+		"/bytes":          wsBytesHandler(&d, 1, maxBytes, budget),
+		"/colors":         wsBytesHandler(&d, 1, maxBytes, budget),
 	}
 	mux := http.NewServeMux()
 
@@ -62,6 +65,9 @@ func TestByteEndpointLimits(t *testing.T) {
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
+	// Close does not join hijacked WebSocket handlers. Wait for their final
+	// deferred release before another test snapshots the global DRBG count.
+	defer waitBudgetActive(t, budget, 0)
 
 	client := &http.Client{Timeout: 3 * time.Second}
 

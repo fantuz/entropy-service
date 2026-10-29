@@ -134,8 +134,12 @@ func TestWordsRejectInvalidParameters(t *testing.T) {
 func TestWordsConcurrentClients(t *testing.T) {
 	// A one-minute default makes receiving frames within three seconds proof
 	// that each request's refresh is applied before ticker creation.
-	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000, newWebSocketBudget(128, 1<<30)))
+	budget := newWebSocketBudget(128, 1<<30)
+
+	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000, budget))
 	defer server.Close()
+	// Client Close/wg.Wait alone do not join the server's upgraded handlers.
+	defer waitBudgetActive(t, budget, 0)
 
 	var wg sync.WaitGroup
 
