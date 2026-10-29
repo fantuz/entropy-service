@@ -108,7 +108,7 @@ func TestWordPageCountAndCookie(t *testing.T) {
 }
 
 func TestWordsRejectInvalidParameters(t *testing.T) {
-	handler := wsWordsHandler(wordTestDRBG(t), 8, 500)
+	handler := wsWordsHandler(wordTestDRBG(t), 8, 500, newWebSocketBudget(128, 1<<30))
 
 	for _, query := range []string{
 		"words=0", "words=-1", "words=", "words=null", "words=abc", "words=9",
@@ -134,7 +134,7 @@ func TestWordsRejectInvalidParameters(t *testing.T) {
 func TestWordsConcurrentClients(t *testing.T) {
 	// A one-minute default makes receiving frames within three seconds proof
 	// that each request's refresh is applied before ticker creation.
-	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000))
+	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000, newWebSocketBudget(128, 1<<30)))
 	defer server.Close()
 
 	var wg sync.WaitGroup
@@ -203,7 +203,7 @@ func TestWordsIdleAndDisconnect(t *testing.T) {
 	source := wordTestDRBG(t)
 	reference := wordTestDRBG(t)
 	done := make(chan struct{})
-	handler := wsWordsHandler(source, 8, 60000)
+	handler := wsWordsHandler(source, 8, 60000, newWebSocketBudget(128, 1<<30))
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer close(done)

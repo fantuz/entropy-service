@@ -27,13 +27,14 @@ func TestWebSocketShutdown(t *testing.T) {
 					defer drbg.DecreaseActiveInstances(1)
 
 					baseline := drbg.ActiveInstances()
-					handler := wsBytesHandler(&parent, 5, 64)
+					budget := newWebSocketBudget(128, 1<<30)
+					handler := wsBytesHandler(&parent, 5, 64, budget)
 
 					switch path {
 					case "/stream":
-						handler = wsBinaryHandler(&parent, 5, 64, 64)
+						handler = wsBinaryHandler(&parent, 5, 64, 64, budget)
 					case "/words":
-						handler = wsWordsHandler(&parent, 3, 5)
+						handler = wsWordsHandler(&parent, 3, 5, budget)
 					}
 
 					ctx, cancel := context.WithCancel(t.Context())
@@ -84,6 +85,10 @@ func TestWebSocketShutdown(t *testing.T) {
 
 					if err := server.Shutdown(shutdownCtx); err != nil {
 						t.Fatal(err)
+					}
+
+					if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
+						t.Fatalf("shutdown did not release reservations: %+v", usage)
 					}
 
 					if got := drbg.ActiveInstances(); got != baseline {

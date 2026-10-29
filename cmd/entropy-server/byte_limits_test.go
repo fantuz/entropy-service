@@ -50,9 +50,9 @@ func TestByteEndpointLimits(t *testing.T) {
 	handlers := map[string]http.HandlerFunc{
 		"/v1/data/random": randomBytesHandler(&d, maxBytes, 20, false),
 		"/v1/data/test":   randomHandler(&d, maxBytes),
-		"/stream":         wsBinaryHandler(&d, 1, 2048, maxBytes),
-		"/bytes":          wsBytesHandler(&d, 1, maxBytes),
-		"/colors":         wsBytesHandler(&d, 1, maxBytes),
+		"/stream":         wsBinaryHandler(&d, 1, 2048, maxBytes, newWebSocketBudget(128, 1<<30)),
+		"/bytes":          wsBytesHandler(&d, 1, maxBytes, newWebSocketBudget(128, 1<<30)),
+		"/colors":         wsBytesHandler(&d, 1, maxBytes, newWebSocketBudget(128, 1<<30)),
 	}
 	mux := http.NewServeMux()
 

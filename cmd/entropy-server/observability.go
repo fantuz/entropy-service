@@ -79,7 +79,7 @@ func healthHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
 	}
 }
 
-func metricsHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
+func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget) http.HandlerFunc {
 	const (
 		counterType = "counter"
 		gaugeType   = "gauge"
@@ -87,6 +87,7 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, _ *http.Request) {
 		meta := d.GetMetadata()
+		wsUsage := budget.usage()
 
 		ready := 0
 		if reseedReady(meta, maxAge) {
@@ -113,6 +114,14 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
 			{"wss_payloads_total", "WebSocket messages sent over WS or WSS", counterType, payloads},
 			{"wss_payloads", "Deprecated alias of wss_payloads_total", "untyped", payloads},
 			{"drbg_instance_count", "Current number of DRBG instances", gaugeType, meta.DRBGInstanceCnt},
+			{"ws_connections_active", "Admitted entropy WebSockets across HTTP and HTTPS", gaugeType, wsUsage.Active},
+			{"ws_connections_limit", "Configured entropy WebSocket connection limit", gaugeType, wsUsage.MaxConnections},
+			{"ws_inbound_message_limit_bytes", "Maximum inbound entropy WebSocket message size", gaugeType, wsInboundLimit},
+			{"ws_memory_reserved_bytes", "Estimated working memory reserved by admitted WebSockets; not process RSS", gaugeType, wsUsage.Reserved},
+			{"ws_memory_budget_bytes", "Configured WebSocket working-memory reservation budget", gaugeType, wsUsage.MaxMemory},
+			{"ws_rejected_connections_total", "WebSocket upgrades rejected by the connection limit", counterType, wsUsage.RejectedConnections},
+			{"ws_rejected_memory_total", "WebSocket upgrades rejected by aggregate memory reservations", counterType, wsUsage.RejectedMemory},
+			{"ws_rejected_size_total", "WebSocket requests too large for the whole memory budget", counterType, wsUsage.RejectedSize},
 			{"qrng_buffer_enabled", "Legacy software QRNG buffer is disabled", gaugeType, 0},
 			{"qrng_buffer_bytes", "Legacy software QRNG buffer bytes; disabled", gaugeType, 0},
 			{"qrng_buffer_capacity_bytes", "Legacy software QRNG buffer capacity in bytes; disabled", gaugeType, 0},

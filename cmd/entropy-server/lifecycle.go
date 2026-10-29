@@ -77,6 +77,8 @@ func (s *managedServer) Shutdown(ctx context.Context) error {
 // websocketContext interrupts blocked reads AND writes on cancellation. Cleanup
 // joins the reader before the handler releases its private generator.
 func websocketContext(parent context.Context, conn *websocket.Conn) (context.Context, func()) {
+	conn.SetReadLimit(wsInboundLimit)
+
 	ctx, cancel := context.WithCancel(parent)
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	done := make(chan struct{})

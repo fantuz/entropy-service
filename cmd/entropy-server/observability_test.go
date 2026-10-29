@@ -90,7 +90,7 @@ func TestMetricsNamesTypesUnitsAndReadiness(t *testing.T) {
 	d.RecordReseedFailure(io.EOF)
 
 	w := httptest.NewRecorder()
-	metricsHandler(d, time.Second)(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
+	metricsHandler(d, time.Second, newWebSocketBudget(128, 1<<30))(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
 
 	if !strings.HasPrefix(w.Header().Get("Content-Type"), "text/plain; version=0.0.4") {
 		t.Fatal("metrics must declare Prometheus text format")
@@ -122,7 +122,7 @@ func TestMetricsNamesTypesUnitsAndReadiness(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	metricsHandler(d, time.Second)(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
+	metricsHandler(d, time.Second, newWebSocketBudget(128, 1<<30))(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
 
 	values, _ = parseMetricSamples(t, w.Body.String())
 	if values["rng_ready"] != 1 || values["rng_generator_reseeds_total"] != 1 || values["rng_reseed_failures_total"] != 1 {
@@ -194,7 +194,7 @@ func TestCountRequestsIncludesErrorsAndPreservesWebSockets(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	handler := wsBinaryHandler(d, 1, 64, 64)
+	handler := wsBinaryHandler(d, 1, 64, 64, newWebSocketBudget(128, 1<<30))
 
 	server := httptest.NewServer(countRequests(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer close(done)

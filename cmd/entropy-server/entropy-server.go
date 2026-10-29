@@ -922,7 +922,7 @@ func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
 	}
 }
 
-func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int) http.HandlerFunc {
+func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webSocketBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		quantity, refresh := maxWords, defaultRefresh
 		q := r.URL.Query()
@@ -957,6 +957,12 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int) http.Handler
 			*field.dst = v
 		}
 
+		release, admitted := budget.admit(w, r, wsReservation(quantity, budget.wordMemory))
+		if !admitted {
+			return
+		}
+		defer release()
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("ws upgrade failed (wsWordsHandler): %v", err)
@@ -967,8 +973,6 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int) http.Handler
 
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
-
-		conn.SetReadLimit(1024)
 
 		ctx, cancel := websocketContext(r.Context(), conn)
 		defer cancel()
@@ -1337,7 +1341,7 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh int) http.HandlerFunc {
 	}
 }
 
-func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int) http.HandlerFunc {
+func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webSocketBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n, err := extractByteCount(r, 2048, maxBytes)
 		if err != nil {
@@ -1353,6 +1357,12 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int) http.Handler
 				refresh = v
 			}
 		}
+
+		release, admitted := budget.admit(w, r, wsByteReservation(n, true))
+		if !admitted {
+			return
+		}
+		defer release()
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -1512,7 +1522,7 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 }
 */
 
-func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes int) http.HandlerFunc {
+func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes int, budget *webSocketBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		quantity, err := extractByteCount(r, defaultQuantity, maxBytes)
 		if err != nil {
@@ -1528,6 +1538,12 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes
 				refresh = v
 			}
 		}
+
+		release, admitted := budget.admit(w, r, wsByteReservation(quantity, false))
+		if !admitted {
+			return
+		}
+		defer release()
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -2045,6 +2061,9 @@ func main() {
 	// master := NewMasterDRBG(entropy)
 	// masterDRBG, _ := drbg.NewDRBG(entropy2)
 
+	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
+	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
+
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
@@ -2061,16 +2080,16 @@ func main() {
 	mux.HandleFunc("/health-1", healthHandler(&master, maxReseedAge))
 	mux.HandleFunc("/health-2", healthHandler(&backup, maxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&master, maxReseedAge))
-	mux.Handle("/metrics-2", metricsHandler(&backup, maxReseedAge))
+	mux.Handle("/metrics-1", metricsHandler(&master, maxReseedAge, wsBudget))
+	mux.Handle("/metrics-2", metricsHandler(&backup, maxReseedAge, wsBudget))
 
-	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes))
-	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes))
-	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs, cfg.MaxBytes))
+	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
+	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
+	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/files", uploadHandler(&backup, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 	// mux.HandleFunc("/files", fileAnalyzeHandler(drbg, cfg.BytesFingerprint, cfg.RefreshColorMs)) // cfg.MaxBytes
 
-	mux.HandleFunc("/words", wsWordsHandler(&backup, cfg.MaxWords, cfg.RefreshColorMs))
+	mux.HandleFunc("/words", wsWordsHandler(&backup, cfg.MaxWords, cfg.RefreshColorMs, wsBudget))
 
 	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie))
