@@ -10,8 +10,15 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
-// var ClientRateMeter = diag.NewRateMeter().
-func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
+// StreamFrame carries timing with the matching payload, even when frames queue.
+// ReceiveWait measures one complete ReadMessage call, including waiting for the
+// server to send. It is not a round-trip or one-way network latency measurement.
+type StreamFrame struct {
+	Data        []byte
+	ReceiveWait time.Duration
+}
+
+func StreamEntropy(ctx context.Context, url string) (<-chan StreamFrame, error) {
 	// url = fmt.Sprintf("%s%sbytes=%d", url, sep, quantity)
 	// var wsurl = url + "?bytes=" + strconv.Itoa(quantity) + "&refresh=" + fps
 	// conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
@@ -39,7 +46,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 
 	// out := make([]byte, 1<<16)
 	// out := make(chan []byte, 1<<25) // 16 is safe
-	out := make(chan []byte, 16)
+	out := make(chan StreamFrame, 16)
 
 	go func() {
 		defer close(out)
@@ -55,7 +62,10 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 
 			// conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
 
+			readStarted := time.Now()
 			_, msg, err := conn.ReadMessage()
+			receiveWait := time.Since(readStarted)
+
 			if err != nil {
 				return
 			}
@@ -72,7 +82,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan []byte, error) {
 			// push into channel (non-blocking if buffered)
 			// Wait for queue space or cancellation
 			select {
-			case out <- msg:
+			case out <- StreamFrame{Data: msg, ReceiveWait: receiveWait}:
 			case <-ctx.Done():
 				// panic("critical end of ws context reached")
 				return

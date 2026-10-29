@@ -310,8 +310,6 @@ func main() {
 
 	stats := Stats{}
 
-	startprg := time.Now()
-
 	graph := diag.NewEntropyGraph(60)
 	dashboard := diag.NewDashboard(60)
 
@@ -323,7 +321,7 @@ func main() {
 	// wscancel()
 
 	// stream, sterr := client.StreamEntropy(wsctx, cfg.WSUrl)
-	var stream <-chan []byte
+	var stream <-chan client.StreamFrame
 
 	if cfg.Mode == modeStream {
 		var sterr error
@@ -339,6 +337,8 @@ func main() {
 	fmt.Print("\a")
 
 	startout := time.Now()
+
+	var wsRuntime time.Duration
 
 	for {
 		start := time.Now()
@@ -357,12 +357,14 @@ func main() {
 				return
 
 			// case <-tickerw.C:
-			case stdata, ok := <-stream:
+			case frame, ok := <-stream:
 				if !ok {
 					log.Print("WebSocket stream closed")
 
 					return
 				}
+
+				stdata := frame.Data
 				// for stdata := range stream {
 				atomic.AddUint64(&diag.BytesFetched, uint64(len(stdata)))
 				stats.TotalBytes += len(stdata)
@@ -418,10 +420,10 @@ func main() {
 					opt++
 				}
 
-				hrtot := time.Since(startprg).Milliseconds()
-				hrreal := time.Since(startout).Milliseconds()
-				elapsedws := time.Since(startws).Milliseconds()
-				stats.Rate = float64(stats.TotalBytes) / float64(elapsedws)
+				cycleEnd := time.Now()
+				totalRuntime := cycleEnd.Sub(startout)
+				wsRuntime += cycleEnd.Sub(startws)
+				stats.Rate = float64(stats.TotalBytes) / totalRuntime.Seconds()
 				// fmt.Println("Program rate         :", r.Rate, "MB/s")
 				// fmt.Println("Program notes        :", r.Notes, "ms")
 				// fmt.Printf("Entropy            : %q", &stats.Entropy, "ms")
@@ -431,8 +433,9 @@ func main() {
 					// btot := atomic.LoadUint64(&diag.BytesFetched)
 					// fmt.Println("real RECV          :", (btot/3)+uint64(len(stdata)))
 					// fmt.Println("WS cycle runtime   :", hrtot-elapsedws, "ms")
-					fmt.Println("WS cycle runtime   :", hrtot-elapsedws-int64(cfg.Refresh)/1000000, "ms")
-					fmt.Println("Total runtime      :", hrreal, "ms")
+					fmt.Printf("Last WS receive    : %.3f ms\n", frame.ReceiveWait.Seconds()*1000)
+					fmt.Printf("WS runtime         : %.3f ms\n", wsRuntime.Seconds()*1000)
+					fmt.Printf("Total runtime      : %.3f ms\n", totalRuntime.Seconds()*1000)
 				}
 
 				if opt > 0 {

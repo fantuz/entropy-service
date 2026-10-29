@@ -43,7 +43,7 @@ func TestStreamEntropyWS(t *testing.T) {
 	total := 0
 
 	for msg := range ch {
-		total += len(msg)
+		total += len(msg.Data)
 		if total >= 5*512 {
 			break
 		}

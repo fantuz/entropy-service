@@ -86,7 +86,7 @@ func TestWordPageCountAndCookie(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			randomWordsHandler(source, 64, 5, 1<<25, tc.cookie > 0)(w, r)
+			randomWordsHandler(source, 64, 5000, 1<<25, tc.cookie > 0)(w, r)
 
 			if w.Code != http.StatusOK {
 				t.Fatalf("status=%d body=%s", w.Code, w.Body)
@@ -255,4 +255,21 @@ func wordTestDRBG(t *testing.T) *drbg.DRBG {
 	t.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
 
 	return &d
+}
+
+func TestWordPageConvertsMillisecondRefresh(t *testing.T) {
+	for _, tc := range []struct {
+		milliseconds int
+		seconds      string
+	}{
+		{1, "1"}, {999, "1"}, {1000, "1"}, {1500, "2"}, {5000, "5"},
+	} {
+		w := httptest.NewRecorder()
+		randomWordsHandler(new(wordTestSource), 3, tc.milliseconds, 64, false)(w,
+			httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/meta/random", nil))
+
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `http-equiv="refresh" content="`+tc.seconds+`"`) {
+			t.Fatalf("%d milliseconds did not produce a %s-second HTML refresh", tc.milliseconds, tc.seconds)
+		}
+	}
 }

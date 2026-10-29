@@ -922,9 +922,9 @@ func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
 	}
 }
 
-func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh time.Duration) http.HandlerFunc {
+func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		quantity, refresh := maxWords, int(defaultRefresh)
+		quantity, refresh := maxWords, defaultRefresh
 		q := r.URL.Query()
 		fields := []struct {
 			name string
@@ -1009,7 +1009,7 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh time.Duration) ht
 	}
 }
 
-func randomWordsHandler(source io.Reader, quantity int, refreshRate int, maxBytes int, hasCookie bool) http.HandlerFunc {
+func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes int, hasCookie bool) http.HandlerFunc {
 	page := template.Must(template.New("page").Parse(`
 <!DOCTYPE html>
 <html>
@@ -1061,6 +1061,12 @@ body {
 			return
 		}
 
+		// HTML meta refresh uses integer seconds, so round milliseconds up.
+		refreshSeconds := refreshMs / 1000
+		if refreshMs%1000 != 0 {
+			refreshSeconds++
+		}
+
 		data := struct {
 			Words   string
 			Hash    string
@@ -1068,7 +1074,7 @@ body {
 		}{
 			Words:   frame.Words,
 			Hash:    frame.Hash,
-			Refresh: refreshRate,
+			Refresh: refreshSeconds,
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1155,9 +1161,9 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 // reference while the upload analysis path is finalized.
 //
 //nolint:unused // retained deliberately; wired via the commented-out /files route.
-func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
+func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ticker := time.NewTicker(refresh * time.Millisecond)
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -1173,7 +1179,7 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 
 		if x := r.URL.Query().Get("refresh"); x != "" {
 			if z, zerr := strconv.Atoi(x); zerr == nil && z > 0 && z <= 1<<25 {
-				refresh = time.Duration(z)
+				refresh = z
 				// log.Printf("Nothing to see here: %d", refresh)
 			}
 		}
@@ -1242,9 +1248,9 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 	}
 }
 
-func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
+func uploadHandler(_ *drbg.DRBG, _ int, refresh int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ticker := time.NewTicker(refresh * time.Millisecond)
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -1341,7 +1347,7 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 	}
 }
 
-func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) http.HandlerFunc {
+func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n, err := extractByteCount(r, 2048, maxBytes)
 		if err != nil {
@@ -1354,7 +1360,7 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) ht
 
 		if q := r.URL.Query().Get("refresh"); q != "" {
 			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 60000 {
-				refresh = time.Duration(v)
+				refresh = v
 			}
 		}
 
@@ -1372,7 +1378,7 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) ht
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 
-		ticker := time.NewTicker(refresh * time.Millisecond)
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
 
 		go func() {
@@ -1526,7 +1532,7 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 }
 */
 
-func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity, maxBytes int) http.HandlerFunc {
+func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		quantity, err := extractByteCount(r, defaultQuantity, maxBytes)
 		if err != nil {
@@ -1539,7 +1545,7 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity
 
 		if q := r.URL.Query().Get("refresh"); q != "" {
 			if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 60000 {
-				refresh = time.Duration(v)
+				refresh = v
 			}
 		}
 
@@ -1557,7 +1563,7 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 
-		ticker := time.NewTicker(refresh * time.Millisecond)
+		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
 
 		go func() {
@@ -1902,10 +1908,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if cfg.ReseedMs <= 0 || cfg.ReseedMs > 10000 {
-		panic("reseed-ms must be between 1 and 10000 ms")
-	}
-
 	if cfg.ReseedSize < 32 || cfg.ReseedSize > 65536 {
 		log.Fatal("buffer-reseed must be between 32 and 65536 bytes")
 	}
@@ -1926,13 +1928,11 @@ func main() {
 		panic(Red + "words must be positive" + Reset)
 	}
 
-	if cfg.MaxReseedAge < 0 {
-		log.Fatal("max-reseed-age must not be negative")
+	if cfg.MaxReseedAgeMs == 0 {
+		cfg.MaxReseedAgeMs = max(1000, 4*cfg.ReseedMs)
 	}
 
-	if cfg.MaxReseedAge == 0 {
-		cfg.MaxReseedAge = max(time.Second, 4*time.Duration(cfg.ReseedMs)*time.Millisecond)
-	}
+	maxReseedAge := time.Duration(cfg.MaxReseedAgeMs) * time.Millisecond
 
 	fmt.Println("\n-------------------------------------------------")
 	fmt.Println(Cyan + "       Entropy Server Pre-Flight Checks" + Reset)
@@ -1948,13 +1948,13 @@ func main() {
 	fmt.Println("ReseedMs interval            :", cfg.ReseedMs)
 	fmt.Println("Max request size KB          :", cfg.MaxBytes/1024)
 	fmt.Println("DRBG stream backend          :", algorithm)
-	fmt.Println("Readiness max seed age       :", cfg.MaxReseedAge)
+	fmt.Println("Readiness max seed age (ms)  :", cfg.MaxReseedAgeMs)
 	fmt.Println("Reseed Buffer size           :", cfg.SeedBuffer)
 	fmt.Println("-------------------------------------------------")
 	fmt.Println("Max number of Bytes          :", cfg.MaxBytes)
 	fmt.Println("Maximum number of Words      :", cfg.MaxWords)
 	fmt.Println("-------------------------------------------------")
-	fmt.Printf("Refresh Rate (seconds)       : %ds\n", cfg.RefreshRate)
+	fmt.Printf("Page refresh (ms)           : %d\n", cfg.PageRefreshMs)
 	fmt.Println("RefreshMs (ms)               :", cfg.RefreshRateMs)
 	fmt.Println("RefreshColorMs (ms)          :", cfg.RefreshColorMs)
 	fmt.Println("-------------------------------------------------")
@@ -2110,13 +2110,13 @@ func main() {
 	mux.Handle("/", http.FileServer(http.FS(webRoot)))
 
 	mux.HandleFunc("/live", livenessHandler)
-	mux.HandleFunc("/ready", healthHandler(&backup, cfg.MaxReseedAge))
+	mux.HandleFunc("/ready", healthHandler(&backup, maxReseedAge))
 
-	mux.HandleFunc("/health-1", healthHandler(&master, cfg.MaxReseedAge))
-	mux.HandleFunc("/health-2", healthHandler(&backup, cfg.MaxReseedAge))
+	mux.HandleFunc("/health-1", healthHandler(&master, maxReseedAge))
+	mux.HandleFunc("/health-2", healthHandler(&backup, maxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&master, cfg.MaxReseedAge))
-	mux.Handle("/metrics-2", metricsHandler(&backup, cfg.MaxReseedAge))
+	mux.Handle("/metrics-1", metricsHandler(&master, maxReseedAge))
+	mux.Handle("/metrics-2", metricsHandler(&backup, maxReseedAge))
 
 	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes))
 	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes))
@@ -2131,13 +2131,13 @@ func main() {
 	mux.HandleFunc("/v1/data/test", randomHandler(&backup, cfg.MaxBytes))
 	mux.HandleFunc("/v1/image/random", randomImageHandler(&backup))
 	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(&backup))
-	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
-	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.MaxBytes, cfg.WantsCookie))
+	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
+	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie))
 	mux.HandleFunc("/v1/qr/random", qrHandler(&backup))
 	mux.HandleFunc("/sound", randomSoundHandler(&backup))
 
-	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.WantsCookie))
-	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.RefreshRate, cfg.MaxBytes, cfg.WantsCookie))
+	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
+	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie))
 
 	// placeholder for public/private key generation
 	// mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
