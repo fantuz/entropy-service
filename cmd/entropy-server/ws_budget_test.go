@@ -32,7 +32,7 @@ func budgetTestServer(t *testing.T, budget *webSocketBudget, secure bool) *httpt
 	mux.HandleFunc("/bytes", wsBytesHandler(&parent, 60000, 1<<25, budget))
 	mux.HandleFunc("/colors", wsBytesHandler(&parent, 60000, 1<<25, budget))
 	mux.HandleFunc("/words", wsWordsHandler(&parent, 20, 60000, budget))
-	mux.HandleFunc("/metrics", metricsHandler(&parent, time.Hour, budget))
+	mux.HandleFunc("/metrics", metricsHandler(&parent, time.Hour, budget, newHTTPRequestBudget(128, 512<<20)))
 
 	server := httptest.NewUnstartedServer(mux)
 

@@ -19,8 +19,8 @@ func TestFetchEntropyHTTP(t *testing.T) {
 
 	ctx := context.Background()
 
-	// diag.ClientRateMeter.Update(len(data))
-	before := diag.ClientRateMeter.Bytes()
+	// Bytes resets with the rate window; use the lifetime byte count.
+	before := diag.ClientRateMeter.Total()
 	// fmt.Println("before: ", diag.ClientRateMeter.Update(len(msg)))
 	// data, err := FetchEntropy(ctx, srv.URL, 65536)
 	data, err := FetchEntropy(ctx, srv.URL, 65536)
@@ -33,10 +33,10 @@ func TestFetchEntropyHTTP(t *testing.T) {
 	}
 
 	// diag.ClientRateMeter.Update(len(data))
-	after := diag.ClientRateMeter.Bytes()
+	after := diag.ClientRateMeter.Total()
 
 	// fmt.Println("after: ", diag.ClientRateMeter.Update(len(msg)))
-	if after <= before {
-		t.Fatal("rate meter did not increase")
+	if after-before < uint64(len(data)) {
+		t.Fatal("rate meter did not account for fetched bytes")
 	}
 }

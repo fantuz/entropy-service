@@ -38,6 +38,8 @@ type Config struct {
 	WantsCookie      bool
 	WSMaxConnections int
 	WSMemoryMiB      int64
+	HTTPMaxRequests  int
+	HTTPMemoryMiB    int64
 }
 
 func ParseConfig() *Config {
@@ -76,6 +78,8 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum raw bytes per HTTP response or WebSocket message (default 32 MiB)")
 	flags.IntVar(&cfg.WSMaxConnections, "ws-max-connections", 128, "Maximum simultaneous entropy WebSockets across HTTP and HTTPS (positive)")
 	flags.Int64Var(&cfg.WSMemoryMiB, "ws-memory-mib", 1024, "Aggregate estimated WebSocket working-memory budget in MiB (positive; not an RSS limit)")
+	flags.IntVar(&cfg.HTTPMaxRequests, "http-max-requests", 128, "Maximum simultaneous HTTP generation requests across HTTP and HTTPS (positive)")
+	flags.Int64Var(&cfg.HTTPMemoryMiB, "http-memory-mib", 512, "Aggregate estimated HTTP generation memory budget in MiB (positive; separate from WebSocket budget; not an RSS limit)")
 	flags.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
 	flags.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flags.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
@@ -90,6 +94,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		fmt.Fprintln(output, "Timing values are plain integer milliseconds, e.g. 1000 (no unit suffix).")
 		fmt.Fprintln(output, "WebSocket budgets are shared by HTTP/HTTPS and reserved until disconnect.")
 		fmt.Fprintln(output, "Inbound WebSocket messages are limited to 1 KiB.")
+		fmt.Fprintln(output, "HTTP generation budgets are shared by HTTP/HTTPS; probes and static files are excluded.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -110,6 +115,13 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 	if cfg.WSMaxConnections < 1 || cfg.WSMemoryMiB < 1 || cfg.WSMemoryMiB > (1<<63-1)/(1<<20) {
 		err := errors.New("ws-max-connections and ws-memory-mib must be positive; memory budget must fit in int64 bytes")
+		fmt.Fprintln(output, err)
+
+		return nil, err
+	}
+
+	if cfg.HTTPMaxRequests < 1 || cfg.HTTPMemoryMiB < 1 || cfg.HTTPMemoryMiB > (1<<63-1)/(1<<20) {
+		err := errors.New("http-max-requests and http-memory-mib must be positive; memory budget must fit in int64 bytes")
 		fmt.Fprintln(output, err)
 
 		return nil, err

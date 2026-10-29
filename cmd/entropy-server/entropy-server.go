@@ -895,7 +895,7 @@ func randomImageHandler(d *drbg.DRBG) http.HandlerFunc {
 	}
 }
 
-func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
+func randomHandler(d *drbg.DRBG, maxBytes int, budget *httpRequestBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n, err := extractByteCount(r, 1024, maxBytes)
 		if err != nil {
@@ -903,6 +903,12 @@ func randomHandler(d *drbg.DRBG, maxBytes int) http.HandlerFunc {
 
 			return
 		}
+
+		release, ok := budget.admit(w, r, httpReservation(n, 1))
+		if !ok {
+			return
+		}
+		defer release()
 
 		buf := make([]byte, n)
 		// d.Read(buf[:n])
@@ -1003,7 +1009,7 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 	}
 }
 
-func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes int, hasCookie bool) http.HandlerFunc {
+func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes int, hasCookie bool, budget *httpRequestBudget) http.HandlerFunc {
 	page := template.Must(template.New("page").Parse(`
 <!DOCTYPE html>
 <html>
@@ -1044,6 +1050,12 @@ body {
 			return
 		}
 
+		release, ok := budget.admit(w, r, httpReservation(prefs.Words, budget.wordMemory))
+		if !ok {
+			return
+		}
+		defer release()
+
 		if hasCookie {
 			_ = setPrefsCookie(w, prefs)
 		}
@@ -1082,7 +1094,7 @@ body {
 }
 
 // func randomBytesHandler(d *drbg.DRBG, _ int, hasCookie bool) http.HandlerFunc
-func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) http.HandlerFunc {
+func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, budget *httpRequestBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// max 2MB
 		// size := 2097152
@@ -1092,6 +1104,12 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 
 			return
 		}
+
+		release, ok := budget.admit(w, r, httpReservation(prefs.Bytes, 1))
+		if !ok {
+			return
+		}
+		defer release()
 
 		if hasCookie {
 			// prefs := extractPrefs(r)
@@ -2063,6 +2081,8 @@ func main() {
 
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
 	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
+	httpBudget := newHTTPRequestBudget(cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB*(1<<20))
+	log.Printf("HTTP generation limits: %d requests, %d MiB estimated working memory", cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB)
 
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
@@ -2080,8 +2100,8 @@ func main() {
 	mux.HandleFunc("/health-1", healthHandler(&master, maxReseedAge))
 	mux.HandleFunc("/health-2", healthHandler(&backup, maxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&master, maxReseedAge, wsBudget))
-	mux.Handle("/metrics-2", metricsHandler(&backup, maxReseedAge, wsBudget))
+	mux.Handle("/metrics-1", metricsHandler(&master, maxReseedAge, wsBudget, httpBudget))
+	mux.Handle("/metrics-2", metricsHandler(&backup, maxReseedAge, wsBudget, httpBudget))
 
 	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
@@ -2092,17 +2112,19 @@ func main() {
 	mux.HandleFunc("/words", wsWordsHandler(&backup, cfg.MaxWords, cfg.RefreshColorMs, wsBudget))
 
 	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie))
-	mux.HandleFunc("/v1/data/test", randomHandler(&backup, cfg.MaxBytes))
-	mux.HandleFunc("/v1/image/random", randomImageHandler(&backup))
-	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(&backup))
+	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie, httpBudget))
+	mux.HandleFunc("/v1/data/test", randomHandler(&backup, cfg.MaxBytes, httpBudget))
+	// Fixed 1024x1024 images: RGBA pixels, source bytes and PNG scratch.
+	mux.HandleFunc("/v1/image/random", httpBudget.wrap(randomImageHandler(&backup), 16<<20))
+	mux.HandleFunc("/v1/image/heatmap", httpBudget.wrap(entropyHeatmapHandler(&backup), 16<<20))
 	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
-	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie))
-	mux.HandleFunc("/v1/qr/random", qrHandler(&backup))
-	mux.HandleFunc("/sound", randomSoundHandler(&backup))
+	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
+	mux.HandleFunc("/v1/qr/random", httpBudget.wrap(qrHandler(&backup), 4<<20))
+	// Up to five seconds of samples plus WAV output; keep the sound slot limit.
+	mux.HandleFunc("/sound", httpBudget.wrap(randomSoundHandler(&backup), 8<<20))
 
 	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
-	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie))
+	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
 
 	// placeholder for public/private key generation
 	// mux.HandleFunc("/v1/cert/random", healthHandler(drbg))

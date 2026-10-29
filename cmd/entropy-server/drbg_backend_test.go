@@ -41,7 +41,7 @@ func TestRandomBytesInheritsBackend(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			randomBytesHandler(&parent, 64, 20, false)(w,
+			randomBytesHandler(&parent, 64, 20, false, newHTTPRequestBudget(128, 512<<20))(w,
 				httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=64", nil))
 
 			if w.Code != http.StatusOK || !bytes.Equal(w.Body.Bytes(), want) {

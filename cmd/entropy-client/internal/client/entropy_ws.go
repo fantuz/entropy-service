@@ -21,7 +21,7 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 
-	conn.SetReadLimit(1 << 25) // Same 32 MiB bound as StreamEntropy.
+	conn.SetReadLimit(maxEntropyBytes)
 
 	tester := stats.NewStreamTester()
 

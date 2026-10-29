@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +12,12 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
+
+// The same payload bound applies to HTTP bodies and WebSocket messages.
+const maxEntropyBytes = 1 << 25 // 32 MiB
+
+// ErrEntropyTooLarge means the response exceeded the client's payload limit.
+var ErrEntropyTooLarge = errors.New("entropy response exceeds 32 MiB limit")
 
 var entropyHTTPClient = &http.Client{
 	Timeout: 30 * time.Second,
@@ -113,11 +120,19 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 		return nil, fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	// consider streaming/chunking.
-	// Read fully (for small samples). If you need streaming, replace with io.Copy and counting writer.
-	data, err := io.ReadAll(resp.Body)
+	if resp.ContentLength > maxEntropyBytes {
+		return nil, ErrEntropyTooLarge
+	}
+
+	// Inspect one extra byte so unknown-length/chunked responses cannot be
+	// silently truncated into an apparently successful entropy sample.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxEntropyBytes+1))
 	if err != nil {
 		return nil, err
+	}
+
+	if len(data) > maxEntropyBytes {
+		return nil, ErrEntropyTooLarge
 	}
 
 	metrics.AddClientBytesReceived(uint64(len(data)))

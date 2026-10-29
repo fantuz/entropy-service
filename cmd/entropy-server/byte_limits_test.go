@@ -49,10 +49,11 @@ func TestByteEndpointLimits(t *testing.T) {
 	defer drbg.DecreaseActiveInstances(1)
 
 	budget := newWebSocketBudget(128, 1<<30)
+	httpBudget := newHTTPRequestBudget(128, 512<<20)
 
 	handlers := map[string]http.HandlerFunc{
-		"/v1/data/random": randomBytesHandler(&d, maxBytes, 20, false),
-		"/v1/data/test":   randomHandler(&d, maxBytes),
+		"/v1/data/random": randomBytesHandler(&d, maxBytes, 20, false, httpBudget),
+		"/v1/data/test":   randomHandler(&d, maxBytes, httpBudget),
 		"/stream":         wsBinaryHandler(&d, 1, 2048, maxBytes, budget),
 		"/bytes":          wsBytesHandler(&d, 1, maxBytes, budget),
 		"/colors":         wsBytesHandler(&d, 1, maxBytes, budget),

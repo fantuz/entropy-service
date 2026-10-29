@@ -86,7 +86,7 @@ func TestWordPageCountAndCookie(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			randomWordsHandler(source, 64, 5000, 1<<25, tc.cookie > 0)(w, r)
+			randomWordsHandler(source, 64, 5000, 1<<25, tc.cookie > 0, newHTTPRequestBudget(128, 512<<20))(w, r)
 
 			if w.Code != http.StatusOK {
 				t.Fatalf("status=%d body=%s", w.Code, w.Body)
@@ -269,7 +269,7 @@ func TestWordPageConvertsMillisecondRefresh(t *testing.T) {
 		{1, "1"}, {999, "1"}, {1000, "1"}, {1500, "2"}, {5000, "5"},
 	} {
 		w := httptest.NewRecorder()
-		randomWordsHandler(new(wordTestSource), 3, tc.milliseconds, 64, false)(w,
+		randomWordsHandler(new(wordTestSource), 3, tc.milliseconds, 64, false, newHTTPRequestBudget(128, 512<<20))(w,
 			httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/meta/random", nil))
 
 		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `http-equiv="refresh" content="`+tc.seconds+`"`) {

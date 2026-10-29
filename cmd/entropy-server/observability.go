@@ -79,7 +79,7 @@ func healthHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
 	}
 }
 
-func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget) http.HandlerFunc {
+func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget, httpBudget *httpRequestBudget) http.HandlerFunc {
 	const (
 		counterType = "counter"
 		gaugeType   = "gauge"
@@ -88,6 +88,7 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget)
 	return func(w http.ResponseWriter, _ *http.Request) {
 		meta := d.GetMetadata()
 		wsUsage := budget.usage()
+		httpUsage := httpBudget.usage()
 
 		ready := 0
 		if reseedReady(meta, maxAge) {
@@ -111,6 +112,13 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget)
 			{"rng_reseed_last_success_timestamp_seconds", "Unix timestamp of the last successful seed for this root generator", gaugeType, meta.LastReseedAt.Unix()},
 			{"rng_ready", "One when this root generator has fresh seed state and no unresolved reseed failure", gaugeType, ready},
 			{"http_requests_total", "HTTP requests received, including errors, upgrades, probes and static files", counterType, metrics.NumHTTPRequests()},
+			{"http_generation_requests_active", "Admitted HTTP generation requests across HTTP and HTTPS", gaugeType, httpUsage.Active},
+			{"http_generation_requests_limit", "Configured HTTP generation request limit", gaugeType, httpUsage.MaxRequests},
+			{"http_generation_memory_reserved_bytes", "Estimated working memory reserved by HTTP generation; not process RSS", gaugeType, httpUsage.Reserved},
+			{"http_generation_memory_budget_bytes", "Configured HTTP generation working-memory budget", gaugeType, httpUsage.MaxMemory},
+			{"http_generation_rejected_requests_total", "HTTP generation requests rejected by the request limit", counterType, httpUsage.RejectedRequests},
+			{"http_generation_rejected_memory_total", "HTTP generation requests rejected by aggregate memory reservations", counterType, httpUsage.RejectedMemory},
+			{"http_generation_rejected_size_total", "HTTP generation requests too large for the whole memory budget", counterType, httpUsage.RejectedSize},
 			{"wss_payloads_total", "WebSocket messages sent over WS or WSS", counterType, payloads},
 			{"wss_payloads", "Deprecated alias of wss_payloads_total", "untyped", payloads},
 			{"drbg_instance_count", "Current number of DRBG instances", gaugeType, meta.DRBGInstanceCnt},

@@ -90,7 +90,7 @@ func TestMetricsNamesTypesUnitsAndReadiness(t *testing.T) {
 	d.RecordReseedFailure(io.EOF)
 
 	w := httptest.NewRecorder()
-	metricsHandler(d, time.Second, newWebSocketBudget(128, 1<<30))(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
+	metricsHandler(d, time.Second, newWebSocketBudget(128, 1<<30), newHTTPRequestBudget(128, 512<<20))(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
 
 	if !strings.HasPrefix(w.Header().Get("Content-Type"), "text/plain; version=0.0.4") {
 		t.Fatal("metrics must declare Prometheus text format")
@@ -122,7 +122,7 @@ func TestMetricsNamesTypesUnitsAndReadiness(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	metricsHandler(d, time.Second, newWebSocketBudget(128, 1<<30))(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
+	metricsHandler(d, time.Second, newWebSocketBudget(128, 1<<30), newHTTPRequestBudget(128, 512<<20))(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics-2", nil))
 
 	values, _ = parseMetricSamples(t, w.Body.String())
 	if values["rng_ready"] != 1 || values["rng_generator_reseeds_total"] != 1 || values["rng_reseed_failures_total"] != 1 {
@@ -180,7 +180,7 @@ func parseMetricSamples(t *testing.T, body string) (map[string]float64, map[stri
 func TestCountRequestsIncludesErrorsAndPreservesWebSockets(t *testing.T) {
 	d := observableTestDRBG(t)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/random", randomBytesHandler(d, 64, 20, false))
+	mux.HandleFunc("/random", randomBytesHandler(d, 64, 20, false, newHTTPRequestBudget(128, 512<<20)))
 	mux.HandleFunc("/live", livenessHandler)
 	counted := countRequests(mux)
 	before := metrics.NumHTTPRequests()

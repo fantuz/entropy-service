@@ -29,7 +29,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan StreamFrame, error) 
 		_ = conn.Close()
 	})
 
-	conn.SetReadLimit(1 << 25) // 32 MB
+	conn.SetReadLimit(maxEntropyBytes)
 	_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	// conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	conn.SetPongHandler(func(string) error {
@@ -38,9 +38,9 @@ func StreamEntropy(ctx context.Context, url string) (<-chan StreamFrame, error) 
 		return nil
 	})
 
-	// out := make([]byte, 1<<16)
-	// out := make(chan []byte, 1<<25) // 16 is safe
-	out := make(chan StreamFrame, 16)
+	// One queued frame bounds backlog while preserving ordered delivery and
+	// backpressure. The reader and consumer can each also hold a live frame.
+	out := make(chan StreamFrame, 1)
 
 	go func() {
 		defer close(out)
