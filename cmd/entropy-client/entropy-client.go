@@ -453,7 +453,11 @@ func main() {
 		if cfg.Mode == modePull {
 			<-tickerh.C
 			// data, err := client.FetchEntropy(httpCtx, refhttpurl, cfg.Slice)
+			// Measure the request and full body read, excluding refresh wait and diagnostics.
+			httpStarted := time.Now()
 			data, err := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
+			httpFetchRuntime := time.Since(httpStarted)
+
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
 				os.Exit(1)
@@ -522,8 +526,9 @@ func main() {
 				opt++
 			}
 
-			hrinside := time.Since(start).Milliseconds()
-			hrreal := time.Since(startout).Milliseconds()
+			cycleEnd := time.Now()
+			cycleRuntime := cycleEnd.Sub(start)
+			totalRuntime := cycleEnd.Sub(startout)
 			// hrtot := time.Since(startprg).Milliseconds()
 			// fmt.Println("Program notes        :", r.Notes, "ms")
 			// fmt.Println("Program rate         :", r.Rate, "MB/s")
@@ -531,8 +536,9 @@ func main() {
 				fmt.Printf("received           : %d bytes\n", len(data))
 				// btot := atomic.LoadUint64(&diag.BytesFetched)
 				// fmt.Println("real RECV          :", btot/3)
-				fmt.Println("HTTP cycle runtime :", hrinside, "ms")
-				fmt.Println("Total runtime      :", hrreal, "ms")
+				fmt.Printf("Last HTTP fetch    : %.3f ms\n", httpFetchRuntime.Seconds()*1000)
+				fmt.Printf("HTTP cycle runtime : %.3f ms\n", cycleRuntime.Seconds()*1000)
+				fmt.Printf("Total runtime      : %.3f ms\n", totalRuntime.Seconds()*1000)
 
 				opt++
 			}
