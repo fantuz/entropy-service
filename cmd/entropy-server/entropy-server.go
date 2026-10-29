@@ -970,21 +970,11 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int) http.Handler
 
 		conn.SetReadLimit(1024)
 
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := websocketContext(r.Context(), conn)
 		defer cancel()
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
-
-		go func() {
-			defer cancel()
-
-			for {
-				if _, _, err := conn.ReadMessage(); err != nil {
-					return
-				}
-			}
-		}()
 
 		for {
 			select {
@@ -1375,21 +1365,11 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int) http.Handler
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
 
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := websocketContext(r.Context(), conn)
 		defer cancel()
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
-
-		go func() {
-			defer cancel()
-
-			for {
-				if _, _, err := conn.ReadMessage(); err != nil {
-					return
-				}
-			}
-		}()
 
 		buf := make([]byte, n)
 
@@ -1560,21 +1540,11 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
 
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := websocketContext(r.Context(), conn)
 		defer cancel()
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
-
-		go func() {
-			defer cancel()
-
-			for {
-				if _, _, err := conn.ReadMessage(); err != nil {
-					return
-				}
-			}
-		}()
 
 		buf := make([]byte, quantity)
 
@@ -1765,7 +1735,7 @@ func ResolveEntropyDevice(path string, require bool) (string, error) {
 
 // func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error)
 // func startHTTP(ctx context.Context, addr string, handler http.Handler, master *drbg.DRBG) (*http.Server, error)
-func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Server, error) {
+func startHTTP(ctx context.Context, addr string, handler http.Handler) (*managedServer, error) {
 	// ln, err := net.Listen("tcp", addr)
 	// if err != nil { return nil, err }
 	// tln := newTunedListener(ln)
@@ -1799,6 +1769,8 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Se
 		*/
 	}
 
+	managed := newManagedServer(ctx, srv)
+
 	// Serve loop
 	go func() {
 		err := srv.Serve(ln)
@@ -1807,26 +1779,12 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*http.Se
 		}
 	}()
 
-	// Context-driven graceful shutdown
-	go func() {
-		<-ctx.Done()
-
-		shutdownCtx, cancel := context.WithTimeout(
-			// context.Background(),
-			context.WithoutCancel(ctx),
-			5*time.Second,
-		)
-		defer cancel()
-
-		_ = srv.Shutdown(shutdownCtx)
-	}()
-
-	return srv, nil
+	return managed, nil
 }
 
 // func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master drbg.DRBG) (*http.Server, error)
 // func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config, master *drbg.DRBG) (*http.Server, error)
-func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config) (*http.Server, error) {
+func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfig *tls.Config) (*managedServer, error) {
 	ln, err := listener.NewTunedListener(ctx, addr, 4<<20)
 	if err != nil {
 		return nil, err
@@ -1867,6 +1825,8 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		})
 	*/
 
+	managed := newManagedServer(ctx, srv)
+
 	// Serve loop
 	go func() {
 		err := srv.Serve(tlsLn)
@@ -1875,21 +1835,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		}
 	}()
 
-	// Context-driven shutdown
-	go func() {
-		<-ctx.Done()
-
-		shutdownCtx, cancel := context.WithTimeout(
-			// context.Background(),
-			context.WithoutCancel(ctx),
-			5*time.Second,
-		)
-		defer cancel()
-
-		_ = srv.Shutdown(shutdownCtx)
-	}()
-
-	return srv, nil
+	return managed, nil
 }
 
 func main() {
@@ -2151,8 +2097,9 @@ func main() {
 	fmt.Printf("	9) start HTTP server(s)\n")
 
 	var (
-		httpSrv  *http.Server
-		httpsSrv *http.Server
+		httpSrv  *managedServer
+		httpsSrv *managedServer
+		debugSrv *managedServer
 		httpErr  error
 		httpsErr error
 	)
@@ -2178,17 +2125,22 @@ func main() {
 	}
 
 	if cfg.ShowDebug {
+		muxdebug := http.NewServeMux()
+		muxdebug.HandleFunc("/debug/pprof/", pprof.Index)
+		muxdebug.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		muxdebug.HandleFunc("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+		muxdebug.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		muxdebug.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		muxdebug.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		debugSrv = newManagedServer(ctx, &http.Server{
+			Addr: "127.0.0.1:6060", Handler: muxdebug, ReadHeaderTimeout: 5 * time.Second,
+		})
+
 		go func() {
-			muxdebug := http.NewServeMux()
-
-			muxdebug.HandleFunc("/debug/pprof/", pprof.Index)
-			muxdebug.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			muxdebug.HandleFunc("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
-			muxdebug.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-			muxdebug.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-			muxdebug.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-			_ = http.ListenAndServe("127.0.0.1:6060", muxdebug) //nolint:gosec // debug-only pprof endpoint, localhost
+			if err := debugSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("debug serve error: %v", err)
+			}
 		}()
 
 		log.Println("Debug server running on 127.0.0.1:6060/debug/pprof")
@@ -2224,24 +2176,26 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Block and wait for shutdown
-	// if httpErr != nil
-	if httpSrv != nil {
-		_ = httpSrv.Shutdown(shutdownCtx)
-	}
+	// Stop listeners together and join all handlers, including WebSockets.
+	var shutdown sync.WaitGroup
 
-	if httpsSrv != nil {
-		_ = httpsSrv.Shutdown(shutdownCtx)
-	}
-
-	/*
-		// if cfg.HTTPSAddr != ""
-		if cfg.EnableHTTPS {
-			if httpsErr != nil {
-				_ = httpsSrv.Shutdown(shutdownCtx)
-			}
+	for _, srv := range []*managedServer{httpSrv, httpsSrv, debugSrv} {
+		if srv == nil {
+			continue
 		}
-	*/
+
+		shutdown.Add(1)
+
+		go func() {
+			defer shutdown.Done()
+
+			if err := srv.Shutdown(shutdownCtx); err != nil {
+				log.Printf("shutdown %s: %v", srv.Addr, err)
+			}
+		}()
+	}
+
+	shutdown.Wait()
 
 	log.Println("shutdown complete")
 }

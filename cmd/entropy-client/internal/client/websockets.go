@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gorilla/websocket"
-
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
@@ -22,11 +20,7 @@ func StreamEntropy(ctx context.Context, url string) (<-chan StreamFrame, error) 
 	// url = fmt.Sprintf("%s%sbytes=%d", url, sep, quantity)
 	// var wsurl = url + "?bytes=" + strconv.Itoa(quantity) + "&refresh=" + fps
 	// conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
-	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, url, nil)
-	if resp != nil && resp.Body != nil {
-		_ = resp.Body.Close()
-	}
-
+	conn, err := dialWebSocket(ctx, url)
 	if err != nil {
 		return nil, err
 	}

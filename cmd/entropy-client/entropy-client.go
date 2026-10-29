@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
-
-	"github.com/gorilla/websocket"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/client"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
@@ -100,14 +101,19 @@ func drawUI(stats *Stats, result *diag.Diagnostics) {
 }
 
 func main() {
-	/*
-		rctx, rstop := signal.NotifyContext(
-			context.Background(),
-			os.Interrupt,
-			syscall.SIGTERM,
-		)
-		defer rstop()
-	*/
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := run(ctx)
+	canceled := ctx.Err() != nil
+
+	stop()
+
+	if err != nil && !canceled {
+		log.Print(err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context) error {
 	cfg := config.ParseConfig()
 	if cfg.Mode != modePull && cfg.Mode != modeStream {
 		panic("mode must be pull or stream")
@@ -142,13 +148,17 @@ func main() {
 		opt        = 0
 	)
 
-	timeoutctx, timeoutcancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer timeoutcancel()
-
 	fmt.Print("\033[H\033[2J")
 	fmt.Print("\a")
 
-	testdata, _ := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
+	sampleCtx, cancelSample := context.WithTimeout(ctx, 3*time.Second)
+	testdata, err := sampleEntropy(sampleCtx, cfg.Mode, refhttpurl, refwsurl, cfg.Slice)
+
+	cancelSample()
+
+	if err != nil {
+		return fmt.Errorf("sample entropy: %w", err)
+	}
 
 	/*
 		for i:=0; i < 10; i++ {
@@ -163,8 +173,6 @@ func main() {
 
 	result := diag.RunDiagnostics(testdata)
 	// test := diag.NewRateMeter
-
-	timeoutcancel()
 
 	fmt.Println()
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
@@ -222,90 +230,37 @@ func main() {
 
 	fmt.Println("----------------------------------------------")
 
-	time.Sleep(3 * time.Second)
-	fmt.Print("\033[H\033[2J")
-
-	wsconn, _, wscerr := websocket.DefaultDialer.Dial(refwsurl, nil)
-	if wscerr != nil {
-		fmt.Fprintf(os.Stderr, "fetch error: %v\n", wscerr)
-		fmt.Printf("error: %v\n", refhttpurl)
-		fmt.Printf("error: %v\n", refwsurl)
-		panic(wscerr)
-		// os.Exit(1)
+	if !waitContext(ctx, 3*time.Second) {
+		return nil
 	}
 
-	defer wsconn.Close()
-
+	fmt.Print("\033[H\033[2J")
 	fmt.Println("\n----------------------------------------------")
 
-	ctxA, cancelA := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancelA()
+	diagnosticCtx, cancelDiagnostic := context.WithTimeout(ctx, 3*time.Second)
 
-	errA := client.TestEntropyHTTP(ctxA, refhttpurl)
-	if errA != nil {
-		fmt.Fprintf(os.Stderr, "fetch error: %v\n", errA)
-		log.Fatal(errA)
-		time.Sleep(3 * time.Second)
+	if cfg.Mode == modePull {
+		err = client.TestEntropyHTTP(diagnosticCtx, refhttpurl)
+	} else {
+		err = client.TestEntropyWS(diagnosticCtx, refwsurl)
+	}
+
+	cancelDiagnostic()
+
+	if ctx.Err() != nil {
+		return nil
+	}
+
+	// A completed diagnostic time budget is expected for an ongoing stream.
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("entropy diagnostic: %w", err)
 	}
 
 	fmt.Println("----------------------------------------------")
-
-	ctxB, cancelB := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancelB()
-
-	errB := client.TestEntropyWS(ctxB, refwsurl)
-	if errB != nil {
-		fmt.Fprintf(os.Stderr, "fetch error: %v\n", errB)
-		log.Fatal(errB)
-		time.Sleep(3 * time.Second)
-	}
-
-	fmt.Println("----------------------------------------------")
-
-	cancelA()
-	cancelB()
-
 	fmt.Print("\a")
-	time.Sleep(2 * time.Second)
 
-	/*
-		resultA := diag.RunDiagnostics(testdata)
-		if resultA.Pass == true {
-			fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", resultA.Pass)
-		} else {
-			fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", resultA.Pass)
-		}
-	*/
-
-	select {
-	case <-timeoutctx.Done():
-		{
-			cancelA()
-			cancelB()
-			timeoutcancel()
-			wsconn.Close()
-			// fmt.Println("HERE-CASE-CTX-CONTINUE:")
-			// return
-		}
-	default:
-		{
-			// fmt.Println("there-CASE-CTX-CONTINUE:")
-			// continue
-
-			/*
-				dataone, msg, wserr := wsconn.ReadMessage()
-				if wserr != nil {
-					fmt.Fprintf(os.Stderr, "fetch error: %v\n", wserr)
-					os.Exit(1)
-					//panic(err)
-				} else {
-					fmt.Printf("MSG : %v\n", len(msg))
-					fmt.Printf("DATA: %v\n", dataone)
-				}
-				fmt.Println("HERE-CASE-CTX-CONTINUE:")
-				wsconn.Close()
-			*/
-		}
+	if !waitContext(ctx, 2*time.Second) {
+		return nil
 	}
 
 	stats := Stats{}
@@ -316,7 +271,7 @@ func main() {
 	tickerh := time.NewTicker(cfg.Refresh)
 	defer tickerh.Stop()
 
-	wsctx, wscancel := context.WithCancel(context.Background())
+	wsctx, wscancel := context.WithCancel(ctx)
 	defer wscancel()
 	// wscancel()
 
@@ -328,11 +283,18 @@ func main() {
 
 		stream, sterr = client.StreamEntropy(wsctx, refwsurl)
 		if sterr != nil {
-			panic(sterr)
+			return fmt.Errorf("open entropy stream: %w", sterr)
 		}
 	}
 
-	// atomic.AddUint64(&diag.wsCRequests, +1)
+	defer func() {
+		wscancel()
+
+		if stream != nil {
+			for range stream {
+			}
+		}
+	}()
 
 	fmt.Print("\a")
 
@@ -341,6 +303,10 @@ func main() {
 	var wsRuntime time.Duration
 
 	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		start := time.Now()
 
 		// defer wsconn.Close()
@@ -354,14 +320,16 @@ func main() {
 			case <-wsctx.Done():
 				// panic("critical point reached")
 				// continue
-				return
+				return nil
 
 			// case <-tickerw.C:
 			case frame, ok := <-stream:
 				if !ok {
-					log.Print("WebSocket stream closed")
+					if ctx.Err() != nil {
+						return nil
+					}
 
-					return
+					return errors.New("WebSocket stream closed")
 				}
 
 				stdata := frame.Data
@@ -438,8 +406,8 @@ func main() {
 					fmt.Printf("Total runtime      : %.3f ms\n", totalRuntime.Seconds()*1000)
 				}
 
-				if opt > 0 {
-					time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
+				if opt > 0 && !waitContext(ctx, cfg.Refresh/8) {
+					return nil
 				}
 				// }
 				/*
@@ -451,21 +419,24 @@ func main() {
 		}
 
 		if cfg.Mode == modePull {
-			<-tickerh.C
-			// data, err := client.FetchEntropy(httpCtx, refhttpurl, cfg.Slice)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-tickerh.C:
+			}
 			// Measure the request and full body read, excluding refresh wait and diagnostics.
 			httpStarted := time.Now()
-			data, err := client.FetchEntropySimple(&refhttpurl, &cfg.Slice)
+			httpCtx, cancelHTTP := context.WithTimeout(ctx, 3*time.Second)
+			data, err := client.FetchEntropy(httpCtx, refhttpurl, cfg.Slice)
 			httpFetchRuntime := time.Since(httpStarted)
 
+			cancelHTTP()
+
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
-				os.Exit(1)
-				// panic(err)
-			} else {
-				atomic.AddUint64(&diag.BytesFetched, uint64(len(data)))
-				// atomic.AddUint64(&diag.httpCRequests, +1)
+				return fmt.Errorf("fetch entropy: %w", err)
 			}
+
+			atomic.AddUint64(&diag.BytesFetched, uint64(len(data)))
 
 			// defer tickerh.Stop()
 
@@ -543,8 +514,8 @@ func main() {
 				opt++
 			}
 
-			if opt > 0 {
-				time.Sleep(cfg.Refresh / 8) // * time.Millisecond)
+			if opt > 0 && !waitContext(ctx, cfg.Refresh/8) {
+				return nil
 			}
 		}
 	}

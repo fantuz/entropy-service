@@ -11,16 +11,17 @@ import (
 
 func TestEntropyWS(ctx context.Context, endpoint string) error {
 	// refwsurl := "ws://127.0.0.1:8080/stream?bytes=2097152"
-	conn, resp, err := websocket.DefaultDialer.Dial(endpoint, nil)
-	if resp != nil && resp.Body != nil {
-		_ = resp.Body.Close()
-	}
-
+	conn, err := dialWebSocket(ctx, endpoint)
 	if err != nil {
 		return err
 	}
 
 	defer conn.Close()
+
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+
+	conn.SetReadLimit(1 << 25) // Same 32 MiB bound as StreamEntropy.
 
 	tester := stats.NewStreamTester()
 
@@ -32,11 +33,15 @@ func TestEntropyWS(ctx context.Context, endpoint string) error {
 		select {
 		case <-ctx.Done():
 			// fmt.Println("Finished WebSocket entropy streaming test")
-			return nil
+			return ctx.Err()
 
 		default:
 			msgType, data, err := conn.ReadMessage()
 			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+
 				return err
 			}
 
