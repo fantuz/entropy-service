@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-
-	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 )
 
 const (
@@ -65,7 +63,6 @@ func randomSoundHandler(source io.Reader) http.HandlerFunc {
 	slots := make(chan struct{}, 2)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		metrics.AddHTTPRequests(1)
 		w.Header().Set("Cache-Control", "no-store")
 
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -106,8 +103,6 @@ func randomSoundHandler(source io.Reader) http.HandlerFunc {
 
 				return
 			}
-
-			metrics.AddBytesGenerated(len(entropy))
 
 			wav, err = synthesizeSound(r.Context(), entropy, opts)
 			if err != nil {

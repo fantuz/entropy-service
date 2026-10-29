@@ -11,8 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	// "io".
-	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 )
 
 type Reader interface {
@@ -27,13 +26,16 @@ type DRBG struct {
 	Stream cipher.Stream
 
 	// Crypto state
-	key         [32]byte
-	nonce       [aes.BlockSize]byte
-	cipher      cipher.Stream
-	algorithm   Algorithm
-	generated   uint64
-	Reseeded    time.Time
-	reseedEpoch atomic.Uint64
+	key             [32]byte
+	nonce           [aes.BlockSize]byte
+	cipher          cipher.Stream
+	algorithm       Algorithm
+	generated       uint64
+	Reseeded        time.Time
+	reseeds         uint64
+	reseedFailures  uint64
+	lastReseedError string
+	reseedEpoch     atomic.Uint64
 
 	// Observability / header metadata
 	version        string
@@ -42,9 +44,6 @@ type DRBG struct {
 	reseedInterval time.Duration
 	// reseedInterval int64
 	reseedSizeBits int
-
-	// optional: pointer to external entropy buffer
-	entropyBuf qrng.QRNGBuffer
 
 	// counter for number of DRBG instances
 	DRBGInstanceCnt int64
@@ -55,12 +54,16 @@ type Metadata struct {
 	Version              string
 	Source               string
 	DRBG                 string
-	ReseedAgeMs          time.Duration
+	ReseedAge            time.Duration
 	ReseedIntervalMs     int64
 	ReseedSizeBits       int
 	EntropyBufferedBytes int
 	EntropyFillPct       int
 	DRBGInstanceCnt      int64
+	LastReseedAt         time.Time
+	ReseedsTotal         uint64
+	ReseedFailuresTotal  uint64
+	LastReseedError      string
 }
 
 // HealthInfo contains all info needed to generate JSON.
@@ -83,18 +86,11 @@ var activeDRBG atomic.Int64
 const maxBytesPerKey uint64 = 1 << 38
 
 func DecreaseActiveInstances(quantity int64) {
-	activeDRBG.Add(-1)
+	activeDRBG.Add(-quantity)
 }
 
 func ActiveInstances() int64 {
 	return activeDRBG.Load()
-}
-
-func (d *DRBG) SetEntropyBuffer(q qrng.QRNGBuffer) {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
-	// d.Mu = sync.Mutex{}
-	d.entropyBuf = q
 }
 
 // NewDRBG creates a new DRBG instance from a seed.
@@ -181,6 +177,8 @@ func (d *DRBG) Reseed(seed []byte) error {
 	d.cipher = c
 	d.generated = 0
 	d.Reseeded = time.Now()
+	d.reseeds++
+	d.lastReseedError = ""
 	d.reseedEpoch.Add(1)
 	// activeDRBG.Add(-1)
 	return nil
@@ -205,6 +203,7 @@ func (d *DRBG) readLocked(p []byte) (int, error) {
 	clear(p)
 	d.cipher.XORKeyStream(p, p)
 	d.generated += uint64(len(p))
+	metrics.AddBytesGenerated(len(p))
 	// d.cipher.XORKeyStream(p.CH, p.CH)
 	// d.CH <- generateEntropyChunk()
 
@@ -235,93 +234,63 @@ func (d *DRBG) ReseedAge() time.Duration {
 	return time.Since(d.Reseeded)
 }
 
-// WriteHeaders writes all observability headers to an http.ResponseWriter.
-func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
+// RecordReseedFailure marks a failed or skipped refresh without changing the
+// key, byte budget, reseed timestamp, or epoch. A successful Reseed clears it.
+func (d *DRBG) RecordReseedFailure(err error) {
+	if err == nil {
+		return
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	now := time.Now()
-
-	w.Header().Set("X-RNG-Version", d.version)
-	w.Header().Set("X-RNG-Source", d.source)
-	w.Header().Set("X-RNG-DRBG", d.algo)
-
-	w.Header().Set(
-		"X-RNG-Reseed-Age-ms",
-		strconv.FormatInt(now.Sub(d.Reseeded).Milliseconds(), 10),
-	)
-
-	w.Header().Set(
-		"X-RNG-Reseed-Interval-ms",
-		strconv.FormatInt(d.reseedInterval.Milliseconds(), 10),
-	)
-
-	w.Header().Set(
-		"X-RNG-Reseed-Size-bits",
-		strconv.Itoa(d.reseedSizeBits),
-	)
-
-	bufKB := 0
-	bufPct := 0
-
-	if d.entropyBuf.CH != nil {
-		// d.entropyBuf.Mu.Lock()
-		// *qrng.QRNGBuffer.Mu.Lock()
-		// bufKB = len(d.entropyBuf.Buf) / 1024
-		// bufPct = (len(d.entropyBuf.Buf) * 100) / d.entropyBuf.Capacity
-		bufKB = len(d.entropyBuf.CH) / 1024
-		bufPct = (len(d.entropyBuf.CH) * 100) / d.entropyBuf.Capacity
-		// d.entropyBuf.Mu.Unlock()
-	}
-
-	w.Header().Set("X-RNG-Entropy-Buffered-kB", strconv.Itoa(bufKB))
-	w.Header().Set("X-RNG-Entropy-Buffered-%", strconv.Itoa(bufPct))
+	d.reseedFailures++
+	d.lastReseedError = err.Error()
 }
 
-// SetMetadata sets all DRBG metadata.
-func (d *DRBG) SetMetadata(version, source, _ string, interval time.Duration, sizeBits int, buf qrng.QRNGBuffer) {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
+// WriteHeaders reports a synchronized metadata snapshot. The old software
+// QRNG buffer has been removed; its compatibility headers remain zero.
+func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
+	meta := d.GetMetadata()
+	w.Header().Set("X-RNG-Version", meta.Version)
+	w.Header().Set("X-RNG-Source", meta.Source)
+	w.Header().Set("X-RNG-DRBG", meta.DRBG)
+	w.Header().Set("X-RNG-Reseed-Age-ms", strconv.FormatInt(meta.ReseedAge.Milliseconds(), 10))
+	w.Header().Set("X-RNG-Reseed-Interval-ms", strconv.FormatInt(meta.ReseedIntervalMs, 10))
+	w.Header().Set("X-RNG-Reseed-Size-bits", strconv.Itoa(meta.ReseedSizeBits))
+	w.Header().Set("X-RNG-Entropy-Buffered-kB", "0")
+	w.Header().Set("X-RNG-Entropy-Buffered-%", "0")
+}
+
+// SetMetadata sets the root generator's metadata. sizeBits is measured in bits.
+func (d *DRBG) SetMetadata(version, source, _ string, interval time.Duration, sizeBits int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	d.version = version
 	d.source = source
-	// Keep the existing signature; report the actual constructed backend.
 	d.algo = d.algorithm.String()
 	d.reseedInterval = interval
 	d.reseedSizeBits = sizeBits
-	d.entropyBuf = buf
-	// d.DRBGInstanceNumber = activeDRBG
 }
 
-// GetMetadata returns a snapshot of metadata.
+// GetMetadata returns one synchronized snapshot; removed buffer fields stay zero.
 func (d *DRBG) GetMetadata() Metadata {
-	bufKB := 0
-	bufPct := 0
-
-	// if d.entropyBuf != nil
-	if d.entropyBuf.CH != nil {
-		// d.Mu.Lock() // old
-		// d.entropyBuf.Mu.Lock()
-		// defer d.Mu.Unlock()
-		// bufKB = len(d.entropyBuf.CH)
-		// bufPct = len(d.entropyBuf.CH) * 100 / d.entropyBuf.Capacity
-		bufKB = len(d.entropyBuf.Buf)
-		bufPct = len(d.entropyBuf.Buf) * 100 / d.entropyBuf.Capacity
-		// d.entropyBuf.Mu.Unlock()
-	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	return Metadata{
-		Version: d.version,
-		Source:  d.source,
-		DRBG:    d.algo,
-		// ReseedAgeMs:		now.Sub(d.reseeded).Milliseconds(),
-		ReseedIntervalMs:     d.reseedInterval.Milliseconds(),
-		ReseedSizeBits:       d.reseedSizeBits,
-		EntropyBufferedBytes: bufKB,
-		EntropyFillPct:       bufPct,
-		// DRBGInstanceCnt:        d.DRBGInstanceCnt,
-		DRBGInstanceCnt: ActiveInstances(),
+		Version:             d.version,
+		Source:              d.source,
+		DRBG:                d.algo,
+		ReseedAge:           time.Since(d.Reseeded),
+		LastReseedAt:        d.Reseeded.UTC(),
+		ReseedIntervalMs:    d.reseedInterval.Milliseconds(),
+		ReseedSizeBits:      d.reseedSizeBits,
+		DRBGInstanceCnt:     ActiveInstances(),
+		ReseedsTotal:        d.reseeds,
+		ReseedFailuresTotal: d.reseedFailures,
+		LastReseedError:     d.lastReseedError,
 	}
 }
 

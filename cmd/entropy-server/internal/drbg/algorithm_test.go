@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
 )
 
 func testSeed() []byte {
@@ -197,7 +195,7 @@ func TestBackendLimitAndMetadata(t *testing.T) {
 	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
-			d.SetMetadata("test", "test", "incorrect caller label", time.Second, 256, qrng.QRNGBuffer{})
+			d.SetMetadata("test", "test", "incorrect caller label", time.Second, 256)
 			d.generated = maxBytesPerKey - 4
 
 			buf := bytes.Repeat([]byte{0xa5}, 5)

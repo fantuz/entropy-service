@@ -36,7 +36,6 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/listener"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
-	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/qrng"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/transport"
 )
@@ -67,18 +66,6 @@ type EntropyPool struct {
 
 type EntropySource interface {
 	Read(p []byte) (int, error)
-}
-
-type HealthInfo struct {
-	Status               string `json:"status"`
-	Version              string `json:"rng_version"`
-	Source               string `json:"rng_source"`
-	DRBG                 string `json:"rng_drbg"`
-	ReseedAgeMs          int64  `json:"reseed_age_ms"`
-	ReseedIntervalMs     int64  `json:"reseed_interval_ms"`
-	ReseedSizeBits       int    `json:"reseed_size_bits"`
-	EntropyBufferedBytes int    `json:"entropy_buffered_kb"`
-	EntropyBufferedPCT   int    `json:"entropy_buffered_pct"`
 }
 
 // Buffered QRNG struct.
@@ -711,13 +698,22 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			for _, d := range generators {
+			for i, d := range generators {
 				if ctx.Err() != nil {
 					return
 				}
 
 				if _, err := io.ReadFull(source, seed); err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+
 					log.Printf("reseed entropy read failed: %v", err)
+
+					for _, pending := range generators[i:] {
+						pending.RecordReseedFailure(err)
+					}
+
 					break
 				}
 
@@ -727,6 +723,8 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 
 				if err := d.Reseed(seed); err != nil {
 					log.Printf("reseed failed: %v", err)
+					d.RecordReseedFailure(err)
+
 					continue
 				}
 
@@ -894,8 +892,6 @@ func randomImageHandler(d *drbg.DRBG) http.HandlerFunc {
 		w.Header().Set("X-Rng-Reseed-Age-Ms-Test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 		_ = png.Encode(w, img)
-		metrics.AddBytesGenerated(len(img.Pix))
-		metrics.AddHTTPRequests(1)
 	}
 }
 
@@ -961,8 +957,6 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh time.Duration) ht
 			*field.dst = v
 		}
 
-		metrics.AddHTTPRequests(1)
-
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("ws upgrade failed (wsWordsHandler): %v", err)
@@ -1009,7 +1003,6 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh time.Duration) ht
 					return
 				}
 
-				metrics.AddBytesGenerated(len(frame.Words))
 				metrics.AddWSPayloads(1)
 			}
 		}
@@ -1085,9 +1078,6 @@ body {
 
 			return
 		}
-
-		metrics.AddBytesGenerated(len(frame.Words))
-		metrics.AddHTTPRequests(1)
 	}
 }
 
@@ -1121,6 +1111,7 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 
 			return
 		}
+		defer drbg.DecreaseActiveInstances(1)
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
 		/*
@@ -1151,9 +1142,6 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 		}
 
 		_, _ = w.Write(buf)
-
-		metrics.AddBytesGenerated(len(buf))
-		metrics.AddHTTPRequests(1)
 	}
 }
 
@@ -1170,8 +1158,6 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool) ht
 func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
-
-		metrics.AddHTTPRequests(1)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -1243,7 +1229,6 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 					return
 				}
 
-				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
 				// rng.DecreaseActiveInstances(-1)
 				// continue
@@ -1260,8 +1245,6 @@ func fileAnalyzeHandler(d *drbg.DRBG, _ int, refresh time.Duration) http.Handler
 func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(refresh * time.Millisecond)
-
-		metrics.AddHTTPRequests(1)
 
 		conn, cerr := upgrader.Upgrade(w, r, nil)
 		if cerr != nil {
@@ -1349,7 +1332,6 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh time.Duration) http.HandlerFunc 
 					// atomic.AddUint64(&rngBytesGenerated, uint64(len(buf)))
 					// rng.DecreaseActiveInstances(-1)
 					metrics.AddWSPayloads(1)
-					metrics.AddHTTPRequests(1)
 				}
 
 				w.WriteHeader(http.StatusOK)
@@ -1375,8 +1357,6 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) ht
 				refresh = time.Duration(v)
 			}
 		}
-
-		metrics.AddHTTPRequests(1)
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -1431,7 +1411,6 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh time.Duration, maxBytes int) ht
 					return
 				}
 
-				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
 			}
 		}
@@ -1564,8 +1543,6 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity
 			}
 		}
 
-		metrics.AddHTTPRequests(1)
-
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("ws upgrade failed (wsBinaryHandler): %v", err)
@@ -1612,7 +1589,6 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh time.Duration, defaultQuantity
 					return
 				}
 
-				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
 			}
 		}
@@ -1710,113 +1686,6 @@ func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.Han
 	}
 }
 */
-
-func metricsHandler(d *drbg.DRBG) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		meta := d.GetMetadata()
-
-		bytes := metrics.BytesGenerated() / 1024 / 1024
-		reseeds := metrics.Reseeds()
-		reqs := metrics.NumHTTPRequests()
-		payloads := metrics.NumWSPayloads()
-		entropy := metrics.BufferedBytes()
-		entropyA := metrics.TestA()
-		entropyB := metrics.TestB()
-
-		// age := metrics.ReseedAgeMs
-		age := d.ReseedAge().Milliseconds()
-
-		bufBytes := meta.EntropyBufferedBytes / 1024
-		bufCap := meta.EntropyFillPct
-		DRBGcnt := meta.DRBGInstanceCnt
-
-		fmt.Fprintf(w,
-			`# HELP rng_bytes_generated_total Total bytes generated by DRBG
-# TYPE rng_bytes_generated_total counter
-rng_mb_generated_total %d
-
-# HELP rng_reseeds_total Total reseeds
-# TYPE rng_reseeds_total counter
-rng_reseeds_total %d
-
-# HELP rng_reseed_age_ms Age since last reseed
-# TYPE rng_reseed_age_ms gauge
-rng_reseed_age_ms %d
-
-# HELP qrng_buffer_bytes Current buffer fill
-# TYPE qrng_buffer_bytes gauge
-qrng_buffer_capacity_kb %d
-
-# HELP qrng_buffer_capacity_bytes Buffer capacity
-# TYPE qrng_buffer_capacity_bytes gauge
-qrng_buffer_capacity_pct %d
-
-# HELP http_requests_total Total HTTP requests
-# TYPE http_requests_total counter
-http_requests_total %d
-
-# HELP wss_payloads_total Total WSS Payloads sent within sessions
-# TYPE wss_payloads counter
-wss_payloads %d
-
-# HELP entropy_buffer_size_kb Total size of entropy buffer
-# TYPE entropy_buffer_size_kb gauge
-entropy_buffer_capacity_kb %d
-
-# HELP entropy_buffer_capacity_kb_A Total size of entropy buffer TEST A
-# TYPE entropy_buffer_capacity_kb_A gauge
-entropy_buffer_capacity_kb_A %d
-
-# HELP entropy_buffer_capacity_kb_B Total size of entropy buffer TEST B
-# TYPE entropy_buffer_capacity_kb_B gauge
-entropy_buffer_capacity_kb_B %d
-
-# HELP drbg_instance_count Total number of DBRG instances 
-# TYPE drbg_instance_count counter
-drbg_instance_count %d
-`,
-			bytes,
-			reseeds,
-			age,
-			bufBytes,
-			bufCap,
-			reqs,
-			payloads,
-			entropy,
-			entropyA,
-			entropyB,
-			DRBGcnt,
-		)
-	}
-}
-
-func healthHandler(d *drbg.DRBG) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		meta := d.GetMetadata()
-
-		health := HealthInfo{
-			Status:               "ok",
-			Version:              meta.Version,
-			Source:               meta.Source,
-			DRBG:                 meta.DRBG,
-			ReseedAgeMs:          d.ReseedAge().Milliseconds(),
-			ReseedIntervalMs:     meta.ReseedIntervalMs,
-			ReseedSizeBits:       meta.ReseedSizeBits,
-			EntropyBufferedBytes: meta.EntropyBufferedBytes,
-			EntropyBufferedPCT:   meta.EntropyFillPct,
-		}
-
-		d.WriteHeaders(w)
-		// w.WriteHeader(http.StatusOK)
-
-		w.Header().Set("Content-Type", "application/json")
-
-		err := json.NewEncoder(w).Encode(health)
-		if err != nil {
-			http.Error(w, "failed to encode health info", http.StatusInternalServerError)
-		}
-	}
-}
 
 func deviceExists(path string) error {
 	_, err := os.Stat(path)
@@ -2057,8 +1926,12 @@ func main() {
 		panic(Red + "words must be positive" + Reset)
 	}
 
-	if cfg.QRNGBuffer < 1 || cfg.QRNGBuffer > 4096 {
-		panic(Red + "QRNG buffer size KB must be between 1 and 4096 KB" + Reset)
+	if cfg.MaxReseedAge < 0 {
+		log.Fatal("max-reseed-age must not be negative")
+	}
+
+	if cfg.MaxReseedAge == 0 {
+		cfg.MaxReseedAge = max(time.Second, 4*time.Duration(cfg.ReseedMs)*time.Millisecond)
 	}
 
 	fmt.Println("\n-------------------------------------------------")
@@ -2075,7 +1948,7 @@ func main() {
 	fmt.Println("ReseedMs interval            :", cfg.ReseedMs)
 	fmt.Println("Max request size KB          :", cfg.MaxBytes/1024)
 	fmt.Println("DRBG stream backend          :", algorithm)
-	fmt.Println("QRNGBuffer size              :", cfg.QRNGBuffer)
+	fmt.Println("Readiness max seed age       :", cfg.MaxReseedAge)
 	fmt.Println("Reseed Buffer size           :", cfg.SeedBuffer)
 	fmt.Println("-------------------------------------------------")
 	fmt.Println("Max number of Bytes          :", cfg.MaxBytes)
@@ -2137,8 +2010,6 @@ func main() {
 		log.Print("Seed source: configured entropy source with optional RDRAND mixing")
 	}
 
-	qrngBuf := qrng.NewQRNGBuffer(dev, cfg.QRNGBuffer) // 65536
-
 	fmt.Println("	2) initialize seed space")
 
 	/*
@@ -2196,18 +2067,8 @@ func main() {
 
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI"
 	fmt.Println("	6) set DRBG metadata (optional)")
-	master.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
-	backup.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize, *qrngBuf)
-
-	// Attach the QRNG buffer for dynamic header reporting
-	fmt.Println("	7) attach the QRNG buffer to DRBG")
-
-	// Attach it to DRBG
-	master.SetEntropyBuffer(*qrngBuf)
-	backup.SetEntropyBuffer(*qrngBuf)
-
-	fmt.Println("	8) start network listener(s)")
-	// tln := newTunedListener(ln)
+	master.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
+	backup.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
 	var tlsCfg *tls.Config
 
@@ -2248,11 +2109,14 @@ func main() {
 
 	mux.Handle("/", http.FileServer(http.FS(webRoot)))
 
-	mux.HandleFunc("/health-1", healthHandler(&master))
-	mux.HandleFunc("/health-2", healthHandler(&backup))
+	mux.HandleFunc("/live", livenessHandler)
+	mux.HandleFunc("/ready", healthHandler(&backup, cfg.MaxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&master))
-	mux.Handle("/metrics-2", metricsHandler(&backup))
+	mux.HandleFunc("/health-1", healthHandler(&master, cfg.MaxReseedAge))
+	mux.HandleFunc("/health-2", healthHandler(&backup, cfg.MaxReseedAge))
+
+	mux.Handle("/metrics-1", metricsHandler(&master, cfg.MaxReseedAge))
+	mux.Handle("/metrics-2", metricsHandler(&backup, cfg.MaxReseedAge))
 
 	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes))
 	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes))
@@ -2295,7 +2159,7 @@ func main() {
 
 	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
 	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, &backup)
-	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux)
+	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, countRequests(mux))
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	} else {
@@ -2305,7 +2169,7 @@ func main() {
 	if cfg.EnableHTTPS {
 		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
 		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, &backup)
-		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg)
+		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, countRequests(mux), tlsCfg)
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
 		} else {

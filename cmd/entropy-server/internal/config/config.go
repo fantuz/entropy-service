@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	ReseedMs         int
+	MaxReseedAge     time.Duration
 	ReseedSize       int
 	MaxBytes         int
 	QRNGBuffer       int
@@ -47,9 +48,10 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.RefreshRate, "refresh", 5, "Default refresh rate (in seconds) of words presented by /v1/words/random endpoint")
 	flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (maximum 20)")
 	flag.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Reseed interval (ms)")
+	flag.DurationVar(&cfg.MaxReseedAge, "max-reseed-age", 0, "Maximum seed age for readiness (0 = max(1s, four reseed intervals))")
 	flag.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
 	flag.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
-	flag.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Size of QRNG buffer in KB")
+	flag.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Deprecated; ignored (reseeding reads the configured source directly)")
 	flag.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum raw bytes per HTTP response or WebSocket message (default 32 MiB)")
 	flag.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
 	flag.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
