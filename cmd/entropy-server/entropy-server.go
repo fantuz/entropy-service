@@ -1361,6 +1361,13 @@ func uploadHandler(_ *drbg.DRBG, _ int, refresh int) http.HandlerFunc {
 
 func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webSocketBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		format, err := parseByteFrameFormat(r.URL.Query())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+
+			return
+		}
+
 		n, err := extractByteCount(r, 2048, maxBytes)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1376,7 +1383,7 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webS
 			}
 		}
 
-		release, admitted := budget.admit(w, r, wsByteReservation(n, true))
+		release, admitted := budget.admit(w, r, wsByteReservation(n, format == byteFrameJSON))
 		if !admitted {
 			return
 		}
@@ -1412,16 +1419,9 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webS
 					return
 				}
 
-				hash := sha256.Sum256(buf)
-				frame := EntropyDataFrame{
-					Hex:    hex.EncodeToString(buf),
-					Base64: base64.StdEncoding.EncodeToString(buf),
-					Hash:   hex.EncodeToString(hash[:]),
-				}
-
 				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 
-				if err := conn.WriteJSON(frame); err != nil {
+				if err := writeByteFrame(conn, buf, format); err != nil {
 					return
 				}
 

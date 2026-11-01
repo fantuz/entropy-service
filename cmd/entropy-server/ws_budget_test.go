@@ -133,7 +133,10 @@ func waitBudgetActive(t *testing.T, budget *webSocketBudget, want int) {
 }
 
 func TestWebSocketInboundMessageLimit(t *testing.T) {
-	for _, path := range []string{"/stream?bytes=64", "/bytes?bytes=64", "/colors?bytes=64", "/words?words=3"} {
+	for _, path := range []string{
+		"/stream?bytes=64", "/bytes?bytes=64", "/colors?bytes=64", "/words?words=3",
+		"/bytes?bytes=64&format=compact", "/colors?bytes=64&format=hash",
+	} {
 		for _, size := range []int{wsInboundLimit + 1, 128 << 10} {
 			t.Run(path+"/"+strconv.Itoa(size), func(t *testing.T) {
 				budget := newWebSocketBudget(4, 1<<20)

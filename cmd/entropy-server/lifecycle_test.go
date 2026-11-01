@@ -18,7 +18,7 @@ import (
 func TestWebSocketShutdown(t *testing.T) {
 	for _, secure := range []bool{false, true} {
 		for _, cancelParent := range []bool{false, true} {
-			for _, path := range []string{"/stream", "/bytes", "/colors", "/words"} {
+			for _, path := range []string{"/stream", "/bytes", "/colors", "/words", "/bytes?format=compact", "/colors?format=hash"} {
 				t.Run(strings.Join([]string{path, boolLabel(secure), boolLabel(cancelParent)}, "/"), func(t *testing.T) {
 					parent, err := drbg.NewDRBG(bytes.Repeat([]byte{0x42}, 64))
 					if err != nil {

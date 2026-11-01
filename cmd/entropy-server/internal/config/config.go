@@ -75,7 +75,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
 	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
 	flags.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Deprecated; ignored (reseeding reads the configured source directly)")
-	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum raw bytes per HTTP response or WebSocket message (default 32 MiB)")
+	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum generated sample bytes (default 32 MiB; compact WebSocket messages add a 32-byte digest)")
 	flags.IntVar(&cfg.WSMaxConnections, "ws-max-connections", 128, "Maximum simultaneous entropy WebSockets across HTTP and HTTPS (positive)")
 	flags.Int64Var(&cfg.WSMemoryMiB, "ws-memory-mib", 1024, "Aggregate estimated WebSocket working-memory budget in MiB (positive; not an RSS limit)")
 	flags.IntVar(&cfg.HTTPMaxRequests, "http-max-requests", 128, "Maximum simultaneous HTTP generation requests across HTTP and HTTPS (positive)")
@@ -94,6 +94,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		fmt.Fprintln(output, "Timing values are plain integer milliseconds, e.g. 1000 (no unit suffix).")
 		fmt.Fprintln(output, "WebSocket budgets are shared by HTTP/HTTPS and reserved until disconnect.")
 		fmt.Fprintln(output, "Inbound WebSocket messages are limited to 1 KiB.")
+		fmt.Fprintln(output, "/bytes and /colors accept format=json (default), compact, or hash.")
 		fmt.Fprintln(output, "HTTP generation budgets are shared by HTTP/HTTPS; probes and static files are excluded.")
 		flags.PrintDefaults()
 	}
