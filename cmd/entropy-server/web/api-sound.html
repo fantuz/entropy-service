@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entropy Service — Harmonic Sounds</title>
+  <style>
+    body { background: #09110f; color: #bcf4d8; font: 16px monospace; margin: 3rem auto; padding: 1rem; max-width: 42rem; }
+    h1, a { color: #00ff88; }
+    form { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 2rem 0; }
+    label { display: grid; gap: .5rem; }
+    select, input, button { font: inherit; padding: .6rem; border-radius: .4rem; }
+    input { width: 8rem; }
+    audio { display: block; width: 100%; margin: 1.5rem 0; }
+    #status { min-height: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>Harmonic Sounds</h1>
+  <p>Random pitch, overtones and decay. A short sound with no melody or beat.</p>
+  <form id="controls">
+    <label>Texture
+      <select name="style"><option value="bloom">Soft bloom</option><option value="chime">Bright chime</option></select>
+    </label>
+    <label>Duration (ms)
+      <input name="duration_ms" type="number" min="250" max="5000" step="1" value="2500" required>
+    </label>
+    <button type="submit">Generate sound</button>
+  </form>
+  <p id="status" role="status" aria-live="polite">Generate a sound, then press play.</p>
+  <audio id="player" controls preload="metadata"></audio>
+  <a id="download" hidden>Download this WAV</a>
+  <p>48 kHz · mono · 16-bit PCM. Sound parameters come from the service DRBG.
+     These sounds are a creative demonstration, not an entropy-quality test.</p>
+  <script>
+    const form = document.getElementById('controls');
+    const player = document.getElementById('player');
+    const download = document.getElementById('download');
+    const status = document.getElementById('status');
+    const button = form.querySelector('button');
+    let objectURL;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      status.textContent = 'Generating…';
+      try {
+        const query = new URLSearchParams(new FormData(form));
+        const response = await fetch('/sound?' + query, { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + await response.text());
+        const blob = await response.blob();
+        player.pause();
+        if (objectURL) URL.revokeObjectURL(objectURL);
+        objectURL = URL.createObjectURL(blob);
+        player.src = objectURL;
+        download.href = objectURL;
+        download.download = 'entropy-' + query.get('style') + '.wav';
+        download.hidden = false;
+        status.textContent = 'Ready — press play. Download saves this exact sound.';
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    window.addEventListener('pagehide', (event) => {
+      if (!event.persisted && objectURL) URL.revokeObjectURL(objectURL);
+    });
+  </script>
+</body>
+</html>

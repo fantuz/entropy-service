@@ -25,12 +25,16 @@ func newManagedServer(parent context.Context, server *http.Server) *managedServe
 	ctx, cancel := context.WithCancel(parent)
 	s := &managedServer{Server: server, cancel: cancel, done: make(chan struct{})}
 	handler := server.Handler
+	// Late rejections bypass the normal handler's request observer.
+	rejectStopped := countRequests(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "server shutting down", http.StatusServiceUnavailable)
+	}))
 	server.BaseContext = func(net.Listener) context.Context { return ctx }
 	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		if s.stopping {
 			s.mu.Unlock()
-			http.Error(w, "server shutting down", http.StatusServiceUnavailable)
+			rejectStopped.ServeHTTP(w, r)
 
 			return
 		}

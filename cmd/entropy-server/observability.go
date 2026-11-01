@@ -29,13 +29,10 @@ type HealthInfo struct {
 	EntropyBufferedPCT   int       `json:"entropy_buffered_pct"`
 }
 
-// Count once at the HTTP boundary, including rejected requests and static files.
-// Passing the original ResponseWriter preserves WebSocket upgrade support.
+// Count once at the HTTP boundary and log failed responses to the standard
+// logger (stderr by default), preserving upgrades and response streaming.
 func countRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		metrics.AddHTTPRequests(1)
-		next.ServeHTTP(w, r)
-	})
+	return observeRequests(next, log.Default())
 }
 
 func reseedReady(meta drbg.Metadata, maxAge time.Duration) bool {

@@ -80,7 +80,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.Int64Var(&cfg.WSMemoryMiB, "ws-memory-mib", 1024, "Aggregate estimated WebSocket working-memory budget in MiB (positive; not an RSS limit)")
 	flags.IntVar(&cfg.HTTPMaxRequests, "http-max-requests", 128, "Maximum simultaneous HTTP generation requests across HTTP and HTTPS (positive)")
 	flags.Int64Var(&cfg.HTTPMemoryMiB, "http-memory-mib", 512, "Aggregate estimated HTTP generation memory budget in MiB (positive; separate from WebSocket budget; not an RSS limit)")
-	flags.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum bytes analized for fingerprinting upon file upload")
+	flags.IntVar(&cfg.BytesFingerprint, "fingerprint", 2097152, "Maximum upload prefix bytes analyzed statistically (1-33554432); SHA-256 covers the full upload")
 	flags.BoolVar(&cfg.EnableHTTPS, "enable-https", true, "Enable/Disable HTTPS server (false/true)")
 	flags.BoolVar(&cfg.RequireDevice, "require-device", false, "Fail if entropy device unavailable")
 	flags.BoolVar(&cfg.MixRDRAND, "rdrand-mix", false, "Supplement startup/reseed bytes with CPU RDRAND (requires amd64 CPU support)")
@@ -123,6 +123,13 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 	if cfg.HTTPMaxRequests < 1 || cfg.HTTPMemoryMiB < 1 || cfg.HTTPMemoryMiB > (1<<63-1)/(1<<20) {
 		err := errors.New("http-max-requests and http-memory-mib must be positive; memory budget must fit in int64 bytes")
+		fmt.Fprintln(output, err)
+
+		return nil, err
+	}
+
+	if cfg.BytesFingerprint < 1 || cfg.BytesFingerprint > 1<<25 {
+		err := errors.New("fingerprint must be between 1 and 33554432 bytes")
 		fmt.Fprintln(output, err)
 
 		return nil, err
