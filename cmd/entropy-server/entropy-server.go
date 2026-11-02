@@ -1142,6 +1142,7 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 		// Stream a bounded response without allocating a buffer proportional to size.
 		// Keep the per-request child DRBG and existing admission budget.
 		w.Header().Set("Content-Length", strconv.Itoa(size))
+
 		if _, err := io.CopyN(w, &child, int64(size)); err != nil {
 			// Headers/body may already have been sent: do not call http.Error here.
 			log.Printf("random bytes stream failed: %v", err)
