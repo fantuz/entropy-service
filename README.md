@@ -399,70 +399,78 @@ The compact encoder allocated 32 B/op beyond the existing sample buffer in these
 go test ./cmd/entropy-server -run '^$' -bench '^BenchmarkByteFrameFormats$' -benchmem -benchtime=300ms -count=3
 ```
 
-### Author-reported HTTP benchmark: Ryzen 5 3500U
+### HTTP throughput benchmarks: Ryzen 5 3500U
 
-Measured on an **AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx**, using local HTTP requests to `/v1/data/random`. The sample size is **512 KiB (524288 bytes)**, with **32 wrk threads**, **64 connections** and a **10-second requested duration**:
+Author-reported measurements on an **AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx**, using `/v1/data/random` over local HTTP. Both runs used **32 wrk threads**, **64 connections**, a **10-second requested duration** and a **3-second timeout**. The commands differ only in the requested response size:
 
 ```sh
-wrk -t32 -c64 -d10s --latency --timeout 3 'http://localhost:8080/v1/data/random?bytes=524288'
+# 256 KiB per response
+wrk -t32 -c64 -d10s --latency --timeout 3 'http://localhost:8080/v1/data/random?bytes=262144'
+
+# 1 MiB per response
+wrk -t32 -c64 -d10s --latency --timeout 3 'http://localhost:8080/v1/data/random?bytes=1048576'
 ```
 
-| Metric | Reported result |
-| --- | ---: |
-| Completed requests | 35,837 in 10.04 s |
-| Requests/s | 3,570.87 |
-| Transfer/s, original wrk label | `1.75GB` |
-| Total read, original wrk label | `17.52GB` |
-| Mean latency | 19.05 ms |
-| Median latency (p50) | 20.11 ms |
-| p75 latency | 26.60 ms |
-| p90 latency | 38.44 ms |
-| p99 latency | 58.19 ms |
-| Maximum latency | 173.02 ms |
+| Metric | 256 KiB responses | 1 MiB responses |
+| --- | ---: | ---: |
+| Bytes per response | 262,144 | 1,048,576 |
+| Completed requests | 106,029 | 36,857 |
+| Measured duration | 10.03 s | 10.07 s |
+| Requests/s | 10,566.28 | 3,658.70 |
+| Transfer/s, original wrk label | `2.58GB` | `3.57GB` |
+| Total read, original wrk label | `25.92GB` | `36.01GB` |
+| Mean latency | 8.02 ms | 25.13 ms |
+| Median latency (p50) | 4.62 ms | 11.64 ms |
+| p75 latency | 13.06 ms | 39.47 ms |
+| p90 latency | 19.23 ms | 64.31 ms |
+| p99 latency | 35.85 ms | 120.08 ms |
+| Maximum latency | 89.66 ms | 259.94 ms |
 
-This is a short **loopback HTTP delivery** measurement, including work by both the server and local load generator; it does not measure physical network throughput or raw QRNG speed. No socket errors are listed in the supplied output. The tested revision, DRBG backend, seed source, Go version and `GOMAXPROCS` were not supplied with this result. Different hardware, payloads and load settings make it unsuitable for a direct before/after comparison with the older runs below.
+These short **loopback HTTP delivery** runs include work by both the server and local load generator. They measure delivery of DRBG output rather than raw QRNG speed or physical network bandwidth. Transfer figures retain wrk's printed unit labels and include HTTP overhead. No socket errors are listed in either supplied log. The tested revision, DRBG backend, seed source, Go version and `GOMAXPROCS` were not supplied with the results.
 
 <details>
-<summary>Full supplied wrk output</summary>
+<summary>Full wrk output: 256 KiB responses</summary>
 
 ```text
-Running 10s test @ http://localhost:8080/v1/data/random?bytes=524288
+Running 10s test @ http://localhost:8080/v1/data/random?bytes=262144
   32 threads and 64 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    19.05ms   14.24ms 173.02ms   58.50%
-    Req/Sec   112.04     28.93   232.00     67.03%
+    Latency     8.02ms    8.45ms  89.66ms   84.42%
+    Req/Sec   331.76     80.65   640.00     69.41%
   Latency Distribution
-     50%   20.11ms
-     75%   26.60ms
-     90%   38.44ms
-     99%   58.19ms
-  35837 requests in 10.04s, 17.52GB read
-Requests/sec:   3570.87
-Transfer/sec:      1.75GB
+     50%    4.62ms
+     75%   13.06ms
+     90%   19.23ms
+     99%   35.85ms
+  106029 requests in 10.03s, 25.92GB read
+Requests/sec:  10566.28
+Transfer/sec:      2.58GB
 ```
 
 </details>
 
-### Historical HTTP results
+<details>
+<summary>Full wrk output: 1 MiB responses</summary>
 
-The earlier README included short loopback `wrk` runs on an Intel Core i5-3470 at 3.20 GHz, using 16 load threads and 64 connections for about five seconds:
-
-| Response size | Requests/s | Transfer/s, original wrk labels | Reported socket errors |
-| --- | ---: | ---: | --- |
-| 64 B | 68,019.56 | 11.68 MB/s | None. |
-| 2 MiB | 572.97 | 1.12 GB/s | 2 timeouts. |
-
-These are **historical author measurements**, not a rerun of the current release. They used the old `/v1/random` route; the exact revision, backend and source configuration were not recorded. Transfer totals include HTTP overhead.
-
-### Benchmark your installation
-
-Throughput benchmarks measure delivery performance, separately from the [statistical tests](#statistical-tests). Start a server with recorded flags, then run:
-
-```sh
-wrk -t4 -c16 -d30s --latency --timeout 5s 'http://127.0.0.1:8080/v1/data/random?bytes=65536'
+```text
+Running 10s test @ http://localhost:8080/v1/data/random?bytes=1048576
+  32 threads and 64 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    25.13ms   28.10ms 259.94ms   84.53%
+    Req/Sec   114.97     46.36   363.00     72.57%
+  Latency Distribution
+     50%   11.64ms
+     75%   39.47ms
+     90%   64.31ms
+     99%  120.08ms
+  36857 requests in 10.07s, 36.01GB read
+Requests/sec:   3658.70
+Transfer/sec:      3.57GB
 ```
 
-Compare `-drbg=chacha20` and `-drbg=aes-256-ctr`, vary `GOMAXPROCS` and concurrency, and record errors, tail latency, CPU and peak RSS as well as throughput. AES can benefit from CPU acceleration; private generators allow parallel bulk work, but tiny requests, encoding or the load generator may become the bottleneck. Longer runs and remote/TLS clients answer different questions from a loopback test. Do not apply blanket `sysctl` or socket-buffer tuning before identifying the constraint.
+</details>
+
+For your own comparisons, vary the payload, concurrency, backend and `GOMAXPROCS` one at a time. Record the server flags, CPU, Go version, latency percentiles, errors and memory use alongside throughput. Remote and TLS clients exercise different constraints from these local HTTP runs. Use the [statistical tests](#statistical-tests) separately to assess output characteristics.
 
 ## Statistical tests
 
