@@ -237,25 +237,25 @@ function computePercentages(values) {
 }
 */
 
-function drawLegendOnCanvas(ctx, labels, colors, values, startX, startY) {
-    const percentages = computePercentages(values);
-    ctx.font = "12px Arial";
+function drawLegendOnCanvas(ctx, labels, colors, values) {
+    ctx.save();
+    ctx.font = "12px monospace";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-
-    labels.forEach((label, i) => {
-        const y = startY + i * 15;
+    const text = labels.map((label, i) => `${label}: ${values[i]}`);
+    const keySize = 12, keyGap = 6;
+    const legendWidth = keySize + keyGap + Math.max(...text.map(label => ctx.measureText(label).width));
+    const legendX = (ctx.canvas.width - legendWidth) / 2;
+    text.forEach((label, i) => {
+        const y = ctx.canvas.height - 24 + i * 16;
         ctx.fillStyle = colors[i];
-        ctx.fillRect(startX, y - 6, 12, 12);
-        ctx.fillStyle = "#000";
-	//const percentText = percentages[i].toFixed(2) + "%";
-	//const percentText = percentages[i] + "%";
-	//const percentText = values[i] + "%";
-	//const percentText = values[i];
-	const percentText = values[1-i];
-        const fullText = `${label} — ${percentText}`;
-        ctx.fillText(fullText, startX + 20, y);
-        //ctx.fillText(label, startX + 20, y);
+        ctx.fillRect(legendX, y - keySize / 2, keySize, keySize);
+        ctx.strokeStyle = "#444";
+        ctx.strokeRect(legendX, y - keySize / 2, keySize, keySize);
+        ctx.fillStyle = "black";
+        ctx.fillText(label, legendX + keySize + keyGap, y);
     });
+    ctx.restore();
 }
 
 function generateByteRangeLabels(bucketSize) {
@@ -263,7 +263,7 @@ function generateByteRangeLabels(bucketSize) {
 
     for (let i = 0; i <= 1; i += bucketSize) {
         //labels.push(`${i}-${i + bucketSize - 1}`);
-        labels.push(`# of ${i}`);
+        labels.push(`${i}`);
     }
 
     return labels;
@@ -314,7 +314,7 @@ function renderPie() {
     pieCtx.fillText(label, x, y);
 	*/
 
-    drawLegendOnCanvas(pieCtx, labels, "grey", [allvalues[0],allvalues[1]], 0, 150);
+    drawLegendOnCanvas(pieCtx, labels, ["#000000", "#ffffcc"], allvalues);
 }
 
 const mosaicCanvas = document.getElementById("mosaic");

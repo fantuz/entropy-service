@@ -3,429 +3,464 @@
 [![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go)](https://golangci-lint.run/)
 [![build](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml)
 ![Latest GitHub release](https://img.shields.io/github/release/fantuz/entropy-service.svg)
-[![GitHub license](https://img.shields.io/github/license/fantuz/entropy-service)](https://github.com/fantuz/entropy-service/blob/main/LICENSE)
+[![GitHub license](https://img.shields.io/github/license/fantuz/entropy-service)](LICENSE)
 ![GitHub all releases](https://img.shields.io/github/downloads/fantuz/entropy-service/total)
 
-## Intended usage
+**From photons to bytes. Random data from your own hardware, delivered through simple APIs.**
 
-entropy-service is a GO-based software intended to let users fetch an amount randomness via simple API(s). Useful in daily cryptographic operations, where the randomness source may be "staving" or being tampered-with.
-In my demonstrative setup, real-time entropy is backed by a real QRNG (Quantum Random Number Generator), a PCI card made by ID Quantique in Geneva. This entropy is then fed into a DRBG module written in GO, which "amplifies" the output of entropy source, using well-known algorithms as ChaCha20 or AES-CRT.
+entropy-service is a Go server and command-line client for generating, delivering and inspecting random data. Connect a supported hardware random-number source, such as a quantum random-number generator (QRNG), or use the operating system's cryptographic random source. Fetch binary samples, keep a WebSocket stream open, or explore words, images, colours and short harmonic sounds in a browser.
 
-## Practical implementations
+The original demonstration uses an ID Quantique Quantis PCI card. Hardware supplies seed material; a software deterministic random bit generator (DRBG), using ChaCha20 or optional AES-256-CTR, produces the bulk output. This expands a seeded cryptographic stream; it does not create additional physical entropy or make every delivered byte a fresh QRNG measurement.
 
-With this powerful software, users can setup their own "cryptographically-strong entropy source" and use simple APIs to retrieve chunks of randomness, either in form of:
+- **Build applications and experiments:** retrieve bounded binary samples over HTTP or continuous samples over WebSockets.
+- **Study random data:** inspect distributions, bit balance, heatmaps and uploaded files. These diagnostics help find obvious problems; they do not certify a source's unpredictability.
+- **Explore generative output:** sample words from a dictionary, generate images and QR codes, or synthesise harmonic audio.
+- **Operate your own service:** monitor seed freshness, failures, traffic and resource budgets through JSON health checks, Prometheus text metrics and stderr logs.
 
-- a binary stream
-- a set of words
-- a background color
-- randomly-generated images and heatmaps
-- randomly-generated sounds (to be added soon)
+`entropy-server` serves the APIs and embedded browser pages. `entropy-client` consumes the binary HTTP/WebSocket APIs and offers terminal diagnostics.
 
-The suite also includes advanced SRE-style views, statistics and metrics:
+[Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API reference](#api-reference) · [Performance](#performance) · [Development](#development) · [Roadmap](#roadmap)
 
-- an entropy quality monitor and visualization tool (/streams.html)
-- a JSON status monitor, showing startup and runtime information (/health)
-- a Prometheus-like metrics collector, presenting live runtime counters (/metrics)
+## Quick start
 
-The two programs operate as described:
+Use **Go 1.24.4 or newer**, Git and Make. Linux is the primary deployment target; hardware devices also need their own working kernel driver and read permissions.
 
-- entropy-server ....
-- entropy-client ....
+```sh
+git clone https://github.com/fantuz/entropy-service.git
+cd entropy-service
+make build
 
-## Architecture and logic
-
-### High-Level Overview
-
-- Summary of the different functions from entropy sourcing to randomness streaming
-
+# Local demonstration using the OS CSPRNG; no QRNG or TLS certificates needed.
+./bin/entropy-server -device=/dev/urandom -enable-https=false -http=127.0.0.1:8080
 ```
 
-                           ┌─────────────────────────┐
-                           │     External QRNG       │
-                           │  (hardware / upstream)  │
-                           └─────────────┬───────────┘
-                                         │ fetch()
-                                         ▼
-                           ┌─────────────────────────┐
-                           │     Entropy Buffer      │
-                           │   (ring / pool cache)   │
-                           └─────────────┬───────────┘
-                                         │ reseed() (time-driven)
-                                         ▼
-                           ┌─────────────────────────┐
-                           │      Master DRBG        │
-                           │   (ChaCha20 stream)     │
-                           │  - expands entropy      │
-                           │  - derives child seeds  │
-                           └─────────────┬───────────┘
-                                         │ derive()
-                                         │
-                                         │
-                                         │
-              ┌──────────────────────────┼──────────────────────────┐
-              ▼                          ▼                          ▼
-      ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
-      │ Conn DRBG #1 │           │ Conn DRBG #2 │           │ Conn DRBG #N │
-      │ isolated key │           │ isolated key │           │ isolated key │
-      └───────┬──────┘           └───────┬──────┘           └───────┬──────┘
-              │ serve()                  │ serve()                  │ serve()
-              ▼                          ▼                          ▼
-       HTTP/HTTPS/WS              HTTP/HTTPS/WS              HTTP/HTTPS/WS
-              └──────────────────────────┴──────────────────────────┘
-                                         │
-                                         ▼
-                                      Clients
-                          (browsers, curl, websockets, ..)
+In another terminal, from the repository directory:
 
-Legend
-  Fetch()  → External entropy acquisition from QRNG source
-  Reseed() → Periodically refreshes the master DRBG providing with new entropy buffer
-  Derive() → Per-connection DRBG instantiation (state isolation)
-  Serve()  → HTTP/HTTPS streaming of expanded cryptographic output
+```sh
+curl --fail http://127.0.0.1:8080/ready
+curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin
+wc -c sample.bin
 
-Supported client protocols
-  HTTP/1.1
-  h2
-  wss://
+# Repeated HTTP requests, 64 KiB per response.
+./bin/entropy-client -mode=pull -url=http://127.0.0.1:8080/v1/data/random -slice=65536 -refresh=100ms
+
+# Alternatively, one WebSocket connection delivering 64 KiB per message.
+./bin/entropy-client -mode=stream -wsurl=ws://127.0.0.1:8080/stream -slice=65536 -refresh=100ms
 ```
 
-- Separation of roles: server streams binary data, client processes WSS binary data and renders via Javascript engine
+Stop a running client or server with Ctrl+C. Open [byte preview](http://127.0.0.1:8080/bytes.html?bytes=4096&refresh=1000), [colours](http://127.0.0.1:8080/colors.html), [words](http://127.0.0.1:8080/words.html?words=8&refresh=1000), [sound](http://127.0.0.1:8080/sound.html) or [file analysis](http://127.0.0.1:8080/upload.html) in your browser.
 
-```
-+----------------------------+
-| GO entropy-service backend |             (server)
-+----------------------------+
-            ↓
-    << WebSocket binary >>          (half-duplex channel)
-            ↓
-  +------------------------+
-  | Main Thread (IO + DOM) |
-  |           ↓            |               (client)
-  |  Worker (math engine)  |
-  +------------------------+
+Build the **whole command packages**, not individual `.go` files: each binary now spans several source files. Without Make, use `go build -o ./bin/entropy-server ./cmd/entropy-server` and the corresponding `./cmd/entropy-client` command.
+
+### Hardware and TLS
+
+Require your hardware source explicitly when silent fallback would be inappropriate:
+
+```sh
+./bin/entropy-server -device=/dev/qrandom0 -require-device=true -enable-https=false -http=127.0.0.1:8080
 ```
 
-### Services being offered via API
+Without `-require-device=true`, an unavailable device can fall back to the OS CSPRNG. `/dev/urandom` is a cryptographic source, not a deliberately weak test generator. Accepting a device path does not establish the quality of its output; the hardware, driver and source assessment remain part of your deployment.
 
-- entropy control panel with metrics graphs and quality indexes
-- entropy heatmaps (to infer the quality of RNG source)
-- random binary data generation, length of which is configurable via URI parameter
-- random passphrase / wordlist generation, presentated in different encodings, length of which is configurable via URI parameter
-- random imgage generation
-- support for websockets and JSON payloads (more efficient, less network overhead, entropy is streamed and broadcasted continuously)
-- observable metrics, exposing entropy source availability, buffer size, pressure, reseed interval, size of reseed, time since last reseed.
-- h2 readyness, now commented out as debug in HTTP/2 is way harder than HTTP/1.1
+The standalone binary enables HTTPS by default and expects `cert.pem` and `key.pem`. To serve HTTP on port 8080 and TLS 1.3 on port 8443 using your own certificates:
 
-### Server robustness and stability, by design
-
-- socket management, thread-safe and thread-aware structs
-- per-connection DRBG isolation
-- rolling buffers, to better feed client expectations, to improve dashboard rendering
-- running parallel routines in a context-safe manner, correctly implementing and supporting OS-signalling
-- HTTP and HTTPS servers sharing same mux, HTTP headers
-- support for modern wesockets, allowing less overhead while guaranteeing a continuous and timely stream of data
-- use of GO atomic counters to accomodate atomic updates even under high-concurrency
-- pluggable over different /dev/Xrandom sources (as said, for example, a ChaosKey integrated by kernel driver /dev/kaoskeyX or any better/safer/more modern entropy source, for example by ID-Quantique company)
-- OS Variables to enable/disable TLS, h2, and other useful test features
-- CLI options to control entropy-source device, buffers sizes, reseed intervals, listening ports, TLS on/off, mandatory presence of RNG device, fallback RNG device, timers and more.
-- pages are optimezed for client-side renderingm as the separation of DOM, canvas and JS workers is enforced by-design (not-blocking, not-CPU intensive, allows packet drop, recovery and other anti-stall features)
-- abstraction and reorganization of code in line with GO guidelines. DRBG, transport, service and domain are now located in more canonical project structure (for example: domain/ rng/ service/ transport/ /cmd)
-
-### Hardware already supported, more to be added soon
-
-The software has been adapted to fetch entropy from etherogeneous sources, as the Linux CSPRNG itself (/dev/urandom, for testing only) or an USB Chaos Key (low entropy, still deterministic in a way). Possibilities are endless as every character device will become a valid choice; ranging from barcode reader to any webcam, mouse, or radio-wave, your imagination is the limit !
-
-```
- - Bus 001 Device 003: ID 1d50:60c6 OpenMoko, Inc. USBtrng hardware random number generator
- - Quantis PCI by ID Quantique
- - Linux default CSRNG source, /dev/urandom, useful when testing or need to fallback
- - pretty much any character device under Linux
- - eventually any SDR radio-receiver, as AirSpy, RTL, BladeRF and others.
+```sh
+./bin/entropy-server -device=/dev/urandom -cert-file=/absolute/path/cert.pem -key-file=/absolute/path/key.pem
 ```
 
-### API mappings
+Use `https://` and `wss://` for remote consumers. Configure access control at the deployment boundary: the application currently has no built-in authentication or WebSocket origin restriction. HTTP/2 is not enabled in the current listener setup.
 
-```
-Websockets (Standard HTTP 101 Upgrade)
-    /stream.html?bytes=<B>&refresh=<MS>
-	/bytes.html?bytes=<B>&refresh=<MS>
-    /words.html?words=N>&refresh=<MS>
-	/colors.html?refresh=<MS>
+### Install Linux packages
 
-Regular HTTP
- - images
-	/v1/image/random
-	/v1/image/heatmap
- - data
-	/v1/data/random
-	/v1/data/test
- - words
-	/v1/meta/random
-    /paroleparoleparole
- - metrics, health
-	/health
-	/metrics
-```
+The [Releases](https://github.com/fantuz/entropy-service/releases) page provides archives and `.deb`/`.rpm` packages for Linux amd64, armv7 and arm64. Download the package matching your system, then install that file:
 
-## Build
+```sh
+# Debian / Ubuntu; keep only the intended package in the current directory.
+sudo apt install ./entropy-service_*.deb
 
-### Prerequisites
+# RPM-based systems.
+sudo rpm -Uvh ./entropy-service_*.rpm
 
-Once cloned the repository via Github, go through the below steps to freshly build your entropy-service.
-
-#### Linux (Debian / Ubuntu)
-
-- Install the only base-package required:
-
-```
-sudo apt-get install golang
-```
-
-- Optionally, install a few well-known tools for performance testing:
-
-```
-sudo apt-get install wrk dieharder rng-tools
-```
-
-#### macOS (Homebrew)
-
-- Install the only base-package required:
-
-```
-brew install go
-```
-
-- Optionally, install a few well-known tools for performance testing:
-
-```
-brew install wrk dieharder
-```
-
-> Note: `rng-tools` (the `rngd` daemon) is Linux-specific and has no macOS equivalent, so it is omitted above.
->
-> macOS notes:
->
-> - There is no hardware QRNG support; use the kernel CSPRNG fallback by passing `-device /dev/urandom` (the default `/dev/qrandom0` is a Linux/hardware device).
-> - `sudo` is not required for `/dev/urandom`; it is only needed to access privileged hardware entropy devices on Linux.
-> - The committed pre-built binaries (if any) are Linux x86-64 ELF and will not run on macOS — always build locally as shown below.
->
-### Preliminary and preparation steps
-
-Ensure all go dependencies are satisfied. Follow on-screen instructions in case of issues.
-
-- build entropy-server
-
-```
-go build cmd/entropy-server/entropy-server.go
-```
-
-- build entropy-client
-
-```
-go build cmd/entropy-client/entropy-client.go
-```
-
-### Using the Makefile
-
-A `Makefile` wraps the common workflows so you don't have to remember the individual commands:
-
-```
-make build            # build both binaries into ./bin
-make build-server     # build only entropy-server
-make build-client     # build only entropy-client
-make test             # go test ./...
-make lint             # run golangci-lint
-make fmt              # run golangci-lint fmt (gofmt/gofumpt/goimports/gci)
-make release-snapshot # build a local snapshot release (archives + deb/rpm) into ./dist
-make clean            # remove ./bin and ./dist
-```
-
-The `lint`, `fmt` and `release-snapshot` targets need two extra dev tools:
-
-```
-# macOS (Homebrew)
-brew install golangci-lint goreleaser
-
-# Linux: see https://golangci-lint.run/ and https://goreleaser.com/install/
-```
-
-Continuous integration mirrors this: `.github/workflows/build.yml` runs the tests, linters and a snapshot build on every push/PR, while `.github/workflows/release.yml` runs GoReleaser to publish artifacts whenever a `vX.Y.Z` tag is pushed.
-
-## Install (packages)
-
-Tagged releases publish `.deb` and `.rpm` packages (built by GoReleaser) for `linux/amd64`, `linux/armv7` and `linux/arm64`. Grab the package matching your distro and architecture from the [Releases](https://github.com/fantuz/entropy-service/releases) page and install it:
-
-```
-# Debian / Ubuntu
-sudo dpkg -i entropy-service_*_linux_amd64.deb
-
-# RHEL / Fedora / openSUSE
-sudo rpm -i entropy-service_*_linux_amd64.rpm
-```
-
-The package installs both `entropy-server` and `entropy-client` into `/usr/bin` and registers a `entropy-server` systemd service (enabled and started automatically). By default the service starts on HTTP `:8080` with HTTPS disabled, using `/var/lib/entropy-service` as its working directory:
-
-```
 sudo systemctl status entropy-server
 sudo journalctl -u entropy-server -f
 ```
 
-To enable TLS or change flags, edit `/usr/lib/systemd/system/entropy-server.service` (or a drop-in under `/etc/systemd/system/entropy-server.service.d/`), then `sudo systemctl daemon-reload && sudo systemctl restart entropy-server`.
+Packages install both binaries in `/usr/bin` and enable/start `entropy-server`. The supplied unit runs as root, listens on HTTP `:8080`, disables HTTPS and uses `/var/lib/entropy-service` as its working directory. Review those defaults for your deployment.
 
-## Run
+Change flags with `sudo systemctl edit entropy-server`. For example, to require a hardware source and bind only to loopback:
 
-- **entropy-server**<br/>
-We are now ready to start both HTTP & HTTPS listeners, respectively on ports 8080 and 8443 by default, on all available inet interfaces.
-SUDO command may be necessary to access the xRNG devices on different platforms (e. including symbolic links under /dev).
-The 'cd' command helps serving the ./web contents, residing in cmd/entropy-server/web. For simplicity you can create a symlink within the execution directory, or copy the whole ./web directory.
-
-```
-cd entropy-server
-sudo go run . -reseed-ms 2500 -buffer-reseed 512 -buffer-entropy 2 -buffer-qrng 2 -device /dev/urandom -words 8 -max-bytes 2097152 -refresh-ms '50ms' -refresh-colors-ms '50ms' -refresh 1 -cert-file cert.pem -key-file key.pem
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/entropy-server -device=/dev/qrandom0 -require-device=true -enable-https=false -http=127.0.0.1:8080
 ```
 
-- **entropy-client**<br/>
-If you want fetch entropy using a dedicated GO-CLI client with multiple capabilities, instead of the classic web broser, you need to invoke the following command as described below, instead of launching a browser. Also usefult to monitor the entropy-source itself, or to locally attach remote source of entropy.
+Then run `sudo systemctl daemon-reload` and `sudo systemctl restart entropy-server`. Browser assets are embedded in the binary: no `./web` copy, symlink or special working directory is needed. Rebuild the server when changing those assets.
 
-```
-cd entropy-client
+## Configuration
 
-### stream mode (Websockets)
-go run . -refresh '50ms' -mode stream -slice 2097152 -wsurl ws://127.0.0.1:8080/stream -url http://127.0.0.1:8080/v1/data/random
+Run either binary with `-help` for its complete flag list. Boolean values use `-flag=true` or `-flag=false`.
 
-### pull mode (HTTP)
-go run . -refresh '50ms' -mode pull -slice 2097152 -wsurl ws://127.0.0.1:8080/stream -url http://127.0.0.1:8080/v1/data/random
-```
+### Server
 
-> Important: pass **bare** endpoints to `-wsurl` and `-url` (no `?query` string). The client automatically appends `?bytes=<slice>&refresh=<refresh>` to both URLs. If you add your own query string, you get a malformed double-query URL (e.g. `.../stream?bytes=...&refresh=...?bytes=...&refresh=...`) and the stream silently produces no data. Control the request size with `-slice` and the rate with `-refresh` instead.
+All server timing flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=250`, not `250ms`. Sizes below are bytes unless explicitly labelled MiB.
 
-### Screenshots
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `-device` | `/dev/qrandom0` | Entropy source device; OS fallback is allowed unless required. |
+| `-require-device` | `false` | Fail startup if the requested device is unavailable. |
+| `-drbg` | `chacha20` | Stream backend: `chacha20` or `aes-256-ctr`. |
+| `-cpu-mix` | `false` | Supplement seed reads with RDSEED, falling back to RDRAND on supported amd64 CPUs. |
+| `-rdrand-mix` | `false` | Older RDRAND-only option; requires CPU support. `-cpu-mix` takes precedence. |
+| `-reseed-ms` | `250` | Root reseed interval, from 1 to 10000 ms. |
+| `-buffer-reseed` | `256` | Fresh bytes read per root reseed, from 32 to 65536. |
+| `-max-reseed-age` | `0` | Readiness threshold; zero selects `max(1000, 4 × reseed-ms)` ms. |
+| `-http`, `-https` | `:8080`, `:8443` | Listener addresses; these defaults bind all interfaces. |
+| `-enable-https` | `true` | Enable the HTTPS listener; the packaged service overrides this to false. |
+| `-cert-file`, `-key-file` | `cert.pem`, `key.pem` | TLS certificate and private key paths. |
+| `-max-bytes` | `33554432` | Maximum generated binary sample, from 1 byte to 32 MiB. |
+| `-words` | `20` | Default word count and per-request word limit. |
+| `-refresh-ms` | `5000` | Default `/bytes` WebSocket interval. |
+| `-refresh-colors-ms` | `1500` | Default `/stream`, `/colors` and `/words` WebSocket interval. |
+| `-refresh` | `5000` | HTTP word-page refresh; HTML rounds up to whole seconds. |
+| `-fingerprint` | `2097152` | Upload prefix analysed statistically; SHA-256 still covers the entire upload. |
+| `-cookie` | `false` | Enable HTTP preference cookies for byte/word requests. |
+| `-ws-max-connections`, `-ws-memory-mib` | `128`, `1024` | Shared WebSocket connection and estimated working-memory budgets. |
+| `-http-max-requests`, `-http-memory-mib` | `128`, `512` | Separate shared HTTP work and estimated working-memory budgets. |
+| `-debug` | `false` | Debug output and a loopback-only pprof listener on port 6060. |
 
-- ntop-style entropy-client interface (cmd/entropy-client/entropy-client.go)<br/>
-<img width="640" height="360" alt="Screenshot From 2026-03-08 14-16-42" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
+`-buffer-qrng` is deprecated and ignored. `-buffer-entropy` is an unused legacy option; neither controls an active pool or ring buffer.
 
-- WSS Endpoint STREAM: real-time entropy quality monitor (/stream.html + /data)<br/>
-<img width="640" height="360" alt="Screenshot From 2026-03-08 14-32-49" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
+CPU mixing is optional and applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
 
-- WSS Endpoint BYTES: Websocket streamer, byte generator (/bytes.html + /bytes)<br/>
-<img width="640" height="360" alt="Screenshot From 2026-02-25 16-16-48" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+### Client
 
-- WSS Endpoint WORDS: Websocket streamer, word generator (/words.html + /words)<br/>
-<img width="640" height="360" alt="Screenshot From 2026-02-25 18-35-56" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `-mode` | `pull` | `pull` for HTTP or `stream` for WebSockets. |
+| `-slice` | `2097152` | Requested bytes per response/message, from 1 byte to 32 MiB. |
+| `-refresh` | `1s` | A **Go duration**, e.g. `100ms`; minimum 1 ms. |
+| `-url` | `http://127.0.0.1:8080/v1/data/random` | Binary HTTP endpoint. |
+| `-wsurl` | `ws://127.0.0.1:8080/stream` | Raw binary WebSocket endpoint. |
+| `-debug` | `false` | Fetch/receive timing and runtime information, shown to three decimal places in ms. |
+| `-preview`, `-matrix`, `-graph`, `-dashboard`, `-histogram` | `false` | Optional terminal views and diagnostics. |
+| `-writeout` | `false` | Experimental Linux mode writing received bytes to `/dev/urandom`; this does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
 
-- WSS Endpoint COLORS: Websocket streamer, color generator (/colors.html + /colors)<br/>
-<img width="640" height="360" alt="Screenshot From 2026-02-25 20-09-33" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
+Pass **bare endpoints** to `-url` and `-wsurl`: the client appends its own `bytes` and `refresh` query parameters. Use `-slice` and `-refresh` to control them. The CLI consumes `/stream` raw messages, not `/bytes` compact envelopes.
 
-- File upload & analysis interface (upload.html)<br/>
-<img width="600" height="600" alt="Screenshot From 2026-03-09 19-31-49" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
+The client performs startup diagnostics before entering its normal loop. The last WS receive duration includes waiting for the server's next frame. The HTTP fetch duration includes reading the body. Neither is a pure network round-trip measurement; terminal rendering and client pacing can also limit observed throughput.
 
-- Metrics (/metrics)<br/>
-<img width="647" height="755" alt="Screenshot From 2026-03-09 19-32-00" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
+## Architecture
 
-## Performances
-
-### Results
-
-Pressure tests on a 10+ years old hardware showed pretty impressive numbers:
-
-- **HTTP**\
-70'000 requests per second (payload 64B)\
-up to 1.1 GB/s (payload 512KB)
-- **HTTPS**\
-50'000 requests per second (payload 64B)\
-up to 600 MB/s (payload 512KB)
-
-Results from WRK test utility are summarized here below:
-
-- Test with HTTP / 2MB payload
-
-```
-max@iMac:~/entropy-service$ wrk -t16 -c64 -d5s --latency --timeout 1 http://localhost:8080/v1/random?bytes=2097152
-Running 5s test @ http://localhost:8080/v1/random?bytes=2097152
-  16 threads and 64 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   132.02ms  134.43ms 978.98ms   85.13%
-    Req/Sec    37.79     23.16   131.00     72.42%
-  Latency Distribution
-     50%  102.16ms
-     75%  217.21ms
-     90%  301.35ms
-     99%  593.49ms
-  2887 requests in 5.04s, 5.64GB read
-  Socket errors: connect 0, read 0, write 0, timeout 2
-Requests/sec:    572.97
-Transfer/sec:      1.12GB
+```mermaid
+flowchart TD
+    S["Configured device or OS CSPRNG"] --> I["Startup reads and one reseed loop"]
+    C["Optional CPU seed mixing"] -.-> I
+    I --> R["Reference root: master"]
+    I --> P["Serving root: backup"]
+    R --> H["Reference health and metrics"]
+    P --> M["Serving health and metrics"]
+    P --> G["Private request or connection generators"]
+    P --> D["Other HTTP generators"]
+    G --> B["Binary HTTP and WebSocket consumers"]
 ```
 
-- Test with HTTP / 64B payload
+The old background producer, software ring buffer and experimental generator-pool path are no longer active. The current code still creates **two root DRBGs** from separate source reads: `master` is exposed through the first health/metrics pair, while `backup` is the serving parent for all generation endpoints. The names do not imply automatic failover.
 
+`/v1/data/random` creates a private generator per request. Each entropy WebSocket creates its own generator lazily on the first output read, then refreshes it after a parent reseed or before exceeding the 256 GiB per-key output limit. Child seeds come from the serving DRBG; they are not additional hardware reads. `/v1/data/test` and the other generated HTTP representations read the serving root directly.
+
+This lets independent bulk consumers use multiple CPU cores without holding one shared lock for all their output. Parent seed derivation and reseeding still synchronise, and each individual generator serialises its own reads. AES acceleration, message size, encoding, TLS, network capacity and client work determine actual scaling.
+
+Fresh entropy is read before taking the root generator's reseed lock. At the default settings, periodic reads nominally request `2 roots × 256 bytes / 250 ms = 2048 bytes/s`, in addition to startup/validation reads. This is seed-source demand, not the service's output throughput or a claim about measured physical entropy.
+
+### Security and source boundaries
+
+ChaCha20 and AES-256-CTR are selectable stream backends inside the project's own SHA-512-based seed/reseed construction. This is **not an implementation of NIST CTR_DRBG**, and the project makes no FIPS-validation or independent security-audit claim.
+
+The suite can support laboratory work, application prototyping and integration experiments. It is not an HSM, key-management system, OpenSSL provider or certified entropy source. Remote randomness also introduces trust in the server and transport; keep private keys and sensitive seed material out of public diagnostic pages and logs.
+
+Source failures are visible through readiness and reseed metrics. A failed reseed does **not** automatically stop existing DRBG output. Use `/ready` in routing/monitoring if your application requires a recent successful seed, and assess whether a stricter failure policy is needed.
+
+## API reference
+
+HTTP and HTTPS use the same routes. WebSockets use the corresponding `ws://` or `wss://` address and require a normal HTTP Upgrade handshake. Browser `.html` pages are clients of the APIs, not WebSocket endpoints themselves.
+
+### Binary data, words, images and sound
+
+The normal request method below is GET, except where another method is specified.
+
+| Route | Response and parameters |
+| --- | --- |
+| `/v1/data/random` | Raw binary sample. `bytes=N`, default 2 MiB, capped by `-max-bytes`; uses a private request generator. |
+| `/v1/data/test` | Raw binary sample from the serving root. `bytes=N`, default 1024; this route does not run statistical tests. |
+| `/v1/meta/random` | HTML page with sampled words and a SHA-256 digest. `words=N`, default/limit from `-words`; page refresh comes from the server's `-refresh` flag. |
+| `/paroleparoleparole` | Alias of `/v1/meta/random`. |
+| `/v1/image/random` | 1024 × 1024 PNG with random RGB pixels. |
+| `/v1/image/heatmap` | 1024 × 1024 PNG coloured by byte popcount. A visual diagnostic, not an entropy certification. |
+| `/v1/qr/random` | 256 × 256 PNG QR code encoding 64 generated bytes as hexadecimal text. Dimensions and sample length are currently fixed. |
+| `/sound` | GET returns a 48 kHz, 16-bit mono WAV; HEAD returns its headers. `duration_ms=250..5000` (default 2500), `style=bloom` (default) or `chime`. Uses 64 random bytes to select synthesis parameters; the audio samples are harmonic synthesis, not raw random bytes. |
+| `/files` | POST a raw file body with `Content-Type: application/octet-stream`, up to 32 MiB. Returns JSON analysis; see below. |
+
+Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. The dictionary currently comes from `github.com/8ff/diceware` and is loaded once.
+
+With `-cookie=true`, `/v1/data/random` and the HTTP word pages use validated preference cookies; explicit query values take precedence. Fresh cookie-mode defaults are 512 KiB and 3 words, bounded by server limits. A stored/query `refresh` preference does not override the HTTP word page's server-configured refresh interval.
+
+### WebSockets
+
+| Route | Output | Parameters and defaults |
+| --- | --- | --- |
+| `/stream` | One raw binary sample per message, with no digest prefix. | `bytes=2048`, `refresh=1500`. |
+| `/bytes` | Byte sample and SHA-256, in the selected format. | `bytes=2048`, `refresh=5000`, `format=json`. |
+| `/colors` | Same protocol as `/bytes`, with a different default interval. | `bytes=2048`, `refresh=1500`, `format=json`. |
+| `/words` | JSON with `words` as a space-separated string and `hash` as a SHA-256 hex digest of that string. | `words=20`, `refresh=1500`; word default/limit follows `-words`. |
+
+The table shows factory defaults; server flags can change the intervals. Request `refresh` values are integer milliseconds from 1 to 60000. `/words` rejects invalid or duplicate values; `/stream`, `/bytes` and `/colors` currently fall back to the configured interval for an invalid `refresh` value. The first message is sent on the first timer tick, not immediately on connection.
+
+`/bytes` and `/colors` accept three formats:
+
+| `format` | Message type | Application payload |
+| --- | --- | --- |
+| `json` | Text | `{"hex":"…","base64":"…","hash":"…"}`; compatibility default, containing two encodings of the same sample. |
+| `compact` | Binary | **32 raw SHA-256 digest bytes, followed by N raw sample bytes, in one message.** No hex prefix or length header. |
+| `hash` | Text | `{"hash":"…","bytes":N}`; metadata only, without the sample. |
+
+For compact messages, read the first 32 bytes as the digest and the remainder as the sample; a 32 MiB sample therefore needs a receive limit of **33554464 bytes**. The hash format still generates and hashes the requested sample on the server. A digest sent with the data is a checksum, not proof of origin or entropy quality.
+
+Examples: `ws://127.0.0.1:8080/bytes?bytes=65536&refresh=100&format=compact` and `ws://127.0.0.1:8080/colors?bytes=2048&refresh=1000&format=hash`.
+
+### File analysis
+
+```sh
+curl --fail http://127.0.0.1:8080/files \
+  -H 'Content-Type: application/octet-stream' \
+  --data-binary @sample.bin
 ```
-max@iMac:~/entropy-service$ wrk -t16 -c64 -d5 --latency --timeout 1 http://127.0.0.1:8080/v1/random?bytes=64
-Running 5s test @ http://127.0.0.1:8080/v1/random?bytes=64
-  16 threads and 64 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     2.24ms    3.35ms  35.56ms   87.12%
-    Req/Sec     4.32k     1.67k   14.34k    78.76%
-  Latency Distribution
-     50%  750.00us
-     75%    3.11ms
-     90%    6.57ms
-     99%   15.28ms
-  346811 requests in 5.10s, 59.53MB read
-Requests/sec:  68019.56
-Transfer/sec:     11.68MB
+
+Uploads are streamed through a 32 KiB read buffer and are not saved to disk. SHA-256 covers the complete upload; statistical analysis covers only the first `-fingerprint` bytes (2 MiB by default). JSON fields are `total_bytes`, `analyzed_bytes`, `histogram` (256 counts), `entropy` (empirical Shannon bits per byte), `ones`, `zeros`, `sha256` and `preview` (Base64, up to 2048 analysed bytes).
+
+Histogram, bit balance and entropy refer to the analysed prefix, not necessarily the whole file. The browser's mosaic, waveform and FFT are small-preview illustrations. Empty/incomplete uploads return 400, oversized uploads 413, unsupported content types 415 and unsupported methods 405. Uploads share the HTTP work budget.
+
+### Health and metrics
+
+| Route | Purpose |
+| --- | --- |
+| `/live` | Liveness JSON; independent of seed freshness. |
+| `/ready` | Serving-root readiness JSON; 200 when fresh with no unresolved reseed error, otherwise 503. |
+| `/health-1` | Reference-root health JSON. |
+| `/health-2` | Serving-root health JSON, using the same readiness policy as `/ready`. |
+| `/metrics-1` | Prometheus text metrics with reference-root metadata. |
+| `/metrics-2` | Prometheus text metrics with serving-root metadata; the normal operational target. |
+
+Both metrics endpoints also include the same service-wide counters and budgets; avoid counting those twice by scraping both as independent traffic totals. Seed age, reseed interval/size, failure totals and last-error information are exposed in health JSON.
+
+Useful metric families include `rng_ready`, `rng_reseed_age_seconds`, `rng_reseed_failures_total`, `rng_bytes_generated_total`, `http_requests_total`, `wss_payloads_total`, `drbg_instance_count`, `ws_connections_*`, `ws_memory_*`, `ws_rejected_*` and `http_generation_*`.
+
+`drbg_instance_count` normally starts at **2** for the two roots, then includes active children. Merely viewing metrics does not create a child generator. Generated-byte totals include internal child-seed derivation; they are not exact network-payload counters. Legacy software-buffer metrics remain zero because those buffers are disabled. The embedded `rng_version` value is still hard-coded and should not be used to identify the installed release.
+
+### Browser pages
+
+All pages are embedded and available on both listeners. `/` serves the asset directory listing. The `api-` pages are additional browser entry points, not a separate versioned API.
+
+| Page | Additional entry point | Role |
+| --- | --- | --- |
+| `/bytes.html` | `/api-bytes.html` | Compact byte messages; worker prepares a bounded hex/Base64 preview and displays the full-sample digest. |
+| `/colors.html` | `/api-colors.html` | Hash-only colour display, avoiding transmission of the full sample. |
+| `/words.html` | `/api-words.html` | Live words and their digest. |
+| `/sound.html` | `/api-sound.html` | Generate and play short harmonic WAV clips. |
+| `/upload.html` | `/api-upload.html` | Upload a file for server analysis and preview-based visualisations. |
+| `/stream.html` | `/api-stream.html` | Legacy experimental stream-analysis view; its binary/worker handling still needs repair. Prefer the CLI for raw streaming and `/bytes.html` for browser byte previews. |
+
+The byte/colour views move presentation work into a browser worker and bound pending display work. This limits UI work; it does not increase the amount of entropy in a sample.
+
+<details>
+<summary>Legacy navigation helpers and old documentation names</summary>
+
+These embedded helpers use browser-side redirects; they are not HTTP redirect APIs:
+
+| Helper | Target |
+| --- | --- |
+| `/aa_health-1`, `/aa_health-2` | `/health-1`, `/health-2`, respectively. |
+| `/aa_metrics-1`, `/aa_metrics-2` | `/metrics-1`, `/metrics-2`, respectively. |
+| `/zz_v1-data-random.html` | `/v1/data/random` |
+| `/zz_v1-data-test.html` | `/v1/data/test` |
+| `/zz_v1-image-heatmap.html` | `/v1/image/heatmap` |
+| `/zz_v1-image-random.html` | `/v1/image/random` |
+| `/zz_v1-meta-random.html` | `/v1/meta/random` |
+| `/zz_v1-qr-random.html` | `/v1/qr/random` |
+
+Older README examples mentioned paths that are **not registered aliases**:
+
+| Old name | Current route |
+| --- | --- |
+| `/health` | `/ready` or `/health-2` |
+| `/metrics` | `/metrics-2` |
+| `/v1/random` | `/v1/data/random` |
+| `/data` | `/stream` (WebSocket) |
+| `/streams.html` | `/stream.html` (legacy view); prefer `/bytes.html` for byte previews. |
+
+</details>
+
+### Optional profiling endpoints
+
+With `-debug=true`, a separate listener on **127.0.0.1:6060** exposes `/debug/pprof/`, `/debug/pprof/profile`, `/debug/pprof/heap`, `/debug/pprof/cmdline`, `/debug/pprof/symbol` and `/debug/pprof/trace`. The index also serves named runtime profiles, including `/debug/pprof/allocs`, `/debug/pprof/block`, `/debug/pprof/goroutine`, `/debug/pprof/mutex` and `/debug/pprof/threadcreate`. Block/mutex samples require their corresponding runtime sampling to be enabled. These routes are not on the public API listeners.
+
+## Stability and resource limits
+
+The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket handlers and the client. Uploads have a separate fixed 32 MiB ceiling. Encoding can make the transmitted message larger than the underlying sample.
+
+| Resource | Default policy |
+| --- | --- |
+| Incoming WebSocket message | 1 KiB maximum; the server does not need large client messages. |
+| Entropy WebSockets | At most 128 admitted connections and 1024 MiB estimated working memory, shared across HTTP/HTTPS. Reservations last until disconnect. |
+| HTTP generation and file analysis | At most 128 admitted requests and 512 MiB estimated working memory, shared across HTTP/HTTPS. Probes and static files are excluded. |
+| Sound synthesis | An additional two simultaneous synthesis/download slots. |
+| CLI receive queue | One queued WS message; other in-flight reader/consumer buffers can also exist. |
+| Network lifecycle | Context-driven cancellation, WS write deadlines and a shared five-second server shutdown deadline. |
+
+Budgets are **admission estimates, not process RSS limits**. For N-byte WS samples the reservation is `N + 64 KiB` for raw/compact/hash formats, or `16N + 64 KiB` for JSON. With the default 1 GiB budget and full 32 MiB samples, that admits at most 31 raw/compact/hash connections, or one JSON connection, before other reservations. TLS, kernel buffers, garbage collection and retained allocations require additional headroom.
+
+Invalid sample parameters return 400. A request whose reservation exceeds the entire memory budget returns 413; temporary connection/request or aggregate-memory exhaustion returns 503 with `Retry-After: 1`. Successful WebSocket admission is still followed by the usual Upgrade validation.
+
+HTTP responses with status **400 or higher** are logged to stderr with method, path, status, duration and remote address. Query strings and request bodies are omitted. After a successful WS upgrade, later stream errors are connection events rather than new HTTP response statuses. Under systemd, console logs are available through `journalctl`.
+
+### Recent improvements: October–November 2026
+
+| Area | Implemented change and practical effect |
+| --- | --- |
+| Seeding | Full startup/reseed reads, explicit errors and a single context-controlled reseed loop; readiness now reports stale or failed seeding. |
+| CPU and concurrency | Removed the disconnected producer and busy-spinning WS branches; optional AES backend and private bulk generators reduce shared-lock contention. |
+| Validation and budgets | Validated byte counts/cookies, a common 32 MiB sample ceiling, inbound WS limits and aggregate HTTP/WS admission budgets. |
+| Lifecycle and diagnostics | Joined WS cleanup, client cancellation, synchronised client rate metrics and separate HTTP/WS cycle timing. |
+| Transmission and UI | Opt-in compact/hash WS formats, bounded browser previews and worker-based presentation instead of sending/rendering both full text encodings. |
+| Features and operations | Harmonic WAV output, streaming file analysis, embedded web assets and failed-request logging; word sampling loads the dictionary once instead of shuffling it per request. |
+
+These are implementation improvements, not a claim of a measured percentage gain for every workload. The results below separate protocol size, encoding CPU cost and historical network throughput.
+
+## Performance
+
+### Application payload size
+
+For a **32 MiB generated sample**, current encoder payloads are:
+
+| Route/format | Application bytes sent | What the client receives |
+| --- | ---: | --- |
+| `/stream` | 33,554,432 | Raw sample. |
+| `/bytes?format=json` | 111,848,205 | Hex + Base64 + digest, approximately 106.7 MiB. |
+| `/bytes?format=compact` | 33,554,464 | Digest + raw sample: 32 bytes overhead. |
+| `/colors?format=hash` | 93 | Digest and sample length; no raw sample. |
+
+Sizes include JSON's trailing newline and exclude HTTP Upgrade, WebSocket framing and TLS overhead. Compact cuts application payload by about **70% versus the JSON byte format**. Ordinary binary HTTP and `/stream` were already raw and do not incur that 3.33× text-encoding expansion.
+
+### Encoding benchmark
+
+The tracked `BenchmarkByteFrameFormats` benchmark measures SHA-256 plus format encoding of an already allocated sample into `io.Discard`. It excludes DRBG generation, sockets, TLS and browser processing; its input-processing rate is not a network-transfer result.
+
+Measured from commit [01ed418](https://github.com/fantuz/entropy-service/commit/01ed41846d3ecd340db176ded8cb2e820b87bcc1) on an AMD EPYC 9V74 VM, Linux amd64, Go 1.24.4, with 9 visible logical CPUs. The benchmark loop is serial. Three 300 ms runs per case, medians rounded:
+
+| Sample | JSON time/op | Compact time/op |
+| --- | ---: | ---: |
+| 512 KiB | 4.73 ms | 0.319 ms |
+| 8 MiB | 77.57 ms | 5.42 ms |
+
+The compact encoder allocated 32 B/op beyond the existing sample buffer in these runs. That is an encoder allocation measurement, not the complete connection's memory footprint. Reproduce on your hardware:
+
+```sh
+go test ./cmd/entropy-server -run '^$' -bench '^BenchmarkByteFrameFormats$' -benchmem -benchtime=300ms -count=3
 ```
 
-Evidence of my poor-man test-platform:
+### Historical HTTP results
 
-```
-max@iMac:~/entropy-service$ grep model\ name /proc/cpuinfo
-model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
-model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
-model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
-model name	: Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
-```
+The earlier README included short loopback `wrk` runs on an Intel Core i5-3470 at 3.20 GHz, using 16 load threads and 64 connections for about five seconds:
 
-### sysctl & ulimit tuning
+| Response size | Requests/s | Transfer/s, original wrk labels | Reported socket errors |
+| --- | ---: | ---: | --- |
+| 64 B | 68,019.56 | 11.68 MB/s | None. |
+| 2 MiB | 572.97 | 1.12 GB/s | 2 timeouts. |
 
-I currently run those commonly tuned parameters:
+These are **historical author measurements**, not a rerun of the current release. They used the old `/v1/random` route; the exact revision, backend and source configuration were not recorded. The original high-throughput log used **2 MiB**, not the 512 KiB stated in its headline. Transfer totals include HTTP overhead. Unsupported HTTPS headline figures have been omitted.
 
-```
-ulimit -n 1048576
-```
+For a current end-to-end measurement, start a server with recorded flags, then run, for example:
 
-```
-sysctl -w net.core.wmem_max=33554432
-sysctl -w net.core.wmem_default=8388608
-sysctl -w net.core.rmem_max=33554432
-sysctl -w net.core.rmem_default=8388608
-sysctl -w net.ipv4.tcp_rmem="4096 87380 33554432"
-sysctl -w net.ipv4.tcp_wmem="4096 65536 33554432"
-sysctl -w net.ipv4.tcp_slow_start_after_idle=0
-sysctl -w net.core.somaxconn=65535
-sysctl -w net.ipv4.tcp_max_syn_backlog=65535
-sysctl -w net.ipv4.tcp_tw_reuse=1
-sysctl -w net.ipv4.tcp_fin_timeout=15
-sysctl -w net.ipv4.tcp_keepalive_time=60
-sysctl -w net.ipv4.tcp_keepalive_intvl=10
-sysctl -w net.ipv4.tcp_keepalive_probes=6
-sysctl -w net.ipv4.tcp_no_metrics_save=1
+```sh
+wrk -t4 -c16 -d30s --latency --timeout 5s 'http://127.0.0.1:8080/v1/data/random?bytes=65536'
 ```
 
-### Mature PoC
+Compare `-drbg=chacha20` and `-drbg=aes-256-ctr`, vary `GOMAXPROCS` and concurrency, and record errors, tail latency, CPU and peak RSS as well as throughput. AES can benefit from CPU acceleration; private generators allow parallel bulk work, but tiny requests, encoding or the load generator may become the bottleneck. Longer runs and remote/TLS clients answer different questions from a loopback test. Do not apply blanket `sysctl` or socket-buffer tuning before identifying the constraint.
 
-The whole project is just a showcase and PoC built around the use of a rather old PCI card (not PCI0e), a QRNG produced by ID Quantique. Given that support ended with Kernel 4, I had to migrate myself some syscalls to make the drivers compile on Kernel(s) 5 and 6.
+## Development
 
-## What is yet to come
+| Command | Action |
+| --- | --- |
+| `make build` | Build both command packages into `./bin`. |
+| `make build-server`, `make build-client` | Build one binary. |
+| `make test` | Run `go test ./...`. |
+| `make lint` | Run golangci-lint. |
+| `make fmt` | Run the configured golangci-lint formatters. |
+| `make release-snapshot` | Build local GoReleaser snapshot artifacts in `./dist`. |
+| `make clean` | Remove `./bin` and `./dist`. |
 
-### Features to be added
+Formatting/linting require [golangci-lint](https://golangci-lint.run/); packaging requires [GoReleaser](https://goreleaser.com/install/). CI currently uses golangci-lint 2.12.2. For local release preparation, also run:
 
-- FUSE device support allowing for "openssl rand -engine entropyctl"
-- eventually add go sync.Pool, to be evalueted yet
-- add GO build tags for PROD and for DEMO modes
-- define and implement GO tests
-- replace Diceware dependency with local dictionary, only used for /words endpoint
-- conditional systemd startup, probing the respective kernel module if existing (i.e. for Quantis PCI QRNG cards) before starting (a basic systemd unit is already shipped via the deb/rpm packages)
-- CUDA-awarness and integration if interesting or found to be relevant in future evaluatons
-- ChaCha20 to be replaced by AES-CTR when my test hardware will support CPU extension, to avoid doing it via sowftware.
-- random sound generator
+```sh
+go test -race -count=1 ./...
+```
+
+Race tests require a supported platform and a C toolchain with cgo enabled. Packaged release binaries are built with `CGO_ENABLED=0`; that does not prevent testing the source with the race detector separately.
+
+The tracked tests cover DRBG backends/reads, reseed failures, private streams, validation, budgets, shutdown/cancellation, sound, file analysis, logging and client timing/metrics. Passing statistical checks is not a substitute for cryptographic review.
+
+Current build CI runs ordinary Go tests, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow packages/publishes without its own test step. **A mandatory race-test release gate and automated browser regression checks remain pending.**
+
+## Roadmap
+
+Available features are documented above. The following are follow-up work or ideas, not capabilities shipped by this repository:
+
+- Enforce race checks before releases; add browser regression coverage and repair the legacy stream-analysis view.
+- Correct cumulative pull-mode throughput accounting and use release-derived version metadata in health output.
+- Decide whether to remove the reference root or give it a defined operational role; clarify source-failure policy and cancellation of blocking hardware reads.
+- Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
+- Improve deployment hardening: service identity/device permissions, access control, origin policy and optional hardware-specific startup checks.
+- Evaluate integrations separately: FUSE/CUSE byte devices and an OpenSSL provider need distinct designs. FUSE alone does not implement `openssl rand -engine entropyctl`. HSM/blockchain integrations, GPU generation and production/demo build profiles are not implemented.
+
+## Project background and screenshots
+
+The project began as a demonstration around an older Quantis PCI QRNG, with driver adaptation for newer Linux kernels. Hardware-driver maintenance is separate from this Go suite. The service can also run with the OS CSPRNG and no external card.
+
+<details>
+<summary>Historical interface gallery (February–March 2026)</summary>
+
+These screenshots illustrate earlier interfaces; layouts and endpoint names have since evolved.
+
+**Terminal client** — diagnostics in the terminal.
+
+<img width="640" height="360" alt="Terminal entropy-client diagnostics" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
+
+**Legacy stream-analysis view** — `/stream.html`, using `/stream` in the current server.
+
+<img width="640" height="360" alt="Historical stream-analysis interface" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
+
+**Byte preview** — `/bytes.html` and `/bytes`.
+
+<img width="640" height="360" alt="Byte preview interface" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
+
+**Words** — `/words.html` and `/words`.
+
+<img width="640" height="360" alt="Word generation interface" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
+
+**Colours** — `/colors.html` and `/colors`.
+
+<img width="640" height="360" alt="Colour display interface" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
+
+**File analysis** — `/upload.html` and `/files`.
+
+<img width="600" height="600" alt="File analysis interface" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
+
+**Metrics** — use `/metrics-2` for the current serving-root view.
+
+<img width="647" height="755" alt="Historical metrics output" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
+
+</details>
+
+## License
+
+[MIT](LICENSE) · Copyright © 2026 Massimiliano Fantuzzi HB9GUS.

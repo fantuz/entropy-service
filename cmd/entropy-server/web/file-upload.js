@@ -31,16 +31,30 @@
             hist.fillRect(i * width, histogram.height - height, width, height);
         });
 
-        const [, pie] = canvas("pie");
+        const [pieCanvas, pie] = canvas("pie");
         const angle = result.zeros / (result.ones + result.zeros) * 2 * Math.PI;
         for (const [start, end, color] of [[0, angle, "#000000"], [angle, 2 * Math.PI, "#ffffcc"]]) {
             pie.beginPath(); pie.moveTo(75, 75); pie.arc(75, 75, 60, start, end);
             pie.fillStyle = color; pie.fill();
         }
-        pie.fillStyle = "black";
+        pie.save();
         pie.font = "12px monospace";
-        pie.fillText(`0: ${result.zeros}`, 0, 150);
-        pie.fillText(`1: ${result.ones}`, 0, 165);
+        pie.textAlign = "left";
+        pie.textBaseline = "middle";
+        const labels = [`0: ${result.zeros}`, `1: ${result.ones}`];
+        const keySize = 12, keyGap = 6;
+        const legendWidth = keySize + keyGap + Math.max(...labels.map(label => pie.measureText(label).width));
+        const legendX = (pieCanvas.width - legendWidth) / 2;
+        labels.forEach((label, i) => {
+            const y = pieCanvas.height - 24 + i * 16;
+            pie.fillStyle = i === 0 ? "#000000" : "#ffffcc";
+            pie.fillRect(legendX, y - keySize / 2, keySize, keySize);
+            pie.strokeStyle = "#444";
+            pie.strokeRect(legendX, y - keySize / 2, keySize, keySize);
+            pie.fillStyle = "black";
+            pie.fillText(label, legendX + keySize + keyGap, y);
+        });
+        pie.restore();
 
         const [mosaic, tiles] = canvas("mosaic");
         const columns = Math.floor(mosaic.width / 16);
