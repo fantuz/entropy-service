@@ -26,6 +26,7 @@ func TestStreamingRoutesAndBudgetRelease(t *testing.T) {
 				budget := newHTTPRequestBudget(8, 64<<20)
 
 				var handler http.HandlerFunc
+
 				if strings.HasSuffix(endpoint, "/random") {
 					handler = randomBytesHandler(d, 1<<25, 20, false, budget)
 				} else {
@@ -34,9 +35,11 @@ func TestStreamingRoutesAndBudgetRelease(t *testing.T) {
 
 				w := httptest.NewRecorder()
 				handler(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, endpoint+"?bytes="+strconv.Itoa(count), nil))
+
 				if w.Code != http.StatusOK || w.Body.Len() != count || w.Header().Get("Content-Length") != strconv.Itoa(count) {
 					t.Fatalf("status=%d len=%d headers=%v", w.Code, w.Body.Len(), w.Header())
 				}
+
 				if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
 					t.Fatalf("reservation leaked: %+v", usage)
 				}
@@ -213,9 +216,11 @@ func TestStreamingBudgetReleaseAfterCancellation(t *testing.T) {
 
 	w := &cancelOutputWriter{header: make(http.Header), cancel: cancel}
 	h(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/data/random?bytes=131072", nil))
+
 	if w.calls != 1 {
 		t.Fatalf("expected cancellation after first chunk, calls=%d", w.calls)
 	}
+
 	if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
 		t.Fatalf("cancellation leaked request budget: %+v", usage)
 	}
@@ -239,6 +244,7 @@ func TestStreamingConcurrencyAndBudget(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=524288", nil))
+
 			if w.Code != http.StatusOK || w.Body.Len() != 524288 {
 				errs <- fmt.Errorf("status=%d bytes=%d", w.Code, w.Body.Len())
 			}
@@ -264,6 +270,7 @@ func TestHTTPStreamingPreservesConservativeMemoryLimit(t *testing.T) {
 	d := observableTestDRBG(t)
 	w := httptest.NewRecorder()
 	randomBytesHandler(d, 1<<25, 20, false, budget)(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=2097152", nil))
+
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("memory admission unexpectedly relaxed: %d", w.Code)
 	}

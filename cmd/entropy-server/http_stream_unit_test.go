@@ -18,9 +18,11 @@ func TestStreamEntropyResponseLengths(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			err := streamEntropyResponse(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil), bytes.NewReader(data), n)
+
 			if err != nil || w.Body.Len() != n || !bytes.Equal(data, w.Body.Bytes()) {
 				t.Fatalf("err=%v len=%d want=%d", err, w.Body.Len(), n)
 			}
+
 			if w.Result().Header.Get("Content-Length") != strconv.Itoa(n) {
 				t.Fatal("wrong Content-Length")
 			}
@@ -54,6 +56,7 @@ func (w *cancelOutputWriter) Write(p []byte) (int, error) { w.calls++; w.cancel(
 func TestStreamEntropyResponseCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
 	w := &cancelOutputWriter{header: make(http.Header), cancel: cancel}
 
@@ -66,6 +69,7 @@ func TestStreamEntropyResponseCancellation(t *testing.T) {
 func TestStreamEntropyResponsePreCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
+
 	w := httptest.NewRecorder()
 
 	err := streamEntropyResponse(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil), bytes.NewReader(make([]byte, 64)), 64)
