@@ -2,7 +2,7 @@
 
 (() => {
     const view = document.body.dataset.entropyView;
-    const status = document.getElementById("connection-status");
+    const status = document.getElementById("stream-notice");
     const info = document.getElementById("sample-info");
     const scriptURL = document.currentScript.src;
     const endpoint = new URL(view === "colors" ? "/colors" : "/bytes", location.href);
@@ -20,12 +20,13 @@
     let animation = null;
 
     function setStatus(state, message) {
+        status.hidden = false;
         status.dataset.state = state;
         status.textContent = message;
     }
 
     function start() {
-        setStatus("connecting", "Connecting");
+        setStatus("waiting", "Awaiting first sample");
         const active = new Worker(new URL("entropy-display-worker.js", scriptURL));
         worker = active;
         active.onerror = () => {
@@ -43,6 +44,7 @@
             animation = requestAnimationFrame(() => {
                 animation = null;
                 if (worker !== active) return;
+                status.hidden = true;
                 document.getElementById("hash").textContent = frame.hash;
                 const color = [0, 2, 4].map(offset => parseInt(frame.hash.slice(offset, offset + 2), 16) / 2);
                 document.body.style.backgroundColor = `rgb(${color.join(",")})`;

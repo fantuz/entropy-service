@@ -34,6 +34,8 @@ make build
 ./bin/entropy-server -device=/dev/urandom -enable-https=false -http=127.0.0.1:8080
 ```
 
+**Start in your browser:** open **http://127.0.0.1:8080/** (or your configured HTTP/HTTPS base URL). The embedded homepage presents interactive demonstrations, HTTP APIs, WebSocket routes, health/metrics endpoints and optional legacy shortcuts in a three-column layout. It hides internal JavaScript files from navigation without denying access to those required assets.
+
 In another terminal, from the repository directory:
 
 ```sh
@@ -48,7 +50,7 @@ wc -c sample.bin
 ./bin/entropy-client -mode=stream -wsurl=ws://127.0.0.1:8080/stream -slice=65536 -refresh=100ms
 ```
 
-Stop a running client or server with Ctrl+C. Open [byte preview](http://127.0.0.1:8080/bytes.html?bytes=4096&refresh=1000), [colours](http://127.0.0.1:8080/colors.html), [words](http://127.0.0.1:8080/words.html?words=8&refresh=1000), [sound](http://127.0.0.1:8080/sound.html) or [file analysis](http://127.0.0.1:8080/upload.html) in your browser.
+Stop a running client or server with Ctrl+C. The homepage links to the canonical [byte preview](http://127.0.0.1:8080/api-bytes.html?bytes=4096&refresh=1000), [colours](http://127.0.0.1:8080/api-colors.html), [words](http://127.0.0.1:8080/api-words.html?words=8&refresh=1000), [harmonic sound](http://127.0.0.1:8080/api-sound.html), [file analysis](http://127.0.0.1:8080/api-upload.html) and [live stream-analysis](http://127.0.0.1:8080/api-stream.html?bytes=4096&refresh=500) pages.
 
 Build the **whole command packages**, not individual `.go` files: each binary now spans several source files. Without Make, use `go build -o ./bin/entropy-server ./cmd/entropy-server` and the corresponding `./cmd/entropy-client` command.
 
@@ -68,7 +70,7 @@ The standalone binary enables HTTPS by default and expects `cert.pem` and `key.p
 ./bin/entropy-server -device=/dev/urandom -cert-file=/absolute/path/cert.pem -key-file=/absolute/path/key.pem
 ```
 
-Use `https://` and `wss://` for remote consumers. Configure access control at the deployment boundary: the application currently has no built-in authentication or WebSocket origin restriction. HTTP/2 is not enabled in the current listener setup.
+Use `https://` and `wss://` for remote consumers. Configure authentication and access controls at the deployment boundary: the service has no built-in client authentication. The WebSocket upgrader uses Gorilla's default same-host browser origin policy; requests without an `Origin` header may still be admitted. Origin validation is not authentication. HTTP/2 is not enabled in the current listener setup.
 
 ### Install Linux packages
 
@@ -331,20 +333,22 @@ Useful metric families include `rng_ready`, `rng_reseed_age_seconds`, `rng_resee
 
 ### Browser pages
 
-All pages are embedded and available on both listeners. `/` serves the asset directory listing. The `api-` pages are additional browser entry points, not a separate versioned API.
+The embedded homepage at `/` is a **curated, three-column navigation page**. It links every active HTTP/API and WebSocket route and includes the older `aa_*` and `zz_*` redirect helpers in an expandable section. Internal JavaScript and CSS assets remain loadable by the browser but are not displayed as navigation targets. The `api-` prefix names **browser demonstration pages**, not versioned API endpoints.
 
-| Page | Additional entry point | Role |
-| --- | --- | --- |
-| `/bytes.html` | `/api-bytes.html` | Compact byte messages; worker prepares a bounded hex/Base64 preview and displays the full-sample digest. |
-| `/colors.html` | `/api-colors.html` | Hash-only colour display, avoiding transmission of the full sample. |
-| `/words.html` | `/api-words.html` | Live words and their digest. |
-| `/sound.html` | `/api-sound.html` | Generate and play short harmonic WAV clips. |
-| `/upload.html` | `/api-upload.html` | Upload a file for server analysis and preview-based visualisations. |
-| `/stream.html` | `/api-stream.html` | Legacy experimental stream-analysis view; see note below. |
+| Canonical browser page | Role |
+| --- | --- |
+| `/api-bytes.html` | WebSocket compact frames: bounded hexadecimal/Base64 preview plus full-sample SHA-256 digest. |
+| `/api-colors.html` | Hash-only colour display without transmitting the entire sample. |
+| `/api-words.html` | Live dictionary words and SHA-256 digest. |
+| `/api-sound.html` | Centered controls to generate and play harmonic WAV files. |
+| `/api-upload.html` | File analysis, histogram, readable Yin/Yang legend, mosaic, waveform and FFT. |
+| `/api-stream.html` | Live binary `/stream` analysis: histogram, Shannon entropy, mosaic, bit balance, waveform and FFT. |
 
-The stream-analysis view still needs binary/worker repairs. Prefer the CLI for raw streaming and `/bytes.html` for browser byte previews.
+The duplicate `/bytes.html`, `/colors.html`, `/words.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. The HTTP and WebSocket API route names themselves are unchanged.
 
-The byte/colour views move presentation work into a browser worker and bound pending display work. This limits UI work; it does not increase the amount of entropy in a sample.
+The live stream-analysis page accepts integer `bytes` (1–33554432) and `refresh` (1–60000 milliseconds), requests raw binary WebSocket frames and analyses at most the first **64 KiB of an accepted frame**, at a maximum display-analysis rate of five frames per second. FFT uses the first 2048 bytes when available. These limits affect browser work only, not the server's delivered payload. Graphs are illustrative, not statistical certificates.
+
+Byte, colour, word and stream pages show a small **AWAITING FIRST SAMPLE** notice instead of a large connection-status panel. It disappears once the first valid sample is displayed; connection failures/disconnects remain visible. SHA-256 values use the shared bright-green terminal style, and Base64 previews are centered; long encodings may wrap visually at the container width without altering their text. Browser worker/paint backpressure prevents large or frequent samples from overloading the visual display.
 
 <details>
 <summary>Legacy navigation helpers and old documentation names</summary>
@@ -372,7 +376,7 @@ Older README examples mentioned paths that are **not registered aliases**:
 | `/metrics` | `/metrics-2` |
 | `/v1/random` | `/v1/data/random` |
 | `/data` | `/stream` (WebSocket) |
-| `/streams.html` | `/stream.html` (legacy view); prefer `/bytes.html` for byte previews. |
+| `/streams.html` | `/api-stream.html` (browser analysis); `/api-bytes.html` for byte previews. |
 
 </details>
 
@@ -603,17 +607,17 @@ Race tests require a supported platform and a C toolchain with cgo enabled. Pack
 
 The tracked tests cover DRBG backends/reads, reseed failures, private streams, validation, budgets, shutdown/cancellation, sound, file analysis, logging and client timing/metrics. Passing statistical checks is not a substitute for cryptographic review.
 
-Current build CI runs ordinary Go tests, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow packages/publishes without its own test step. **A mandatory race-test release gate and automated browser regression checks remain pending.**
+Current build CI runs ordinary Go tests, **server race-detector tests**, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow publishes without its own test step. A mandatory race-test release gate and automated browser-interaction tests in CI remain pending.
 
 ## Roadmap
 
 Available features are documented above. The following are follow-up work or ideas, not capabilities shipped by this repository:
 
-- Enforce race checks before releases; add browser regression coverage and repair the legacy stream-analysis view.
+- Enforce race checks before releases; expand browser regression coverage (especially real network disconnections and mobile rendering).
 - Use release-derived version metadata in health output.
 - Clarify source-failure policy and cancellation of blocking hardware reads.
 - Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
-- Improve deployment hardening: service identity/device permissions, access control, origin policy and optional hardware-specific startup checks.
+- Improve deployment hardening: service identity/device permissions, authentication/access control, explicit optional origin allowlists for cross-host browser clients, and hardware-specific startup checks.
 - Evaluate integrations separately: FUSE/CUSE byte devices and an OpenSSL provider need distinct designs. FUSE alone does not implement `openssl rand -engine entropyctl`. HSM/blockchain integrations, GPU generation and production/demo build profiles are not implemented.
 
 ## Project background and screenshots

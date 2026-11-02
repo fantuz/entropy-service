@@ -121,7 +121,7 @@ h3 {
 <p id="upload-status" role="status" aria-live="polite" data-state="ready">READY TO ANALYZE</p>
 <p>Files are sent to this server for analysis. Maximum upload: 32 MiB.</p>
 <p id="sample-info"></p>
-<p>SHA-256 (full upload): <span id="file-sha256"></span></p>
+<p class="analysis-label">SHA-256 (full upload): <span id="file-sha256"></span></p>
 <form class="uploadForm" id="uploadForm">
 <input type="file" id="fileInput" name="file" accept="*/*" />
 <button id="submit-upload" type="submit">Upload and analyze</button>
@@ -137,7 +137,7 @@ h3 {
     </div>
     </br>
     <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
-    <div class="hex">0/1 distribution (Yin/Yang)</br>
+    <div class="hex"><h3 class="analysis-label">0/1 Distribution (Yin/Yang)</h3>
 	<canvas id="pie" width="150" height="170"></canvas>
     </div>
     </br>

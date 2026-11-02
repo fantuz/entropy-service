@@ -35,6 +35,7 @@
           <a class="card" href="/v1/image/heatmap"><strong>Entropy heatmap</strong><span>View an image illustrating sample byte patterns.</span><small class="path">/v1/image/heatmap</small></a>
           <a class="card" href="/v1/image/random"><strong>Random image</strong><span>View a generated RGB image.</span><small class="path">/v1/image/random</small></a>
           <a class="card" href="/v1/qr/random"><strong>QR code</strong><span>Generate a QR image containing a hexadecimal sample.</span><small class="path">/v1/qr/random</small></a>
+          <a class="card" href="/api-stream.html"><strong>Live stream analysis</strong><span>Histogram, RGB mosaic, Yin/Yang, waveform and FFT of selected binary samples.</span><small class="path">/api-stream.html</small></a>
         </div>
       </section>
 
@@ -45,19 +46,43 @@
           <a class="card" href="/live"><strong>Liveness</strong><span>Check whether the HTTP service responds.</span><small class="path">/live</small></a>
           <a class="card" href="/ready"><strong>Readiness</strong><span>Inspect seed freshness and reseed errors.</span><small class="path">/ready</small></a>
           <a class="card" href="/metrics-2"><strong>Metrics</strong><span>Explore generation, reseeding and resource-budget counters.</span><small class="path">/metrics-2</small></a>
+          <a class="card" href="/health-1"><strong>Health alias 1</strong><span>Compatibility health response for the serving DRBG.</span><small class="path">/health-1</small></a>
+          <a class="card" href="/health-2"><strong>Health alias 2</strong><span>Health status of the serving DRBG.</span><small class="path">/health-2</small></a>
+          <a class="card" href="/metrics-1"><strong>Metrics alias</strong><span>Compatibility Prometheus endpoint.</span><small class="path">/metrics-1</small></a>
         </div>
       </section>
 
-      <section aria-labelledby="api-title">
-        <h2 id="api-title">Use the APIs</h2>
-        <p class="sub">Binary endpoints are best used with programs or <code>curl</code>; WebSockets need an Upgrade-capable client.</p>
+      <section aria-labelledby="http-title">
+        <h2 id="http-title">Direct HTTP endpoints</h2>
+        <p class="sub">These are API responses, not HTML user interfaces. Binary responses are downloads; the file-analysis API expects a POST request.</p>
+        <div class="grid">
+          <a class="card" href="/v1/data/random?bytes=4096"><strong>Random bytes</strong><span>Download a 4 KiB demonstration response from a private DRBG.</span><small class="path">GET /v1/data/random?bytes=4096</small></a>
+          <a class="card" href="/v1/data/test?bytes=1024"><strong>Test bytes</strong><span>Download a 1 KiB response from the serving root generator.</span><small class="path">GET /v1/data/test?bytes=1024</small></a>
+          <a class="card" href="/v1/meta/random?words=8"><strong>Words and digest</strong><span>HTML word sample generated on the server.</span><small class="path">GET /v1/meta/random</small></a>
+          <a class="card" href="/v1/image/random"><strong>Random image API</strong><span>Generated 1024 × 1024 pixel PNG.</span><small class="path">GET /v1/image/random</small></a>
+          <a class="card" href="/v1/image/heatmap"><strong>Entropy heatmap API</strong><span>Illustrative population-count image.</span><small class="path">GET /v1/image/heatmap</small></a>
+          <a class="card" href="/v1/qr/random"><strong>QR image API</strong><span>PNG code with a random hex sample.</span><small class="path">GET /v1/qr/random</small></a>
+          <a class="card" href="/sound?duration_ms=2500&amp;style=bloom"><strong>Harmonic WAV API</strong><span>Download a generated 2.5-second WAV clip.</span><small class="path">GET /sound</small></a>
+          <a class="card" href="/api-upload.html"><strong>File analysis API</strong><span>Upload using the interactive form; the underlying request is POST.</span><small class="path">POST /files</small></a>
+          <a class="card" href="/paroleparoleparole?words=8"><strong>Words alias</strong><span>Compatibility route for the server-side word page.</span><small class="path">GET /paroleparoleparole</small></a>
+        </div>
+      </section>
+
+      <section aria-labelledby="ws-title">
+        <h2 id="ws-title">Live WebSocket endpoints</h2>
+        <p class="sub">The cards open working browser demos. The paths shown are raw WebSocket upgrade routes; they require a WebSocket client, not a normal browser GET.</p>
+        <div class="grid">
+          <a class="card" href="/api-stream.html"><strong>Binary stream</strong><span>Raw binary frames, visualized by the stream-analysis page.</span><small class="path">WS /stream</small></a>
+          <a class="card" href="/api-bytes.html"><strong>Byte stream</strong><span>Compact binary digest + sample, or optional JSON formats.</span><small class="path">WS /bytes</small></a>
+          <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
+          <a class="card" href="/api-words.html"><strong>Word stream</strong><span>JSON dictionary words and SHA-256.</span><small class="path">WS /words</small></a>
+        </div>
         <div class="panel">
-          <strong>Download 4,096 random bytes over HTTP</strong>
+          <strong>HTTP example · download 4,096 bytes</strong>
           <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
-          <p>Replace <code>127.0.0.1:8080</code> with your server address and use HTTPS when configured.</p>
-          <strong>Keep a binary WebSocket stream open</strong>
-          <pre><code>ws://127.0.0.1:8080/stream?bytes=65536&amp;refresh=1000</code></pre>
-          <p>Other endpoints include <code>/v1/data/test</code>, <code>/v1/meta/random</code>, <code>/bytes</code>, <code>/colors</code>, <code>/words</code>, and <code>POST /files</code>. See the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference and examples</a>.</p>
+          <strong>WebSocket example · stream 4,096 bytes per message</strong>
+          <pre><code>ws://127.0.0.1:8080/stream?bytes=4096&amp;refresh=500</code></pre>
+          <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> and <code>wss://</code> when TLS is enabled. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
         </div>
       </section>
 
@@ -65,8 +90,23 @@
         <h2 id="scope-title">Understanding the output</h2>
         <div class="panel">
           <p>The configured source supplies seed material. ChaCha20 or AES-256-CTR generates the bulk response bytes; these are <strong>not</strong> independent fresh samples directly from the hardware. Visual checks can illustrate statistical patterns, but do not certify unpredictability or cryptographic suitability.</p>
-          <p class="note">This homepage intentionally shows useful demonstrations and API routes, not the underlying HTML, JavaScript, worker and compatibility files. Those static assets remain available where required by the browser pages.</p>
-          <details><summary>Experimental stream-analysis page</summary><p>The legacy <a href="/api-stream.html">stream-analysis view</a> is still under repair. For binary streaming, use <code>/stream</code> with the CLI client instead.</p></details>
+          <p class="note">This homepage links the supported API routes and demos; internal JavaScript workers and CSS are intentionally omitted from the navigation but remain available to the browser. The stream-analysis page samples data for display and does not establish cryptographic quality.</p>
+          <details><summary>Legacy navigation shortcuts (optional)</summary>
+            <p>These browser-side redirect helpers are retained for old bookmarks; they are not separate API implementations.</p>
+            <div class="legacy-links">
+              <a href="/aa_health-1">/aa_health-1</a> ·
+              <a href="/aa_health-2">/aa_health-2</a> ·
+              <a href="/aa_metrics-1">/aa_metrics-1</a> ·
+              <a href="/aa_metrics-2">/aa_metrics-2</a> ·
+              <a href="/zz_v1-data-random.html">/zz_v1-data-random.html</a> ·
+              <a href="/zz_v1-data-test.html">/zz_v1-data-test.html</a> ·
+              <a href="/zz_v1-image-random.html">/zz_v1-image-random.html</a> ·
+              <a href="/zz_v1-image-heatmap.html">/zz_v1-image-heatmap.html</a> ·
+              <a href="/zz_v1-meta-random.html">/zz_v1-meta-random.html</a> ·
+              <a href="/zz_v1-qr-random.html">/zz_v1-qr-random.html</a>
+            </div>
+          </details>
+          <details><summary>Optional developer profiling</summary><p>With <code>-debug=true</code>, Go pprof is served separately at <code>http://127.0.0.1:6060/debug/pprof/</code> on the server host; it is deliberately not linked as a public endpoint.</p></details>
         </div>
       </section>
     </main>

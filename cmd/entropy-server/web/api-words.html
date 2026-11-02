@@ -132,7 +132,7 @@ h3 {
 <body>
 
 <div class="panel">
-    <p id="connection-status" role="status" aria-live="polite" data-state="connecting">CONNECTING</p>
+    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
     <div class="section">
         <h3>Words</h3>
         <div id="words" class="words">—</div>
@@ -147,7 +147,7 @@ h3 {
 "use strict";
 const params = new URLSearchParams(location.search);
 const query = params.toString();
-const status = document.getElementById("connection-status");
+const status = document.getElementById("stream-notice");
 const words = document.getElementById("words");
 const hash = document.getElementById("hash");
 const ws = new WebSocket(
@@ -159,6 +159,7 @@ let latest = null;
 let paintScheduled = false;
 
 function setStatus(state, message) {
+    status.hidden = false;
     status.dataset.state = state;
     status.textContent = message;
 }
@@ -177,17 +178,18 @@ function paintLatest() {
     });
     words.replaceChildren(phrase);
     hash.textContent = data.hash;
+    status.hidden = true;
     const rgb = [0, 2, 4].map(offset => parseInt(data.hash.slice(offset, offset + 2), 16) / 2);
     document.body.style.backgroundColor = `rgb(${rgb.join(",")})`;
 }
 
-ws.onopen = () => setStatus("connected", "Connected");
+ws.onopen = () => setStatus("waiting", "Awaiting first sample");
 ws.onerror = () => {
     failed = true;
     setStatus("error", "Connection failed");
 };
 ws.onclose = () => {
-    if (!failed) setStatus("disconnected", "Disconnected");
+    if (!failed) setStatus("disconnected", "Stream closed — reload to retry");
 };
 ws.onmessage = event => {
     try {

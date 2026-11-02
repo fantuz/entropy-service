@@ -18,7 +18,7 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 
 	for _, path := range []string{
 		"/", "/theme.css", "/entropy-display.js",
-		"/entropy-display-worker.js", "/worker.js", "/file-upload.js",
+		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/file-upload.js",
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
 		"/api-sound.html", "/api-upload.html", "/api-stream.html",
 	} {
@@ -72,7 +72,7 @@ func TestWebConnectionStatusIsSingleElement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, name := range []string{"api-bytes.html", "api-colors.html", "api-words.html"} {
+	for _, name := range []string{"api-bytes.html", "api-colors.html", "api-words.html", "api-stream.html"} {
 		t.Run(name, func(t *testing.T) {
 			data, err := fs.ReadFile(webRoot, name)
 			if err != nil {
@@ -81,10 +81,43 @@ func TestWebConnectionStatusIsSingleElement(t *testing.T) {
 
 			content := string(data)
 
-			if strings.Count(content, "id=\"connection-status\"") != 1 ||
+			if strings.Count(content, "id=\"stream-notice\"") != 1 ||
+				strings.Contains(content, "id=\"connection-status\"") ||
 				!strings.Contains(content, "href=\"/theme.css\"") {
-				t.Fatal("browser page must have one connection status and the common theme")
+				t.Fatal("browser page must have one unobtrusive stream notice and the common theme")
 			}
 		})
+	}
+}
+
+func TestHomepageLinksAllPublicRoutes(t *testing.T) {
+	root, err := fs.Sub(webFS, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := fs.ReadFile(root, "index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	content := string(data)
+
+	for _, route := range []string{
+		"/api-bytes.html", "/api-colors.html", "/api-words.html",
+		"/api-sound.html", "/api-upload.html", "/api-stream.html",
+		"/live", "/ready", "/health-1", "/health-2", "/metrics-1", "/metrics-2",
+		"/v1/data/random", "/v1/data/test", "/v1/meta/random",
+		"/v1/image/random", "/v1/image/heatmap", "/v1/qr/random",
+		"/sound", "/files", "/paroleparoleparole",
+		"WS /stream", "WS /bytes", "WS /colors", "WS /words",
+		"/aa_health-1", "/aa_health-2", "/aa_metrics-1", "/aa_metrics-2",
+		"/zz_v1-data-random.html", "/zz_v1-data-test.html",
+		"/zz_v1-image-random.html", "/zz_v1-image-heatmap.html",
+		"/zz_v1-meta-random.html", "/zz_v1-qr-random.html",
+	} {
+		if !strings.Contains(content, route) {
+			t.Errorf("homepage does not mention public route %q", route)
+		}
 	}
 }

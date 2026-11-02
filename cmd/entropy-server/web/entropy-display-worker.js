@@ -65,13 +65,13 @@ self.onmessage = function(event) {
     try {
         socket = new WebSocket(event.data.url);
         socket.binaryType = "arraybuffer";
-        socket.onopen = () => self.postMessage({ type: "status", state: "connected", text: "Connected" });
+        socket.onopen = () => self.postMessage({ type: "status", state: "waiting", text: "Awaiting first sample" });
         socket.onerror = () => {
             failed = true;
             self.postMessage({ type: "status", state: "error", text: "Connection failed; check request size and server availability" });
         };
         socket.onclose = () => {
-            if (!failed) self.postMessage({ type: "status", state: "disconnected", text: "Disconnected" });
+            if (!failed) self.postMessage({ type: "status", state: "disconnected", text: "Stream closed — reload to retry" });
         };
         socket.onmessage = function(message) {
             try {
