@@ -31,6 +31,7 @@ func TestStreamingRoutesAndBudgetRelease(t *testing.T) {
 				} else {
 					handler = randomHandler(d, 1<<25, budget)
 				}
+
 				w := httptest.NewRecorder()
 				handler(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, endpoint+"?bytes="+strconv.Itoa(count), nil))
 				if w.Code != http.StatusOK || w.Body.Len() != count || w.Header().Get("Content-Length") != strconv.Itoa(count) {
@@ -68,6 +69,7 @@ func TestWebSocketOriginPolicyEndToEnd(t *testing.T) {
 			if tc.origin != "" {
 				hdr.Set("Origin", tc.origin)
 			}
+
 			dialer := websocket.Dialer{HandshakeTimeout: 2 * time.Second}
 
 			conn, response, err := dialer.Dial(endpoint, hdr)
@@ -113,6 +115,7 @@ func BenchmarkHTTPGeneration(b *testing.B) {
 					for range b.N {
 						w := &streamDiscardWriter{header: make(http.Header)}
 						handler(w, req)
+
 						if w.count != int64(n) {
 							b.Fatalf("got=%d want=%d", w.count, n)
 						}
@@ -174,6 +177,7 @@ func BenchmarkHTTPFullBufferBaseline(b *testing.B) {
 					_, err = io.ReadFull(&child, buf)
 
 					drbg.DecreaseActiveInstances(1)
+
 					if err != nil {
 						b.Fatal(err)
 					}
@@ -193,6 +197,7 @@ func TestStreamingBudgetReleaseAfterWriteFailure(t *testing.T) {
 	h := randomBytesHandler(d, 1<<25, 20, false, budget)
 	w := &shortOutputWriter{header: make(http.Header)}
 	h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=65536", nil))
+
 	if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
 		t.Fatalf("write failure leaked request budget: %+v", usage)
 	}
@@ -205,6 +210,7 @@ func TestStreamingBudgetReleaseAfterCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	w := &cancelOutputWriter{header: make(http.Header), cancel: cancel}
 	h(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/data/random?bytes=131072", nil))
 	if w.calls != 1 {
