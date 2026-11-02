@@ -1139,26 +1139,13 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 			}
 		*/
 
-		buf := make([]byte, size)
-
-		// buf := bufPool.Get().([]byte)
-		// defer bufPool.Put(buf)
-		// data := d.ReadInto(buf[:size]) //n
-		// io.Reader(buf)
-		// d.Read(buf[size:])
-		// d.WriteTo(w, size)
-		// io.Copy(w, buf)
-		// child.Read(buf[:size])
-		// x := child.Read(buf[:size])
-		// aa := entropyPool.Read(size)
-
-		if _, err := io.ReadFull(&child, buf); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-
-			return
+		// Stream a bounded response without allocating a buffer proportional to size.
+		// Keep the per-request child DRBG and existing admission budget.
+		w.Header().Set("Content-Length", strconv.Itoa(size))
+		if _, err := io.CopyN(w, &child, int64(size)); err != nil {
+			// Headers/body may already have been sent: do not call http.Error here.
+			log.Printf("random bytes stream failed: %v", err)
 		}
-
-		_, _ = w.Write(buf)
 	}
 }
 
