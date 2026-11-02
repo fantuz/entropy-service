@@ -16,7 +16,7 @@ func TestStreamEntropyResponseLengths(t *testing.T) {
 		t.Run(strconv.Itoa(n), func(t *testing.T) {
 			data := bytes.Repeat([]byte{0xa5}, n)
 			w := httptest.NewRecorder()
-			err := streamEntropyResponse(w, httptest.NewRequest(http.MethodGet, "/", nil), bytes.NewReader(data), n)
+			err := streamEntropyResponse(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil), bytes.NewReader(data), n)
 			if err != nil || w.Body.Len() != n || !bytes.Equal(data, w.Body.Bytes()) {
 				t.Fatalf("err=%v len=%d want=%d", err, w.Body.Len(), n)
 			}
@@ -34,7 +34,7 @@ func (w *shortOutputWriter) WriteHeader(int)             {}
 func (w *shortOutputWriter) Write(p []byte) (int, error) { return len(p) - 1, nil }
 func TestStreamEntropyResponseShortWrite(t *testing.T) {
 	w := &shortOutputWriter{header: make(http.Header)}
-	err := streamEntropyResponse(w, httptest.NewRequest(http.MethodGet, "/", nil), bytes.NewReader(make([]byte, 65536)), 65536)
+	err := streamEntropyResponse(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil), bytes.NewReader(make([]byte, 65536)), 65536)
 	if !errors.Is(err, io.ErrShortWrite) {
 		t.Fatalf("expected ErrShortWrite; got %v", err)
 	}
@@ -74,7 +74,7 @@ func TestStreamEntropyResponsePreCanceled(t *testing.T) {
 
 func TestStreamEntropyResponseRejectZero(t *testing.T) {
 	w := httptest.NewRecorder()
-	if err := streamEntropyResponse(w, httptest.NewRequest(http.MethodGet, "/", nil), bytes.NewReader(nil), 0); err == nil {
+	if err := streamEntropyResponse(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil), bytes.NewReader(nil), 0); err == nil {
 		t.Fatal("expected error")
 	}
 }
@@ -86,7 +86,7 @@ func TestStreamEntropyResponseSourceFailure(t *testing.T) {
 	sentinel := errors.New("synthetic entropy failure")
 	src := io.MultiReader(bytes.NewReader(make([]byte, 32<<10)), failReader{sentinel})
 	w := httptest.NewRecorder()
-	err := streamEntropyResponse(w, httptest.NewRequest(http.MethodGet, "/", nil), src, 64<<10)
+	err := streamEntropyResponse(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil), src, 64<<10)
 	if !errors.Is(err, sentinel) || w.Body.Len() != 32<<10 {
 		t.Fatalf("err=%v len=%d", err, w.Body.Len())
 	}

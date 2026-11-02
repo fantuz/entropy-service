@@ -69,6 +69,7 @@ func TestWebSocketOriginPolicyEndToEnd(t *testing.T) {
 				hdr.Set("Origin", tc.origin)
 			}
 			dialer := websocket.Dialer{HandshakeTimeout: 2 * time.Second}
+
 			conn, response, err := dialer.Dial(endpoint, hdr)
 			if response != nil && response.Body != nil {
 				defer response.Body.Close()
@@ -77,6 +78,7 @@ func TestWebSocketOriginPolicyEndToEnd(t *testing.T) {
 			if conn != nil {
 				_ = conn.Close()
 			}
+
 			if tc.allowed && err != nil {
 				t.Fatalf("expected successful handshake; %v", err)
 			}
@@ -95,16 +97,19 @@ func BenchmarkHTTPGeneration(b *testing.B) {
 				b.Run(algo.String()+"/"+endpoint+"/"+strconv.Itoa(n), func(b *testing.B) {
 					root := newBenchmarkDRBG(b, algo)
 					budget := newHTTPRequestBudget(128, 2<<30)
+
 					var handler http.HandlerFunc
 					if endpoint == "random" {
 						handler = randomBytesHandler(root, 1<<25, 20, false, budget)
 					} else {
 						handler = randomHandler(root, 1<<25, budget)
 					}
+
 					req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/v1/data/"+endpoint+"?bytes="+strconv.Itoa(n), nil)
 					b.SetBytes(int64(n))
 					b.ReportAllocs()
 					b.ResetTimer()
+
 					for range b.N {
 						w := &streamDiscardWriter{header: make(http.Header)}
 						handler(w, req)
@@ -125,6 +130,7 @@ func newBenchmarkDRBG(tb testing.TB, algo drbg.Algorithm) *drbg.DRBG {
 	for i := range seed {
 		seed[i] = byte(i + 1)
 	}
+
 	d, err := drbg.NewDRBGWithAlgorithm(seed, algo)
 	if err != nil {
 		tb.Fatal(err)
@@ -157,6 +163,7 @@ func BenchmarkHTTPFullBufferBaseline(b *testing.B) {
 				b.SetBytes(int64(n))
 				b.ReportAllocs()
 				b.ResetTimer()
+
 				for range b.N {
 					child, err := drbg.NewConnectionDRBG(root)
 					if err != nil {
@@ -170,6 +177,7 @@ func BenchmarkHTTPFullBufferBaseline(b *testing.B) {
 					if err != nil {
 						b.Fatal(err)
 					}
+
 					if _, err = io.Discard.Write(buf); err != nil {
 						b.Fatal(err)
 					}
@@ -222,8 +230,9 @@ func TestStreamingConcurrencyAndBudget(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
 			w := httptest.NewRecorder()
-			h(w, httptest.NewRequest(http.MethodGet, "/v1/data/random?bytes=524288", nil))
+			h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=524288", nil))
 			if w.Code != http.StatusOK || w.Body.Len() != 524288 {
 				errs <- fmt.Errorf("status=%d bytes=%d", w.Code, w.Body.Len())
 			}
@@ -236,6 +245,7 @@ func TestStreamingConcurrencyAndBudget(t *testing.T) {
 	for err := range errs {
 		t.Error(err)
 	}
+
 	if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
 		t.Fatalf("concurrent requests leaked budget: %+v", usage)
 	}
@@ -247,7 +257,7 @@ func TestHTTPStreamingPreservesConservativeMemoryLimit(t *testing.T) {
 	budget := newHTTPRequestBudget(8, 1<<20)
 	d := observableTestDRBG(t)
 	w := httptest.NewRecorder()
-	randomBytesHandler(d, 1<<25, 20, false, budget)(w, httptest.NewRequest(http.MethodGet, "/v1/data/random?bytes=2097152", nil))
+	randomBytesHandler(d, 1<<25, 20, false, budget)(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=2097152", nil))
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("memory admission unexpectedly relaxed: %d", w.Code)
 	}
