@@ -19,7 +19,7 @@ The original demonstration uses an ID Quantique Quantis PCI card. Hardware suppl
 
 `entropy-server` serves the APIs and embedded browser pages. `entropy-client` consumes the binary HTTP/WebSocket APIs and offers terminal diagnostics.
 
-[Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API reference](#api-reference) · [Performance](#performance) · [Development](#development) · [Roadmap](#roadmap)
+[Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API reference](#api-reference) · [Performance](#performance) · [Statistical tests](#statistical-tests) · [Development](#development) · [Roadmap](#roadmap)
 
 ## Quick start
 
@@ -105,46 +105,69 @@ Run either binary with `-help` for its complete flag list. Boolean values use `-
 
 All server timing flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=250`, not `250ms`. Sizes below are bytes unless explicitly labelled MiB.
 
+#### Source and reseeding
+
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `-device` | `/dev/qrandom0` | Entropy source device; OS fallback is allowed unless required. |
+| `-device` | `/dev/qrandom0` | Source device; OS fallback is allowed unless required. |
 | `-require-device` | `false` | Fail startup if the requested device is unavailable. |
-| `-drbg` | `chacha20` | Stream backend: `chacha20` or `aes-256-ctr`. |
-| `-cpu-mix` | `false` | Supplement seed reads with RDSEED, falling back to RDRAND on supported amd64 CPUs. |
-| `-rdrand-mix` | `false` | Older RDRAND-only option; requires CPU support. `-cpu-mix` takes precedence. |
-| `-reseed-ms` | `250` | Root reseed interval, from 1 to 10000 ms. |
-| `-buffer-reseed` | `256` | Fresh bytes read per root reseed, from 32 to 65536. |
-| `-max-reseed-age` | `0` | Readiness threshold; zero selects `max(1000, 4 × reseed-ms)` ms. |
-| `-http`, `-https` | `:8080`, `:8443` | Listener addresses; these defaults bind all interfaces. |
-| `-enable-https` | `true` | Enable the HTTPS listener; the packaged service overrides this to false. |
-| `-cert-file`, `-key-file` | `cert.pem`, `key.pem` | TLS certificate and private key paths. |
-| `-max-bytes` | `33554432` | Maximum generated binary sample, from 1 byte to 32 MiB. |
+| `-drbg` | `chacha20` | Backend: `chacha20` or `aes-256-ctr`. |
+| `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |
+| `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |
+| `-reseed-ms` | `250` | Root reseed interval: 1–10000 ms. |
+| `-buffer-reseed` | `256` | Bytes per root reseed: 32–65536. |
+| `-max-reseed-age` | `0` | Readiness age limit in ms; zero selects `max(1000, 4 × reseed-ms)`. |
+
+#### Listeners and TLS
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `-http` | `:8080` | HTTP address; binds all interfaces by default. |
+| `-https` | `:8443` | HTTPS address; binds all interfaces by default. |
+| `-enable-https` | `true` | Enable HTTPS; the packaged service sets this to false. |
+| `-cert-file` | `cert.pem` | TLS certificate path. |
+| `-key-file` | `key.pem` | TLS private key path. |
+| `-debug` | `false` | Debug output and loopback pprof on port 6060. |
+
+#### Output and resource budgets
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `-max-bytes` | `33554432` | Maximum binary sample: 1 byte to 32 MiB. |
 | `-words` | `20` | Default word count and per-request word limit. |
-| `-refresh-ms` | `5000` | Default `/bytes` WebSocket interval. |
-| `-refresh-colors-ms` | `1500` | Default `/stream`, `/colors` and `/words` WebSocket interval. |
-| `-refresh` | `5000` | HTTP word-page refresh; HTML rounds up to whole seconds. |
-| `-fingerprint` | `2097152` | Upload prefix analysed statistically; SHA-256 still covers the entire upload. |
-| `-cookie` | `false` | Enable HTTP preference cookies for byte/word requests. |
-| `-ws-max-connections`, `-ws-memory-mib` | `128`, `1024` | Shared WebSocket connection and estimated working-memory budgets. |
-| `-http-max-requests`, `-http-memory-mib` | `128`, `512` | Separate shared HTTP work and estimated working-memory budgets. |
-| `-debug` | `false` | Debug output and a loopback-only pprof listener on port 6060. |
+| `-refresh-ms` | `5000` | Default `/bytes` WS interval in ms. |
+| `-refresh-colors-ms` | `1500` | Default `/stream`, `/colors` and `/words` WS interval in ms. |
+| `-refresh` | `5000` | HTTP word-page interval in ms; HTML rounds up to seconds. |
+| `-fingerprint` | `2097152` | Upload prefix analysed statistically; full-upload SHA-256 is unaffected. |
+| `-cookie` | `false` | Enable HTTP byte/word preference cookies. |
+| `-ws-max-connections` | `128` | Shared WS connection limit. |
+| `-ws-memory-mib` | `1024` | Shared WS estimated memory budget in MiB. |
+| `-http-max-requests` | `128` | Separate HTTP work limit. |
+| `-http-memory-mib` | `512` | Separate HTTP estimated memory budget in MiB. |
 
 `-buffer-qrng` is deprecated and ignored. `-buffer-entropy` is an unused legacy option; neither controls an active pool or ring buffer.
 
-CPU mixing is optional and applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
+`-cpu-mix` prefers RDSEED, falls back to RDRAND, and takes precedence over `-rdrand-mix`. Mixing applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
 
 ### Client
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `-mode` | `pull` | `pull` for HTTP or `stream` for WebSockets. |
-| `-slice` | `2097152` | Requested bytes per response/message, from 1 byte to 32 MiB. |
+| `-mode` | `pull` | HTTP `pull` or WebSocket `stream`. |
+| `-slice` | `2097152` | Bytes per response/message: 1 byte to 32 MiB. |
 | `-refresh` | `1s` | A **Go duration**, e.g. `100ms`; minimum 1 ms. |
-| `-url` | `http://127.0.0.1:8080/v1/data/random` | Binary HTTP endpoint. |
-| `-wsurl` | `ws://127.0.0.1:8080/stream` | Raw binary WebSocket endpoint. |
-| `-debug` | `false` | Fetch/receive timing and runtime information, shown to three decimal places in ms. |
-| `-preview`, `-matrix`, `-graph`, `-dashboard`, `-histogram` | `false` | Optional terminal views and diagnostics. |
-| `-writeout` | `false` | Experimental Linux mode writing received bytes to `/dev/urandom`; this does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
+| `-debug` | `false` | Fetch/receive timing and runtime, to three decimal places in ms. |
+| `-preview` | `false` | Hex preview. |
+| `-matrix` | `false` | Transition matrix. |
+| `-graph` | `false` | Entropy history graph. |
+| `-dashboard` | `false` | Summary dashboard. |
+| `-histogram` | `false` | Extended histogram. |
+| `-writeout` | `false` | Experimental Linux write to `/dev/urandom`; does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
+
+Transport flags and their full default URLs are listed separately to keep the table readable:
+
+- `-url`: `http://127.0.0.1:8080/v1/data/random`
+- `-wsurl`: `ws://127.0.0.1:8080/stream`
 
 Pass **bare endpoints** to `-url` and `-wsurl`: the client appends its own `bytes` and `refresh` query parameters. Use `-slice` and `-refresh` to control them. The CLI consumes `/stream` raw messages, not `/bytes` compact envelopes.
 
@@ -189,17 +212,19 @@ HTTP and HTTPS use the same routes. WebSockets use the corresponding `ws://` or 
 
 The normal request method below is GET, except where another method is specified.
 
-| Route | Response and parameters |
-| --- | --- |
-| `/v1/data/random` | Raw binary sample. `bytes=N`, default 2 MiB, capped by `-max-bytes`; uses a private request generator. |
-| `/v1/data/test` | Raw binary sample from the serving root. `bytes=N`, default 1024; this route does not run statistical tests. |
-| `/v1/meta/random` | HTML page with sampled words and a SHA-256 digest. `words=N`, default/limit from `-words`; page refresh comes from the server's `-refresh` flag. |
-| `/paroleparoleparole` | Alias of `/v1/meta/random`. |
-| `/v1/image/random` | 1024 × 1024 PNG with random RGB pixels. |
-| `/v1/image/heatmap` | 1024 × 1024 PNG coloured by byte popcount. A visual diagnostic, not an entropy certification. |
-| `/v1/qr/random` | 256 × 256 PNG QR code encoding 64 generated bytes as hexadecimal text. Dimensions and sample length are currently fixed. |
-| `/sound` | GET returns a 48 kHz, 16-bit mono WAV; HEAD returns its headers. `duration_ms=250..5000` (default 2500), `style=bloom` (default) or `chime`. Uses 64 random bytes to select synthesis parameters; the audio samples are harmonic synthesis, not raw random bytes. |
-| `/files` | POST a raw file body with `Content-Type: application/octet-stream`, up to 32 MiB. Returns JSON analysis; see below. |
+| Route | Response | Parameters / defaults |
+| --- | --- | --- |
+| `/v1/data/random` | Raw binary; private request generator. | `bytes=N`<br>Default: 2 MiB; capped by `-max-bytes`. |
+| `/v1/data/test` | Raw binary; shared serving root. | `bytes=N`<br>Default: 1024 bytes; no statistical tests are run. |
+| `/v1/meta/random` | HTML words and SHA-256. | `words=N`<br>Default/limit: `-words`; page interval: `-refresh`. |
+| `/paroleparoleparole` | Alias of the HTTP word page. | Same as `/v1/meta/random`. |
+| `/v1/image/random` | Random RGB PNG. | Fixed 1024 × 1024 pixels. |
+| `/v1/image/heatmap` | Byte-popcount PNG. | Fixed 1024 × 1024 pixels; visual diagnostic. |
+| `/v1/qr/random` | PNG QR code containing hexadecimal data. | Fixed 256 × 256 pixels; encodes 64 generated bytes. |
+| `/sound` | WAV audio; GET or HEAD. | `duration_ms=250..5000`<br>`style=bloom` or `chime`. |
+| `/files` | JSON file analysis; POST a raw binary body. | Maximum: 32 MiB; see [file analysis](#file-analysis). |
+
+Sound defaults to 2500 ms and `bloom`, with 48 kHz, 16-bit mono output. It uses 64 random bytes to select synthesis parameters; the PCM samples are harmonic synthesis, not raw random bytes. Heatmaps illustrate byte patterns rather than certifying entropy quality. QR dimensions and encoded sample length are not configurable.
 
 Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. The dictionary currently comes from `github.com/8ff/diceware` and is loaded once.
 
@@ -207,12 +232,14 @@ With `-cookie=true`, `/v1/data/random` and the HTTP word pages use validated pre
 
 ### WebSockets
 
-| Route | Output | Parameters and defaults |
+| Route | Payload | Default query values |
 | --- | --- | --- |
-| `/stream` | One raw binary sample per message, with no digest prefix. | `bytes=2048`, `refresh=1500`. |
-| `/bytes` | Byte sample and SHA-256, in the selected format. | `bytes=2048`, `refresh=5000`, `format=json`. |
-| `/colors` | Same protocol as `/bytes`, with a different default interval. | `bytes=2048`, `refresh=1500`, `format=json`. |
-| `/words` | JSON with `words` as a space-separated string and `hash` as a SHA-256 hex digest of that string. | `words=20`, `refresh=1500`; word default/limit follows `-words`. |
+| `/stream` | Raw binary sample; no digest prefix. | `bytes=2048`<br>`refresh=1500` |
+| `/bytes` | Sample and SHA-256, in the selected format. | `bytes=2048`<br>`refresh=5000`<br>`format=json` |
+| `/colors` | Same protocol as `/bytes`. | `bytes=2048`<br>`refresh=1500`<br>`format=json` |
+| `/words` | JSON fields: `words`, `hash`. | `words=20`<br>`refresh=1500` |
+
+For `/words`, the word default and limit follow `-words`. The response contains a space-separated word string and its SHA-256 hex digest.
 
 The table shows factory defaults; server flags can change the intervals. Request `refresh` values are integer milliseconds from 1 to 60000. `/words` rejects invalid or duplicate values; `/stream`, `/bytes` and `/colors` currently fall back to the configured interval for an invalid `refresh` value. The first message is sent on the first timer tick, not immediately on connection.
 
@@ -220,9 +247,9 @@ The table shows factory defaults; server flags can change the intervals. Request
 
 | `format` | Message type | Application payload |
 | --- | --- | --- |
-| `json` | Text | `{"hex":"…","base64":"…","hash":"…"}`; compatibility default, containing two encodings of the same sample. |
-| `compact` | Binary | **32 raw SHA-256 digest bytes, followed by N raw sample bytes, in one message.** No hex prefix or length header. |
-| `hash` | Text | `{"hash":"…","bytes":N}`; metadata only, without the sample. |
+| `json` | Text | JSON fields: `hex`, `base64`, `hash`.<br>Compatibility default; two encodings of the same sample. |
+| `compact` | Binary | **32 digest bytes + N raw sample bytes**, in one message.<br>No hex prefix or length header. |
+| `hash` | Text | JSON fields: `hash`, `bytes`.<br>Metadata only; the sample is not transmitted. |
 
 For compact messages, read the first 32 bytes as the digest and the remainder as the sample; a 32 MiB sample therefore needs a receive limit of **33554464 bytes**. The hash format still generates and hashes the requested sample on the server. A digest sent with the data is a checksum, not proof of origin or entropy quality.
 
@@ -268,7 +295,9 @@ All pages are embedded and available on both listeners. `/` serves the asset dir
 | `/words.html` | `/api-words.html` | Live words and their digest. |
 | `/sound.html` | `/api-sound.html` | Generate and play short harmonic WAV clips. |
 | `/upload.html` | `/api-upload.html` | Upload a file for server analysis and preview-based visualisations. |
-| `/stream.html` | `/api-stream.html` | Legacy experimental stream-analysis view; its binary/worker handling still needs repair. Prefer the CLI for raw streaming and `/bytes.html` for browser byte previews. |
+| `/stream.html` | `/api-stream.html` | Legacy experimental stream-analysis view; see note below. |
+
+The stream-analysis view still needs binary/worker repairs. Prefer the CLI for raw streaming and `/bytes.html` for browser byte previews.
 
 The byte/colour views move presentation work into a browser worker and bound pending display work. This limits UI work; it does not increase the amount of entropy in a sample.
 
@@ -279,8 +308,10 @@ These embedded helpers use browser-side redirects; they are not HTTP redirect AP
 
 | Helper | Target |
 | --- | --- |
-| `/aa_health-1`, `/aa_health-2` | `/health-1`, `/health-2`, respectively. |
-| `/aa_metrics-1`, `/aa_metrics-2` | `/metrics-1`, `/metrics-2`, respectively. |
+| `/aa_health-1` | `/health-1` |
+| `/aa_health-2` | `/health-2` |
+| `/aa_metrics-1` | `/metrics-1` |
+| `/aa_metrics-2` | `/metrics-2` |
 | `/zz_v1-data-random.html` | `/v1/data/random` |
 | `/zz_v1-data-test.html` | `/v1/data/test` |
 | `/zz_v1-image-heatmap.html` | `/v1/image/heatmap` |
@@ -377,9 +408,11 @@ The earlier README included short loopback `wrk` runs on an Intel Core i5-3470 a
 | 64 B | 68,019.56 | 11.68 MB/s | None. |
 | 2 MiB | 572.97 | 1.12 GB/s | 2 timeouts. |
 
-These are **historical author measurements**, not a rerun of the current release. They used the old `/v1/random` route; the exact revision, backend and source configuration were not recorded. The original high-throughput log used **2 MiB**, not the 512 KiB stated in its headline. Transfer totals include HTTP overhead. Unsupported HTTPS headline figures have been omitted.
+These are **historical author measurements**, not a rerun of the current release. They used the old `/v1/random` route; the exact revision, backend and source configuration were not recorded. Transfer totals include HTTP overhead.
 
-For a current end-to-end measurement, start a server with recorded flags, then run, for example:
+### Benchmark your installation
+
+Throughput benchmarks measure delivery performance, separately from the [statistical tests](#statistical-tests). Start a server with recorded flags, then run:
 
 ```sh
 wrk -t4 -c16 -d30s --latency --timeout 5s 'http://127.0.0.1:8080/v1/data/random?bytes=65536'
@@ -387,12 +420,76 @@ wrk -t4 -c16 -d30s --latency --timeout 5s 'http://127.0.0.1:8080/v1/data/random?
 
 Compare `-drbg=chacha20` and `-drbg=aes-256-ctr`, vary `GOMAXPROCS` and concurrency, and record errors, tail latency, CPU and peak RSS as well as throughput. AES can benefit from CPU acceleration; private generators allow parallel bulk work, but tiny requests, encoding or the load generator may become the bottleneck. Longer runs and remote/TLS clients answer different questions from a loopback test. Do not apply blanket `sysctl` or socket-buffer tuning before identifying the constraint.
 
+## Statistical tests
+
+Use `rngtest` for a quick regression screen and Dieharder for a broader statistical battery. These tests assess statistical behaviour, not maximum throughput or cryptographic certification. The HTTP examples test the **served DRBG output**, not the QRNG device before your software generator.
+
+On Debian/Ubuntu, install the tools if needed:
+
+```sh
+sudo apt install curl rng-tools5 dieharder
+```
+
+Run the examples in **Bash**, with the server already running. Replace the address if it runs elsewhere:
+
+```bash
+set -o pipefail
+ENTROPY_URL='http://127.0.0.1:8080/v1/data/random'
+```
+
+### Quick screen with rngtest
+
+```bash
+curl -fsS --max-time 60 "${ENTROPY_URL}?bytes=25000004" | rngtest -c 10000 -b 1000
+```
+
+This requests about 23.84 MiB: 10,000 blocks of 20,000 bits, plus four initialisation bytes, within the default 32 MiB response limit. It reports every 1,000 blocks. If you lowered `-max-bytes`, reduce the block count and request size together: `bytes = 2500 × blocks + 4`.
+
+The five legacy checks are monobit, poker, runs, long runs and continuous run; they are not five separate cryptographic standards. Confirm that successes plus failures totals 10,000. An occasional rejected block can occur with good random data; exit status 1 means at least one block was rejected. See the [rngtest manual](https://github.com/nhorman/rng-tools/blob/master/rngtest.1.in).
+
+### Broader battery with Dieharder
+
+Dieharder needs a continuing supply of fresh input. Do not loop a small capture: file-input mode can rewind and reuse data, making results suspect. Define this feeder once; it downloads a fresh 1 MiB response before forwarding it, so calculation pauses do not hold an HTTP download open:
+
+```bash
+entropy_stream() (
+    entropy_chunk=$(mktemp) || exit
+    trap 'rm -f "$entropy_chunk"' EXIT
+    while :; do
+        curl -fsS --max-time 30 \
+            "${ENTROPY_URL}?bytes=1048576" \
+            -o "$entropy_chunk" || exit
+        cat "$entropy_chunk" || break
+    done
+)
+```
+
+The temporary file is overwritten with fresh data each cycle and removed on exit. Run the full default battery with this one-liner:
+
+```bash
+entropy_stream | dieharder -g 200 -a
+```
+
+`-g 200` selects raw binary stdin; `-a` runs the default battery. Allow substantial runtime and data consumption. For a shorter first run, replace `-a` with `-d sts_monobit`. To inspect available tests, use `dieharder -l`.
+
+An isolated `WEAK` result is not proof of a defect. Repeat suspicious tests with fresh input and the same parameters, and compare with an OS-source baseline rather than rerunning until everything passes. Check for premature `EOF` and missing results; exit status alone does not establish completion. See the [Dieharder manual](https://manpages.debian.org/testing/dieharder/dieharder.1.en.html).
+
+For a baseline or direct device check, run the same test with input redirected from `/dev/urandom` or, on the machine with the QRNG and read permission, `/dev/qrandom0`:
+
+```bash
+dieharder -g 200 -d sts_monobit < /dev/urandom
+dieharder -g 200 -d sts_monobit < /dev/qrandom0
+```
+
+Feed each utility the original bytes; do not place `rngtest -p` before Dieharder, because that filters out rejected blocks. Passing statistical tests cannot certify unpredictability or replace cryptographic review; see [NIST SP 800-22](https://csrc.nist.gov/pubs/sp/800/22/r1/upd1/final).
+
 ## Development
 
 | Command | Action |
 | --- | --- |
 | `make build` | Build both command packages into `./bin`. |
-| `make build-server`, `make build-client` | Build one binary. |
+| `make build-server` | Build the server. |
+| `make build-client` | Build the client. |
 | `make test` | Run `go test ./...`. |
 | `make lint` | Run golangci-lint. |
 | `make fmt` | Run the configured golangci-lint formatters. |
