@@ -1,5 +1,6 @@
 # entropy-service
 
+[![Modern build and Debian packages](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml)
 [![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go)](https://golangci-lint.run/)
 [![build](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml)
 ![Latest GitHub release](https://img.shields.io/github/release/fantuz/entropy-service.svg)
