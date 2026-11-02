@@ -1754,7 +1754,7 @@ func main() {
 
 	log.Printf("Entropy source: %s\n", dev)
 
-	fmt.Println("	1) initialize entropy device as buffer source")
+	fmt.Println("	1) open entropy seed source")
 
 	// qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
 	qrngdev, err := NewEntropySource(dev, cfg.RequireDevice)
@@ -1781,65 +1781,23 @@ func main() {
 		log.Print("Seed source: configured entropy source with optional RDRAND mixing")
 	}
 
-	fmt.Println("	2) initialize seed space")
+	fmt.Println("	2) read root DRBG seed")
 
-	/*
-		seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
-		//seed, serr := fetchEntropy(64, dev, cfg.SeedBuffer) // 64*8 = 512 bits
-		//seed, serr := fetchEntropy(cfg.SeedBuffer, dev, cfg.QRNGBuffer) // 64*8 = 512 bits
-		if serr != nil {
-			log.Fatal(serr)
-		}
-	*/
-
-	g := make([]byte, 65536)
-	// entropy, _ := qrngdev.Read(g)
-
-	// entropy, err := io.ReadFull(qrngdev, g)
-	// if err != nil {
-	//	log.Fatalf("read master seed: %v", err)
-	// }
-
-	if _, err := io.ReadFull(qrngdev, g); err != nil {
-		log.Fatalf("read master seed: %v", err)
+	seed := make([]byte, 64)
+	if _, err := io.ReadFull(qrngdev, seed); err != nil {
+		log.Fatalf("read root seed: %v", err)
 	}
 
-	fmt.Println("	3) initialize the entropy read pool (check size in config.go configuration file) (removed logic)")
+	fmt.Println("	3) initialize root DRBG")
 
-	// entropyPool = NewEntropyPool(entropy) // 8 MB pool
-	// test write
-	// entropyPool.Write(g)
-	// entropyPool.Write(entropy.Read)
-
-	fmt.Println("	4) start the entropy producer pool with given 64 KB of buffer (removed logic)")
-	// startEntropyProducer(entropyPool, dev, 65536)
-
-	// resp := handler(pool)
-	// assert(len(resp) == expected)
-
-	// Initialize the generators from separately read startup seed buffers.
-	fmt.Println("	5) write the entropy out to DRBG buffer")
-
-	master, merr := drbg.NewDRBGWithAlgorithm(g, algorithm)
-	if merr != nil {
-		log.Fatal(merr)
+	root, err := drbg.NewDRBGWithAlgorithm(seed, algorithm)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// backup, berr := drbg.NewDRBG(entropyPool.buf)
-	backupSeed := make([]byte, 64)
-	if _, err := io.ReadFull(qrngdev, backupSeed); err != nil {
-		log.Fatalf("read backup seed: %v", err)
-	}
-
-	backup, berr := drbg.NewDRBGWithAlgorithm(backupSeed, algorithm)
-	if berr != nil {
-		log.Fatal(berr)
-	}
-
-	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI"
-	fmt.Println("	6) set DRBG metadata (optional)")
-	master.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
-	backup.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
+	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
+	fmt.Println("	4) set DRBG metadata (optional)")
+	root.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
 	var tlsCfg *tls.Config
 
@@ -1858,18 +1816,6 @@ func main() {
 		tlsCfg = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 	}
 
-	/*
-		fmt.Println("9) setup the masterDRBG")
-		e := make([]byte, 65536)
-		entropy2, _ := qrngdev.Read(e)
-	*/
-
-	// f := entropyPool.Read(e)
-	// entropy := entropyPool.Read(2097152)
-	// drbgmaster, _ := drbg.NewDRBG(entropy)
-	// master := NewMasterDRBG(entropy)
-	// masterDRBG, _ := drbg.NewDRBG(entropy2)
-
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
 	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
 	httpBudget := newHTTPRequestBudget(cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB*(1<<20))
@@ -1886,35 +1832,36 @@ func main() {
 	mux.Handle("/", http.FileServer(http.FS(webRoot)))
 
 	mux.HandleFunc("/live", livenessHandler)
-	mux.HandleFunc("/ready", healthHandler(&backup, maxReseedAge))
+	mux.HandleFunc("/ready", healthHandler(&root, maxReseedAge))
 
-	mux.HandleFunc("/health-1", healthHandler(&master, maxReseedAge))
-	mux.HandleFunc("/health-2", healthHandler(&backup, maxReseedAge))
+	// Keep numbered health and metrics routes as aliases of the same root.
+	mux.HandleFunc("/health-1", healthHandler(&root, maxReseedAge))
+	mux.HandleFunc("/health-2", healthHandler(&root, maxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&master, maxReseedAge, wsBudget, httpBudget))
-	mux.Handle("/metrics-2", metricsHandler(&backup, maxReseedAge, wsBudget, httpBudget))
+	mux.Handle("/metrics-1", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget))
+	mux.Handle("/metrics-2", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget))
 
-	mux.HandleFunc("/stream", wsBinaryHandler(&backup, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
-	mux.HandleFunc("/colors", wsBytesHandler(&backup, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
-	mux.HandleFunc("/bytes", wsBytesHandler(&backup, cfg.RefreshRateMs, cfg.MaxBytes, wsBudget))
+	mux.HandleFunc("/stream", wsBinaryHandler(&root, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
+	mux.HandleFunc("/colors", wsBytesHandler(&root, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
+	mux.HandleFunc("/bytes", wsBytesHandler(&root, cfg.RefreshRateMs, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/files", uploadHandler(cfg.BytesFingerprint, httpBudget))
 
-	mux.HandleFunc("/words", wsWordsHandler(&backup, cfg.MaxWords, cfg.RefreshColorMs, wsBudget))
+	mux.HandleFunc("/words", wsWordsHandler(&root, cfg.MaxWords, cfg.RefreshColorMs, wsBudget))
 
-	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.WantsCookie))
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(&backup, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie, httpBudget))
-	mux.HandleFunc("/v1/data/test", randomHandler(&backup, cfg.MaxBytes, httpBudget))
+	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&root, cfg.MaxBytes, cfg.WantsCookie))
+	mux.HandleFunc("/v1/data/random", randomBytesHandler(&root, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie, httpBudget))
+	mux.HandleFunc("/v1/data/test", randomHandler(&root, cfg.MaxBytes, httpBudget))
 	// Fixed 1024x1024 images: RGBA pixels, source bytes and PNG scratch.
-	mux.HandleFunc("/v1/image/random", httpBudget.wrap(randomImageHandler(&backup), 16<<20))
-	mux.HandleFunc("/v1/image/heatmap", httpBudget.wrap(entropyHeatmapHandler(&backup), 16<<20))
-	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
-	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
-	mux.HandleFunc("/v1/qr/random", httpBudget.wrap(qrHandler(&backup), 4<<20))
+	mux.HandleFunc("/v1/image/random", httpBudget.wrap(randomImageHandler(&root), 16<<20))
+	mux.HandleFunc("/v1/image/heatmap", httpBudget.wrap(entropyHeatmapHandler(&root), 16<<20))
+	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
+	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
+	mux.HandleFunc("/v1/qr/random", httpBudget.wrap(qrHandler(&root), 4<<20))
 	// Up to five seconds of samples plus WAV output; keep the sound slot limit.
-	mux.HandleFunc("/sound", httpBudget.wrap(randomSoundHandler(&backup), 8<<20))
+	mux.HandleFunc("/sound", httpBudget.wrap(randomSoundHandler(&root), 8<<20))
 
-	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
-	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&backup, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
+	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
+	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
 
 	// placeholder for public/private key generation
 	// mux.HandleFunc("/v1/cert/random", healthHandler(drbg))
@@ -1925,7 +1872,7 @@ func main() {
 	// start HTTP & HTTPS servers on the same mux
 	// os.Getenv("TLS") == "1"
 
-	fmt.Printf("	9) start HTTP server(s)\n")
+	fmt.Printf("	5) start HTTP server(s)\n")
 
 	var (
 		httpSrv  *managedServer
@@ -1935,8 +1882,6 @@ func main() {
 		httpsErr error
 	)
 
-	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, backup)
-	// httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, mux, &backup)
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, countRequests(mux))
 	if httpErr != nil {
 		log.Fatal(httpErr)
@@ -1945,8 +1890,6 @@ func main() {
 	}
 
 	if cfg.EnableHTTPS {
-		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, backup)
-		// httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, mux, tlsCfg, &backup)
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, countRequests(mux), tlsCfg)
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
@@ -1978,24 +1921,9 @@ func main() {
 	}
 
 	// Run permanent reseed loop
-	fmt.Printf("	10) start reseed loop every %d ms\n", cfg.ReseedMs)
+	fmt.Printf("	6) start reseed loop every %d ms\n", cfg.ReseedMs)
 
-	// wait for first reseed to fully complete, especially useful when using fallback CSPRNG
-	// time.Sleep(time.Duration(cfg.ReseedMs*2))
-
-	// go func() {
-	//	ticker := time.NewTicker(time.Duration(cfg.ReseedMs) * time.Millisecond)
-	//	// ticker := time.NewTicker(time.Duration(cfg.ReseedMs))
-	//	for range ticker.C {
-	//		// entropy := entropyPool.Read(65536)
-	//		go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
-	//		go reseedLoop(ctx, &backup, cfg.ReseedMs, dev, cfg.QRNGBuffer, g)
-	//		// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.QRNGBuffer, cfg.SeedBuffer)
-	//		// go reseedLoop(ctx, &master, cfg.ReseedMs, dev, cfg.SeedBuffer, cfg.SeedBuffer)
-	//	}
-	// }()
-
-	go reseedLoop(ctx, qrngdev, cfg.ReseedMs, cfg.ReseedSize, &master, &backup)
+	go reseedLoop(ctx, qrngdev, cfg.ReseedMs, cfg.ReseedSize, &root)
 
 	log.Println(Cyan + "Entropy Server startup sequence completed successfully\n" + Reset)
 

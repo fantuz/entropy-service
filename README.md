@@ -179,22 +179,20 @@ The client performs startup diagnostics before entering its normal loop. The las
 flowchart TD
     S["Configured device or OS CSPRNG"] --> I["Startup reads and one reseed loop"]
     C["Optional CPU seed mixing"] -.-> I
-    I --> R["Reference root: master"]
-    I --> P["Serving root: backup"]
-    R --> H["Reference health and metrics"]
+    I --> P["Serving root DRBG"]
     P --> M["Serving health and metrics"]
     P --> G["Private request or connection generators"]
     P --> D["Other HTTP generators"]
     G --> B["Binary HTTP and WebSocket consumers"]
 ```
 
-The old background producer, software ring buffer and experimental generator-pool path are no longer active. The current code still creates **two root DRBGs** from separate source reads: `master` is exposed through the first health/metrics pair, while `backup` is the serving parent for all generation endpoints. The names do not imply automatic failover.
+The service creates **one root DRBG**, seeded from a full 64-byte startup read and refreshed by one reseed loop. This root serves all generation endpoints and seeds their private generators. The former reference root, background producer, software ring buffer and experimental generator-pool path are no longer active.
 
 `/v1/data/random` creates a private generator per request. Each entropy WebSocket creates its own generator lazily on the first output read, then refreshes it after a parent reseed or before exceeding the 256 GiB per-key output limit. Child seeds come from the serving DRBG; they are not additional hardware reads. `/v1/data/test` and the other generated HTTP representations read the serving root directly.
 
 This lets independent bulk consumers use multiple CPU cores without holding one shared lock for all their output. Parent seed derivation and reseeding still synchronise, and each individual generator serialises its own reads. AES acceleration, message size, encoding, TLS, network capacity and client work determine actual scaling.
 
-Fresh entropy is read before taking the root generator's reseed lock. At the default settings, periodic reads nominally request `2 roots × 256 bytes / 250 ms = 2048 bytes/s`, in addition to startup/validation reads. This is seed-source demand, not the service's output throughput or a claim about measured physical entropy.
+Fresh entropy is read before taking the root generator's reseed lock. At the default settings, periodic reads nominally request `256 bytes / 250 ms = 1024 bytes/s`, in addition to startup/validation reads. This is seed-source demand, not the service's output throughput or a claim about measured physical entropy.
 
 ### Security and source boundaries
 
@@ -273,16 +271,16 @@ Histogram, bit balance and entropy refer to the analysed prefix, not necessarily
 | --- | --- |
 | `/live` | Liveness JSON; independent of seed freshness. |
 | `/ready` | Serving-root readiness JSON; 200 when fresh with no unresolved reseed error, otherwise 503. |
-| `/health-1` | Reference-root health JSON. |
+| `/health-1` | Compatibility alias of the serving-root health check. |
 | `/health-2` | Serving-root health JSON, using the same readiness policy as `/ready`. |
-| `/metrics-1` | Prometheus text metrics with reference-root metadata. |
+| `/metrics-1` | Compatibility alias of the serving-root metrics. |
 | `/metrics-2` | Prometheus text metrics with serving-root metadata; the normal operational target. |
 
-Both metrics endpoints also include the same service-wide counters and budgets; avoid counting those twice by scraping both as independent traffic totals. Seed age, reseed interval/size, failure totals and last-error information are exposed in health JSON.
+`/health-1`, `/health-2` and `/ready` inspect the same root; `/metrics-1` and `/metrics-2` expose the same root and service-wide counters and budgets. Scrape one metrics route to avoid counting the same service twice. Seed age, reseed interval/size, failure totals and last-error information are exposed in health JSON.
 
 Useful metric families include `rng_ready`, `rng_reseed_age_seconds`, `rng_reseed_failures_total`, `rng_bytes_generated_total`, `http_requests_total`, `wss_payloads_total`, `drbg_instance_count`, `ws_connections_*`, `ws_memory_*`, `ws_rejected_*` and `http_generation_*`.
 
-`drbg_instance_count` normally starts at **2** for the two roots, then includes active children. Merely viewing metrics does not create a child generator. Generated-byte totals include internal child-seed derivation; they are not exact network-payload counters. Legacy software-buffer metrics remain zero because those buffers are disabled. The embedded `rng_version` value is still hard-coded and should not be used to identify the installed release.
+`drbg_instance_count` normally starts at **1** for the root, then includes active children. Merely viewing metrics does not create a child generator. Generated-byte totals include internal child-seed derivation; they are not exact network-payload counters. Legacy software-buffer metrics remain zero because those buffers are disabled. The embedded `rng_version` value is still hard-coded and should not be used to identify the installed release.
 
 ### Browser pages
 
@@ -566,7 +564,7 @@ Available features are documented above. The following are follow-up work or ide
 
 - Enforce race checks before releases; add browser regression coverage and repair the legacy stream-analysis view.
 - Correct cumulative pull-mode throughput accounting and use release-derived version metadata in health output.
-- Decide whether to remove the reference root or give it a defined operational role; clarify source-failure policy and cancellation of blocking hardware reads.
+- Clarify source-failure policy and cancellation of blocking hardware reads.
 - Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
 - Improve deployment hardening: service identity/device permissions, access control, origin policy and optional hardware-specific startup checks.
 - Evaluate integrations separately: FUSE/CUSE byte devices and an OpenSSL provider need distinct designs. FUSE alone does not implement `openssl rand -engine entropyctl`. HSM/blockchain integrations, GPU generation and production/demo build profiles are not implemented.
