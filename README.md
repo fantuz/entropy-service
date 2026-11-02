@@ -151,27 +151,74 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 
 ### Client
 
+Client timing options accept **Go durations**, such as `50ms` or `1s`. Byte counts are plain integers. Reception, analysis and terminal display have separate settings; a frame below means one HTTP response or one WebSocket message.
+
+#### Transport and payload
+
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `-mode` | `pull` | HTTP `pull` or WebSocket `stream`. |
 | `-slice` | `2097152` | Bytes per response/message: 1 byte to 32 MiB. |
-| `-refresh` | `1s` | A **Go duration**, e.g. `100ms`; minimum 1 ms. |
-| `-debug` | `false` | Fetch/receive timing and runtime, to three decimal places in ms. |
-| `-preview` | `false` | Hex preview. |
-| `-matrix` | `false` | Transition matrix. |
-| `-graph` | `false` | Entropy history graph. |
-| `-dashboard` | `false` | Summary dashboard. |
-| `-histogram` | `false` | Extended histogram. |
-| `-writeout` | `false` | Experimental Linux write to `/dev/urandom`; does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
+| `-refresh` | `1s` | HTTP request interval or requested server WS interval; minimum 1 ms. |
+| `-writeout` | `false` | Experimental Linux write of every received frame to `/dev/urandom`; does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
 
-Transport flags and their full default URLs are listed separately to keep the table readable:
+Transport URLs are listed separately to keep the table readable:
 
 - `-url`: `http://127.0.0.1:8080/v1/data/random`
 - `-wsurl`: `ws://127.0.0.1:8080/stream`
 
 Pass **bare endpoints** to `-url` and `-wsurl`: the client appends its own `bytes` and `refresh` query parameters. Use `-slice` and `-refresh` to control them. The CLI consumes `/stream` raw messages, not `/bytes` compact envelopes.
 
-The client performs startup diagnostics before entering its normal loop. The last WS receive duration includes waiting for the server's next frame. The HTTP fetch duration includes reading the body. Neither is a pure network round-trip measurement; terminal rendering and client pacing can also limit observed throughput.
+#### Analysis and terminal display
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `-analysis-bytes` | `1048576` | Maximum prefix bytes analysed per selected frame.<br>Range: 0 to 33554432; `0` selects the full frame. |
+| `-analysis-interval` | `250ms` | Minimum interval between analysed frames.<br>Non-negative; `0` analyses every frame. |
+| `-display-interval` | `1s` | Terminal redraw interval; minimum 1 ms.<br>Does not change the requested reception interval. |
+| `-dashboard` | `false` | Reception/analysis rates and histories of sampled statistics. |
+| `-matrix` | `false` | Compute and display the transition matrix for analysed samples. |
+| `-graph` | `false` | Shannon-entropy history of analysed samples. |
+| `-preview` | `false` | Up to 64 bytes, in hex, from the last selected frame. |
+| `-histogram` | `false` | Byte-distribution bars from the analysed sample's existing counts. |
+| `-debug` | `false` | Receive/fetch, analysis and runtime timings, to three decimal places in ms. |
+
+By default, the client receives and counts every frame but analyses **at most the first 1 MiB of a selected frame, once every 250 ms**. The first frame is analysed immediately; later samples require both a new frame and an elapsed analysis interval. Slow sources therefore produce fewer samples. The terminal redraws once per second using the latest available result.
+
+These settings apply to both `pull` and `stream`. They do not reduce the requested payload or filter data written with `-writeout`. Matrix computation is skipped unless `-matrix` is enabled. Statistics describe individual analysed samples; graphs show their history rather than a cumulative test of all received bytes.
+
+For example, request 16 MiB every 50 ms while keeping analysis and display work bounded:
+
+```sh
+./bin/entropy-client -mode=stream -dashboard -slice=16777216 -refresh=50ms \
+  -analysis-bytes=1048576 -analysis-interval=250ms -display-interval=1s
+```
+
+The three analysis/display arguments above are the defaults and may be omitted. The requested payload rate is **320 MiB/s** (`16 MiB / 0.05 s`), a scheduling target rather than a measured capacity. Actual throughput depends on generation, reception, analysis, terminal I/O and the network.
+
+To analyse **every byte of every frame**, set both analysis options to zero:
+
+```sh
+./bin/entropy-client -mode=stream -dashboard -slice=16777216 -refresh=50ms \
+  -analysis-bytes=0 -analysis-interval=0 -display-interval=1s
+```
+
+Add `-matrix` if transition-matrix analysis is also wanted. Setting only `-analysis-bytes=0` still selects frames at the configured interval; setting only `-analysis-interval=0` still respects the prefix cap. Full analysis can reduce throughput. The bounded receive queue applies backpressure when processing cannot keep up; increasing display frequency does not accelerate reception.
+
+#### Reading the monitor
+
+| Display | Meaning |
+| --- | --- |
+| `Requested rate` | Payload size divided by requested interval; a target, in MiB/s. |
+| `Received` / `Average received` | All frames handled by the monitor and their cumulative throughput over monitoring runtime. |
+| `Total received` / `Transfer Rate` | Receiver byte count and throughput sampled over approximately one-second windows. |
+| `Analysed Rate` | Bytes actually analysed per second, including the prefix/frame selection limits. |
+| `Analysis samples` / `Analysed prefix` | Number of selected frames versus received frames, and analysed bytes versus the last selected frame's full size. |
+| `Analysed total` / `Sample age` | Cumulative sampled bytes and age of the latest analysis sample. |
+
+`Total received`, `Transfer Rate` and `Analysed Rate` are shown with `-dashboard`. Throughput uses **MiB/s**: 1 MiB = 1,048,576 bytes. Analysis rates measure processing of sampled data, not physical entropy production. Receiver and monitor counters can differ briefly because frames may be in flight or queued and rate windows differ.
+
+The client performs startup diagnostics before normal monitoring; its reception-rate window is reset afterwards. With `-debug`, `Last WS receive` includes waiting for the server's next message; `WS runtime` sums message-read durations. `Last HTTP fetch` includes the complete response body; `HTTP cycle runtime` includes request pacing plus that fetch. Analysis is timed separately, and `Total runtime` is wall time since monitoring started. These are client-side timings, not pure network round-trip measurements.
 
 ## Architecture
 
@@ -563,7 +610,7 @@ Current build CI runs ordinary Go tests, lint and a GoReleaser snapshot for rele
 Available features are documented above. The following are follow-up work or ideas, not capabilities shipped by this repository:
 
 - Enforce race checks before releases; add browser regression coverage and repair the legacy stream-analysis view.
-- Correct cumulative pull-mode throughput accounting and use release-derived version metadata in health output.
+- Use release-derived version metadata in health output.
 - Clarify source-failure policy and cancellation of blocking hardware reads.
 - Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
 - Improve deployment hardening: service identity/device permissions, access control, origin policy and optional hardware-specific startup checks.
