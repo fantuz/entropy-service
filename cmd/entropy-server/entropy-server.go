@@ -26,8 +26,6 @@ import (
 	"syscall"
 	"time"
 
-	// "golang.org/x/net/http2" // enable HTTP/2.
-	// "github.com/fantuz/entropy-service/cmd/entropy-server/internal/protocol".
 	"github.com/gorilla/websocket"
 	"github.com/skip2/go-qrcode"
 
@@ -42,36 +40,14 @@ import (
 //go:embed web
 var webFS embed.FS
 
-// "net"
-
 type ClientPrefs struct {
 	Bytes   int `json:"bytes"`
 	Refresh int `json:"refresh"`
 	Words   int `json:"words"`
 }
 
-// contextKey is a private type for context keys to avoid collisions.
-// type contextKey string
-// const connDRBGKey contextKey = "conn_drbg"
-
-type EntropyPool struct {
-	buf      []byte
-	size     int
-	readPos  int
-	writePos int
-	// mu       sync.Mutex
-	cond *sync.Cond
-}
-
 type EntropySource interface {
 	Read(p []byte) (int, error)
-}
-
-// Buffered QRNG struct.
-type QRNGBuffer struct {
-	buf       []byte
-	mu        sync.Mutex
-	fillDelay time.Duration
 }
 
 type EntropyFrame struct {
@@ -278,9 +254,9 @@ func extractPrefs(r *http.Request, maxBytes, maxWords int, hasCookie bool) (Clie
 	return prefs, nil
 }
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
+// Gorilla's default origin policy rejects cross-origin browser requests.
+// Non-browser clients with no Origin header remain supported.
+var upgrader = websocket.Upgrader{}
 
 func popcount(b byte) int {
 	b -= (b >> 1) & 0x55
@@ -309,126 +285,6 @@ func abs(x float64) float64 {
 	return x
 }
 
-/*
-func fetchEntropy(n int) ([]byte, error) {
-    b := make([]byte, n)
-
-    f, err := os.Open("/dev/qrandom0")
-    if err != nil { return nil, err }
-    defer f.Close()
-
-    total := 0
-    for total < n {
-    	//_, err := rand.Read(b) // replace with QRNG logic
-        m, err := f.Read(b[total:])
-        if err != nil { return nil, err }
-        total += m
-    }
-
-    return b, nil
-}
-*/
-
-/*
-var entropyPool []byte
-var mu sync.Mutex
-*/
-
-/*
-func fetchEntropy(n int) ([]byte, error) {
-    mu.Lock()
-    defer mu.Unlock()
-
-    // refill pool if too small
-    if len(entropyPool) < n {
-        f, err := os.Open("/dev/qrandom0")
-        if err != nil { return nil, err }
-        tmp := make([]byte, 4096)
-        for {
-            m, err := f.Read(tmp)
-            if err != nil {
-                f.Close()
-                return nil, err
-            }
-            entropyPool = append(entropyPool, tmp[:m]...)
-            if len(entropyPool) >= n { break }
-        }
-        f.Close()
-    }
-
-    out := entropyPool[:n]
-    entropyPool = entropyPool[n:]
-    return out, nil
-}
-*/
-
-func NewEntropyPool(size int) EntropyPool {
-	// p := EntropyPool
-	p := &EntropyPool{
-		buf:  make([]byte, size),
-		size: size,
-	}
-
-	// p.cond = sync.NewCond(&p.mu)
-
-	return *p
-	// return p
-}
-
-func (p *EntropyPool) Write(data []byte) {
-	// p.mu.Lock()
-	// defer p.mu.Unlock()
-	for _, b := range data {
-		next := (p.writePos + 1) % p.size
-
-		if next == p.readPos {
-			// buffer full
-			p.cond.Wait()
-
-			continue
-		}
-
-		p.buf[p.writePos] = b
-		p.writePos = next
-	}
-
-	p.cond.Broadcast()
-}
-
-func (p *EntropyPool) Read(n int) []byte {
-	out := make([]byte, n)
-
-	// p.mu.Lock()
-	// defer p.mu.Unlock()
-
-	for i := range n {
-		/*
-			for p.readPos == p.writePos {
-				p.cond.Wait()
-			}
-		*/
-		out[i] = p.buf[p.readPos]
-		p.readPos = (p.readPos + 1) % p.size
-	}
-
-	//	p.cond.Broadcast()
-
-	return out
-}
-
-/*
-func startEntropyProducer(pool EntropyPool, dev string, quantity int) {
-	go func() {
-		tmp := make([]byte, 4096)
-
-		for {
-			generateEntropy(tmp, dev, quantity)
-			pool.Write(tmp)
-		}
-	}()
-}
-*/
-
 func NewEntropySource(path string, require bool) (EntropySource, error) {
 	if path == "" {
 		if require {
@@ -452,240 +308,8 @@ func NewEntropySource(path string, require bool) (EntropySource, error) {
 	return f, nil
 }
 
-/*
-func initQRNGBuffer(dev string, l int) {
-	// size in MB
-	//qrngBuffer = NewQRNGBuffer(dev, l*1024*1024)
-	qrngBuffer = qrng.NewQRNGBuffer(dev, l)
-	// report in KB
-	log.Printf("initQRNG() set qrngBuffer to %v KB", l*1024*1024)
-	// Attach it to DRBG
-	//SetEntropyBuffer(qrngBuffer)
-}
-*/
-
-// NewQRNGBuffer creates a buffered QRNG reader
-/*
-func NewQRNGBuffer(dev string, capacity int) *QRNGBuffer {
-	q := &QRNGBuffer{
-		buf:       make([]byte, 0, capacity),
-		capacity:  capacity,
-		fillDelay: 10 * time.Millisecond,
-		devPath:   dev,
-		stop:      make(chan struct{}),
-	}
-
-	// Start background fill
-	go q.fillLoop()
-	// TODO: fix here
-	//metrics.AddBufferedBytes(uint64(q.capacity))
-	metrics.AddBufferedBytes(uint64(q.capacity))
-	//incBuffer()
-
-	return q
-}
-*/
-
-// Get returns n bytes from the buffer (blocking if necessary).
-func (q *QRNGBuffer) Get(n int) ([]byte, error) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	// Wait for buffer to fill if necessary
-	for len(q.buf) < n {
-		// q.mu.Unlock()
-		time.Sleep(q.fillDelay)
-		// q.mu.Lock()
-	}
-
-	out := q.buf[:n]
-	q.buf = q.buf[n:]
-	// TODO restore: incTestB(len(q.buf))
-	metrics.AddBufferedBytes(uint64(len(q.buf)))
-
-	return out, nil
-}
-
-/*
-func generateEntropy(buf []byte, dev string, quantity int) {
-	// _, err := io.ReadFull(drbgreal, buf)
-	// if err != nil {
-	//    log.Printf("entropy error: %v", err)
-	// }
-	data, err := fetchEntropy(len(buf), dev, quantity)
-	// data, err := fetchEntropy(len(buf),DefaultCSPRNG,quantity)
-	fmt.Println("entropy generate done")
-
-	if err != nil {
-		log.Printf("entropy error: %v", err)
-
-		return
-	}
-
-	copy(buf, data)
-}
-*/
-
-/*
-// fillLoop continuously fills the buffer from the QRNG device
-func (q *QRNGBuffer) fillLoop() {
-	for {
-		select {
-		case <-q.stop:
-			return
-		default:
-		}
-
-		q.mu.Lock()
-		free := q.capacity - len(q.buf)
-		q.mu.Unlock()
-
-		if free <= 0 {
-			time.Sleep(q.fillDelay)
-			continue
-		}
-
-		tmp := make([]byte, free)
-		f, err := os.Open(q.devPath)
-		if err != nil {
-			time.Sleep(10 * time.Millisecond) // retry
-			continue
-		}
-
-		total := 0
-		for total < free {
-			m, err := f.Read(tmp[total:])
-			if err != nil {
-				break
-			}
-			total += m
-			// TODO restore: incTestA(m)
-			metrics.AddBufferedBytes(uint64(m))
-		}
-		f.Close()
-
-		q.mu.Lock()
-		q.buf = append(q.buf, tmp[:total]...)
-		q.mu.Unlock()
-	}
-}
-*/
-
-/*
-// fetchEntropySimple reads n bytes from the buffered QRNG
-func fetchEntropySimple(n int, dev string, bufferlen int) ([]byte, error) {
-	log.Println("entropy fetch start")
-	if &qrngBuffer != nil {
-		// init QRNG
-		log.Println("entropy fetch inside 1")
-		qrng.InitQRNGBuffer(dev, bufferlen)
-		log.Println("entropy fetch inside 2")
-
-		// Attach it to DRBG
-		//drbg.SetEntropyBuffer(&qrngBuffer)
-		//SetEntropyBuffer(qrng.QRNGBuffer)
-	}
-
-	//metrics.AddBufferedBytes(uint64(q.capacity))
-	//atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
-	return qrng.Read(n)
-}
-*/
-
-// fetchEntropy reads n bytes from the buffered QRNG.
-/*
-func fetchEntropy(n int, dev string, bufferlen int) ([]byte, error) {
-	// log.Println("entropy fetch start")
-
-	// NOTE: previously this init was wrapped in `if &qrngBuffer != nil { ... }`.
-	// That guard was dead code: qrngBuffer is a package-level variable, so its
-	// address is never nil and the check was always true (staticcheck SA4022).
-	// The guard was removed; the init below runs unconditionally, exactly as it
-	// did before.
-	// init QRNG
-	qrng.InitQRNGBuffer(dev, bufferlen)
-
-	// TODO: fix here
-	// metrics.AddBufferedBytes(uint64(q.capacity))
-	// atomic.AddUint64(&rngBufferSize, uint64(len(qrngBuffer)))
-	return qrngBuffer.Get(n)
-}
-*/
-
-// func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, dev string, bufferlen int, reseedbuf int).
-/*
-func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, bufferlen int, reseedbuf []byte) {
-	// log.Printf("reseedLoop started for %q", d)
-	// log.Printf("reseedLoop started for %v", d)
-	// log.Println("reseed interval:", interval)
-	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
-	// ticker := time.NewTicker(time.Duration(interval))
-	defer ticker.Stop()
-	// fmt.Printf("%v\n", ticker)
-
-	// ctx, cancel := context.WithCancel(context.Background())
-	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	// defer cancel()
-
-//		select {
-//			case <-ctx.Done():
-//				log.Println("reseedLoop: context already canceled")
-//				go func() {
-//				    //sig := <-signalChan
-//				    //sig := <-ctx
-//				    //log.Println("shutting down:", sig)
-//				    cancel()
-//				}()
-//			default:
-//				//continue
-//		}
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("ctx done immediately")
-			// sig := <-ctx
-			// ctx.cancel()
-			return
-		case <-ticker.C:
-			// for range ticker.C {
-			// log.Printf("reseedLoop: started, bufferlen: %d, reseedbuf: %d", bufferlen, reseedbuf)
-
-//				entropy, eerr := fetchEntropy(bufferlen, dev, reseedbuf)
-//				//entropy, _ := fetchEntropy(reseedbuf, dev, bufferlen)
-//
-//				if eerr != nil {
-//					log.Println("entropy fetch failed:", eerr)
-//					//continue
-//				}
-
-			ticker.Stop()
-
-			buf := make([]byte, reseedbuf[bufferlen])
-
-			eerr := d.Reseed(buf)
-			if eerr != nil {
-				log.Println("reseed failed:", eerr)
-			}
-
-			metrics.AddReseeds(1)
-
-			ctx.Done()
-			// log.Println("reseedLoop: fetch done")
-			return
-			//}
-		default:
-			// ticker.Stop()
-			// defer ticker.Stop()
-			// return
-			continue
-		}
-		// log.Println("interval:", interval)
-	}
-}
-*/
-
-// func reseedLoop(ctx context.Context, d *drbg.DRBG, interval int, _ string, bufferlen int, reseedbuf []byte) {
+// Active reseed loop: reads from the configured entropy source and updates
+// the serving generator. Former QRNGBuffer and reseed prototypes were unused.
 func reseedLoop(ctx context.Context, source io.Reader, interval, size int, generators ...*drbg.DRBG) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
@@ -909,21 +533,13 @@ func randomHandler(d *drbg.DRBG, maxBytes int, budget *httpRequestBudget) http.H
 		}
 		defer release()
 
-		buf := make([]byte, n)
-		// d.Read(buf[:n])
-		// _, _ = d.Read(buf[n:])
-
-		if _, err := io.ReadFull(d, buf); err != nil {
-			http.Error(w, "entropy failure", http.StatusInternalServerError)
-
-			return
-		}
-
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("X-Entropy-Metric", "random-data")
 		w.Header().Set("X-Rng-Reseed-Age-Ms-Test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
-		_, _ = w.Write(buf)
+		if err := streamEntropyResponse(w, r, d, n); err != nil {
+			log.Printf("test entropy stream interrupted: %v", err)
+		}
 	}
 }
 
@@ -1139,13 +755,10 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 			}
 		*/
 
-		// Stream a bounded response without allocating a buffer proportional to size.
-		// Keep the per-request child DRBG and existing admission budget.
-		w.Header().Set("Content-Length", strconv.Itoa(size))
-
-		if _, err := io.CopyN(w, &child, int64(size)); err != nil {
-			// Headers/body may already have been sent: do not call http.Error here.
-			log.Printf("random bytes stream failed: %v", err)
+		// Stream from this request's private DRBG, checking cancellation each chunk.
+		if err := streamEntropyResponse(w, r, &child, size); err != nil {
+			// A response may already have started: never append an HTTP error body.
+			log.Printf("random bytes stream interrupted: %v", err)
 		}
 	}
 }
