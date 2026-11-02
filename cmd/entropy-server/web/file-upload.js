@@ -6,6 +6,10 @@
     const submit = document.getElementById("submit-upload");
     const cancel = document.getElementById("cancel-upload");
     const status = document.getElementById("upload-status");
+    function setStatus(state, message) {
+        status.dataset.state = state;
+        status.textContent = message;
+    }
     let controller = null;
 
     function canvas(id) {
@@ -117,13 +121,13 @@
         if (controller !== null) return;
         const file = input.files[0];
         if (!file || file.size < 1 || file.size > 32 * 1024 * 1024) {
-            status.textContent = "Choose a non-empty file of at most 32 MiB.";
+            setStatus("error", "Choose a non-empty file of at most 32 MiB");
             return;
         }
 
         controller = new AbortController();
         submit.disabled = true; input.disabled = true; cancel.disabled = false;
-        status.textContent = "Uploading and analyzing...";
+        setStatus("connecting", "Uploading and analyzing");
         document.getElementById("file-entropy").textContent = `${file.name} (${file.size} bytes)`;
         document.getElementById("entropy").textContent = "pending";
         document.getElementById("sample-info").textContent = "";
@@ -138,9 +142,9 @@
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             render(await response.json());
-            status.textContent = "Analysis complete";
+            setStatus("ready", "Analysis complete");
         } catch (error) {
-            status.textContent = error.name === "AbortError" ? "Upload canceled" : error.message;
+            setStatus(error.name === "AbortError" ? "disconnected" : "error", error.name === "AbortError" ? "Upload canceled" : error.message);
         } finally {
             controller = null;
             submit.disabled = false; input.disabled = false; cancel.disabled = true;

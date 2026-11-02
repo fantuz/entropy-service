@@ -65,13 +65,13 @@ self.onmessage = function(event) {
     try {
         socket = new WebSocket(event.data.url);
         socket.binaryType = "arraybuffer";
-        socket.onopen = () => self.postMessage({ type: "status", text: "Connected" });
+        socket.onopen = () => self.postMessage({ type: "status", state: "connected", text: "Connected" });
         socket.onerror = () => {
             failed = true;
-            self.postMessage({ type: "status", text: "Connection failed; check the request size and server availability." });
+            self.postMessage({ type: "status", state: "error", text: "Connection failed; check request size and server availability" });
         };
         socket.onclose = () => {
-            if (!failed) self.postMessage({ type: "status", text: "Disconnected" });
+            if (!failed) self.postMessage({ type: "status", state: "disconnected", text: "Disconnected" });
         };
         socket.onmessage = function(message) {
             try {
@@ -81,11 +81,11 @@ self.onmessage = function(event) {
                 publishLatest();
             } catch (error) {
                 failed = true;
-                self.postMessage({ type: "status", text: error.message });
+                self.postMessage({ type: "status", state: "error", text: error.message });
                 socket.close(1002, "invalid entropy response");
             }
         };
     } catch (error) {
-        self.postMessage({ type: "status", text: error.message });
+        self.postMessage({ type: "status", state: "error", text: error.message });
     }
 };

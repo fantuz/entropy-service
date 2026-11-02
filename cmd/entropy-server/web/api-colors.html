@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Entropy Stream Service - Random Colors</title>
 <style>
 body {
@@ -84,12 +85,13 @@ h3 {
     opacity: 0.6;
 }
 </style>
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body data-entropy-view="colors">
 
-    <p id="connection-status" role="status">Connecting...</p>
+    <p id="connection-status" role="status" aria-live="polite" data-state="connecting">CONNECTING</p>
     <p id="sample-info"></p>
-    <div id="hash" class="hash">please wait</div>
+    <div id="hash" class="hash">—</div>
 
 <script src="/entropy-display.js" defer></script>
 

@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Entropy Stream Service - Random Bytes</title>
 <style>
 body {
@@ -111,29 +112,25 @@ h3 {
     opacity: 0.6;
 }
 </style>
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body data-entropy-view="bytes">
 
-<!--
-    <div id="hex" class="fade">connecting...</div>
-    <div id="base64" class="base64"></div>
-    <div id="hash" class="hash">please wait</div>
--->
 
 <div class="panel">
-    <p id="connection-status" role="status">Connecting...</p>
+    <p id="connection-status" role="status" aria-live="polite" data-state="connecting">CONNECTING</p>
     <p id="sample-info"></p>
     <div class="section">
         <h3>Hex preview</h3>
-        <div class="hex" id="hex">connecting</div>
+        <div class="hex" id="hex">—</div>
     </div>
     <div class="section">
         <h3>Base64 preview</h3>
-        <div class="base64" id="base64">...</div>
+        <div class="base64" id="base64">—</div>
     </div>
     <div class="section">
         <h3>SHA256</h3>
-        <div class="hash" id="hash">...</div>
+        <div class="hash" id="hash">—</div>
     </div>
 </div>
 

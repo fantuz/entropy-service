@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Entropy Stream Service - Random Bytes Stream</title>
 <style>
 body {
@@ -98,29 +99,30 @@ h3 {
     border: 1px solid red;
 }
 </style>
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
 <div class="panel">
     <h3>Shannon Entropy Index: <span id="entropy">0</span></h3>
-    <div class="hex" id="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br>
+    <div class="hex">cumulative distribution of values obtained via Websockets JSON BLOB</br>
 	<canvas id="histogram" width="800" height="75"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">RGB mosaic</br></br>
+    <div class="hex">RGB mosaic</br></br>
 	<canvas id="mosaic" width="800" height="96"></canvas>
     </div>
     </br>
     <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
-    <div class="hex" id="hex">0/1 distribution (Yin/Yang)</br>
+    <div class="hex">0/1 distribution (Yin/Yang)</br>
 	<canvas id="pie" width="150" height="170"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">input waveform sample (oscilloscope view)</br></br>
+    <div class="hex">input waveform sample (oscilloscope view)</br></br>
 	<canvas id="wave" width="800" height="200"></canvas>
     </div>
     </br>
-    <div class="hex" id="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br>
+    <div class="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br>
 	<canvas id="fft" width="800" height="50"></canvas>
     </div>
     </br>

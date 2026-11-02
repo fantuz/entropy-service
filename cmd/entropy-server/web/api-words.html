@@ -127,58 +127,85 @@ h3 {
     .words span { display: block; }
 }
 </style>
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
 <div class="panel">
+    <p id="connection-status" role="status" aria-live="polite" data-state="connecting">CONNECTING</p>
     <div class="section">
         <h3>Words</h3>
-        <div id="words" class="words">connecting ...</div>
+        <div id="words" class="words">—</div>
     </div>
     <div class="section">
         <h3>SHA256</h3>
-        <div id="hash" class="data">please wait</div>
+        <div id="hash" class="data">—</div>
     </div>
 </div>
 
 <script>
+"use strict";
 const params = new URLSearchParams(location.search);
-const refresh = Number(params.get("refresh") ?? 500);
 const query = params.toString();
+const status = document.getElementById("connection-status");
+const words = document.getElementById("words");
+const hash = document.getElementById("hash");
 const ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://")
-    + location.host + "/words" + (query ? "?" + query : "")
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/words" + (query ? "?" + query : "")
 );
+let failed = false;
+let latest = null;
+let paintScheduled = false;
 
-ws.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    const words = document.getElementById("words");
-    const hash = document.getElementById("hash");
+function setStatus(state, message) {
+    status.dataset.state = state;
+    status.textContent = message;
+}
 
-    // derive color from first 3 bytes of hex
-    const r = parseInt(data.hash.slice(0,2),16);
-    const g = parseInt(data.hash.slice(2,4),16);
-    const b = parseInt(data.hash.slice(4,6),16);
+function paintLatest() {
+    paintScheduled = false;
+    if (latest === null) return;
+    const data = latest;
+    latest = null;
+    const phrase = document.createDocumentFragment();
+    data.words.split(" ").forEach((word, i) => {
+        if (i > 0) phrase.append(" ");
+        const item = document.createElement("span");
+        item.textContent = word;
+        phrase.append(item);
+    });
+    words.replaceChildren(phrase);
+    hash.textContent = data.hash;
+    const rgb = [0, 2, 4].map(offset => parseInt(data.hash.slice(offset, offset + 2), 16) / 2);
+    document.body.style.backgroundColor = `rgb(${rgb.join(",")})`;
+}
 
-    words.classList.add("out");
-    hash.classList.add("out");
-
-    setTimeout(() => {
-        const phrase = document.createDocumentFragment();
-        data.words.split(" ").forEach((word, i) => {
-            if (i > 0) phrase.append(" ");
-            const item = document.createElement("span");
-            item.textContent = word;
-            phrase.append(item);
-        });
-        words.replaceChildren(phrase);
-        hash.textContent = data.hash;
-        words.classList.remove("out");
-        hash.classList.remove("out");
-        document.body.style.backgroundColor =
-            `rgb(${r/2},${g/2},${b/2})`;
-    }, refresh/4);
-
+ws.onopen = () => setStatus("connected", "Connected");
+ws.onerror = () => {
+    failed = true;
+    setStatus("error", "Connection failed");
+};
+ws.onclose = () => {
+    if (!failed) setStatus("disconnected", "Disconnected");
+};
+ws.onmessage = event => {
+    try {
+        const data = JSON.parse(event.data);
+        if (typeof data.words !== "string" || typeof data.hash !== "string" ||
+            !/^[0-9a-f]{64}$/.test(data.hash)) {
+            throw new Error("Invalid words response");
+        }
+        latest = data;
+        if (!paintScheduled) {
+            paintScheduled = true;
+            requestAnimationFrame(paintLatest);
+        }
+    } catch (error) {
+        failed = true;
+        setStatus("error", error.message);
+        ws.close(1002, "invalid words response");
+    }
 };
 </script>
 

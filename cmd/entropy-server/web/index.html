@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Explore entropy-service: random-data APIs, browser demonstrations, and operational health checks.">
+  <title>Entropy Service — Explore APIs and demos</title>
+  <link rel="stylesheet" href="/theme.css">
+</head>
+<body class="page-home">
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">Self-hosted / Go / HTTP + WebSocket</div>
+      <h1>Entropy Service</h1>
+      <p class="lede">A self-hosted random-data laboratory and distribution service. Explore live demos, programmatic APIs and operational checks. Seed from supported hardware or the operating system; generate bulk output using a software DRBG.</p>
+      <div class="pills" aria-label="Capabilities">
+        <span class="pill">ChaCha20 or AES-256-CTR</span>
+        <span class="pill">Bounded HTTP samples</span>
+        <span class="pill">WebSocket streams</span>
+        <span class="pill">Health &amp; metrics</span>
+      </div>
+    </header>
+
+    <main>
+      <section aria-labelledby="explore-title">
+        <h2 id="explore-title">Explore in your browser</h2>
+        <p class="sub">These pages are interactive demonstrations. Choose one to start.</p>
+        <div class="grid">
+          <a class="card" href="/api-bytes.html"><strong>Random bytes</strong><span>Inspect byte samples, encodings and their digest.</span><small class="path">/api-bytes.html</small></a>
+          <a class="card" href="/api-colors.html"><strong>Colours</strong><span>Watch changing colours derived from sample hashes.</span><small class="path">/api-colors.html</small></a>
+          <a class="card" href="/api-words.html"><strong>Random words</strong><span>Explore dictionary word samples and their SHA-256 digest.</span><small class="path">/api-words.html</small></a>
+          <a class="card" href="/api-sound.html"><strong>Sound</strong><span>Generate and play short harmonically synthesised clips.</span><small class="path">/api-sound.html</small></a>
+          <a class="card" href="/api-upload.html"><strong>File analysis</strong><span>Upload a file to inspect its byte statistics and SHA-256 digest.</span><small class="path">/api-upload.html</small></a>
+          <a class="card" href="/v1/image/heatmap"><strong>Entropy heatmap</strong><span>View an image illustrating sample byte patterns.</span><small class="path">/v1/image/heatmap</small></a>
+          <a class="card" href="/v1/image/random"><strong>Random image</strong><span>View a generated RGB image.</span><small class="path">/v1/image/random</small></a>
+          <a class="card" href="/v1/qr/random"><strong>QR code</strong><span>Generate a QR image containing a hexadecimal sample.</span><small class="path">/v1/qr/random</small></a>
+        </div>
+      </section>
+
+      <section aria-labelledby="status-title">
+        <h2 id="status-title">Check the service</h2>
+        <p class="sub">Operational endpoints return JSON or Prometheus text, not interactive pages.</p>
+        <div class="grid">
+          <a class="card" href="/live"><strong>Liveness</strong><span>Check whether the HTTP service responds.</span><small class="path">/live</small></a>
+          <a class="card" href="/ready"><strong>Readiness</strong><span>Inspect seed freshness and reseed errors.</span><small class="path">/ready</small></a>
+          <a class="card" href="/metrics-2"><strong>Metrics</strong><span>Explore generation, reseeding and resource-budget counters.</span><small class="path">/metrics-2</small></a>
+        </div>
+      </section>
+
+      <section aria-labelledby="api-title">
+        <h2 id="api-title">Use the APIs</h2>
+        <p class="sub">Binary endpoints are best used with programs or <code>curl</code>; WebSockets need an Upgrade-capable client.</p>
+        <div class="panel">
+          <strong>Download 4,096 random bytes over HTTP</strong>
+          <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
+          <p>Replace <code>127.0.0.1:8080</code> with your server address and use HTTPS when configured.</p>
+          <strong>Keep a binary WebSocket stream open</strong>
+          <pre><code>ws://127.0.0.1:8080/stream?bytes=65536&amp;refresh=1000</code></pre>
+          <p>Other endpoints include <code>/v1/data/test</code>, <code>/v1/meta/random</code>, <code>/bytes</code>, <code>/colors</code>, <code>/words</code>, and <code>POST /files</code>. See the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference and examples</a>.</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="scope-title">
+        <h2 id="scope-title">Understanding the output</h2>
+        <div class="panel">
+          <p>The configured source supplies seed material. ChaCha20 or AES-256-CTR generates the bulk response bytes; these are <strong>not</strong> independent fresh samples directly from the hardware. Visual checks can illustrate statistical patterns, but do not certify unpredictability or cryptographic suitability.</p>
+          <p class="note">This homepage intentionally shows useful demonstrations and API routes, not the underlying HTML, JavaScript, worker and compatibility files. Those static assets remain available where required by the browser pages.</p>
+          <details><summary>Experimental stream-analysis page</summary><p>The legacy <a href="/api-stream.html">stream-analysis view</a> is still under repair. For binary streaming, use <code>/stream</code> with the CLI client instead.</p></details>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Entropy Service &mdash; <a href="https://github.com/fantuz/entropy-service">source code and documentation</a>. The landing page uses only the embedded theme stylesheet; no external fonts or scripts.
+    </footer>
+  </div>
+</body>
+</html>

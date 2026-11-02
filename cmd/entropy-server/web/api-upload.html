@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Entropy Service - File Analysis</title>
 <style>
 body {
@@ -108,6 +109,7 @@ h3 {
     border: 1px solid red;
 }
 </style>
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
@@ -116,7 +118,8 @@ h3 {
     <h3>File: <span id="file-entropy">NO FILE LOADED</span></h3>
     </br>
 
-<p id="upload-status" role="status">Files are sent to this server for analysis. Maximum upload: 32 MiB.</p>
+<p id="upload-status" role="status" aria-live="polite" data-state="ready">READY TO ANALYZE</p>
+<p>Files are sent to this server for analysis. Maximum upload: 32 MiB.</p>
 <p id="sample-info"></p>
 <p>SHA-256 (full upload): <span id="file-sha256"></span></p>
 <form class="uploadForm" id="uploadForm">

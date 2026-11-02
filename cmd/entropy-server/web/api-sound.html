@@ -14,6 +14,7 @@
     audio { display: block; width: 100%; margin: 1.5rem 0; }
     #status { min-height: 2rem; }
   </style>
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
   <h1>Harmonic Sounds</h1>
@@ -27,7 +28,8 @@
     </label>
     <button type="submit">Generate sound</button>
   </form>
-  <p id="status" role="status" aria-live="polite">Generate a sound, then press play.</p>
+  <p id="status" role="status" aria-live="polite" data-state="ready">READY TO GENERATE</p>
+  <p>Press play once a clip is ready. Download saves the same WAV file.</p>
   <audio id="player" controls preload="metadata"></audio>
   <a id="download" hidden>Download this WAV</a>
   <p>48 kHz · mono · 16-bit PCM. Sound parameters come from the service DRBG.
@@ -43,7 +45,8 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       button.disabled = true;
-      status.textContent = 'Generating…';
+      status.dataset.state = 'connecting';
+      status.textContent = 'Generating';
       try {
         const query = new URLSearchParams(new FormData(form));
         const response = await fetch('/sound?' + query, { cache: 'no-store' });
@@ -56,8 +59,10 @@
         download.href = objectURL;
         download.download = 'entropy-' + query.get('style') + '.wav';
         download.hidden = false;
-        status.textContent = 'Ready — press play. Download saves this exact sound.';
+        status.dataset.state = 'ready';
+        status.textContent = 'Ready — press play';
       } catch (error) {
+        status.dataset.state = 'error';
         status.textContent = error.message;
       } finally {
         button.disabled = false;

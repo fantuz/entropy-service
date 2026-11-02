@@ -19,18 +19,23 @@
     let worker = null;
     let animation = null;
 
+    function setStatus(state, message) {
+        status.dataset.state = state;
+        status.textContent = message;
+    }
+
     function start() {
-        status.textContent = "Connecting...";
+        setStatus("connecting", "Connecting");
         const active = new Worker(new URL("entropy-display-worker.js", scriptURL));
         worker = active;
         active.onerror = () => {
-            if (worker === active) status.textContent = "Display worker failed";
+            if (worker === active) setStatus("error", "Display worker failed");
         };
         active.onmessage = function(event) {
             if (worker !== active) return;
             const frame = event.data;
             if (frame.type === "status") {
-                status.textContent = frame.text;
+                setStatus(frame.state || "error", frame.text);
                 return;
             }
             if (frame.type !== "frame") return;
