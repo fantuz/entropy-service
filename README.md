@@ -399,6 +399,50 @@ The compact encoder allocated 32 B/op beyond the existing sample buffer in these
 go test ./cmd/entropy-server -run '^$' -bench '^BenchmarkByteFrameFormats$' -benchmem -benchtime=300ms -count=3
 ```
 
+### Author-reported HTTP benchmark: Ryzen 5 3500U
+
+Measured on an **AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx**, using local HTTP requests to `/v1/data/random`. The sample size is **512 KiB (524288 bytes)**, with **32 wrk threads**, **64 connections** and a **10-second requested duration**:
+
+```sh
+wrk -t32 -c64 -d10s --latency --timeout 3 'http://localhost:8080/v1/data/random?bytes=524288'
+```
+
+| Metric | Reported result |
+| --- | ---: |
+| Completed requests | 35,837 in 10.04 s |
+| Requests/s | 3,570.87 |
+| Transfer/s, original wrk label | `1.75GB` |
+| Total read, original wrk label | `17.52GB` |
+| Mean latency | 19.05 ms |
+| Median latency (p50) | 20.11 ms |
+| p75 latency | 26.60 ms |
+| p90 latency | 38.44 ms |
+| p99 latency | 58.19 ms |
+| Maximum latency | 173.02 ms |
+
+This is a short **loopback HTTP delivery** measurement, including work by both the server and local load generator; it does not measure physical network throughput or raw QRNG speed. No socket errors are listed in the supplied output. The tested revision, DRBG backend, seed source, Go version and `GOMAXPROCS` were not supplied with this result. Different hardware, payloads and load settings make it unsuitable for a direct before/after comparison with the older runs below.
+
+<details>
+<summary>Full supplied wrk output</summary>
+
+```text
+Running 10s test @ http://localhost:8080/v1/data/random?bytes=524288
+  32 threads and 64 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    19.05ms   14.24ms 173.02ms   58.50%
+    Req/Sec   112.04     28.93   232.00     67.03%
+  Latency Distribution
+     50%   20.11ms
+     75%   26.60ms
+     90%   38.44ms
+     99%   58.19ms
+  35837 requests in 10.04s, 17.52GB read
+Requests/sec:   3570.87
+Transfer/sec:      1.75GB
+```
+
+</details>
+
 ### Historical HTTP results
 
 The earlier README included short loopback `wrk` runs on an Intel Core i5-3470 at 3.20 GHz, using 16 load threads and 64 connections for about five seconds:
