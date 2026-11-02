@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"time"
@@ -37,7 +38,8 @@ func sampleEntropy(ctx context.Context, mode, httpURL, wsURL string, quantity in
 	defer func() {
 		cancel()
 
-		for range frames {
+		for frame := range frames {
+			frame.Release()
 		}
 	}()
 
@@ -49,6 +51,9 @@ func sampleEntropy(ctx context.Context, mode, httpURL, wsURL string, quantity in
 			return nil, io.EOF
 		}
 
-		return frame.Data, nil
+		data := bytes.Clone(frame.Data)
+		frame.Release()
+
+		return data, nil
 	}
 }

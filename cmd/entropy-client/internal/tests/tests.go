@@ -56,7 +56,7 @@ func PrintDiagnostics(result *diag.Diagnostics) {
 	fmt.Println("Entropy diagnostics")
 	fmt.Println("---------------------------")
 
-	fmt.Printf("payload size       : %d\n", result.N)
+	fmt.Printf("sample bytes       : %d\n", result.N)
 	// fmt.Printf("histogram rate     : %v\n", result.Rate)
 	fmt.Printf("shannon entropy    : %.5f / 8\n", result.Shannon)
 	fmt.Printf("chi-square         : %.3f (p=%.5f)\n", result.Chi2, result.Chi2P)

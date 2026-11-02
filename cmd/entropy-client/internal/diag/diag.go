@@ -31,6 +31,12 @@ var (
 // RunDiagnostics computes a small battery of tests on the provided bytes.
 // It is intentionally small and self-contained so it can be called from a worker or CLI.
 func RunDiagnostics(data []byte) Diagnostics {
+	return RunDiagnosticsWithMatrix(data, true)
+}
+
+// RunDiagnosticsWithMatrix omits the transition-matrix pass when not requested.
+// All other statistics and the pass rule are identical to RunDiagnostics.
+func RunDiagnosticsWithMatrix(data []byte, includeMatrix bool) Diagnostics {
 	n := len(data)
 	if n == 0 {
 		return Diagnostics{N: 0, Pass: false, Notes: "empty input"}
@@ -39,7 +45,11 @@ func RunDiagnostics(data []byte) Diagnostics {
 	hist := computeHistogram(data)
 	chi2 := chiSquare(hist, n)
 	chi2p := chi2PValue(chi2, 256-1)
-	tm := BuildTransitionMatrix(data)
+
+	var tm TransitionMatrix
+	if includeMatrix {
+		tm = BuildTransitionMatrix(data)
+	}
 
 	shannon := shannonEntropy(hist, n)
 	monop := monobitPvalue(data)

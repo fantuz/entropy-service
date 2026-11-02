@@ -8,77 +8,76 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/metrics"
 )
 
-// StreamFrame carries timing with the matching payload, even when frames queue.
-// ReceiveWait measures one complete ReadMessage call, including waiting for the
-// server to send. It is not a round-trip or one-way network latency measurement.
+// StreamFrame carries timing with its payload. ReceiveWait covers a complete
+// message read, including waiting for the server; it is not network latency.
+// Call Release after the last use of Data. Data must not be used after Release.
+// Callers that retain frames without releasing them still receive owned buffers,
+// but forfeit reuse. Copies share the same idempotent release operation.
 type StreamFrame struct {
-	Data        []byte
-	ReceiveWait time.Duration
+	Data         []byte
+	ReceiveWait  time.Duration
+	CycleRuntime time.Duration // HTTP request pacing plus fetch; zero for WS.
+	lease        *frameLease
 }
 
-func StreamEntropy(ctx context.Context, url string) (<-chan StreamFrame, error) {
-	// url = fmt.Sprintf("%s%sbytes=%d", url, sep, quantity)
-	// var wsurl = url + "?bytes=" + strconv.Itoa(quantity) + "&refresh=" + fps
-	// conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
-	conn, err := dialWebSocket(ctx, url)
+func (f StreamFrame) Release() {
+	if f.lease != nil {
+		f.lease.release()
+	}
+}
+
+func StreamEntropy(ctx context.Context, endpoint string) (<-chan StreamFrame, error) {
+	size, err := streamFrameSize(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	stop := context.AfterFunc(ctx, func() {
-		_ = conn.Close()
-	})
+	conn, err := dialWebSocket(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 
 	conn.SetReadLimit(maxEntropyBytes)
 	_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	// conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	conn.SetPongHandler(func(string) error {
 		_ = conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-		// panic("critical read deadline reached")
+
 		return nil
 	})
 
-	// One queued frame bounds backlog while preserving ordered delivery and
-	// backpressure. The reader and consumer can each also hold a live frame.
+	// One queued frame, one reader and one consumer. Only the consumer returns
+	// its buffer; the producer never overwrites a queued or retained payload.
 	out := make(chan StreamFrame, 1)
+	pool := make(chan []byte, 3)
 
 	go func() {
 		defer close(out)
 		defer conn.Close()
 		defer stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			// conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
-
-			readStarted := time.Now()
-			_, msg, err := conn.ReadMessage()
-			receiveWait := time.Since(readStarted)
+		for ctx.Err() == nil {
+			started := time.Now()
+			frame, err := readStreamFrame(conn, pool, size)
+			frame.ReceiveWait = time.Since(started)
 
 			if err != nil {
 				return
 			}
 
 			if diag.ClientRateMeter != nil {
-				diag.ClientRateMeter.Update(len(msg))
+				diag.ClientRateMeter.Update(len(frame.Data))
 			}
 
-			// diag.ClientRateMeter.Update(len(msg))
-			// instrumentation: increment counters on successful read
-			metrics.AddClientBytesReceived(uint64(len(msg)))
-			metrics.IncClientWSSMessages() // optional counter for messages received
+			metrics.AddClientBytesReceived(uint64(len(frame.Data)))
+			metrics.IncClientWSSMessages()
 
-			// push into channel (non-blocking if buffered)
-			// Wait for queue space or cancellation
 			select {
-			case out <- StreamFrame{Data: msg, ReceiveWait: receiveWait}:
+			case out <- frame:
 			case <-ctx.Done():
-				// panic("critical end of ws context reached")
+				frame.Release()
+
 				return
 			}
 		}

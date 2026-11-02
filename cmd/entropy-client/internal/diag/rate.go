@@ -60,7 +60,7 @@ func (r *RateMeter) Update(n int) {
 		return
 	}
 
-	r.rate = float64(r.bytes*8) / elapsed // bits/sec
+	r.rate = float64(r.bytes) * 8 / elapsed // bits/sec; convert before multiplying on 32-bit hosts.
 	r.bytes = 0
 	r.last = now
 }
@@ -77,4 +77,20 @@ func (r *RateMeter) Total() uint64 {
 	defer r.mu.Unlock()
 
 	return r.total
+}
+
+func (r *RateMeter) RateMiB() float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.rate / (8 * 1024 * 1024)
+}
+
+// Reset starts a new measurement window after startup diagnostics.
+func (r *RateMeter) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.rate, r.bytes, r.total = 0, 0, 0
+	r.last = time.Now()
 }
