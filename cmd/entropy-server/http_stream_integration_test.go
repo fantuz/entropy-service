@@ -12,16 +12,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 	"github.com/gorilla/websocket"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
 
 func TestStreamingRoutesAndBudgetRelease(t *testing.T) {
 	d := observableTestDRBG(t)
+
 	for _, endpoint := range []string{"/v1/data/random", "/v1/data/test"} {
 		for _, count := range []int{1, 32768, 32769, 2 << 20} {
 			t.Run(endpoint+"/"+strconv.Itoa(count), func(t *testing.T) {
 				budget := newHTTPRequestBudget(8, 64<<20)
+
 				var handler http.HandlerFunc
 				if strings.HasSuffix(endpoint, "/random") {
 					handler = randomBytesHandler(d, 1<<25, 20, false, budget)
@@ -29,7 +32,7 @@ func TestStreamingRoutesAndBudgetRelease(t *testing.T) {
 					handler = randomHandler(d, 1<<25, budget)
 				}
 				w := httptest.NewRecorder()
-				handler(w, httptest.NewRequest(http.MethodGet, endpoint+"?bytes="+strconv.Itoa(count), nil))
+				handler(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, endpoint+"?bytes="+strconv.Itoa(count), nil))
 				if w.Code != http.StatusOK || w.Body.Len() != count || w.Header().Get("Content-Length") != strconv.Itoa(count) {
 					t.Fatalf("status=%d len=%d headers=%v", w.Code, w.Body.Len(), w.Header())
 				}
@@ -49,6 +52,7 @@ func TestWebSocketOriginPolicyEndToEnd(t *testing.T) {
 		}
 	}))
 	defer server.Close()
+
 	endpoint := "ws" + strings.TrimPrefix(server.URL, "http")
 	for _, tc := range []struct {
 		name, origin string
@@ -66,12 +70,17 @@ func TestWebSocketOriginPolicyEndToEnd(t *testing.T) {
 			}
 			dialer := websocket.Dialer{HandshakeTimeout: 2 * time.Second}
 			conn, response, err := dialer.Dial(endpoint, hdr)
+			if response != nil && response.Body != nil {
+				defer response.Body.Close()
+			}
+
 			if conn != nil {
 				_ = conn.Close()
 			}
 			if tc.allowed && err != nil {
 				t.Fatalf("expected successful handshake; %v", err)
 			}
+
 			if !tc.allowed && (response == nil || response.StatusCode != http.StatusForbidden) {
 				t.Fatalf("expected 403; response=%v err=%v", response, err)
 			}
@@ -92,11 +101,11 @@ func BenchmarkHTTPGeneration(b *testing.B) {
 					} else {
 						handler = randomHandler(root, 1<<25, budget)
 					}
-					req := httptest.NewRequest(http.MethodGet, "/v1/data/"+endpoint+"?bytes="+strconv.Itoa(n), nil)
+					req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/v1/data/"+endpoint+"?bytes="+strconv.Itoa(n), nil)
 					b.SetBytes(int64(n))
 					b.ReportAllocs()
 					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
+					for range b.N {
 						w := &streamDiscardWriter{header: make(http.Header)}
 						handler(w, req)
 						if w.count != int64(n) {
@@ -111,6 +120,7 @@ func BenchmarkHTTPGeneration(b *testing.B) {
 
 func newBenchmarkDRBG(tb testing.TB, algo drbg.Algorithm) *drbg.DRBG {
 	tb.Helper()
+
 	seed := make([]byte, 64)
 	for i := range seed {
 		seed[i] = byte(i + 1)
@@ -119,7 +129,9 @@ func newBenchmarkDRBG(tb testing.TB, algo drbg.Algorithm) *drbg.DRBG {
 	if err != nil {
 		tb.Fatal(err)
 	}
+
 	tb.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
+
 	return &d
 }
 
@@ -145,13 +157,15 @@ func BenchmarkHTTPFullBufferBaseline(b *testing.B) {
 				b.SetBytes(int64(n))
 				b.ReportAllocs()
 				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
+				for range b.N {
 					child, err := drbg.NewConnectionDRBG(root)
 					if err != nil {
 						b.Fatal(err)
 					}
+
 					buf := make([]byte, n)
 					_, err = io.ReadFull(&child, buf)
+
 					drbg.DecreaseActiveInstances(1)
 					if err != nil {
 						b.Fatal(err)
@@ -170,7 +184,7 @@ func TestStreamingBudgetReleaseAfterWriteFailure(t *testing.T) {
 	budget := newHTTPRequestBudget(1, 1<<20)
 	h := randomBytesHandler(d, 1<<25, 20, false, budget)
 	w := &shortOutputWriter{header: make(http.Header)}
-	h(w, httptest.NewRequest(http.MethodGet, "/v1/data/random?bytes=65536", nil))
+	h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=65536", nil))
 	if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
 		t.Fatalf("write failure leaked request budget: %+v", usage)
 	}
@@ -180,6 +194,7 @@ func TestStreamingBudgetReleaseAfterCancellation(t *testing.T) {
 	d := observableTestDRBG(t)
 	budget := newHTTPRequestBudget(1, 1<<20)
 	h := randomBytesHandler(d, 1<<25, 20, false, budget)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	w := &cancelOutputWriter{header: make(http.Header), cancel: cancel}
@@ -196,10 +211,14 @@ func TestStreamingConcurrencyAndBudget(t *testing.T) {
 	d := observableTestDRBG(t)
 	budget := newHTTPRequestBudget(16, 64<<20)
 	h := randomBytesHandler(d, 1<<25, 20, false, budget)
+
 	const workers = 16
+
 	errs := make(chan error, workers)
+
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
+
+	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -210,8 +229,10 @@ func TestStreamingConcurrencyAndBudget(t *testing.T) {
 			}
 		}()
 	}
+
 	wg.Wait()
 	close(errs)
+
 	for err := range errs {
 		t.Error(err)
 	}

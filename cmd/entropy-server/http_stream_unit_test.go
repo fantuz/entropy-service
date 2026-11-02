@@ -54,6 +54,7 @@ func TestStreamEntropyResponseCancellation(t *testing.T) {
 	defer cancel()
 	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
 	w := &cancelOutputWriter{header: make(http.Header), cancel: cancel}
+
 	err := streamEntropyResponse(w, r, bytes.NewReader(make([]byte, 128<<10)), 128<<10)
 	if !errors.Is(err, context.Canceled) || w.calls != 1 {
 		t.Fatalf("err=%v calls=%d", err, w.calls)
@@ -64,6 +65,7 @@ func TestStreamEntropyResponsePreCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	w := httptest.NewRecorder()
+
 	err := streamEntropyResponse(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil), bytes.NewReader(make([]byte, 64)), 64)
 	if !errors.Is(err, context.Canceled) || w.Header().Get("Content-Length") != "" {
 		t.Fatalf("err=%v header=%v", err, w.Header())

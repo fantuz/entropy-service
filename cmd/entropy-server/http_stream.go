@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -12,14 +11,15 @@ import (
 // It cannot interrupt an individual blocked Read or a blocked socket Write;
 // normal HTTP write deadlines and transport cancellation are still required.
 type requestEntropyReader struct {
-	ctx    context.Context
+	check  func() error
 	source io.Reader
 }
 
 func (r requestEntropyReader) Read(p []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
+	if err := r.check(); err != nil {
 		return 0, err
 	}
+
 	return r.source.Read(p)
 }
 
@@ -30,10 +30,13 @@ func streamEntropyResponse(w http.ResponseWriter, r *http.Request, source io.Rea
 	if count <= 0 {
 		return errors.New("entropy response size must be positive")
 	}
+
 	if err := r.Context().Err(); err != nil {
 		return err
 	}
+
 	w.Header().Set("Content-Length", strconv.Itoa(count))
-	_, err := io.CopyN(w, requestEntropyReader{ctx: r.Context(), source: source}, int64(count))
+	_, err := io.CopyN(w, requestEntropyReader{check: r.Context().Err, source: source}, int64(count))
+
 	return err
 }

@@ -537,6 +537,7 @@ func randomHandler(d *drbg.DRBG, maxBytes int, budget *httpRequestBudget) http.H
 		w.Header().Set("X-Entropy-Metric", "random-data")
 		w.Header().Set("X-Rng-Reseed-Age-Ms-Test",
 			strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
+
 		if err := streamEntropyResponse(w, r, d, n); err != nil {
 			log.Printf("test entropy stream interrupted: %v", err)
 		}
