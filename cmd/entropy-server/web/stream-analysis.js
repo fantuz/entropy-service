@@ -147,7 +147,7 @@
         analyzedFrames++;
         analyzedBytes += data.analyzedBytes;
         scheduleStatistics();
-        document.getElementById("entropy").textContent = data.entropy.toFixed(5);
+        window.EntropyShannonAlert.update(data.entropy);
         info.textContent = `LATEST SAMPLE · ${data.totalBytes.toLocaleString()} BYTES DELIVERED · ${data.analyzedBytes.toLocaleString()}-BYTE PREFIX ANALYSED`;
         histogramPlot(data.histogram);
         mosaicPlot(data.mosaic);

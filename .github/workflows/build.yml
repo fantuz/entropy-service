@@ -39,6 +39,8 @@ jobs:
         run: node scripts/test-status-kpis.mjs
       - name: Test status refresh scheduling
         run: node scripts/test-status-refresh.mjs
+      - name: Test stream Shannon entropy alerts
+        run: node scripts/test-stream-entropy-alert.mjs
       - name: Race-test entropy server
         run: go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
       - name: Run linters

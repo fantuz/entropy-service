@@ -375,3 +375,66 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
   font-size: .77rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* Stream-analysis entropy alert only: never recolour sibling plots or page. */
+.page-analysis .entropy-alert-card {
+  --entropy-card-border: var(--border);
+  min-height: 12rem;
+  border-color: var(--entropy-card-border);
+  transition: background-color .18s ease-in-out, border-color .18s ease-in-out;
+}
+.page-analysis .entropy-alert-card .entropy-reading {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: .65rem;
+  margin: .85rem auto;
+  color: var(--text);
+  flex-wrap: wrap;
+}
+.page-analysis .entropy-alert-card #entropy {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.page-analysis .entropy-threshold-control {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  font-size: .83rem;
+  color: var(--green-bright);
+  text-transform: uppercase;
+}
+.page-analysis .entropy-threshold-control input {
+  width: 9.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.page-analysis .entropy-alert-message {
+  min-height: 1.5rem;
+  font-size: .83rem;
+  color: var(--green-bright);
+}
+.page-analysis .entropy-alert-hint {
+  max-width: 66ch;
+  font-size: .75rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.page-analysis .entropy-alert-card[data-state="alert"] {
+  background: #68181c;
+  border-color: #ef6568;
+  box-shadow: inset 0 0 0 1px rgba(255, 126, 126, .18);
+}
+.page-analysis .entropy-alert-card[data-state="alert"] #entropy,
+.page-analysis .entropy-alert-card[data-state="alert"] .analysis-label,
+.page-analysis .entropy-alert-card[data-state="alert"] .entropy-alert-message {
+  color: #fff1f1;
+}
+.page-analysis .entropy-alert-card[data-state="alert"] .entropy-threshold-control,
+.page-analysis .entropy-alert-card[data-state="alert"] .entropy-alert-hint,
+.page-analysis .entropy-alert-card[data-state="alert"] .entropy-reading {
+  color: #ffe0e0;
+}
