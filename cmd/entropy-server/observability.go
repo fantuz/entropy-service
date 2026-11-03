@@ -93,6 +93,7 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget,
 		}
 
 		generated, payloads := metrics.BytesGenerated(), metrics.NumWSPayloads()
+
 		var activity activityPeakValues
 		if len(monitor) != 0 {
 			activity = monitor[0].snapshot()
