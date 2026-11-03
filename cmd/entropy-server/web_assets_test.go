@@ -207,6 +207,7 @@ func TestStatusCapacityDashboard(t *testing.T) {
 		"/status-kpis.js", "kpi-httpMemory-meter", "kpi-wsMemory-meter",
 		"kpi-httpSlots-meter", "kpi-wsSlots-meter", "kpi-generation-rate",
 		"kpi-ws-reject-rate", "kpi-http-reject-rate",
+		"status-interval", "kpi-reseed-headroom", "kpi-reseed-rate", "kpi-reseed-failure-rate",
 	} {
 		if !strings.Contains(string(page), item) {
 			t.Errorf("status page missing %q", item)
@@ -222,6 +223,7 @@ func TestStatusCapacityDashboard(t *testing.T) {
 		"http_generation_memory_reserved_bytes", "ws_memory_reserved_bytes",
 		"ws_rejected_connections_total", "http_generation_rejected_requests_total",
 		"rng_bytes_generated_total", "drbg_instance_count",
+		"rng_reseeds_total", "rng_reseed_failures_total",
 	} {
 		if !strings.Contains(string(script), name) {
 			t.Errorf("KPI controller missing metric %q", name)
