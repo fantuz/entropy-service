@@ -1434,6 +1434,7 @@ func main() {
 	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
 	httpBudget := newHTTPRequestBudget(cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB*(1<<20))
 	activityMonitor := startActivityPeakMonitor(ctx, wsBudget, httpBudget)
+
 	log.Printf("HTTP generation limits: %d requests, %d MiB estimated working memory", cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB)
 
 	// create the multiplexed listener proto
