@@ -80,6 +80,15 @@ readiness age limit; errors or readiness degradation mark it critical.
   Go heap, or physical entropy-buffer fill.
 - **HTTP/WS slot utilization** is active admitted requests or connections divided
   by the configured limit. Short HTTP requests can finish between scrapes.
+- **Dim peak shadows** show server-side high-water marks for those same four
+  gauges. New metrics (`http_generation_requests_peak`,
+  `http_generation_memory_peak_reserved_bytes`, `ws_connections_peak`
+  and `ws_memory_peak_reserved_bytes`) update on each successful admission
+  under the existing budget lock, so brief peaks remain visible even if
+  no dashboard was open at the time. The darker bar spans up to the peak;
+  the bright bar still displays current utilization.
+  The peaks reset when the server process restarts, not when a browser
+  refreshes, and do not represent measured process RAM.
 - **DRBG generation MiB/s**, **WebSocket frames/s** and **HTTP requests/s** are
   deltas between successful scrapes, not measurements of QRNG source throughput.
   HTTP requests include static assets and the dashboard's own polling.

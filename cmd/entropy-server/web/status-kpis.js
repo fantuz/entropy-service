@@ -4,10 +4,10 @@
 // pressure is not RAM usage or QRNG entropy-buffer fill.
 (function initKPIs() {
     const metricNames = {
-        httpMemory: ["http_generation_memory_reserved_bytes", "http_generation_memory_budget_bytes"],
-        wsMemory: ["ws_memory_reserved_bytes", "ws_memory_budget_bytes"],
-        httpSlots: ["http_generation_requests_active", "http_generation_requests_limit"],
-        wsSlots: ["ws_connections_active", "ws_connections_limit"],
+        httpMemory: ["http_generation_memory_reserved_bytes", "http_generation_memory_budget_bytes", "http_generation_memory_peak_reserved_bytes"],
+        wsMemory: ["ws_memory_reserved_bytes", "ws_memory_budget_bytes", "ws_memory_peak_reserved_bytes"],
+        httpSlots: ["http_generation_requests_active", "http_generation_requests_limit", "http_generation_requests_peak"],
+        wsSlots: ["ws_connections_active", "ws_connections_limit", "ws_connections_peak"],
     };
     const httpRejectNames = [
         "http_generation_rejected_requests_total",
@@ -75,15 +75,18 @@
         return `${Math.round(value)} B`;
     }
 
-    function gauge(name, used, capacity, isMemory) {
+    function gauge(name, used, capacity, peak, isMemory) {
         const card = document.getElementById(`kpi-${name}`);
         const meter = document.getElementById(`kpi-${name}-meter`);
+        const shadow = document.getElementById(`kpi-${name}-peak-shadow`);
         if (used === null || capacity === null || capacity <= 0) {
             card.dataset.state = "unknown";
             text(`kpi-${name}-value`, "N/A");
             text(`kpi-${name}-detail`, "No valid budget/limit reported");
             meter.value = 0;
             meter.setAttribute("aria-valuetext", "Not available");
+            shadow.style.width = "0%";
+            text(`kpi-${name}-peak-detail`, "PEAK N/A");
             return;
         }
         const percent = used / capacity * 100;
@@ -93,6 +96,17 @@
         text(`kpi-${name}-detail`, `${isMemory ? bytes(used) : count(used)} / ${isMemory ? bytes(capacity) : count(capacity)}`);
         meter.value = Math.min(100, Math.max(0, percent));
         meter.setAttribute("aria-valuetext", displayed);
+        // Exact process-lifetime high-water marks come from the server,
+        // not a per-browser sampled maximum. Missing metrics are explicit.
+        if (peak === null || peak < used) {
+            shadow.style.width = "0%";
+            text(`kpi-${name}-peak-detail`, "PEAK N/A");
+        } else {
+            const peakPercent = Math.max(0, Math.min(100, peak / capacity * 100));
+            shadow.style.width = `${peakPercent}%`;
+            const formattedPeak = isMemory ? bytes(peak) : count(peak);
+            text(`kpi-${name}-peak-detail`, `PEAK ${peakPercent.toFixed(1)}% · ${formattedPeak}`);
+        }
     }
 
     function perSecond(metrics, prior, name, elapsedSeconds) {
@@ -136,8 +150,8 @@
         const elapsed = baseline ? (now - baseline.at) / 1000 : 0;
         const prior = baseline ? baseline.metrics : null;
 
-        for (const [name, [used, capacity]] of Object.entries(metricNames)) {
-            gauge(name, get(metrics, used), get(metrics, capacity), name.includes("Memory"));
+        for (const [name, [used, capacity, peak]] of Object.entries(metricNames)) {
+            gauge(name, get(metrics, used), get(metrics, capacity), get(metrics, peak), name.includes("Memory"));
         }
 
         const generationPerSecond = perSecond(metrics, prior, "rng_bytes_generated_total", elapsed);
@@ -173,7 +187,7 @@
 
     function unavailable() {
         history.length = 0;
-        for (const name of gaugeNames) gauge(name, null, null, name.includes("Memory"));
+        for (const name of gaugeNames) gauge(name, null, null, null, name.includes("Memory"));
         for (const name of rateNames) text(`kpi-${name}`, "—");
         for (const name of extraNames) text(`kpi-${name}`, "—");
     }

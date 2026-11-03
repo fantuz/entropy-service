@@ -11,14 +11,14 @@ const httpRequestMemory int64 = 64 << 10
 // scratch, GC, TLS and kernel buffers can retain additional memory.
 type httpRequestBudget struct {
 	mu                                             sync.Mutex
-	maxRequests, active                            int
-	maxMemory, reserved, wordMemory                int64
+	maxRequests, active, peakActive                int
+	maxMemory, reserved, peakReserved, wordMemory  int64
 	rejectedRequests, rejectedMemory, rejectedSize uint64
 }
 
 type httpBudgetUsage struct {
-	Active, MaxRequests                            int
-	Reserved, MaxMemory                            int64
+	Active, MaxRequests, PeakActive                int
+	Reserved, MaxMemory, PeakReserved              int64
 	RejectedRequests, RejectedMemory, RejectedSize uint64
 }
 
@@ -87,6 +87,8 @@ func (b *httpRequestBudget) tryReserve(needed int64) (func(), int, string) {
 
 	b.active++
 	b.reserved += needed
+	b.peakActive = max(b.peakActive, b.active)
+	b.peakReserved = max(b.peakReserved, b.reserved)
 
 	var once sync.Once
 
@@ -119,8 +121,8 @@ func (b *httpRequestBudget) usage() httpBudgetUsage {
 	defer b.mu.Unlock()
 
 	return httpBudgetUsage{
-		Active: b.active, MaxRequests: b.maxRequests,
-		Reserved: b.reserved, MaxMemory: b.maxMemory,
+		Active: b.active, MaxRequests: b.maxRequests, PeakActive: b.peakActive,
+		Reserved: b.reserved, MaxMemory: b.maxMemory, PeakReserved: b.peakReserved,
 		RejectedRequests: b.rejectedRequests, RejectedMemory: b.rejectedMemory,
 		RejectedSize: b.rejectedSize,
 	}
