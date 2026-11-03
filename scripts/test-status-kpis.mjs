@@ -8,7 +8,7 @@ const document = {
     getElementById(id) {
         if (!elements.has(id)) {
             elements.set(id, {
-                dataset: {}, textContent: "", value: 0, attributes: {},
+                dataset: {}, textContent: "", value: 0, attributes: {}, style: {},
                 setAttribute(key, value) { this.attributes[key] = value; },
             });
         }
@@ -35,17 +35,26 @@ const first = [
     "http_generation_rejected_size_total 6",
     "http_generation_memory_reserved_bytes 268435456",
     "http_generation_memory_budget_bytes 536870912",
+    "http_generation_memory_peak_reserved_bytes 402653184",
     "ws_memory_reserved_bytes 805306368",
     "ws_memory_budget_bytes 1073741824",
+    "ws_memory_peak_reserved_bytes 939524096",
     "ws_connections_active 126",
     "ws_connections_limit 128",
+    "ws_connections_peak 127",
     "http_generation_requests_active 25",
     "http_generation_requests_limit 100",
+    "http_generation_requests_peak 75",
     "drbg_instance_count 3",
     "rng_reseeds_total 77",
 ].join("\n");
 update(first);
 assert.equal(value("kpi-httpMemory-value"), "50.0%");
+assert.equal(value("kpi-httpMemory-peak-detail"), "PEAK 75.0% · 384.0 MiB");
+assert.equal(document.getElementById("kpi-httpMemory-peak-shadow").style.width, "75%");
+assert.equal(value("kpi-wsMemory-peak-detail"), "PEAK 87.5% · 896.0 MiB");
+assert.equal(value("kpi-httpSlots-peak-detail"), "PEAK 75.0% · 75");
+assert.equal(value("kpi-wsSlots-peak-detail"), "PEAK 99.2% · 127");
 assert.equal(value("kpi-wsMemory-value"), "75.0%");
 assert.equal(state("kpi-wsMemory"), "warning");
 assert.equal(state("kpi-wsSlots"), "critical");
@@ -70,6 +79,8 @@ assert.equal(value("kpi-http-reject-rate"), "24.0 rejects/min");
 unavailable();
 assert.equal(value("kpi-generation-rate"), "—");
 assert.equal(value("kpi-httpMemory-value"), "N/A");
+assert.equal(value("kpi-httpMemory-peak-detail"), "PEAK N/A");
+assert.equal(document.getElementById("kpi-httpMemory-peak-shadow").style.width, "0%");
 assert.equal(state("kpi-httpMemory"), "unknown");
 time += 5000;
 update(second);
@@ -111,5 +122,13 @@ assert.equal(value("kpi-reseed-failure-rate"), "120.0 failures/min");
 time += 250;
 update(reseedBase.replace("rng_reseeds_total 77", "rng_reseeds_total 1"));
 assert.equal(value("kpi-reseed-rate"), "SAMPLING…");
+
+// A gauge must never infer a historical maximum from the local browser.
+unavailable();
+time += 250;
+update(first.replace("http_generation_memory_peak_reserved_bytes 402653184",
+    "http_generation_memory_peak_reserved_bytes 100"));
+assert.equal(value("kpi-httpMemory-peak-detail"), "PEAK N/A");
+assert.equal(document.getElementById("kpi-httpMemory-peak-shadow").style.width, "0%");
 
 console.log("Status KPI calculations: passed");
