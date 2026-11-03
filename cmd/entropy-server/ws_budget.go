@@ -21,15 +21,17 @@ type webSocketBudget struct {
 	maxMemory           int64
 	wordMemory          int64
 	active              int
+	peakActive          int
 	reserved            int64
+	peakReserved        int64
 	rejectedConnections uint64
 	rejectedMemory      uint64
 	rejectedSize        uint64
 }
 
 type webSocketUsage struct {
-	Active, MaxConnections                            int
-	Reserved, MaxMemory                               int64
+	Active, MaxConnections, PeakActive                int
+	Reserved, MaxMemory, PeakReserved                 int64
 	RejectedConnections, RejectedMemory, RejectedSize uint64
 }
 
@@ -89,6 +91,8 @@ func (b *webSocketBudget) admit(w http.ResponseWriter, r *http.Request, needed i
 	default:
 		b.active++
 		b.reserved += needed
+		b.peakActive = max(b.peakActive, b.active)
+		b.peakReserved = max(b.peakReserved, b.reserved)
 	}
 
 	b.mu.Unlock()
@@ -120,8 +124,8 @@ func (b *webSocketBudget) usage() webSocketUsage {
 	defer b.mu.Unlock()
 
 	return webSocketUsage{
-		Active: b.active, MaxConnections: b.maxConnections,
-		Reserved: b.reserved, MaxMemory: b.maxMemory,
+		Active: b.active, MaxConnections: b.maxConnections, PeakActive: b.peakActive,
+		Reserved: b.reserved, MaxMemory: b.maxMemory, PeakReserved: b.peakReserved,
 		RejectedConnections: b.rejectedConnections,
 		RejectedMemory:      b.rejectedMemory, RejectedSize: b.rejectedSize,
 	}
