@@ -1433,6 +1433,7 @@ func main() {
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
 	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
 	httpBudget := newHTTPRequestBudget(cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB*(1<<20))
+	activityMonitor := startActivityPeakMonitor(ctx, wsBudget, httpBudget)
 	log.Printf("HTTP generation limits: %d requests, %d MiB estimated working memory", cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB)
 
 	// create the multiplexed listener proto
@@ -1452,8 +1453,8 @@ func main() {
 	mux.HandleFunc("/health-1", healthHandler(&root, maxReseedAge))
 	mux.HandleFunc("/health-2", healthHandler(&root, maxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget))
-	mux.Handle("/metrics-2", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget))
+	mux.Handle("/metrics-1", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor))
+	mux.Handle("/metrics-2", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor))
 
 	mux.HandleFunc("/stream", wsBinaryHandler(&root, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/colors", wsBytesHandler(&root, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
