@@ -1,140 +1,31 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entropy Stream Service - Random Bytes</title>
-<style>
-body {
-    #margin: 5%;
-    position:relative;
-    margin: auto;
-    font-family: "JetBrains Mono", monospace;
-    #letter-spacing: 0.04em;
-    #font-family: monospace;
-    #display: flex;
-    #justify-content: center;
-    text-align: center;
-    align-items: center;
-    #height: 100vh;
-    background: black;
-    color: #00ff88;
-    padding-top: 5%;
-    padding-bottom: 5%;
-    #word-wrap: break-word;
-    overflow: auto;
-    max-width: 100%;
-    transition: background 0.5s ease-in-out;
-}
-
-.section {
-    margin-bottom: 25px;
-}
-
-.panel {
-    box-sizing: border-box;
-    position:relative;
-    margin: auto;
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(12px);
-    padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    max-width: 90%;
-    word-wrap: break-word;
-}
-
-.data {
-    color: #00ffcc;
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-
-.hex {
-    opacity: 1;
-    font-size: 1em;
-    transition: opacity 0.3s ease-in-out;
-    box-shadow: 0 0 30px rgba(0,0,0,0.6);
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(12px);
-    padding: 40px;
-    border-radius: 16px;
-}
-
-.hex.out {
-    opacity: 0;
-}
-
-.base64 {
-    opacity: 1;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    font-size: 1em;
-    color: #444;
-    transition: opacity 0.5s ease-in-out;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    background: rgba(0, 0, 0, 0.65);
-    padding: 40px;
-    border-radius: 16px;
-    word-break: break-all;
-}
-
-.base64.out {
-    opacity: 0;
-}
-
-.hash {
-    opacity: 1;
-    font-family: "IBM Plex Mono", monospace;
-    text-shadow: 0 0 8px rgba(0,255,200,0.4);
-    #letter-spacing: 0.04em;
-    opacity: 1;
-    font-family: monospace;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    font-size: 1.4em;
-    color: #444;
-    #box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    background: rgba(255, 255, 255, 0.65);
-    #padding: 5%;
-    padding: 40px;
-    border-radius: 16px;
-}
-
-.hash.out {
-    opacity: 0;
-}
-
-h3 {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
-    opacity: 0.6;
-}
-</style>
-<link rel="stylesheet" href="/theme.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Entropy Service — Random Bytes</title>
+  <link rel="stylesheet" href="/theme.css">
 </head>
-<body data-entropy-view="bytes">
-
-
-<div class="panel">
-    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
-    <p id="sample-info"></p>
-    <div class="section">
-        <h3>Hex preview</h3>
-        <div class="hex" id="hex">—</div>
-    </div>
-    <div class="section">
-        <h3>Base64 preview</h3>
-        <div class="base64" id="base64">—</div>
-    </div>
-    <div class="section">
-        <h3>SHA256</h3>
-        <div class="hash" id="hash">—</div>
-    </div>
-</div>
-
-<script src="/entropy-display.js" defer></script>
-
+<body class="page-bytes" data-entropy-view="bytes">
+  <main class="panel">
+    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite"
+       data-state="waiting">AWAITING FIRST SAMPLE</p>
+    <p id="sample-info" class="analysis-meta"></p>
+    <section class="section" aria-labelledby="bytes-hex-title">
+      <h3 id="bytes-hex-title">Hex preview</h3>
+      <div class="hex" id="hex">—</div>
+    </section>
+    <section class="section" aria-labelledby="bytes-base64-title">
+      <h3 id="bytes-base64-title">Base64 preview</h3>
+      <div class="base64" id="base64">—</div>
+    </section>
+    <section class="section" aria-labelledby="bytes-sha-title">
+      <h3 id="bytes-sha-title">SHA-256</h3>
+      <div class="hash" id="hash">—</div>
+    </section>
+    <p><a href="/">← Back to all endpoints</a></p>
+  </main>
+  <script src="/entropy-display.js" defer></script>
 </body>
 </html>
