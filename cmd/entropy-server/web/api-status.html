@@ -67,7 +67,7 @@
       </section>
       <section aria-labelledby="activity-title" class="status-kpis">
         <h2 id="activity-title">Activity &amp; exhaustion signals</h2>
-        <p class="sub">Rates use consecutive successful Prometheus scrapes, approximately five seconds apart. First samples and counter resets require a new measurement interval.</p>
+        <p class="sub">Rates use recent Prometheus counter snapshots (up to five seconds of history). Short polling intervals may show sampling noise; counter resets restart rate calculation.</p>
         <div class="status-activity-grid">
           <article class="status-activity-card">
             <h3>DRBG generation rate</h3>
@@ -114,6 +114,21 @@
             <output id="kpi-http-rejections">—</output>
             <p>Cumulative: slots, memory and oversized requests</p>
           </article>
+          <article class="status-activity-card" id="kpi-reseed-headroom-card">
+            <h3>Seed freshness headroom</h3>
+            <output id="kpi-reseed-headroom">—</output>
+            <p>Time remaining before the configured readiness age limit</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>Successful reseed pace</h3>
+            <output id="kpi-reseed-rate">—</output>
+            <p>Successful root reseeds per minute (rolling sample window)</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>Failed reseed pace</h3>
+            <output id="kpi-reseed-failure-rate">—</output>
+            <p>Failed or skipped root reseeds per minute (rolling sample window)</p>
+          </article>
         </div>
         <p class="status-kpi-note">Rejection pace is an interval estimate, not a percentage of all requests. Counters restart with the server. None of these figures represents physical entropy-buffer fullness or measured RAM pressure.</p>
       </section>
@@ -126,8 +141,14 @@
         <div><dt>DRBG bytes generated*</dt><dd id="bytes-generated">—</dd></div>
         <div><dt>Active WebSockets</dt><dd id="active-websockets">—</dd></div>
       </dl>
-      <p class="note">*Generated-byte count includes internal DRBG seed derivation; it is not a network-throughput counter. The page updates approximately every five seconds. A liveness response does not imply that reseeding is healthy.</p>
-      <p class="status-links"><button type="button" id="status-refresh">Refresh now</button> <span id="status-updated" class="analysis-meta" aria-live="off">Not checked yet</span></p>
+      <p class="note">*Generated-byte count includes internal DRBG seed derivation; it is not a network-throughput counter. Choose an interval from 0.25 to 60 seconds; the next check starts after the previous check finishes. A liveness response does not imply that reseeding is healthy.</p>
+      <div class="status-links status-refresh-controls">
+        <label for="status-interval">Auto-refresh (seconds)</label>
+        <input type="number" id="status-interval" min="0.25" max="60" step="any" value="5" inputmode="decimal" aria-describedby="status-refresh-help">
+        <button type="button" id="status-refresh">Refresh now</button>
+        <span id="status-updated" class="analysis-meta" aria-live="off">Not checked yet</span>
+        <p id="status-refresh-help" class="status-kpi-note">Minimum 0.25 s; maximum 60 s. No overlapping checks. The next refresh is scheduled after the current check completes.</p>
+      </div>
       <details class="panel">
         <summary>Compatible legacy endpoints</summary>
         <p>The aliases below remain registered for existing clients. They do not represent separate DRBG instances or independent health checks. Scrape only one metrics endpoint.</p>
