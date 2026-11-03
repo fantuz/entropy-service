@@ -1,157 +1,79 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entropy Service - File Analysis</title>
-<style>
-body {
-    position:relative;
-    margin: auto;
-    font-family: "JetBrains Mono", monospace;
-    text-align: center;
-    align-items: center;
-    background: grey;
-    color: #00ff88;
-    word-wrap: break-word;
-    overflow: auto;
-    max-width: 100%;
-    background-color: ivory;
-}
-
-#uploadForm {
-    opacity: 1;
-    visibility: visible;
-    margin: auto;
-    border: 1px solid red;
-}
-
-#uploadForm.out {
-    visibility: hidden;
-    opacity: 0;
-    border: 1px solid red;
-}
-
-.uploadForm {
-    opacity: 1;
-    visibility: visible;
-    margin: auto;
-    border: 1px solid red;
-}
-
-.uploadForm.out {
-    opacity: 0;
-    visibility: hidden;
-    border: 1px solid red;
-}
-
-#yinyang {
-    border: 1px solid red;
-}
-
-#entropy {
-    position:relative;
-}
-
-.section {
-    display: block;
-    margin-bottom: 15px;
-}
-
-.panel {
-    position:relative;
-    margin: auto;
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(12px);
-    padding: 20px;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    border-radius: 16px;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    max-width: 95%;
-    word-wrap: break-word;
-    display: block;
-    float: none;
-    text-align: center;
-    align-items: center;
-    justify-content: center;
-}
-
-.data {
-    color: #00ffcc;
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-
-.hex {
-    opacity: 1;
-    font-size: 1em;
-    backdrop-filter: blur(12px);
-    padding: 10px;
-    color: #444;
-    transition: opacity 0.2s ease-in-out;
-    border-radius: 16px;
-    font-family: "IBM Plex Mono", monospace;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    text-shadow: 0 0 8px rgba(0,255,200,0.4);
-    background: rgba(255, 255, 255, 0.85);
-}
-
-.hex.out {
-    opacity: 0;
-}
-
-h3 {
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
-    opacity: 0.6;
-    border: 1px solid red;
-}
-</style>
-<link rel="stylesheet" href="/theme.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Entropy Service — File Analysis</title>
+  <link rel="stylesheet" href="/theme.css">
 </head>
-<body>
+<body class="page-analysis page-upload">
+  <main class="panel analysis-panel">
+    <h1>File Analysis</h1>
+    <p>Upload a local file for server-side statistical analysis (maximum 32 MiB). The
+       results describe the uploaded bytes; visual plots sample a bounded prefix.</p>
 
-<div class="panel">
-    <h3>Shannon Entropy Index: <span id="entropy">NO FILE LOADED</span></h3>
-    <h3>File: <span id="file-entropy">NO FILE LOADED</span></h3>
-    </br>
+    <section class="analysis-card upload-input-card" aria-labelledby="upload-title">
+      <h2 id="upload-title" class="analysis-label">Select &amp; analyze a file</h2>
+      <form class="uploadForm" id="uploadForm">
+        <label for="fileInput">File to analyze</label>
+        <input type="file" id="fileInput" name="file" accept="*/*">
+        <div class="upload-buttons">
+          <button id="submit-upload" type="submit">Upload and analyze</button>
+          <button id="cancel-upload" type="button" disabled>Cancel</button>
+        </div>
+      </form>
+      <p id="upload-status" role="status" aria-live="polite" data-state="ready">READY TO ANALYZE</p>
+    </section>
 
-<p id="upload-status" role="status" aria-live="polite" data-state="ready">READY TO ANALYZE</p>
-<p>Files are sent to this server for analysis. Maximum upload: 32 MiB.</p>
-<p id="sample-info"></p>
-<p class="analysis-label">SHA-256 (full upload): <span id="file-sha256"></span></p>
-<form class="uploadForm" id="uploadForm">
-<input type="file" id="fileInput" name="file" accept="*/*" />
-<button id="submit-upload" type="submit">Upload and analyze</button>
-<button id="cancel-upload" type="button" disabled>Cancel</button>
-</form>
+    <section class="analysis-card upload-entropy-card" aria-labelledby="upload-entropy-title">
+      <h2 id="upload-entropy-title" class="analysis-label">Shannon entropy index</h2>
+      <p class="upload-entropy-reading"><output id="entropy" class="analysis-value">NO FILE LOADED</output></p>
+      <p class="note">Bits per byte in the uploaded sample. A statistical estimate, not a cryptographic health test.</p>
+    </section>
 
-    <div class="hex">Byte histogram of the analyzed prefix</br></br>
-	<canvas id="histogram" width="800" height="75"></canvas>
-    </div>
-    </br>
-    <div class="hex">RGB mosaic of the preview</br></br>
-	<canvas id="mosaic" width="800" height="96"></canvas>
-    </div>
-    </br>
-    <!-- <h3>Yin/Yang Index: <span id="yinyang">0</span></h3> -->
-    <div class="hex"><h3 class="analysis-label">0/1 Distribution (Yin/Yang)</h3>
-	<canvas id="pie" width="340" height="210"></canvas>
-    </div>
-    </br>
-    <div class="hex">Preview waveform (oscilloscope view)</br></br>
-	<canvas id="wave" width="800" height="200"></canvas>
-    </div>
-    </br>
-    <div class="hex">Fast Fourier Transformation (FFT) <span id="fftvalue">not running</span> (min 2048 Bytes as input)</br></br>
-	<canvas id="fft" width="800" height="50"></canvas>
-    </div>
-    </br>
-</div>
+    <section class="analysis-card" aria-labelledby="upload-file-title">
+      <h2 id="upload-file-title" class="analysis-label">Analyzed file</h2>
+      <p id="file-entropy" class="analysis-meta">NO FILE LOADED</p>
+      <p id="sample-info" class="analysis-meta"></p>
+    </section>
 
-<script src="/file-upload.js" defer></script>
+    <section class="analysis-card" aria-labelledby="upload-sha-title">
+      <h2 id="upload-sha-title" class="analysis-label">SHA-256 · full upload</h2>
+      <output id="file-sha256" class="upload-sha256 hash">—</output>
+    </section>
 
+    <section class="analysis-card" aria-labelledby="upload-hist-title">
+      <h2 id="upload-hist-title" class="analysis-label">Byte histogram · 256 values</h2>
+      <canvas id="histogram" width="800" height="110" aria-label="Byte-frequency histogram"></canvas>
+    </section>
+
+    <section class="analysis-card" aria-labelledby="upload-mosaic-title">
+      <h2 id="upload-mosaic-title" class="analysis-label">RGB mosaic · sampled bytes</h2>
+      <canvas id="mosaic" width="800" height="96" aria-label="Random RGB mosaic"></canvas>
+    </section>
+
+    <section class="analysis-card" aria-labelledby="upload-balance-title">
+      <h2 id="upload-balance-title" class="analysis-label">Bit balance · Yin/Yang</h2>
+      <canvas id="pie" width="340" height="210" aria-label="Zero and one bits with centered legend"></canvas>
+    </section>
+
+    <section class="analysis-card" aria-labelledby="upload-wave-title">
+      <h2 id="upload-wave-title" class="analysis-label">Input waveform · first preview bytes</h2>
+      <canvas id="wave" width="800" height="170" aria-label="Byte-value waveform"></canvas>
+    </section>
+
+    <section class="analysis-card" aria-labelledby="upload-fft-title">
+      <h2 id="upload-fft-title" class="analysis-label">Frequency-domain preview
+        <span id="fftvalue" class="analysis-meta">· REQUIRES 2048 BYTES</span>
+      </h2>
+      <canvas id="fft" width="800" height="110" aria-label="FFT magnitude spectrum of first 2048 bytes"></canvas>
+    </section>
+
+    <p class="note">Statistics cover the analyzed upload prefix. Visual plots use only the
+      preview bytes; uploads are transmitted to the server for analysis.</p>
+    <p><a href="/">← Back to all endpoints</a></p>
+  </main>
+  <script src="/file-upload.js" defer></script>
 </body>
 </html>
