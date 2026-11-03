@@ -15,7 +15,7 @@
     function parseThreshold(raw) {
         // Require at most five decimal places, in the inclusive range [1,8].
         // Reject 8.00001 and any silent rounding of user-supplied precision.
-        if (!/^(?:[1-7](?:\\.\\d{1,5})?|8(?:\\.0{1,5})?)$/.test(raw)) return null;
+        if (!/^(?:[1-7](?:[.][0-9]{1,5})?|8(?:[.]0{1,5})?)$/.test(raw)) return null;
         const candidate = Number(raw);
         return Number.isFinite(candidate) && candidate >= 1 && candidate <= 8 ?
             candidate : null;
