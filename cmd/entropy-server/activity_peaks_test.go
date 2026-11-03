@@ -72,11 +72,11 @@ func TestActivityPeakExposition(t *testing.T) {
 
 	values, kinds := parseMetricSamples(t, w.Body.String())
 	for name, expected := range map[string]float64{
-		"rng_generation_peak_bytes_per_second":	1048576,
-		"wss_payloads_peak_per_second":	13,
-		"http_requests_peak_per_second":	7,
-		"ws_rejections_peak_per_minute":	120,
-		"http_generation_rejections_peak_per_minute":	180,
+		"rng_generation_peak_bytes_per_second":       1048576,
+		"wss_payloads_peak_per_second":               13,
+		"http_requests_peak_per_second":              7,
+		"ws_rejections_peak_per_minute":              120,
+		"http_generation_rejections_peak_per_minute": 180,
 	} {
 		if kinds[name] != "gauge" || values[name] != expected {
 			t.Errorf("%s = %v (type %s), want %v gauge", name, values[name], kinds[name], expected)
