@@ -49,7 +49,7 @@
                 // Only the colour view formats the text; digest bytes stay unchanged.
                 document.getElementById("hash").textContent = view === "colors" &&
                     /^[a-fA-F0-9]{64}$/.test(frame.hash) ?
-                    frame.hash.slice(0, 32) + "\\n" + frame.hash.slice(32) : frame.hash;
+                    frame.hash.slice(0, 32) + "\n" + frame.hash.slice(32) : frame.hash;
                 const color = [0, 2, 4].map(offset => parseInt(frame.hash.slice(offset, offset + 2), 16) / 2);
                 document.body.style.backgroundColor = `rgb(${color.join(",")})`;
                 if (view === "bytes") {
