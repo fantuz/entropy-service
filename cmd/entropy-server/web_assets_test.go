@@ -18,7 +18,7 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 
 	for _, path := range []string{
 		"/", "/theme.css", "/entropy-display.js",
-		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/file-upload.js", "/status-dashboard.js", "/status-kpis.js", "/gallery.js",
+		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/stream-entropy-alert.js", "/file-upload.js", "/status-dashboard.js", "/status-kpis.js", "/gallery.js",
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
 		"/api-sound.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 	} {
@@ -138,6 +138,7 @@ func TestNewWebPagesContainRealEndpoints(t *testing.T) {
 		},
 		"api-stream.html": {
 			"received-bytes", "received-frames", "analysed-bytes", "analysed-frames",
+			"entropy-alert-card", "entropy-threshold", "stream-entropy-alert.js",
 		},
 		"api-words.html": {"words-content", "page-words"},
 	}
