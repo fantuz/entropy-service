@@ -140,6 +140,10 @@ func TestNewWebPagesContainRealEndpoints(t *testing.T) {
 			"received-bytes", "received-frames", "analysed-bytes", "analysed-frames",
 			"entropy-alert-card", "entropy-threshold", "stream-entropy-alert.js",
 		},
+		"api-upload.html": {
+			"uploadForm", "upload-status", "entropy", "file-entropy", "file-sha256",
+			"histogram", "mosaic", "pie", "wave", "fft", "/file-upload.js",
+		},
 		"api-words.html": {"words-content", "page-words"},
 	}
 
