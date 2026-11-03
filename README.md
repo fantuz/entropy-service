@@ -6,20 +6,19 @@
 [![GitHub license](https://img.shields.io/github/license/fantuz/entropy-service)](LICENSE)
 ![GitHub all releases](https://img.shields.io/github/downloads/fantuz/entropy-service/total)
 
-**From photons to bytes. Random data from your own hardware, delivered through simple APIs.**
+**Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
-entropy-service is a Go server and command-line client for generating, delivering and inspecting random data. Connect a supported hardware random-number source, such as a quantum random-number generator (QRNG), or use the operating system's cryptographic random source. Fetch binary samples, keep a WebSocket stream open, or explore words, images, colours and short harmonic sounds in a browser.
+Entropy Service is a Go server and command-line client for generating, distributing, and inspecting pseudorandom data from a cryptographic deterministic random bit generator (DRBG). It supports hardware or operating-system seed sources; ChaCha20 and AES-256-CTR backends; bounded HTTP and WebSocket delivery; and a browser-based showcase for experiments and diagnostics.
 
-The original demonstration uses an ID Quantique Quantis PCI card. Hardware supplies seed material; a software deterministic random bit generator (DRBG), using ChaCha20 or optional AES-256-CTR, produces the bulk output. This expands a seeded cryptographic stream; it does not create additional physical entropy or make every delivered byte a fresh QRNG measurement.
+**From photons to bytes** describes the project's hardware-origin story: an ID Quantique Quantis PCI card inspired the first demonstration. The same architecture can also be seeded from the operating system CSPRNG. DRBG output is generated from seed material, **not a claim that each output byte is an independent hardware-entropy measurement**.
 
-- **Build applications and experiments:** retrieve bounded binary samples over HTTP or continuous samples over WebSockets.
-- **Study random data:** inspect distributions, bit balance, heatmaps and uploaded files. These diagnostics help find obvious problems; they do not certify a source's unpredictability.
-- **Explore generative output:** sample words from a dictionary, generate images and QR codes, or synthesise harmonic audio.
-- **Operate your own service:** monitor seed freshness, failures, traffic and resource budgets through JSON health checks, Prometheus text metrics and stderr logs.
+- **Integrate:** request binary samples over HTTP or maintain a WebSocket stream for development and test applications.
+- **Experiment:** inspect byte statistics, live stream previews, words, images, colours, QR codes, and synthesized sounds.
+- **Operate:** monitor readiness, reseeding, traffic and resource admission through JSON and Prometheus metrics.
 
-`entropy-server` serves the APIs and embedded browser pages. `entropy-client` consumes the binary HTTP/WebSocket APIs and offers terminal diagnostics.
+`entropy-server` serves the APIs and embedded browser pages. `entropy-client` consumes binary HTTP/WebSocket APIs and provides terminal monitoring with bounded analysis.
 
-[Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API reference](#api-reference) · [Performance](#performance) · [Statistical tests](#statistical-tests) · [Development](#development) · [Roadmap](#roadmap)
+[Quick start](#quick-start) · [Use cases](#use-cases) · [Architecture](#architecture) · [Configuration](#configuration) · [API reference](#api-reference) · [Performance](#performance) · [Statistical tests](#statistical-tests) · [Development](#development) · [Security](SECURITY.md) · [Full reference](docs/README.md)
 
 ## Quick start
 
@@ -64,7 +63,7 @@ Require your hardware source explicitly when silent fallback would be inappropri
 
 Without `-require-device=true`, an unavailable device can fall back to the OS CSPRNG. `/dev/urandom` is a cryptographic source, not a deliberately weak test generator. Accepting a device path does not establish the quality of its output; the hardware, driver and source assessment remain part of your deployment.
 
-The standalone binary enables HTTPS by default and expects `cert.pem` and `key.pem`. To serve HTTP on port 8080 and TLS 1.3 on port 8443 using your own certificates:
+The standalone binary enables HTTPS by default and expects deployment-specific `cert.pem` and `key.pem`. **Never deploy the publicly committed `cmd/entropy-server/key.pem`: it is a development fixture, not a secret.** Use your own certificate and private key; see [SECURITY.md](SECURITY.md). To serve HTTP on port 8080 and TLS 1.3 on port 8443 using your own certificates:
 
 ```sh
 ./bin/entropy-server -device=/dev/urandom -cert-file=/absolute/path/cert.pem -key-file=/absolute/path/key.pem
@@ -99,128 +98,26 @@ ExecStart=/usr/bin/entropy-server -device=/dev/qrandom0 -require-device=true -en
 
 Then run `sudo systemctl daemon-reload` and `sudo systemctl restart entropy-server`. Browser assets are embedded in the binary: no `./web` copy, symlink or special working directory is needed. Rebuild the server when changing those assets.
 
+## Use cases
+
+| Scenario | How Entropy Service helps | Boundary to keep in mind |
+| --- | --- | --- |
+| **Develop and test random-data consumers** | Retrieve bounded binary samples through HTTP or binary WebSocket streams. | Remotely delivered bytes depend on the server, its configuration and transport. |
+| **Measure streaming and concurrency** | Adjust payload sizes and intervals; compare DRBG backends and client reception rates. | Requested throughput is not a measured guarantee; benchmark each environment. |
+| **Explore entropy-source integration** | Seed a shared root DRBG from a supported device or the OS CSPRNG. | DRBG output is expanded from seeds, not continuous fresh physical entropy. |
+| **Teach and explore statistical properties** | Visualize histograms, bit balance, entropy estimates, mosaics and FFT previews. | Statistical diagnostics do not prove unpredictability or certify cryptography. |
+| **Prototype operational integrations** | Use liveness, readiness, metrics and resource budgets to monitor the service. | Access controls and secret-management policy belong to the deployment. |
+| **Create interactive demonstrations** | Generate words, colours, images, QR codes and short harmonic sound clips. | These are demonstrations, not certified security or key-management products. |
+
+For a quick tour, start the server and **open its base URL in a browser**. The curated homepage lists supported HTTP APIs, live WebSocket demonstrations and operational endpoints without exposing internal JavaScript files in its navigation.
+
 ## Configuration
 
-Run either binary with `-help` for its complete flag list. Boolean values use `-flag=true` or `-flag=false`.
+The server supports configurable seed sources, DRBG backends, timing and resource budgets; the client separately controls reception, analysis and terminal redraw rates. Server timing flags take integer **milliseconds**, whereas client timing flags accept Go durations such as `50ms`.
 
-### Server
+Typical server options: `-device=/dev/urandom -enable-https=false -http=127.0.0.1:8080`; select `-drbg=aes-256-ctr` to compare the alternate backend. Use `-require-device=true` when physical-source availability is mandatory.
 
-All server timing flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=250`, not `250ms`. Sizes below are bytes unless explicitly labelled MiB.
-
-#### Source and reseeding
-
-| Flag | Default | Purpose |
-| --- | --- | --- |
-| `-device` | `/dev/qrandom0` | Source device; OS fallback is allowed unless required. |
-| `-require-device` | `false` | Fail startup if the requested device is unavailable. |
-| `-drbg` | `chacha20` | Backend: `chacha20` or `aes-256-ctr`. |
-| `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |
-| `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |
-| `-reseed-ms` | `250` | Root reseed interval: 1–10000 ms. |
-| `-buffer-reseed` | `256` | Bytes per root reseed: 32–65536. |
-| `-max-reseed-age` | `0` | Readiness age limit in ms; zero selects `max(1000, 4 × reseed-ms)`. |
-
-#### Listeners and TLS
-
-| Flag | Default | Purpose |
-| --- | --- | --- |
-| `-http` | `:8080` | HTTP address; binds all interfaces by default. |
-| `-https` | `:8443` | HTTPS address; binds all interfaces by default. |
-| `-enable-https` | `true` | Enable HTTPS; the packaged service sets this to false. |
-| `-cert-file` | `cert.pem` | TLS certificate path. |
-| `-key-file` | `key.pem` | TLS private key path. |
-| `-debug` | `false` | Debug output and loopback pprof on port 6060. |
-
-#### Output and resource budgets
-
-| Flag | Default | Purpose |
-| --- | --- | --- |
-| `-max-bytes` | `33554432` | Maximum binary sample: 1 byte to 32 MiB. |
-| `-words` | `20` | Default word count and per-request word limit. |
-| `-refresh-ms` | `5000` | Default `/bytes` WS interval in ms. |
-| `-refresh-colors-ms` | `1500` | Default `/stream`, `/colors` and `/words` WS interval in ms. |
-| `-refresh` | `5000` | HTTP word-page interval in ms; HTML rounds up to seconds. |
-| `-fingerprint` | `2097152` | Upload prefix analysed statistically; full-upload SHA-256 is unaffected. |
-| `-cookie` | `false` | Enable HTTP byte/word preference cookies. |
-| `-ws-max-connections` | `128` | Shared WS connection limit. |
-| `-ws-memory-mib` | `1024` | Shared WS estimated memory budget in MiB. |
-| `-http-max-requests` | `128` | Separate HTTP work limit. |
-| `-http-memory-mib` | `512` | Separate HTTP estimated memory budget in MiB. |
-
-`-buffer-qrng` is deprecated and ignored. `-buffer-entropy` is an unused legacy option; neither controls an active pool or ring buffer.
-
-`-cpu-mix` prefers RDSEED, falls back to RDRAND, and takes precedence over `-rdrand-mix`. Mixing applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
-
-### Client
-
-Client timing options accept **Go durations**, such as `50ms` or `1s`. Byte counts are plain integers. Reception, analysis and terminal display have separate settings; a frame below means one HTTP response or one WebSocket message.
-
-#### Transport and payload
-
-| Flag | Default | Purpose |
-| --- | --- | --- |
-| `-mode` | `pull` | HTTP `pull` or WebSocket `stream`. |
-| `-slice` | `2097152` | Bytes per response/message: 1 byte to 32 MiB. |
-| `-refresh` | `1s` | HTTP request interval or requested server WS interval; minimum 1 ms. |
-| `-writeout` | `false` | Experimental Linux write of every received frame to `/dev/urandom`; does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
-
-Transport URLs are listed separately to keep the table readable:
-
-- `-url`: `http://127.0.0.1:8080/v1/data/random`
-- `-wsurl`: `ws://127.0.0.1:8080/stream`
-
-Pass **bare endpoints** to `-url` and `-wsurl`: the client appends its own `bytes` and `refresh` query parameters. Use `-slice` and `-refresh` to control them. The CLI consumes `/stream` raw messages, not `/bytes` compact envelopes.
-
-#### Analysis and terminal display
-
-| Flag | Default | Purpose |
-| --- | --- | --- |
-| `-analysis-bytes` | `1048576` | Maximum prefix bytes analysed per selected frame.<br>Range: 0 to 33554432; `0` selects the full frame. |
-| `-analysis-interval` | `250ms` | Minimum interval between analysed frames.<br>Non-negative; `0` analyses every frame. |
-| `-display-interval` | `1s` | Terminal redraw interval; minimum 1 ms.<br>Does not change the requested reception interval. |
-| `-dashboard` | `false` | Reception/analysis rates and histories of sampled statistics. |
-| `-matrix` | `false` | Compute and display the transition matrix for analysed samples. |
-| `-graph` | `false` | Shannon-entropy history of analysed samples. |
-| `-preview` | `false` | Up to 64 bytes, in hex, from the last selected frame. |
-| `-histogram` | `false` | Byte-distribution bars from the analysed sample's existing counts. |
-| `-debug` | `false` | Receive/fetch, analysis and runtime timings, to three decimal places in ms. |
-
-By default, the client receives and counts every frame but analyses **at most the first 1 MiB of a selected frame, once every 250 ms**. The first frame is analysed immediately; later samples require both a new frame and an elapsed analysis interval. Slow sources therefore produce fewer samples. The terminal redraws once per second using the latest available result.
-
-These settings apply to both `pull` and `stream`. They do not reduce the requested payload or filter data written with `-writeout`. Matrix computation is skipped unless `-matrix` is enabled. Statistics describe individual analysed samples; graphs show their history rather than a cumulative test of all received bytes.
-
-For example, request 16 MiB every 50 ms while keeping analysis and display work bounded:
-
-```sh
-./bin/entropy-client -mode=stream -dashboard -slice=16777216 -refresh=50ms \
-  -analysis-bytes=1048576 -analysis-interval=250ms -display-interval=1s
-```
-
-The three analysis/display arguments above are the defaults and may be omitted. The requested payload rate is **320 MiB/s** (`16 MiB / 0.05 s`), a scheduling target rather than a measured capacity. Actual throughput depends on generation, reception, analysis, terminal I/O and the network.
-
-To analyse **every byte of every frame**, set both analysis options to zero:
-
-```sh
-./bin/entropy-client -mode=stream -dashboard -slice=16777216 -refresh=50ms \
-  -analysis-bytes=0 -analysis-interval=0 -display-interval=1s
-```
-
-Add `-matrix` if transition-matrix analysis is also wanted. Setting only `-analysis-bytes=0` still selects frames at the configured interval; setting only `-analysis-interval=0` still respects the prefix cap. Full analysis can reduce throughput. The bounded receive queue applies backpressure when processing cannot keep up; increasing display frequency does not accelerate reception.
-
-#### Reading the monitor
-
-| Display | Meaning |
-| --- | --- |
-| `Requested rate` | Payload size divided by requested interval; a target, in MiB/s. |
-| `Received` / `Average received` | All frames handled by the monitor and their cumulative throughput over monitoring runtime. |
-| `Total received` / `Transfer Rate` | Receiver byte count and throughput sampled over approximately one-second windows. |
-| `Analysed Rate` | Bytes actually analysed per second, including the prefix/frame selection limits. |
-| `Analysis samples` / `Analysed prefix` | Number of selected frames versus received frames, and analysed bytes versus the last selected frame's full size. |
-| `Analysed total` / `Sample age` | Cumulative sampled bytes and age of the latest analysis sample. |
-
-`Total received`, `Transfer Rate` and `Analysed Rate` are shown with `-dashboard`. Throughput uses **MiB/s**: 1 MiB = 1,048,576 bytes. Analysis rates measure processing of sampled data, not physical entropy production. Receiver and monitor counters can differ briefly because frames may be in flight or queued and rate windows differ.
-
-The client performs startup diagnostics before normal monitoring; its reception-rate window is reset afterwards. With `-debug`, `Last WS receive` includes waiting for the server's next message; `WS runtime` sums message-read durations. `Last HTTP fetch` includes the complete response body; `HTTP cycle runtime` includes request pacing plus that fetch. Analysis is timed separately, and `Total runtime` is wall time since monitoring started. These are client-side timings, not pure network round-trip measurements.
+**[Complete server and client flags, defaults, and examples](docs/configuration.md)**
 
 ## Architecture
 
@@ -253,338 +150,43 @@ Source failures are visible through readiness and reseed metrics. A failed resee
 
 ## API reference
 
-HTTP and HTTPS use the same routes. WebSockets use the corresponding `ws://` or `wss://` address and require a normal HTTP Upgrade handshake. Browser `.html` pages are clients of the APIs, not WebSocket endpoints themselves.
-
-### Binary data, words, images and sound
-
-The normal request method below is GET, except where another method is specified.
-
-| Route | Response | Parameters / defaults |
-| --- | --- | --- |
-| `/v1/data/random` | Raw binary; private request generator. | `bytes=N`<br>Default: 2 MiB; capped by `-max-bytes`. |
-| `/v1/data/test` | Raw binary; shared serving root. | `bytes=N`<br>Default: 1024 bytes; no statistical tests are run. |
-| `/v1/meta/random` | HTML words and SHA-256. | `words=N`<br>Default/limit: `-words`; page interval: `-refresh`. |
-| `/paroleparoleparole` | Alias of the HTTP word page. | Same as `/v1/meta/random`. |
-| `/v1/image/random` | Random RGB PNG. | Fixed 1024 × 1024 pixels. |
-| `/v1/image/heatmap` | Byte-popcount PNG. | Fixed 1024 × 1024 pixels; visual diagnostic. |
-| `/v1/qr/random` | PNG QR code containing hexadecimal data. | Fixed 256 × 256 pixels; encodes 64 generated bytes. |
-| `/sound` | WAV audio; GET or HEAD. | `duration_ms=250..5000`<br>`style=bloom` or `chime`. |
-| `/files` | JSON file analysis; POST a raw binary body. | Maximum: 32 MiB; see [file analysis](#file-analysis). |
-
-Sound defaults to 2500 ms and `bloom`, with 48 kHz, 16-bit mono output. It uses 64 random bytes to select synthesis parameters; the PCM samples are harmonic synthesis, not raw random bytes. Heatmaps illustrate byte patterns rather than certifying entropy quality. QR dimensions and encoded sample length are not configurable.
-
-Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. The dictionary currently comes from `github.com/8ff/diceware` and is loaded once.
-
-With `-cookie=true`, `/v1/data/random` and the HTTP word pages use validated preference cookies; explicit query values take precedence. Fresh cookie-mode defaults are 512 KiB and 3 words, bounded by server limits. A stored/query `refresh` preference does not override the HTTP word page's server-configured refresh interval.
-
-### WebSockets
-
-| Route | Payload | Default query values |
-| --- | --- | --- |
-| `/stream` | Raw binary sample; no digest prefix. | `bytes=2048`<br>`refresh=1500` |
-| `/bytes` | Sample and SHA-256, in the selected format. | `bytes=2048`<br>`refresh=5000`<br>`format=json` |
-| `/colors` | Same protocol as `/bytes`. | `bytes=2048`<br>`refresh=1500`<br>`format=json` |
-| `/words` | JSON fields: `words`, `hash`. | `words=20`<br>`refresh=1500` |
-
-For `/words`, the word default and limit follow `-words`. The response contains a space-separated word string and its SHA-256 hex digest.
-
-The table shows factory defaults; server flags can change the intervals. Request `refresh` values are integer milliseconds from 1 to 60000. `/words` rejects invalid or duplicate values; `/stream`, `/bytes` and `/colors` currently fall back to the configured interval for an invalid `refresh` value. The first message is sent on the first timer tick, not immediately on connection.
-
-`/bytes` and `/colors` accept three formats:
-
-| `format` | Message type | Application payload |
-| --- | --- | --- |
-| `json` | Text | JSON fields: `hex`, `base64`, `hash`.<br>Compatibility default; two encodings of the same sample. |
-| `compact` | Binary | **32 digest bytes + N raw sample bytes**, in one message.<br>No hex prefix or length header. |
-| `hash` | Text | JSON fields: `hash`, `bytes`.<br>Metadata only; the sample is not transmitted. |
-
-For compact messages, read the first 32 bytes as the digest and the remainder as the sample; a 32 MiB sample therefore needs a receive limit of **33554464 bytes**. The hash format still generates and hashes the requested sample on the server. A digest sent with the data is a checksum, not proof of origin or entropy quality.
-
-Examples: `ws://127.0.0.1:8080/bytes?bytes=65536&refresh=100&format=compact` and `ws://127.0.0.1:8080/colors?bytes=2048&refresh=1000&format=hash`.
-
-### File analysis
-
-```sh
-curl --fail http://127.0.0.1:8080/files \
-  -H 'Content-Type: application/octet-stream' \
-  --data-binary @sample.bin
-```
-
-Uploads are streamed through a 32 KiB read buffer and are not saved to disk. SHA-256 covers the complete upload; statistical analysis covers only the first `-fingerprint` bytes (2 MiB by default). JSON fields are `total_bytes`, `analyzed_bytes`, `histogram` (256 counts), `entropy` (empirical Shannon bits per byte), `ones`, `zeros`, `sha256` and `preview` (Base64, up to 2048 analysed bytes).
-
-Histogram, bit balance and entropy refer to the analysed prefix, not necessarily the whole file. The browser's mosaic, waveform and FFT are small-preview illustrations. Empty/incomplete uploads return 400, oversized uploads 413, unsupported content types 415 and unsupported methods 405. Uploads share the HTTP work budget.
-
-### Health and metrics
+The homepage at `/` is the interactive entry point. Common API routes include:
 
 | Route | Purpose |
 | --- | --- |
-| `/live` | Liveness JSON; independent of seed freshness. |
-| `/ready` | Serving-root readiness JSON; 200 when fresh with no unresolved reseed error, otherwise 503. |
-| `/health-1` | Compatibility alias of the serving-root health check. |
-| `/health-2` | Serving-root health JSON, using the same readiness policy as `/ready`. |
-| `/metrics-1` | Compatibility alias of the serving-root metrics. |
-| `/metrics-2` | Prometheus text metrics with serving-root metadata; the normal operational target. |
+| `GET /v1/data/random?bytes=4096` | Bounded raw binary sample from a private request DRBG. |
+| `WS /stream?bytes=4096&refresh=500` | Continuous raw binary frames. |
+| `WS /bytes` / `WS /colors` / `WS /words` | Framed bytes, colour/hash, or word streams. |
+| `POST /files` | JSON statistics about an uploaded binary file. |
+| `GET /ready` / `GET /metrics-2` | Readiness and Prometheus metrics. |
 
-`/health-1`, `/health-2` and `/ready` inspect the same root; `/metrics-1` and `/metrics-2` expose the same root and service-wide counters and budgets. Scrape one metrics route to avoid counting the same service twice. Seed age, reseed interval/size, failure totals and last-error information are exposed in health JSON.
+Interactive demonstrations live at `/api-bytes.html`, `/api-stream.html`, `/api-words.html`, `/api-colors.html`, `/api-sound.html`, and `/api-upload.html`. They are **browser pages**, not API version prefixes.
 
-Useful metric families include `rng_ready`, `rng_reseed_age_seconds`, `rng_reseed_failures_total`, `rng_bytes_generated_total`, `http_requests_total`, `wss_payloads_total`, `drbg_instance_count`, `ws_connections_*`, `ws_memory_*`, `ws_rejected_*` and `http_generation_*`.
-
-`drbg_instance_count` normally starts at **1** for the root, then includes active children. Merely viewing metrics does not create a child generator. Generated-byte totals include internal child-seed derivation; they are not exact network-payload counters. Legacy software-buffer metrics remain zero because those buffers are disabled. The embedded `rng_version` value is still hard-coded and should not be used to identify the installed release.
-
-### Browser pages
-
-The embedded homepage at `/` is a **curated, three-column navigation page**. It links every active HTTP/API and WebSocket route and includes the older `aa_*` and `zz_*` redirect helpers in an expandable section. Internal JavaScript and CSS assets remain loadable by the browser but are not displayed as navigation targets. The `api-` prefix names **browser demonstration pages**, not versioned API endpoints.
-
-| Canonical browser page | Role |
-| --- | --- |
-| `/api-bytes.html` | WebSocket compact frames: bounded hexadecimal/Base64 preview plus full-sample SHA-256 digest. |
-| `/api-colors.html` | Hash-only colour display without transmitting the entire sample. |
-| `/api-words.html` | Live dictionary words and SHA-256 digest. |
-| `/api-sound.html` | Centered controls to generate and play harmonic WAV files. |
-| `/api-upload.html` | File analysis, histogram, readable Yin/Yang legend, mosaic, waveform and FFT. |
-| `/api-stream.html` | Live binary `/stream` analysis: histogram, Shannon entropy, mosaic, bit balance, waveform and FFT. |
-
-The duplicate `/bytes.html`, `/colors.html`, `/words.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. The HTTP and WebSocket API route names themselves are unchanged.
-
-The live stream-analysis page accepts integer `bytes` (1–33554432) and `refresh` (1–60000 milliseconds), requests raw binary WebSocket frames and analyses at most the first **64 KiB of an accepted frame**, at a maximum display-analysis rate of five frames per second. FFT uses the first 2048 bytes when available. These limits affect browser work only, not the server's delivered payload. Graphs are illustrative, not statistical certificates.
-
-Byte, colour, word and stream pages show a small **AWAITING FIRST SAMPLE** notice instead of a large connection-status panel. It disappears once the first valid sample is displayed; connection failures/disconnects remain visible. SHA-256 values use the shared bright-green terminal style, and Base64 previews are centered; long encodings may wrap visually at the container width without altering their text. Browser worker/paint backpressure prevents large or frequent samples from overloading the visual display.
-
-<details>
-<summary>Legacy navigation helpers and old documentation names</summary>
-
-These embedded helpers use browser-side redirects; they are not HTTP redirect APIs:
-
-| Helper | Target |
-| --- | --- |
-| `/aa_health-1` | `/health-1` |
-| `/aa_health-2` | `/health-2` |
-| `/aa_metrics-1` | `/metrics-1` |
-| `/aa_metrics-2` | `/metrics-2` |
-| `/zz_v1-data-random.html` | `/v1/data/random` |
-| `/zz_v1-data-test.html` | `/v1/data/test` |
-| `/zz_v1-image-heatmap.html` | `/v1/image/heatmap` |
-| `/zz_v1-image-random.html` | `/v1/image/random` |
-| `/zz_v1-meta-random.html` | `/v1/meta/random` |
-| `/zz_v1-qr-random.html` | `/v1/qr/random` |
-
-Older README examples mentioned paths that are **not registered aliases**:
-
-| Old name | Current route |
-| --- | --- |
-| `/health` | `/ready` or `/health-2` |
-| `/metrics` | `/metrics-2` |
-| `/v1/random` | `/v1/data/random` |
-| `/data` | `/stream` (WebSocket) |
-| `/streams.html` | `/api-stream.html` (browser analysis); `/api-bytes.html` for byte previews. |
-
-</details>
-
-### Optional profiling endpoints
-
-With `-debug=true`, a separate listener on **127.0.0.1:6060** exposes `/debug/pprof/`, `/debug/pprof/profile`, `/debug/pprof/heap`, `/debug/pprof/cmdline`, `/debug/pprof/symbol` and `/debug/pprof/trace`. The index also serves named runtime profiles, including `/debug/pprof/allocs`, `/debug/pprof/block`, `/debug/pprof/goroutine`, `/debug/pprof/mutex` and `/debug/pprof/threadcreate`. Block/mutex samples require their corresponding runtime sampling to be enabled. These routes are not on the public API listeners.
+**[Complete HTTP/WebSocket endpoint, parameter and format reference](docs/api.md)**
 
 ## Stability and resource limits
 
-The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket handlers and the client. Uploads have a separate fixed 32 MiB ceiling. Encoding can make the transmitted message larger than the underlying sample.
+Binary HTTP/WebSocket samples are capped at **32 MiB** by default. HTTP and WebSocket requests have independent concurrency/memory-admission budgets; memory reservations are conservative estimates, **not guarantees about RSS**. Errors, source freshness, and reseeding status are observable through the service.
 
-| Resource | Default policy |
-| --- | --- |
-| Incoming WebSocket message | 1 KiB maximum; the server does not need large client messages. |
-| Entropy WebSockets | At most 128 admitted connections and 1024 MiB estimated working memory, shared across HTTP/HTTPS. Reservations last until disconnect. |
-| HTTP generation and file analysis | At most 128 admitted requests and 512 MiB estimated working memory, shared across HTTP/HTTPS. Probes and static files are excluded. |
-| Sound synthesis | An additional two simultaneous synthesis/download slots. |
-| CLI receive queue | One queued WS message; other in-flight reader/consumer buffers can also exist. |
-| Network lifecycle | Context-driven cancellation, WS write deadlines and a shared five-second server shutdown deadline. |
-
-Budgets are **admission estimates, not process RSS limits**. For N-byte WS samples the reservation is `N + 64 KiB` for raw/compact/hash formats, or `16N + 64 KiB` for JSON. With the default 1 GiB budget and full 32 MiB samples, that admits at most 31 raw/compact/hash connections, or one JSON connection, before other reservations. TLS, kernel buffers, garbage collection and retained allocations require additional headroom.
-
-Invalid sample parameters return 400. A request whose reservation exceeds the entire memory budget returns 413; temporary connection/request or aggregate-memory exhaustion returns 503 with `Retry-After: 1`. Successful WebSocket admission is still followed by the usual Upgrade validation.
-
-HTTP responses with status **400 or higher** are logged to stderr with method, path, status, duration and remote address. Query strings and request bodies are omitted. After a successful WS upgrade, later stream errors are connection events rather than new HTTP response statuses. Under systemd, console logs are available through `journalctl`.
-
-### Recent improvements: October–November 2026
-
-| Area | Implemented change and practical effect |
-| --- | --- |
-| Seeding | Full startup/reseed reads, explicit errors and a single context-controlled reseed loop; readiness now reports stale or failed seeding. |
-| CPU and concurrency | Removed the disconnected producer and busy-spinning WS branches; optional AES backend and private bulk generators reduce shared-lock contention. |
-| Validation and budgets | Validated byte counts/cookies, a common 32 MiB sample ceiling, inbound WS limits and aggregate HTTP/WS admission budgets. |
-| Lifecycle and diagnostics | Joined WS cleanup, client cancellation, synchronised client rate metrics and separate HTTP/WS cycle timing. |
-| Transmission and UI | Opt-in compact/hash WS formats, bounded browser previews and worker-based presentation instead of sending/rendering both full text encodings. |
-| Features and operations | Harmonic WAV output, streaming file analysis, embedded web assets and failed-request logging; word sampling loads the dictionary once instead of shuffling it per request. |
-
-These are implementation improvements, not a claim of a measured percentage gain for every workload. The results below separate protocol size, encoding CPU cost and historical network throughput.
+**[Detailed limits, rejection behavior, and operational notes](docs/operations.md)** · [Security model](SECURITY.md)
 
 ## Performance
 
-### Application payload size
+The README records *author-reported* loopback HTTP results of **10,566 requests/s at 256 KiB** and **3,659 requests/s at 1 MiB** on an AMD Ryzen 5 3500U (short `wrk` runs). The corresponding original `wrk` transfer labels are `2.58GB` and `3.57GB` per second. These numbers describe local delivery of DRBG-generated output; they do **not** measure physical entropy production, a remote network link, or universal sustained throughput.
 
-For a **32 MiB generated sample**, current encoder payloads are:
+The repository also includes separate encoding benchmarks; their CPU and allocation figures are not whole-system throughput. The tested server revision, backend, seed source and Go runtime were not all recorded for the historical `wrk` results.
 
-| Route/format | Application bytes sent | What the client receives |
-| --- | ---: | --- |
-| `/stream` | 33,554,432 | Raw sample. |
-| `/bytes?format=json` | 111,848,205 | Hex + Base64 + digest, approximately 106.7 MiB. |
-| `/bytes?format=compact` | 33,554,464 | Digest + raw sample: 32 bytes overhead. |
-| `/colors?format=hash` | 93 | Digest and sample length; no raw sample. |
-
-Sizes include JSON's trailing newline and exclude HTTP Upgrade, WebSocket framing and TLS overhead. Compact cuts application payload by about **70% versus the JSON byte format**. Ordinary binary HTTP and `/stream` were already raw and do not incur that 3.33× text-encoding expansion.
-
-### Encoding benchmark
-
-The tracked `BenchmarkByteFrameFormats` benchmark measures SHA-256 plus format encoding of an already allocated sample into `io.Discard`. It excludes DRBG generation, sockets, TLS and browser processing; its input-processing rate is not a network-transfer result.
-
-Measured from commit [01ed418](https://github.com/fantuz/entropy-service/commit/01ed41846d3ecd340db176ded8cb2e820b87bcc1) on an AMD EPYC 9V74 VM, Linux amd64, Go 1.24.4, with 9 visible logical CPUs. The benchmark loop is serial. Three 300 ms runs per case, medians rounded:
-
-| Sample | JSON time/op | Compact time/op |
-| --- | ---: | ---: |
-| 512 KiB | 4.73 ms | 0.319 ms |
-| 8 MiB | 77.57 ms | 5.42 ms |
-
-The compact encoder allocated 32 B/op beyond the existing sample buffer in these runs. That is an encoder allocation measurement, not the complete connection's memory footprint. Reproduce on your hardware:
-
-```sh
-go test ./cmd/entropy-server -run '^$' -bench '^BenchmarkByteFrameFormats$' -benchmem -benchtime=300ms -count=3
-```
-
-### HTTP throughput benchmarks: Ryzen 5 3500U
-
-Author-reported measurements on an **AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx**, using `/v1/data/random` over local HTTP. Both runs used **32 wrk threads**, **64 connections**, a **10-second requested duration** and a **3-second timeout**. The commands differ only in the requested response size:
-
-```sh
-# 256 KiB per response
-wrk -t32 -c64 -d10s --latency --timeout 3 'http://localhost:8080/v1/data/random?bytes=262144'
-
-# 1 MiB per response
-wrk -t32 -c64 -d10s --latency --timeout 3 'http://localhost:8080/v1/data/random?bytes=1048576'
-```
-
-| Metric | 256 KiB responses | 1 MiB responses |
-| --- | ---: | ---: |
-| Bytes per response | 262,144 | 1,048,576 |
-| Completed requests | 106,029 | 36,857 |
-| Measured duration | 10.03 s | 10.07 s |
-| Requests/s | 10,566.28 | 3,658.70 |
-| Transfer/s, original wrk label | `2.58GB` | `3.57GB` |
-| Total read, original wrk label | `25.92GB` | `36.01GB` |
-| Mean latency | 8.02 ms | 25.13 ms |
-| Median latency (p50) | 4.62 ms | 11.64 ms |
-| p75 latency | 13.06 ms | 39.47 ms |
-| p90 latency | 19.23 ms | 64.31 ms |
-| p99 latency | 35.85 ms | 120.08 ms |
-| Maximum latency | 89.66 ms | 259.94 ms |
-
-These short **loopback HTTP delivery** runs include work by both the server and local load generator. They measure delivery of DRBG output rather than raw QRNG speed or physical network bandwidth. Transfer figures retain wrk's printed unit labels and include HTTP overhead. No socket errors are listed in either supplied log. The tested revision, DRBG backend, seed source, Go version and `GOMAXPROCS` were not supplied with the results.
-
-<details>
-<summary>Full wrk output: 256 KiB responses</summary>
-
-```text
-Running 10s test @ http://localhost:8080/v1/data/random?bytes=262144
-  32 threads and 64 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     8.02ms    8.45ms  89.66ms   84.42%
-    Req/Sec   331.76     80.65   640.00     69.41%
-  Latency Distribution
-     50%    4.62ms
-     75%   13.06ms
-     90%   19.23ms
-     99%   35.85ms
-  106029 requests in 10.03s, 25.92GB read
-Requests/sec:  10566.28
-Transfer/sec:      2.58GB
-```
-
-</details>
-
-<details>
-<summary>Full wrk output: 1 MiB responses</summary>
-
-```text
-Running 10s test @ http://localhost:8080/v1/data/random?bytes=1048576
-  32 threads and 64 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    25.13ms   28.10ms 259.94ms   84.53%
-    Req/Sec   114.97     46.36   363.00     72.57%
-  Latency Distribution
-     50%   11.64ms
-     75%   39.47ms
-     90%   64.31ms
-     99%  120.08ms
-  36857 requests in 10.07s, 36.01GB read
-Requests/sec:   3658.70
-Transfer/sec:      3.57GB
-```
-
-</details>
-
-For your own comparisons, vary the payload, concurrency, backend and `GOMAXPROCS` one at a time. Record the server flags, CPU, Go version, latency percentiles, errors and memory use alongside throughput. Remote and TLS clients exercise different constraints from these local HTTP runs. Use the [statistical tests](#statistical-tests) separately to assess output characteristics.
+**[Full measurement tables, raw logs, commands and reproducibility checklist](docs/benchmarks.md)**
 
 ## Statistical tests
 
-Use `rngtest` for a quick regression screen and Dieharder for a broader statistical battery. These tests assess statistical behaviour, not maximum throughput or cryptographic certification. The HTTP examples test the **served DRBG output**, not the QRNG device before your software generator.
+The project documents `rngtest` and Dieharder workflows for screening generated bytes. A favorable statistical-test result does **not** establish cryptographic unpredictability, prove entropy-source quality, or provide certification. Test the served DRBG output and the raw source independently when comparing them.
 
-On Debian/Ubuntu, install the tools if needed:
-
-```sh
-sudo apt install curl rng-tools5 dieharder
-```
-
-Run the examples in **Bash**, with the server already running. Replace the address if it runs elsewhere:
-
-```bash
-set -o pipefail
-ENTROPY_URL='http://127.0.0.1:8080/v1/data/random'
-```
-
-### Quick screen with rngtest
-
-```bash
-curl -fsS --max-time 60 "${ENTROPY_URL}?bytes=25000004" | rngtest -c 10000 -b 1000
-```
-
-This requests about 23.84 MiB: 10,000 blocks of 20,000 bits, plus four initialisation bytes, within the default 32 MiB response limit. It reports every 1,000 blocks. If you lowered `-max-bytes`, reduce the block count and request size together: `bytes = 2500 × blocks + 4`.
-
-The five legacy checks are monobit, poker, runs, long runs and continuous run; they are not five separate cryptographic standards. Confirm that successes plus failures totals 10,000. An occasional rejected block can occur with good random data; exit status 1 means at least one block was rejected. See the [rngtest manual](https://github.com/nhorman/rng-tools/blob/master/rngtest.1.in).
-
-### Broader battery with Dieharder
-
-Dieharder needs a continuing supply of fresh input. Do not loop a small capture: file-input mode can rewind and reuse data, making results suspect. Define this feeder once; it downloads a fresh 1 MiB response before forwarding it, so calculation pauses do not hold an HTTP download open:
-
-```bash
-entropy_stream() (
-    entropy_chunk=$(mktemp) || exit
-    trap 'rm -f "$entropy_chunk"' EXIT
-    while :; do
-        curl -fsS --max-time 30 \
-            "${ENTROPY_URL}?bytes=1048576" \
-            -o "$entropy_chunk" || exit
-        cat "$entropy_chunk" || break
-    done
-)
-```
-
-The temporary file is overwritten with fresh data each cycle and removed on exit. Run the full default battery with this one-liner:
-
-```bash
-entropy_stream | dieharder -g 200 -a
-```
-
-`-g 200` selects raw binary stdin; `-a` runs the default battery. Allow substantial runtime and data consumption. For a shorter first run, replace `-a` with `-d sts_monobit`. To inspect available tests, use `dieharder -l`.
-
-An isolated `WEAK` result is not proof of a defect. Repeat suspicious tests with fresh input and the same parameters, and compare with an OS-source baseline rather than rerunning until everything passes. Check for premature `EOF` and missing results; exit status alone does not establish completion. See the [Dieharder manual](https://manpages.debian.org/testing/dieharder/dieharder.1.en.html).
-
-For a baseline or direct device check, run the same test with input redirected from `/dev/urandom` or, on the machine with the QRNG and read permission, `/dev/qrandom0`:
-
-```bash
-dieharder -g 200 -d sts_monobit < /dev/urandom
-dieharder -g 200 -d sts_monobit < /dev/qrandom0
-```
-
-Feed each utility the original bytes; do not place `rngtest -p` before Dieharder, because that filters out rejected blocks. Passing statistical tests cannot certify unpredictability or replace cryptographic review; see [NIST SP 800-22](https://csrc.nist.gov/pubs/sp/800/22/r1/upd1/final).
+**[Commands, interpretation and limitations](docs/statistical-tests.md)**
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution workflow, race-test prerequisites, benchmark evidence and pull-request guidance.
 
 | Command | Action |
 | --- | --- |
@@ -609,6 +211,10 @@ The tracked tests cover DRBG backends/reads, reseed failures, private streams, v
 
 Current build CI runs ordinary Go tests, **server race-detector tests**, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow publishes without its own test step. A mandatory race-test release gate and automated browser-interaction tests in CI remain pending.
 
+## Further reading
+
+[Technical reference](docs/README.md) · [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Benchmarks and reproduction](docs/benchmarks.md)
+
 ## Roadmap
 
 Available features are documented above. The following are follow-up work or ideas, not capabilities shipped by this repository:
@@ -622,34 +228,43 @@ Available features are documented above. The following are follow-up work or ide
 
 ## Project background and screenshots
 
+### Current browser interface (November 2026)
+
+The following screenshots capture the Matrix-inspired homepage and stream-analysis layout from the November 2026 UI revision. They are representative examples rather than a guarantee of pixel-identical appearance on later releases.
+
+[![Homepage — curated API and demonstration navigation](docs/images/homepage-preview.webp)](docs/images/homepage.webp)
+
+[![Stream analysis — histogram, bit balance, waveform and FFT](docs/images/stream-analysis-preview.webp)](docs/images/stream-analysis.webp)
+
+
 The project began as a demonstration around an older Quantis PCI QRNG, with driver adaptation for newer Linux kernels. Hardware-driver maintenance is separate from this Go suite. The service can also run with the OS CSPRNG and no external card.
 
 <details>
 <summary>Historical interface gallery (February–March 2026)</summary>
 
-These screenshots illustrate earlier interfaces; layouts and endpoint names have since evolved.
+These historical screenshots illustrate removed page URLs and earlier layouts; follow the linked current `api-*.html` browser pages instead.
 
 **Terminal client** — diagnostics in the terminal.
 
 <img width="640" height="360" alt="Terminal entropy-client diagnostics" src="https://github.com/user-attachments/assets/72b2adf4-376c-405e-9460-13a34190ed9a" />
 
-**Legacy stream-analysis view** — `/stream.html`, using `/stream` in the current server.
+**Historical stream-analysis view** — pictured URL `/stream.html` (removed); current browser page: [`/api-stream.html`](cmd/entropy-server/web/api-stream.html) using WebSocket `/stream`.
 
 <img width="640" height="360" alt="Historical stream-analysis interface" src="https://github.com/user-attachments/assets/de76d3b0-4916-4cdf-adb0-7ae5e08ce6ae" />
 
-**Byte preview** — `/bytes.html` and `/bytes`.
+**Historical byte preview** — pictured URL `/bytes.html` (removed); current browser page: [`/api-bytes.html`](cmd/entropy-server/web/api-bytes.html), using WebSocket `/bytes`.
 
 <img width="640" height="360" alt="Byte preview interface" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
 
-**Words** — `/words.html` and `/words`.
+**Historical words page** — pictured URL `/words.html` (removed); current browser page: [`/api-words.html`](cmd/entropy-server/web/api-words.html), using WebSocket `/words`.
 
 <img width="640" height="360" alt="Word generation interface" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
 
-**Colours** — `/colors.html` and `/colors`.
+**Historical colour page** — pictured URL `/colors.html` (removed); current browser page: [`/api-colors.html`](cmd/entropy-server/web/api-colors.html), using WebSocket `/colors`.
 
 <img width="640" height="360" alt="Colour display interface" src="https://github.com/user-attachments/assets/c305b5dc-314b-4cdf-b0c0-2cab6bb49e53" />
 
-**File analysis** — `/upload.html` and `/files`.
+**Historical file-analysis page** — pictured URL `/upload.html` (removed); current browser page: [`/api-upload.html`](cmd/entropy-server/web/api-upload.html), using `POST /files`.
 
 <img width="600" height="600" alt="File analysis interface" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
 
