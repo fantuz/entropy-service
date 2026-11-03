@@ -1,0 +1,7 @@
+# Keep blank issues available for a small, personally maintained project.
+# Contributors can also choose the structured forms below.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (private reporting guidance)
+    url: https://github.com/fantuz/entropy-service/blob/main/SECURITY.md
+    about: Do not publish vulnerabilities, credentials, or private keys in public issues. Read the security policy first.

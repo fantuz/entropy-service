@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a focused enhancement or new capability.
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem first. Proposals are welcome, but this independently maintained project cannot commit to a delivery schedule. Distinguish prototyping from production or cryptographic assurance claims.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Entropy source / reseeding / DRBG
+        - HTTP or WebSocket API
+        - Client performance / diagnostics
+        - Browser showcase / UX
+        - Monitoring / deployment
+        - Documentation / developer tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the use case and why current behavior is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain expected behavior, compatibility considerations and any new resource requirements.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and trade-offs (optional)
+      description: Mention simpler workarounds or ways to keep complexity low.
+    validations:
+      required: false

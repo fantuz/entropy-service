@@ -1,0 +1,34 @@
+name: Documentation or browser usability
+description: Suggest corrections to docs, examples, error messages or visual consistency.
+title: "[Docs/UX] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for confusing examples, stale endpoint names, README omissions and browser presentation problems. Report security vulnerabilities privately using [SECURITY.md](https://github.com/fantuz/entropy-service/blob/main/SECURITY.md).
+  - type: input
+    id: location
+    attributes:
+      label: Page or file
+      placeholder: "README.md, docs/api.md, /api-gallery.html ..."
+    validations:
+      required: true
+  - type: textarea
+    id: confusion
+    attributes:
+      label: What is unclear or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested wording or behavior (optional)
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context (optional)
+      description: Include a screenshot if useful, with identifying information removed.
+    validations:
+      required: false

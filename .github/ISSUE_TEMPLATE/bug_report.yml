@@ -1,0 +1,69 @@
+name: Bug report
+description: Report a reproducible problem in the server, client, browser UI, or packaging.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. **Security vulnerabilities belong in the private-reporting process in [SECURITY.md](https://github.com/fantuz/entropy-service/blob/main/SECURITY.md), not public issues.** Remove secrets, tokens, private keys, network identifiers and personal data from logs or screenshots.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - entropy-server (HTTP/API)
+        - entropy-server (WebSocket)
+        - entropy-client
+        - Browser showcase / JavaScript
+        - Installation / packaging / CI
+        - Documentation
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release tag or `git rev-parse --short HEAD` (if building from source).
+      placeholder: "v1.x.x or abc1234"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and configuration
+      description: OS, Go version (if applicable), browser, transport, DRBG backend and relevant **redacted** flags.
+      placeholder: "Ubuntu ..., Go ..., ChaCha20, HTTP ..."
+    validations:
+      required: false
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal command or sequence and requested payload size if relevant.
+      placeholder: |
+        1. Start server with ...
+        2. Make request to ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs, errors, or screenshots (optional)
+      description: Redact secrets, keys, addresses and personal information. Do not post vulnerability details here.
+      render: shell
+    validations:
+      required: false

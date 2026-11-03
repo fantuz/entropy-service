@@ -23,11 +23,17 @@ The race detector requires a supported platform and a working C compiler with cg
 
 ## Workflow
 
-1. Open a narrowly scoped issue or discussion describing the change, where useful.
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) in project discussions.
+Use the [issue forms](.github/ISSUE_TEMPLATE/) for reproducible bugs, feature
+requests or documentation issues when they fit; blank issues remain available.
+Do not report security vulnerabilities through public forms.
+
+1. Open a narrowly scoped issue describing the change, where useful.
 2. Create a branch; keep production behavior changes separate from large formatting or documentation rewrites.
 3. Add or update regression tests for new handlers, limits, cancellation behavior, WebSocket protocols, and browser assets.
 4. Run the tests and linter above. Check `git diff --check` before committing.
-5. Open a pull request explaining motivation, compatibility impact, validation performed, and any benchmark context.
+5. Open a pull request using the [pull request template](.github/pull_request_template.md),
+   explaining motivation, compatibility impact, validation performed, and any benchmark context.
 
 Do not commit device secrets, production TLS keys, credentials, or user data. When submitting a security finding, follow [SECURITY.md](SECURITY.md) rather than posting the details publicly.
 
