@@ -83,36 +83,60 @@
       </section>
       <section aria-labelledby="activity-title" class="status-kpis">
         <h2 id="activity-title">Activity &amp; exhaustion signals</h2>
-        <p class="sub">Rates use recent Prometheus counter snapshots (up to five seconds of history). Short polling intervals may show sampling noise; counter resets restart rate calculation.</p>
+        <p class="sub">Rates use recent Prometheus counter snapshots (up to five seconds of history). Short polling intervals may show sampling noise; counter resets restart rate calculation. Dim tracks show process-lifetime peak observed 1-second rates; bright fill shows the current browser-observed rate relative to that peak.</p>
         <div class="status-activity-grid">
           <article class="status-activity-card">
             <h3>DRBG generation rate</h3>
             <output id="kpi-generation-rate">—</output>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-generation-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-generation-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            </div>
             <p>Includes internal seed derivation; not network throughput</p>
           </article>
           <article class="status-activity-card">
             <h3>WebSocket frames</h3>
             <output id="kpi-ws-payload-rate">—</output>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-ws-payload-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-ws-payload-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            </div>
             <p>Successfully sent WS/WSS messages per second</p>
           </article>
           <article class="status-activity-card">
             <h3>HTTP requests</h3>
             <output id="kpi-http-request-rate">—</output>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-http-request-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-http-request-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            </div>
             <p>All HTTP requests, including dashboard polling</p>
           </article>
           <article class="status-activity-card">
             <h3>WebSocket rejection pace</h3>
             <output id="kpi-ws-reject-rate">—</output>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-ws-reject-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-ws-reject-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            </div>
             <p>Recent admission rejects, expressed per minute</p>
           </article>
           <article class="status-activity-card">
             <h3>HTTP rejection pace</h3>
             <output id="kpi-http-reject-rate">—</output>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-http-reject-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-http-reject-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            </div>
             <p>Recent admission rejects, expressed per minute</p>
           </article>
           <article class="status-activity-card">
             <h3>Live DRBG instances</h3>
             <output id="kpi-drbg-instances">—</output>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-drbg-instances-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-drbg-instances-peak-label" class="activity-peak-label">PEAK —</small>
+            </div>
             <p>Root and active child generators</p>
           </article>
           <article class="status-activity-card">

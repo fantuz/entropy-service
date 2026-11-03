@@ -76,7 +76,7 @@ func healthHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
 	}
 }
 
-func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget, httpBudget *httpRequestBudget) http.HandlerFunc {
+func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget, httpBudget *httpRequestBudget, monitor ...*activityPeakMonitor) http.HandlerFunc {
 	const (
 		counterType = "counter"
 		gaugeType   = "gauge"
@@ -93,6 +93,11 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget,
 		}
 
 		generated, payloads := metrics.BytesGenerated(), metrics.NumWSPayloads()
+
+		var activity activityPeakValues
+		if len(monitor) != 0 {
+			activity = monitor[0].snapshot()
+		}
 		// The unsuffixed legacy payload alias stays untyped so counter parsers
 		// do not normalize it to the canonical wss_payloads_total a second time.
 		values := []struct {
@@ -109,6 +114,11 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget,
 			{"rng_reseed_last_success_timestamp_seconds", "Unix timestamp of the last successful seed for this root generator", gaugeType, meta.LastReseedAt.Unix()},
 			{"rng_ready", "One when this root generator has fresh seed state and no unresolved reseed failure", gaugeType, ready},
 			{"http_requests_total", "HTTP requests received, including errors, upgrades, probes and static files", counterType, metrics.NumHTTPRequests()},
+			{"rng_generation_peak_bytes_per_second", "Highest observed interval-average DRBG generation bytes per second since server process start; not hardware entropy rate", gaugeType, activity.GeneratedBytesPerSecond},
+			{"wss_payloads_peak_per_second", "Highest observed interval-average WebSocket frames per second since server process start", gaugeType, activity.WSFramesPerSecond},
+			{"http_requests_peak_per_second", "Highest observed interval-average HTTP requests per second since server process start", gaugeType, activity.HTTPRequestsPerSecond},
+			{"ws_rejections_peak_per_minute", "Highest observed interval-average WebSocket admission rejections per minute since server process start", gaugeType, activity.WSRejectionsPerMinute},
+			{"http_generation_rejections_peak_per_minute", "Highest observed interval-average HTTP generation admission rejections per minute since server process start", gaugeType, activity.HTTPRejectionsPerMinute},
 			{"http_generation_requests_active", "Admitted HTTP generation requests across HTTP and HTTPS", gaugeType, httpUsage.Active},
 			{"http_generation_requests_limit", "Configured HTTP generation request limit", gaugeType, httpUsage.MaxRequests},
 			{"http_generation_requests_peak", "Highest concurrent admitted HTTP generation requests since this server started", gaugeType, httpUsage.PeakActive},
@@ -121,6 +131,7 @@ func metricsHandler(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudget,
 			{"wss_payloads_total", "WebSocket messages sent over WS or WSS", counterType, payloads},
 			{"wss_payloads", "Deprecated alias of wss_payloads_total", "untyped", payloads},
 			{"drbg_instance_count", "Current number of DRBG instances", gaugeType, meta.DRBGInstanceCnt},
+			{"drbg_instances_peak", "Maximum simultaneous DRBG instances since process start", gaugeType, drbg.PeakInstances()},
 			{"ws_connections_active", "Admitted entropy WebSockets across HTTP and HTTPS", gaugeType, wsUsage.Active},
 			{"ws_connections_limit", "Configured entropy WebSocket connection limit", gaugeType, wsUsage.MaxConnections},
 			{"ws_connections_peak", "Highest concurrent admitted WebSocket connections since this server started", gaugeType, wsUsage.PeakActive},

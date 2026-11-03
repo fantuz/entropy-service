@@ -46,6 +46,12 @@ const first = [
     "http_generation_requests_limit 100",
     "http_generation_requests_peak 75",
     "drbg_instance_count 3",
+    "drbg_instances_peak 6",
+    "rng_generation_peak_bytes_per_second 2097152",
+    "wss_payloads_peak_per_second 20",
+    "http_requests_peak_per_second 8",
+    "ws_rejections_peak_per_minute 24",
+    "http_generation_rejections_peak_per_minute 48",
     "rng_reseeds_total 77",
 ].join("\n");
 update(first);
@@ -76,8 +82,18 @@ assert.equal(value("kpi-ws-payload-rate"), "10.0 frames/s");
 assert.equal(value("kpi-http-request-rate"), "4.0 req/s");
 assert.equal(value("kpi-ws-reject-rate"), "12.0 rejects/min");
 assert.equal(value("kpi-http-reject-rate"), "24.0 rejects/min");
+assert.equal(document.getElementById("kpi-generation-rate-peak-meter").value, 50);
+assert.equal(value("kpi-generation-rate-peak-label"), "PEAK 2.00 MiB/s");
+assert.equal(document.getElementById("kpi-ws-payload-rate-peak-meter").value, 50);
+assert.equal(document.getElementById("kpi-http-request-rate-peak-meter").value, 50);
+assert.equal(document.getElementById("kpi-ws-reject-rate-peak-meter").value, 50);
+assert.equal(document.getElementById("kpi-http-reject-rate-peak-meter").value, 50);
+assert.equal(document.getElementById("kpi-drbg-instances-peak-meter").value, 50);
+assert.equal(value("kpi-drbg-instances-peak-label"), "PEAK 6 instances");
 unavailable();
 assert.equal(value("kpi-generation-rate"), "—");
+assert.equal(value("kpi-generation-rate-peak-label"), "PEAK N/A · AWAITING SAMPLES");
+assert.equal(document.getElementById("kpi-generation-rate-peak-meter").value, 0);
 assert.equal(value("kpi-httpMemory-value"), "N/A");
 assert.equal(value("kpi-httpMemory-peak-detail"), "PEAK N/A");
 assert.equal(document.getElementById("kpi-httpMemory-peak-shadow").style.width, "0%");

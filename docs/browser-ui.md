@@ -138,6 +138,19 @@ readiness age limit; errors or readiness degradation mark it critical.
 - **DRBG generation MiB/s**, **WebSocket frames/s** and **HTTP requests/s** are
   deltas between successful scrapes, not measurements of QRNG source throughput.
   HTTP requests include static assets and the dashboard's own polling.
+- **Six lifetime activity peaks** accompany generation MiB/s, WebSocket
+  frames/s, HTTP requests/s, WebSocket rejection pace, HTTP rejection pace,
+  and live DRBG instances. Five rate peaks come from a single server-side
+  roughly one-second sampling loop, independent of the browser. The
+  `drbg_instances_peak` gauge is an exact atomic high-water mark on
+  generator creation. All reset on server restart.
+  Dim tracks represent the stored peak; bright bars indicate the present
+  browser-observed value as a fraction of the peak. The browser's rolling
+  rate window differs from the server's one-second sampler, so an individual
+  displayed rate can occasionally exceed the sampled server peak. The
+  visual fill is clamped in that case without modifying either value.
+  These bars are relative comparisons, **not capacity or safety limits**.
+  Cumulative rejection and reseed totals intentionally have no peak bars.
 - **HTTP/WS rejection pace** sums admission rejections due to connection/request
   limits, estimated-memory pressure and excessive requested sizes. The latest
   interval is scaled to *rejections per minute*, not a percentage of requests.

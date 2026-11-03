@@ -79,7 +79,10 @@ type HealthInfo struct {
 	EntropyFillPct       int    `json:"entropy_buffered_pct"`
 }
 
-var activeDRBG atomic.Int64
+var (
+	activeDRBG atomic.Int64
+	peakDRBG   atomic.Int64
+)
 
 // ChaCha20 has 2^32 blocks of 64 bytes per key. Use the same operational
 // ceiling for both backends; reseeding resets the byte budget.
@@ -91,6 +94,12 @@ func DecreaseActiveInstances(quantity int64) {
 
 func ActiveInstances() int64 {
 	return activeDRBG.Load()
+}
+
+// PeakInstances is the highest concurrent number of DRBG instances created
+// during this process lifetime, including the root generator.
+func PeakInstances() int64 {
+	return peakDRBG.Load()
 }
 
 // NewDRBG creates a new DRBG instance from a seed.
@@ -123,7 +132,14 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 		return DRBG{}, err
 	}
 
-	activeDRBG.Add(1)
+	active := activeDRBG.Add(1)
+
+	for {
+		peak := peakDRBG.Load()
+		if active <= peak || peakDRBG.CompareAndSwap(peak, active) {
+			break
+		}
+	}
 
 	return DRBG{
 		key:       key,
