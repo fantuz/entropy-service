@@ -217,6 +217,7 @@ func TestStatusCapacityDashboard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for _, name := range []string{
 		"http_generation_memory_reserved_bytes", "ws_memory_reserved_bytes",
 		"ws_rejected_connections_total", "http_generation_rejected_requests_total",
@@ -226,6 +227,7 @@ func TestStatusCapacityDashboard(t *testing.T) {
 			t.Errorf("KPI controller missing metric %q", name)
 		}
 	}
+
 	if strings.Contains(string(script), "qrng_buffer_capacity_pct") {
 		t.Fatal("disabled QRNG buffer must not be shown as a fill percentage")
 	}
