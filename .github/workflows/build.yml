@@ -37,6 +37,8 @@ jobs:
         run: go test ./...
       - name: Test browser KPI calculations
         run: node scripts/test-status-kpis.mjs
+      - name: Test status refresh scheduling
+        run: node scripts/test-status-refresh.mjs
       - name: Race-test entropy server
         run: go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
       - name: Run linters
