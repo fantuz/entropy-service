@@ -64,13 +64,16 @@
                 const body = await metrics.value.text();
                 setValue("bytes-generated", metric(body, "rng_bytes_generated_total"));
                 setValue("active-websockets", metric(body, "ws_connections_active"));
+                window.EntropyStatusKPIs.update(body);
                 setStatus("metrics", "ready", "AVAILABLE");
             } catch (_) {
+                window.EntropyStatusKPIs.unavailable();
                 setStatus("metrics", "error", "INVALID RESPONSE");
                 setValue("bytes-generated", "—");
                 setValue("active-websockets", "—");
             }
         } else {
+            window.EntropyStatusKPIs.unavailable();
             setStatus("metrics", "error", "UNREACHABLE");
             setValue("bytes-generated", "—");
             setValue("active-websockets", "—");
