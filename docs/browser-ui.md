@@ -44,6 +44,31 @@ first 64 KiB per accepted frame, and display updates are throttled to five per
 second. Receiver counters are not equivalent to byte generation or network
 throughput benchmarks. The Yin/Yang legend is centered under the chart.
 
+### Shannon entropy sample alert
+
+The **Shannon entropy** instant value now has its own panel, independent of the
+byte histogram. Choose a red-alert threshold between **1.00000** and **8.00000**
+bits per byte, in increments of **0.00001** (default **7.99990**). The panel
+alone turns red when the *full-precision* sample estimate is strictly below
+that threshold. Equality is not an alert. The numeric readout is rounded to
+five decimals and can therefore appear equal to the threshold at its boundary.
+Changing the selector immediately reevaluates the most recently analysed
+sample, without reconnecting the WebSocket or contacting the server.
+
+The threshold is a **per-browser preference**, stored in `localStorage` if
+available. It persists across page reloads in that browser, but never changes
+the server, API responses or the preferences of other visitors. Restricted
+browser storage falls back gracefully to the default.
+
+**Interpretation:** Shannon's plug-in entropy estimator is sample-size-dependent
+and commonly *below* 8 even for excellent random streams. In particular, a
+threshold of 7.99990 can flag perfectly healthy 4 KiB or 64 KiB samples. This
+alert is a user-selected **statistical watchpoint**, *not* a cryptographic
+health check, entropy-source exhaustion detector, or independent randomness
+certification. Only the Shannon panel changes colour; other charts remain
+unaffected.
+
+
 ## Word display stability
 
 `/api-words.html` reserves a stable display region so new strings do not resize
