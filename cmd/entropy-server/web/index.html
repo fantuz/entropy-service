@@ -25,7 +25,7 @@
     <main>
       <section aria-labelledby="explore-title">
         <h2 id="explore-title">Explore in your browser</h2>
-        <p class="sub">These pages are interactive demonstrations. Choose one to start.</p>
+        <p class="sub">Explore live, interactive demonstrations of random bytes, colours, words, sound and analysis.</p>
         <div class="grid">
           <a class="card" href="/api-bytes.html"><strong>Random bytes</strong><span>Inspect byte samples, encodings and their digest.</span><small class="path">/api-bytes.html</small></a>
           <a class="card" href="/api-colors.html"><strong>Colours</strong><span>Watch changing colours derived from sample hashes.</span><small class="path">/api-colors.html</small></a>
@@ -38,7 +38,7 @@
 
       <section aria-labelledby="gallery-title">
         <h2 id="gallery-title">HTTP endpoint gallery</h2>
-        <p class="sub">A dedicated showcase for server-generated images, heatmaps, QR codes and HTML word samples.</p>
+        <p class="sub">See server-generated images, heatmaps, QR codes and words in one synchronized gallery.</p>
         <a class="card gallery-feature" href="/api-gallery.html">
           <strong>Open the HTTP endpoint gallery</strong>
           <span>Explore four live HTTP responses in framed previews, without leaving the Matrix-style interface.</span>
@@ -48,7 +48,7 @@
 
       <section aria-labelledby="status-title">
         <h2 id="status-title">Check the service</h2>
-        <p class="sub">View all operational checks in one browser dashboard, or open the underlying JSON and Prometheus APIs directly.</p>
+        <p class="sub">Monitor readiness, liveness and resource pressure, or inspect the raw operational metrics.</p>
         <div class="grid service-grid">
           <a class="card" href="/api-status.html"><strong>Service status dashboard</strong><span>Live, ready, and metrics in a single browser view.</span><small class="path">/api-status.html</small></a>
           <a class="card" href="/live"><strong>Liveness</strong><span>Check whether the HTTP service responds.</span><small class="path">/live</small></a>
@@ -63,7 +63,7 @@
 
       <section aria-labelledby="http-title">
         <h2 id="http-title">Direct HTTP endpoints</h2>
-        <p class="sub">These are API responses, not HTML user interfaces. Binary responses are downloads; the file-analysis API expects a POST request.</p>
+        <p class="sub">Use the raw HTTP APIs directly: binary downloads, generated media and POST file analysis.</p>
         <div class="grid">
           <a class="card" href="/v1/data/random?bytes=4096"><strong>Random bytes</strong><span>Download a 4 KiB demonstration response from a private DRBG.</span><small class="path">GET /v1/data/random?bytes=4096</small></a>
           <a class="card" href="/v1/data/test?bytes=1024"><strong>Test bytes</strong><span>Download a 1 KiB response from the serving root generator.</span><small class="path">GET /v1/data/test?bytes=1024</small></a>
@@ -79,8 +79,8 @@
 
       <section aria-labelledby="ws-title">
         <h2 id="ws-title">Live WebSocket endpoints</h2>
-        <p class="sub">The cards open working browser demos. The paths shown are raw WebSocket upgrade routes; they require a WebSocket client, not a normal browser GET.</p>
-        <div class="grid">
+        <p class="sub">Explore streaming demos; raw WebSocket routes require a WebSocket client, not an ordinary GET.</p>
+        <div class="grid websocket-grid">
           <a class="card" href="/api-stream.html"><strong>Binary stream</strong><span>Raw binary frames, visualized by the stream-analysis page.</span><small class="path">WS /stream</small></a>
           <a class="card" href="/api-bytes.html"><strong>Byte stream</strong><span>Compact binary digest + sample, or optional JSON formats.</span><small class="path">WS /bytes</small></a>
           <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
