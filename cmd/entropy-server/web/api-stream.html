@@ -23,9 +23,24 @@
     </div>
     <p id="sample-info" class="analysis-meta" aria-live="off">Awaiting a sample for analysis.</p>
 
+    <section class="analysis-card entropy-alert-card" id="entropy-alert-card"
+             data-state="waiting" aria-labelledby="entropy-alert-title">
+      <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>
+      <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output>
+        <span>bits/byte</span></p>
+      <label class="entropy-threshold-control" for="entropy-threshold">
+        Red alert below
+        <input id="entropy-threshold" type="number" min="1" max="8"
+               step="0.00001" value="7.99990" inputmode="decimal">
+        <span>bits/byte</span>
+      </label>
+      <p class="entropy-alert-message" id="entropy-alert-message" role="status"
+         aria-live="polite">AWAITING FIRST ANALYSIS SAMPLE</p>
+      <p class="entropy-alert-hint">Sample-size-dependent statistical indicator, not a cryptographic health test.
+        High thresholds can trigger on healthy finite samples.</p>
+    </section>
     <div class="analysis-card">
-      <h2 class="analysis-label">Shannon entropy · <span id="entropy" class="analysis-value">—</span> bits/byte</h2>
-      <h3 class="analysis-label">Byte histogram · 256 values</h3>
+      <h2 class="analysis-label">Byte histogram · 256 values</h2>
       <canvas id="histogram" width="800" height="110" aria-label="Byte-frequency histogram"></canvas>
     </div>
     <div class="analysis-card">
@@ -47,6 +62,7 @@
     <p class="note">High-frequency frames are sampled for display (at most five updates per second). The complete frame is delivered by the server, but only a bounded prefix is analysed in the browser.</p>
     <p><a href="/">← Back to all endpoints</a></p>
   </main>
+  <script src="/stream-entropy-alert.js" defer></script>
   <script src="/stream-analysis.js" defer></script>
 </body>
 </html>
