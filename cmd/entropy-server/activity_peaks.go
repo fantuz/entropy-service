@@ -18,11 +18,11 @@ type activityPeakCounters struct {
 }
 
 type activityPeakValues struct {
-	GeneratedBytesPerSecond	float64
-	WSFramesPerSecond	float64
-	HTTPRequestsPerSecond	float64
-	WSRejectionsPerMinute	float64
-	HTTPRejectionsPerMinute	float64
+	GeneratedBytesPerSecond float64
+	WSFramesPerSecond       float64
+	HTTPRequestsPerSecond   float64
+	WSRejectionsPerMinute   float64
+	HTTPRejectionsPerMinute float64
 }
 
 // activityPeakMonitor records lifetime maximum *observed interval averages*.
