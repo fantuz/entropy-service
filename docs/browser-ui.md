@@ -62,7 +62,33 @@ field and connection notice retain their positions.
 | `/metrics-2` | Prometheus service counters and limits |
 
 This page polls the existing endpoints approximately every five seconds and
-renders a small subset of values. The original API endpoints are unchanged.
+renders an operational snapshot, four admission-capacity gauges and nine activity
+indicators.
+
+### Reading the capacity gauges and KPIs
+
+- **HTTP/WS memory pressure** is estimated reserved working memory divided by
+  the respective configured admission budget. This is *not* actual process RAM,
+  Go heap, or physical entropy-buffer fill.
+- **HTTP/WS slot utilization** is active admitted requests or connections divided
+  by the configured limit. Short HTTP requests can finish between scrapes.
+- **DRBG generation MiB/s**, **WebSocket frames/s** and **HTTP requests/s** are
+  deltas between successful scrapes, not measurements of QRNG source throughput.
+  HTTP requests include static assets and the dashboard's own polling.
+- **HTTP/WS rejection pace** sums admission rejections due to connection/request
+  limits, estimated-memory pressure and excessive requested sizes. The latest
+  interval is scaled to *rejections per minute*, not a percentage of requests.
+  Cumulative rejection totals are also shown.
+- **DRBG instance count** and **successful root reseeds** are existing server
+  counters. Rate calculations show *SAMPLING* until two good snapshots exist,
+  and reset on failed scrapes or counter rollback.
+- The historical `qrng_buffer_*` Prometheus metrics are fixed at zero because
+  the older software buffer is no longer active. Displaying its fill percent
+  would be misleading, so this dashboard does not use it.
+
+These estimates help indicate admission exhaustion and concurrency pressure;
+they are not a complete memory profiler. Use runtime/pprof data for heap/RSS
+investigation and hardware instrumentation for actual seed-source buffering. The original API endpoints are unchanged.
 For monitoring, continue querying the JSON/Prometheus routes directly.
 
 Compatibility aliases `/health-1`, `/health-2` and `/metrics-1` remain available,
