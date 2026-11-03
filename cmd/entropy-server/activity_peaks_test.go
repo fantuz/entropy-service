@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,9 +40,9 @@ func TestActivityPeakMonitorIntervalRatesAndReset(t *testing.T) {
 	// Counter resets and clock discontinuities cannot create giant spikes.
 	monitor.observe(base.Add(4*time.Second), activityPeakCounters{})
 	monitor.observe(base.Add(4*time.Second), activityPeakCounters{
-		generatedBytes: math.MaxUint64, wsFrames: math.MaxUint64,
-		httpRequests: math.MaxUint64, wsRejections: math.MaxUint64,
-		httpRejections: math.MaxUint64,
+		generatedBytes: ^uint64(0), wsFrames: ^uint64(0),
+		httpRequests: ^uint64(0), wsRejections: ^uint64(0),
+		httpRejections: ^uint64(0),
 	})
 	if after := monitor.snapshot(); after != first {
 		t.Fatalf("counter resets must not inflate existing peaks: %+v", after)
