@@ -132,6 +132,29 @@
         text(id, value === null ? "SAMPLING…" : `${value.toFixed(decimals)} ${suffix}`);
     }
 
+    // The dim track represents the highest observed one-second average since
+    // server startup; the bright fill is the browser's recent current rate.
+    // Distinct sampling windows mean a current estimate may briefly exceed
+    // a server peak; clamp the drawing without changing either measurement.
+    function peakMeter(id, current, peak, unit, digits) {
+        const meter = document.getElementById(`kpi-${id}-peak-meter`);
+        if (peak === null || current === null) {
+            meter.value = 0;
+            text(`kpi-${id}-peak-label`, "PEAK N/A · AWAITING SAMPLES");
+            return;
+        }
+
+        if (peak <= 0) {
+            meter.value = 0;
+            text(`kpi-${id}-peak-label`, "PEAK 0 " + unit);
+            return;
+        }
+
+        const fraction = Math.max(0, Math.min(100, 100 * current / peak));
+        meter.value = fraction;
+        text(`kpi-${id}-peak-label`, `PEAK ${peak.toFixed(digits)} ${unit}`);
+    }
+
     function update(source) {
         const metrics = readMetrics(source);
         if (metrics.size === 0) throw new Error("No numeric Prometheus metrics available");
@@ -159,8 +182,24 @@
         rate("kpi-ws-payload-rate", perSecond(metrics, prior, "wss_payloads_total", elapsed), "frames/s", 1);
         rate("kpi-http-request-rate", perSecond(metrics, prior, "http_requests_total", elapsed), "req/s", 1);
         rate("kpi-ws-reject-rate", rejectionRate(metrics, prior, wsRejectNames, elapsed), "rejects/min", 1);
-        rate("kpi-http-reject-rate", rejectionRate(metrics, prior, httpRejectNames, elapsed), "rejects/min", 1);
-        text("kpi-drbg-instances", count(get(metrics, "drbg_instance_count")));
+        const httpRejectPace = rejectionRate(metrics, prior, httpRejectNames, elapsed);
+        rate("kpi-http-reject-rate", httpRejectPace, "rejects/min", 1);
+
+        const drbgInstances = get(metrics, "drbg_instance_count");
+        peakMeter("generation-rate",
+            generationPerSecond === null ? null : generationPerSecond / 1048576,
+            get(metrics, "rng_generation_peak_bytes_per_second") === null ? null :
+                get(metrics, "rng_generation_peak_bytes_per_second") / 1048576, "MiB/s", 2);
+        peakMeter("ws-payload-rate", perSecond(metrics, prior, "wss_payloads_total", elapsed),
+            get(metrics, "wss_payloads_peak_per_second"), "frames/s", 1);
+        peakMeter("http-request-rate", perSecond(metrics, prior, "http_requests_total", elapsed),
+            get(metrics, "http_requests_peak_per_second"), "req/s", 1);
+        peakMeter("ws-reject-rate", rejectionRate(metrics, prior, wsRejectNames, elapsed),
+            get(metrics, "ws_rejections_peak_per_minute"), "rejects/min", 1);
+        peakMeter("http-reject-rate", httpRejectPace,
+            get(metrics, "http_generation_rejections_peak_per_minute"), "rejects/min", 1);
+        peakMeter("drbg-instances", drbgInstances, get(metrics, "drbg_instances_peak"), "instances", 0);
+        text("kpi-drbg-instances", count(drbgInstances));
         text("kpi-reseed-successes", count(get(metrics, "rng_reseeds_total")));
         text("kpi-ws-rejections", count(sum(metrics, wsRejectNames)));
         text("kpi-http-rejections", count(sum(metrics, httpRejectNames)));
@@ -190,6 +229,10 @@
         for (const name of gaugeNames) gauge(name, null, null, null, name.includes("Memory"));
         for (const name of rateNames) text(`kpi-${name}`, "—");
         for (const name of extraNames) text(`kpi-${name}`, "—");
+        for (const id of ["generation-rate", "ws-payload-rate", "http-request-rate",
+            "ws-reject-rate", "http-reject-rate", "drbg-instances"]) {
+            peakMeter(id, null, null, "", 0);
+        }
     }
 
     window.EntropyStatusKPIs = {update, unavailable, updateReady};
