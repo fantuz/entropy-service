@@ -27,23 +27,29 @@
         <h2 id="explore-title">Explore in your browser</h2>
         <p class="sub">These pages are interactive demonstrations. Choose one to start.</p>
         <div class="grid">
-          <a class="card" href="/api-gallery.html"><strong>HTTP endpoint gallery</strong><span>See image, heatmap, QR and server-rendered words responses inside the showcase.</span><small class="path">/api-gallery.html</small></a>
           <a class="card" href="/api-bytes.html"><strong>Random bytes</strong><span>Inspect byte samples, encodings and their digest.</span><small class="path">/api-bytes.html</small></a>
           <a class="card" href="/api-colors.html"><strong>Colours</strong><span>Watch changing colours derived from sample hashes.</span><small class="path">/api-colors.html</small></a>
           <a class="card" href="/api-words.html"><strong>Random words</strong><span>Explore dictionary word samples and their SHA-256 digest.</span><small class="path">/api-words.html</small></a>
           <a class="card" href="/api-sound.html"><strong>Sound</strong><span>Generate and play short harmonically synthesised clips.</span><small class="path">/api-sound.html</small></a>
           <a class="card" href="/api-upload.html"><strong>File analysis</strong><span>Upload a file to inspect its byte statistics and SHA-256 digest.</span><small class="path">/api-upload.html</small></a>
-          <a class="card" href="/v1/image/heatmap"><strong>Entropy heatmap</strong><span>View an image illustrating sample byte patterns.</span><small class="path">/v1/image/heatmap</small></a>
-          <a class="card" href="/v1/image/random"><strong>Random image</strong><span>View a generated RGB image.</span><small class="path">/v1/image/random</small></a>
-          <a class="card" href="/v1/qr/random"><strong>QR code</strong><span>Generate a QR image containing a hexadecimal sample.</span><small class="path">/v1/qr/random</small></a>
           <a class="card" href="/api-stream.html"><strong>Live stream analysis</strong><span>Histogram, RGB mosaic, Yin/Yang, waveform and FFT of selected binary samples.</span><small class="path">/api-stream.html</small></a>
         </div>
+      </section>
+
+      <section aria-labelledby="gallery-title">
+        <h2 id="gallery-title">HTTP endpoint gallery</h2>
+        <p class="sub">A dedicated showcase for server-generated images, heatmaps, QR codes and HTML word samples.</p>
+        <a class="card gallery-feature" href="/api-gallery.html">
+          <strong>Open the HTTP endpoint gallery</strong>
+          <span>Explore four live HTTP responses in framed previews, without leaving the Matrix-style interface.</span>
+          <small class="path">/api-gallery.html</small>
+        </a>
       </section>
 
       <section aria-labelledby="status-title">
         <h2 id="status-title">Check the service</h2>
         <p class="sub">View all operational checks in one browser dashboard, or open the underlying JSON and Prometheus APIs directly.</p>
-        <div class="grid">
+        <div class="grid service-grid">
           <a class="card" href="/api-status.html"><strong>Service status dashboard</strong><span>Live, ready, and metrics in a single browser view.</span><small class="path">/api-status.html</small></a>
           <a class="card" href="/live"><strong>Liveness</strong><span>Check whether the HTTP service responds.</span><small class="path">/live</small></a>
           <a class="card" href="/ready"><strong>Readiness</strong><span>Inspect seed freshness and reseed errors.</span><small class="path">/ready</small></a>
@@ -51,7 +57,7 @@
         </div>
         <details class="panel">
           <summary>Compatibility health and metrics aliases</summary>
-          <p>The aliases return the same operational information, and remain reachable for existing clients: <a href="/health-1">/health-1</a> · <a href="/health-2">/health-2</a> · <a href="/metrics-1">/metrics-1</a>. Scrape only one metrics endpoint.</p>
+	  <p>The aliases return the same operational information, and remain reachable for existing clients: </br> <a href="/health-1">/health-1</a> </br> <a href="/health-2">/health-2</a> </br> <a href="/metrics-1">/metrics-1</a></p>
         </details>
       </section>
 

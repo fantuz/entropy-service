@@ -241,3 +241,15 @@ code { font-size: .88em; }
 .page-status .status-summary dd { margin: .2rem 0 0; color: var(--cyan); overflow-wrap: anywhere; }
 .page-status .status-links { text-align: center; margin-top: 1rem; }
 @media (max-width: 760px) { .page-status .status-grid { grid-template-columns: 1fr; } .page-status .status-summary { grid-template-columns: 1fr; } }
+
+/* Home-page section hierarchy: the HTTP gallery spans its own row. */
+.page-home .gallery-feature { min-height: 0; }
+
+/* Exactly four operational cards per row on wide desktop screens. */
+.page-home .service-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1050px) {
+  .page-home .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .page-home .service-grid { grid-template-columns: 1fr; }
+}
