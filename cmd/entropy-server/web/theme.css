@@ -273,3 +273,31 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 @media (max-width: 600px) {
   .page-home .service-grid { grid-template-columns: 1fr; }
 }
+
+/* Service Status gauges: admission pressure, not physical entropy-buffer fill. */
+.page-status .status-kpis { margin-top: 2.25rem; }
+.page-status .status-pressure-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.page-status .status-pressure-card,
+.page-status .status-activity-card { min-width: 0; padding: clamp(1rem, 2.5vw, 1.4rem); border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+.page-status .status-pressure-card h3,
+.page-status .status-activity-card h3 { margin: 0 0 .65rem; font-size: .84rem; }
+.page-status .status-pressure-card output,
+.page-status .status-activity-card output { display: block; font-size: clamp(1.1rem, 2vw, 1.5rem); color: var(--green-bright); font-variant-numeric: tabular-nums; font-weight: 700; overflow-wrap: anywhere; }
+.page-status .status-pressure-card progress { display: block; width: 100%; height: 1rem; margin: .8rem auto; border: 0; border-radius: 999px; overflow: hidden; accent-color: var(--green); }
+.page-status .status-pressure-card progress::-webkit-progress-bar { background: var(--surface-raised); border-radius: 999px; }
+.page-status .status-pressure-card progress::-webkit-progress-value { background: var(--green); border-radius: 999px; }
+.page-status .status-pressure-card progress::-moz-progress-bar { background: var(--green); border-radius: 999px; }
+.page-status .status-pressure-card[data-state="warning"] progress { accent-color: var(--warn); }
+.page-status .status-pressure-card[data-state="warning"] progress::-webkit-progress-value { background: var(--warn); }
+.page-status .status-pressure-card[data-state="warning"] progress::-moz-progress-bar { background: var(--warn); }
+.page-status .status-pressure-card[data-state="critical"] progress { accent-color: var(--error); }
+.page-status .status-pressure-card[data-state="critical"] progress::-webkit-progress-value { background: var(--error); }
+.page-status .status-pressure-card[data-state="critical"] progress::-moz-progress-bar { background: var(--error); }
+.page-status .status-pressure-card[data-state="warning"] output { color: var(--warn); }
+.page-status .status-pressure-card[data-state="critical"] output { color: var(--error); }
+.page-status .status-pressure-detail,
+.page-status .status-activity-card p { margin: .5rem auto 0; color: var(--muted); font-size: .78rem; }
+.page-status .status-activity-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.page-status .status-kpi-note { max-width: 90ch; font-size: .83rem; color: var(--muted); }
+@media (max-width: 850px) { .page-status .status-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .page-status .status-pressure-grid, .page-status .status-activity-grid { grid-template-columns: 1fr; } }
