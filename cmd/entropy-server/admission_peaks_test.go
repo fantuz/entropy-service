@@ -33,6 +33,7 @@ func TestAdmissionHighWaterMarks(t *testing.T) {
 	httpFirst()
 	httpSecond()
 	httpSecond()
+
 	usage = httpBudget.usage()
 	if usage.Active != 0 || usage.Reserved != 0 ||
 		usage.PeakActive != 2 || usage.PeakReserved != 384<<10 {
