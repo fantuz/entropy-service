@@ -20,7 +20,7 @@ let time = 10000;
 const performance = { now: () => time };
 const js = readFileSync(new URL("../cmd/entropy-server/web/status-kpis.js", import.meta.url), "utf8");
 vm.runInNewContext(js, { document, window, performance });
-const { update, unavailable } = window.EntropyStatusKPIs;
+const { update, unavailable, updateReady } = window.EntropyStatusKPIs;
 const value = id => document.getElementById(id).textContent;
 const state = id => document.getElementById(id).dataset.state;
 const first = [
