@@ -69,6 +69,27 @@ certification. Only the Shannon panel changes colour; other charts remain
 unaffected.
 
 
+## Byte, colour and upload presentation
+
+`/api-bytes.html` uses the common Matrix theme for its hexadecimal, Base64
+and SHA-256 fields rather than an old inline stylesheet. Base64 remains
+centered and wraps as needed without changing the underlying sample.
+
+`/api-colors.html` displays the 64-character SHA-256 digest on **two
+32-character lines** (16 whole byte pairs per line), preventing uneven
+30+30+2 wrapping at typical browser widths. This is presentation only; the
+hash used to generate the background colour is unchanged.
+
+`/api-upload.html` now follows the stream-analysis card layout. File
+selection and upload controls appear first, then Shannon entropy, file
+metadata, full-upload SHA-256, the histogram, RGB mosaic, Yin/Yang bit
+balance, waveform and FFT preview. Existing upload and cancel handling,
+underlying `/files` API and result semantics are unchanged.
+
+The four `WS /...` route labels in the homepage's WebSocket cards are pinned
+to the card bottoms so they align even when text wraps at different zoom
+levels.
+
 ## Word display stability
 
 `/api-words.html` reserves a stable display region so new strings do not resize
