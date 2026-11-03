@@ -47,7 +47,10 @@ vm.runInNewContext(source, {
     setTimeout: setTimeoutFake, clearTimeout: clearTimeoutFake,
 });
 async function flush() {
-    for (let i = 0; i < 12; i++) await Promise.resolve();
+    // Let Promise.allSettled, response-body reads and finally blocks complete.
+    for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setImmediate(resolve));
+    }
 }
 await flush();
 assert.equal(fetchCount, 3);
