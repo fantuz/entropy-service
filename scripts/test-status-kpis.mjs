@@ -20,7 +20,7 @@ let time = 10000;
 const performance = { now: () => time };
 const js = readFileSync(new URL("../cmd/entropy-server/web/status-kpis.js", import.meta.url), "utf8");
 vm.runInNewContext(js, { document, window, performance });
-const { update, unavailable } = window.EntropyStatusKPIs;
+const { update, unavailable, updateReady } = window.EntropyStatusKPIs;
 const value = id => document.getElementById(id).textContent;
 const state = id => document.getElementById(id).dataset.state;
 const first = [
@@ -80,4 +80,36 @@ assert.equal(value("kpi-generation-rate"), "SAMPLING…");
 time += 5000;
 update(second.replace("http_generation_memory_budget_bytes 536870912", "http_generation_memory_budget_bytes 0"));
 assert.equal(value("kpi-httpMemory-value"), "N/A");
+// Freshness is measured against the readiness age limit, not the disabled buffer.
+updateReady({reseed_age_ms: 2000, max_reseed_age_ms: 10000, ready: true});
+assert.equal(value("kpi-reseed-headroom"), "80.0%");
+assert.equal(state("kpi-reseed-headroom-card"), "normal");
+updateReady({reseed_age_ms: 8500, max_reseed_age_ms: 10000, ready: true});
+assert.equal(state("kpi-reseed-headroom-card"), "warning");
+updateReady({reseed_age_ms: 9500, max_reseed_age_ms: 10000, ready: false});
+assert.equal(state("kpi-reseed-headroom-card"), "critical");
+updateReady({reseed_age_ms: 0, max_reseed_age_ms: 0});
+assert.equal(value("kpi-reseed-headroom"), "N/A");
+
+// At 250 ms, use a rolling baseline rather than only the latest tick.
+unavailable();
+time += 250;
+const reseedBase = first + "\n" + "rng_reseed_failures_total 2";
+update(reseedBase);
+assert.equal(value("kpi-reseed-rate"), "SAMPLING…");
+time += 250;
+update(reseedBase.replace("rng_reseeds_total 77", "rng_reseeds_total 78")
+    .replace("rng_reseed_failures_total 2", "rng_reseed_failures_total 3"));
+assert.equal(value("kpi-reseed-rate"), "240.0 reseeds/min");
+assert.equal(value("kpi-reseed-failure-rate"), "240.0 failures/min");
+time += 250;
+update(reseedBase.replace("rng_reseeds_total 77", "rng_reseeds_total 78")
+    .replace("rng_reseed_failures_total 2", "rng_reseed_failures_total 3"));
+assert.equal(value("kpi-reseed-rate"), "120.0 reseeds/min");
+assert.equal(value("kpi-reseed-failure-rate"), "120.0 failures/min");
+// Counter rollback forces rates to restart.
+time += 250;
+update(reseedBase.replace("rng_reseeds_total 77", "rng_reseeds_total 1"));
+assert.equal(value("kpi-reseed-rate"), "SAMPLING…");
+
 console.log("Status KPI calculations: passed");

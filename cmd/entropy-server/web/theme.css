@@ -301,3 +301,37 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .page-status .status-kpi-note { max-width: 90ch; font-size: .83rem; color: var(--muted); }
 @media (max-width: 850px) { .page-status .status-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .page-status .status-pressure-grid, .page-status .status-activity-grid { grid-template-columns: 1fr; } }
+
+/* Homepage: align all five section subtitles to the full content width.
+   A common font size preserves the terminal rhythm; narrow screens may wrap. */
+.page-home:not(.page-status):not(.page-gallery) main > section > .sub {
+  width: 100%;
+  max-width: none;
+  font-size: clamp(.78rem, 1.1vw, .94rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Four raw WebSocket route cards, matching Check the Service. */
+.page-home .websocket-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1050px) {
+  .page-home .websocket-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .page-home .websocket-grid { grid-template-columns: 1fr; }
+}
+
+/* Inline status polling controls: compact, keyboard-accessible, and responsive. */
+.page-status .status-refresh-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .8rem;
+}
+.page-status .status-refresh-controls label { color: var(--green-bright); font-size: .88rem; }
+.page-status #status-interval { inline-size: 6rem; text-align: center; }
+.page-status .status-refresh-controls #status-updated { flex-basis: 100%; }
+.page-status .status-refresh-controls #status-refresh-help { flex-basis: 100%; margin: 0 auto; text-align: center; }
+.page-status .status-activity-card[data-state="warning"] output { color: var(--warn); }
+.page-status .status-activity-card[data-state="critical"] output { color: var(--error); }

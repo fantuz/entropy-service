@@ -61,9 +61,17 @@ field and connection notice retain their positions.
 | `/ready` | Fresh reseeding and readiness (may return 503 when degraded) |
 | `/metrics-2` | Prometheus service counters and limits |
 
-This page polls the existing endpoints approximately every five seconds and
-renders an operational snapshot, four admission-capacity gauges and nine activity
-indicators.
+This page polls the existing endpoints on a configurable interval (default
+five seconds, selectable from **0.25 to 60 seconds**). The next cycle starts only
+after the current cycle completes, so slow responses never produce overlapping
+scrapes. Choosing 0.25 seconds specifies a minimum idle delay, **not** a
+guaranteed four updates per second; the network and parsing time are additional.
+
+The dashboard renders an operational snapshot, four admission-capacity gauges
+and twelve activity indicators. Three additional indicators show **seed
+freshness headroom**, **successful root reseeds/min**, and **failed root
+reseeds/min**. The freshness percentage is remaining time before the configured
+readiness age limit; errors or readiness degradation mark it critical.
 
 ### Reading the capacity gauges and KPIs
 
@@ -81,7 +89,15 @@ indicators.
   Cumulative rejection totals are also shown.
 - **DRBG instance count** and **successful root reseeds** are existing server
   counters. Rate calculations show *SAMPLING* until two good snapshots exist,
-  and reset on failed scrapes or counter rollback.
+  and reset on failed scrapes or counter rollback. A bounded window of recent
+  samples (up to approximately five seconds, plus one prior baseline for
+  slower polling) reduces rate jitter at 250 ms intervals.
+- **Seed freshness headroom** is computed from `/ready` values
+  `reseed_age_ms` and `max_reseed_age_ms`, not an entropy-buffer measurement.
+  A stale or error-marked root is flagged regardless of age headroom.
+- **Successful and failed reseeds per minute** are derived from changes in
+  `rng_reseeds_total` and `rng_reseed_failures_total`. They do not indicate
+  entropy-source throughput or guarantee fresh randomness.
 - The historical `qrng_buffer_*` Prometheus metrics are fixed at zero because
   the older software buffer is no longer active. Displaying its fill percent
   would be misleading, so this dashboard does not use it.

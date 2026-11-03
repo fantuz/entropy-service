@@ -20,9 +20,18 @@
         "ws_rejected_size_total",
     ];
     const gaugeNames = Object.keys(metricNames);
-    const rateNames = ["generation-rate", "ws-payload-rate", "http-request-rate", "ws-reject-rate", "http-reject-rate"];
+    const rateNames = [
+        "generation-rate", "ws-payload-rate", "http-request-rate", "ws-reject-rate",
+        "http-reject-rate", "reseed-rate", "reseed-failure-rate",
+    ];
     const extraNames = ["drbg-instances", "reseed-successes", "ws-rejections", "http-rejections"];
-    let previous = null;
+    const counterNames = [
+        "rng_bytes_generated_total", "wss_payloads_total", "http_requests_total",
+        "rng_reseeds_total", "rng_reseed_failures_total", ...httpRejectNames, ...wsRejectNames,
+    ];
+    // Store a bounded history for rates. At 250 ms polling a 5s window
+    // reduces the noise of using only two adjacent snapshots.
+    const history = [];
 
     function readMetrics(source) {
         const metrics = new Map();
@@ -113,8 +122,19 @@
         const metrics = readMetrics(source);
         if (metrics.size === 0) throw new Error("No numeric Prometheus metrics available");
         const now = performance.now();
-        const elapsed = previous ? (now - previous.at) / 1000 : 0;
-        const prior = previous ? previous.metrics : null;
+        const latest = history.at(-1);
+        if (latest && counterNames.some(name => {
+            const old = get(latest.metrics, name);
+            const current = get(metrics, name);
+            return old !== null && current !== null && current < old;
+        })) history.length = 0;
+
+        history.push({at: now, metrics});
+        // Retain one older sample even when the refresh interval exceeds 5s.
+        while (history.length > 2 && now - history[1].at >= 5000) history.shift();
+        const baseline = history.length > 1 ? history[0] : null;
+        const elapsed = baseline ? (now - baseline.at) / 1000 : 0;
+        const prior = baseline ? baseline.metrics : null;
 
         for (const [name, [used, capacity]] of Object.entries(metricNames)) {
             gauge(name, get(metrics, used), get(metrics, capacity), name.includes("Memory"));
@@ -130,15 +150,33 @@
         text("kpi-reseed-successes", count(get(metrics, "rng_reseeds_total")));
         text("kpi-ws-rejections", count(sum(metrics, wsRejectNames)));
         text("kpi-http-rejections", count(sum(metrics, httpRejectNames)));
-        previous = {at: now, metrics};
+        const reseedRate = perSecond(metrics, prior, "rng_reseeds_total", elapsed);
+        const failureRate = perSecond(metrics, prior, "rng_reseed_failures_total", elapsed);
+        rate("kpi-reseed-rate", reseedRate === null ? null : reseedRate * 60, "reseeds/min", 1);
+        rate("kpi-reseed-failure-rate", failureRate === null ? null : failureRate * 60, "failures/min", 1);
+    }
+
+    function updateReady(body) {
+        const target = document.getElementById("kpi-reseed-headroom-card");
+        const age = body?.reseed_age_ms;
+        const limit = body?.max_reseed_age_ms;
+        if (!Number.isFinite(age) || !Number.isFinite(limit) || age < 0 || limit <= 0) {
+            target.dataset.state = "unknown";
+            text("kpi-reseed-headroom", "N/A");
+            return;
+        }
+        const remaining = Math.max(0, (limit - age) / limit * 100);
+        target.dataset.state = body.ready === false || body.last_reseed_error ||
+            remaining <= 10 ? "critical" : remaining <= 25 ? "warning" : "normal";
+        text("kpi-reseed-headroom", `${remaining.toFixed(1)}%`);
     }
 
     function unavailable() {
-        previous = null;
+        history.length = 0;
         for (const name of gaugeNames) gauge(name, null, null, name.includes("Memory"));
         for (const name of rateNames) text(`kpi-${name}`, "—");
         for (const name of extraNames) text(`kpi-${name}`, "—");
     }
 
-    window.EntropyStatusKPIs = {update, unavailable};
+    window.EntropyStatusKPIs = {update, unavailable, updateReady};
 })();
