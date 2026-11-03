@@ -438,3 +438,74 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .page-analysis .entropy-alert-card[data-state="alert"] .entropy-reading {
   color: #ffe0e0;
 }
+
+/* Reuse the shared data-field styling on the formerly legacy bytes page. */
+.page-bytes .panel { width: min(100%, 68rem); }
+.page-bytes #base64 {
+  text-align: center;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+/* 64-digit SHA-256: two 32-digit lines (16 complete byte pairs each). */
+.page-colors #hash {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  font-size: clamp(.78rem, 1.55vw, 1.12rem);
+  line-height: 1.8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* All four WebSocket route labels stay pinned to the card footer. */
+.page-home .websocket-grid > .card {
+  display: flex;
+  flex-direction: column;
+}
+.page-home .websocket-grid > .card > .path {
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+/* The upload results now use the exact same visual card system as stream analysis. */
+.page-upload .upload-input-card { text-align: center; }
+.page-upload #uploadForm,
+.page-upload .uploadForm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .8rem;
+  width: min(100%, 44rem);
+  margin: 1rem auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.page-upload #uploadForm label { color: var(--green-bright); text-transform: uppercase; font-size: .83rem; }
+.page-upload #fileInput { width: min(100%, 40rem); }
+.page-upload .upload-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .6rem;
+}
+.page-upload #upload-status { display: block; max-width: 44rem; margin: 1rem auto .5rem; }
+.page-upload .upload-entropy-reading {
+  margin: .75rem auto;
+  color: var(--green-bright);
+  font-size: clamp(1.2rem, 2.9vw, 1.9rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.page-upload #file-entropy { overflow-wrap: anywhere; color: var(--green-bright); }
+.page-upload .upload-sha256 {
+  display: block;
+  width: min(100%, 60rem);
+  margin: .7rem auto;
+  color: var(--green-bright);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.page-upload .analysis-card { min-width: 0; }
