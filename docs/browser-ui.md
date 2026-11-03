@@ -13,11 +13,18 @@ Open `/api-gallery.html` for a framed view of these existing HTTP responses:
 | Random image | `/v1/image/random` | RGB PNG (1024 × 1024) |
 | Heatmap | `/v1/image/heatmap` | Population-count PNG (1024 × 1024) |
 | QR code | `/v1/qr/random` | PNG QR code containing generated hex |
-| Words and digest | `/v1/meta/random?words=8` | Server-rendered HTML, refreshed by the server |
+| Words and digest | `/v1/meta/random?words=8` | Words and SHA-256 extracted from server-rendered HTML |
 
-Refresh the gallery page to obtain another set of images/QR samples. The words
-frame refreshes itself. Binary downloads such as `/v1/data/random` are not
-shown in frames; use a client or `/api-bytes.html` instead.
+The gallery requests all four endpoints together on one browser-controlled clock
+(default: approximately 10 seconds; adjustable from 5 to 120 seconds). It waits
+for the batch to finish before swapping previews and never overlaps cycles.
+Slow or failed requests retain their last successful preview. The word response
+is parsed rather than embedded as a self-refreshing iframe, so its HTTP meta
+refresh does not desynchronise the gallery. PNGs are displayed as returned by
+the server, with no added opaque iframe background or border; a QR code's own
+quiet zone is preserved for scanning. All previews share a common square region
+and short captions are constrained to one line. Binary downloads such as
+`/v1/data/random` are not shown; use a client or `/api-bytes.html` instead.
 
 **These are demonstration views**, not statistical evidence or an entropy
 certificate. The implementation does not introduce aliases such as

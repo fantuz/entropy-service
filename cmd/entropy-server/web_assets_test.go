@@ -18,7 +18,7 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 
 	for _, path := range []string{
 		"/", "/theme.css", "/entropy-display.js",
-		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/file-upload.js", "/status-dashboard.js",
+		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/file-upload.js", "/status-dashboard.js", "/gallery.js",
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
 		"/api-sound.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 	} {
@@ -130,7 +130,7 @@ func TestNewWebPagesContainRealEndpoints(t *testing.T) {
 
 	tests := map[string][]string{
 		"api-gallery.html": {
-			"iframe", "/v1/image/random", "/v1/image/heatmap",
+			"gallery.js", "gallery-preview", "/v1/image/random", "/v1/image/heatmap",
 			"/v1/qr/random", "/v1/meta/random?words=8",
 		},
 		"api-status.html": {
@@ -155,5 +155,37 @@ func TestNewWebPagesContainRealEndpoints(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The gallery must use one refresh coordinator; separate iframes let the words
+// endpoint refresh independently of the PNG endpoints.
+func TestGalleryUsesCoordinatedPreviewRefresh(t *testing.T) {
+	root, err := fs.Sub(webFS, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	html, err := fs.ReadFile(root, "api-gallery.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(string(html), "<iframe") || !strings.Contains(string(html), "/gallery.js") {
+		t.Fatal("gallery must use a shared browser refresh coordinator, not independent iframes")
+	}
+
+	script, err := fs.ReadFile(root, "gallery.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, token := range []string{
+		"Promise.allSettled", "cache: \"no-store\"", "new DOMParser()",
+		"/v1/image/random", "/v1/image/heatmap", "/v1/qr/random", "/v1/meta/random?words=8",
+	} {
+		if !strings.Contains(string(script), token) {
+			t.Errorf("gallery controller missing %q", token)
+		}
 	}
 }
