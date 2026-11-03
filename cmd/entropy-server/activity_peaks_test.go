@@ -11,6 +11,7 @@ import (
 
 func TestActivityPeakMonitorIntervalRatesAndReset(t *testing.T) {
 	var monitor activityPeakMonitor
+
 	base := time.Unix(100, 0)
 	monitor.observe(base, activityPeakCounters{
 		generatedBytes: 100, wsFrames: 10, httpRequests: 10,
@@ -33,6 +34,7 @@ func TestActivityPeakMonitorIntervalRatesAndReset(t *testing.T) {
 		generatedBytes: 2300, wsFrames: 22, httpRequests: 17,
 		wsRejections: 3, httpRejections: 5,
 	})
+
 	if second := monitor.snapshot(); second != first {
 		t.Fatalf("peaks must survive quiet intervals: %+v vs %+v", second, first)
 	}
@@ -44,6 +46,7 @@ func TestActivityPeakMonitorIntervalRatesAndReset(t *testing.T) {
 		httpRequests: ^uint64(0), wsRejections: ^uint64(0),
 		httpRejections: ^uint64(0),
 	})
+
 	if after := monitor.snapshot(); after != first {
 		t.Fatalf("counter resets must not inflate existing peaks: %+v", after)
 	}
@@ -51,7 +54,9 @@ func TestActivityPeakMonitorIntervalRatesAndReset(t *testing.T) {
 
 func TestActivityPeakExposition(t *testing.T) {
 	d := observableTestDRBG(t)
+
 	var monitor activityPeakMonitor
+
 	start := time.Unix(100, 0)
 	monitor.observe(start, activityPeakCounters{})
 	monitor.observe(start.Add(time.Second), activityPeakCounters{
@@ -67,11 +72,11 @@ func TestActivityPeakExposition(t *testing.T) {
 
 	values, kinds := parseMetricSamples(t, w.Body.String())
 	for name, expected := range map[string]float64{
-		"rng_generation_peak_bytes_per_second":    1048576,
-		"wss_payloads_peak_per_second":            13,
-		"http_requests_peak_per_second":           7,
-		"ws_rejections_peak_per_minute":           120,
-		"http_generation_rejections_peak_per_minute": 180,
+		"rng_generation_peak_bytes_per_second":	1048576,
+		"wss_payloads_peak_per_second":	13,
+		"http_requests_peak_per_second":	7,
+		"ws_rejections_peak_per_minute":	120,
+		"http_generation_rejections_peak_per_minute":	180,
 	} {
 		if kinds[name] != "gauge" || values[name] != expected {
 			t.Errorf("%s = %v (type %s), want %v gauge", name, values[name], kinds[name], expected)
