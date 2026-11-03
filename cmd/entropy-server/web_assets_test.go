@@ -193,39 +193,40 @@ func TestGalleryUsesCoordinatedPreviewRefresh(t *testing.T) {
 // Status KPIs must use existing metrics; the removed software ring buffer
 // must not appear as a physical entropy-buffer fullness indicator.
 func TestStatusCapacityDashboard(t *testing.T) {
-    root, err := fs.Sub(webFS, "web")
-    if err != nil {
-        t.Fatal(err)
-    }
+	root, err := fs.Sub(webFS, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-    page, err := fs.ReadFile(root, "api-status.html")
-    if err != nil {
-        t.Fatal(err)
-    }
-    for _, item := range []string{
-        "/status-kpis.js", "kpi-httpMemory-meter", "kpi-wsMemory-meter",
-        "kpi-httpSlots-meter", "kpi-wsSlots-meter", "kpi-generation-rate",
-        "kpi-ws-reject-rate", "kpi-http-reject-rate",
-    } {
-        if !strings.Contains(string(page), item) {
-            t.Errorf("status page missing %q", item)
-        }
-    }
+	page, err := fs.ReadFile(root, "api-status.html")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-    script, err := fs.ReadFile(root, "status-kpis.js")
-    if err != nil {
-        t.Fatal(err)
-    }
-    for _, name := range []string{
-        "http_generation_memory_reserved_bytes", "ws_memory_reserved_bytes",
-        "ws_rejected_connections_total", "http_generation_rejected_requests_total",
-        "rng_bytes_generated_total", "drbg_instance_count",
-    } {
-        if !strings.Contains(string(script), name) {
-            t.Errorf("KPI controller missing metric %q", name)
-        }
-    }
-    if strings.Contains(string(script), "qrng_buffer_capacity_pct") {
-        t.Fatal("disabled QRNG buffer must not be shown as a fill percentage")
-    }
+	for _, item := range []string{
+		"/status-kpis.js", "kpi-httpMemory-meter", "kpi-wsMemory-meter",
+		"kpi-httpSlots-meter", "kpi-wsSlots-meter", "kpi-generation-rate",
+		"kpi-ws-reject-rate", "kpi-http-reject-rate",
+	} {
+		if !strings.Contains(string(page), item) {
+			t.Errorf("status page missing %q", item)
+		}
+	}
+
+	script, err := fs.ReadFile(root, "status-kpis.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"http_generation_memory_reserved_bytes", "ws_memory_reserved_bytes",
+		"ws_rejected_connections_total", "http_generation_rejected_requests_total",
+		"rng_bytes_generated_total", "drbg_instance_count",
+	} {
+		if !strings.Contains(string(script), name) {
+			t.Errorf("KPI controller missing metric %q", name)
+		}
+	}
+	if strings.Contains(string(script), "qrng_buffer_capacity_pct") {
+		t.Fatal("disabled QRNG buffer must not be shown as a fill percentage")
+	}
 }
