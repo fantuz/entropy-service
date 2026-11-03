@@ -27,6 +27,7 @@
         <h2 id="explore-title">Explore in your browser</h2>
         <p class="sub">These pages are interactive demonstrations. Choose one to start.</p>
         <div class="grid">
+          <a class="card" href="/api-gallery.html"><strong>HTTP endpoint gallery</strong><span>See image, heatmap, QR and server-rendered words responses inside the showcase.</span><small class="path">/api-gallery.html</small></a>
           <a class="card" href="/api-bytes.html"><strong>Random bytes</strong><span>Inspect byte samples, encodings and their digest.</span><small class="path">/api-bytes.html</small></a>
           <a class="card" href="/api-colors.html"><strong>Colours</strong><span>Watch changing colours derived from sample hashes.</span><small class="path">/api-colors.html</small></a>
           <a class="card" href="/api-words.html"><strong>Random words</strong><span>Explore dictionary word samples and their SHA-256 digest.</span><small class="path">/api-words.html</small></a>
@@ -41,15 +42,17 @@
 
       <section aria-labelledby="status-title">
         <h2 id="status-title">Check the service</h2>
-        <p class="sub">Operational endpoints return JSON or Prometheus text, not interactive pages.</p>
+        <p class="sub">View all operational checks in one browser dashboard, or open the underlying JSON and Prometheus APIs directly.</p>
         <div class="grid">
+          <a class="card" href="/api-status.html"><strong>Service status dashboard</strong><span>Live, ready, and metrics in a single browser view.</span><small class="path">/api-status.html</small></a>
           <a class="card" href="/live"><strong>Liveness</strong><span>Check whether the HTTP service responds.</span><small class="path">/live</small></a>
           <a class="card" href="/ready"><strong>Readiness</strong><span>Inspect seed freshness and reseed errors.</span><small class="path">/ready</small></a>
           <a class="card" href="/metrics-2"><strong>Metrics</strong><span>Explore generation, reseeding and resource-budget counters.</span><small class="path">/metrics-2</small></a>
-          <a class="card" href="/health-1"><strong>Health alias 1</strong><span>Compatibility health response for the serving DRBG.</span><small class="path">/health-1</small></a>
-          <a class="card" href="/health-2"><strong>Health alias 2</strong><span>Health status of the serving DRBG.</span><small class="path">/health-2</small></a>
-          <a class="card" href="/metrics-1"><strong>Metrics alias</strong><span>Compatibility Prometheus endpoint.</span><small class="path">/metrics-1</small></a>
         </div>
+        <details class="panel">
+          <summary>Compatibility health and metrics aliases</summary>
+          <p>The aliases return the same operational information, and remain reachable for existing clients: <a href="/health-1">/health-1</a> · <a href="/health-2">/health-2</a> · <a href="/metrics-1">/metrics-1</a>. Scrape only one metrics endpoint.</p>
+        </details>
       </section>
 
       <section aria-labelledby="http-title">

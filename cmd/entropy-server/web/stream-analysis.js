@@ -14,10 +14,32 @@
     let pending = null;
     let redrawScheduled = false;
     let haveSample = false;
-    let received = 0;
-    let analyzed = 0;
+    let receivedFrames = 0;
+    let receivedBytes = 0;
+    let analyzedFrames = 0;
+    let analyzedBytes = 0;
+    let statsScheduled = false;
+
+    function updateStatistics() {
+        document.getElementById("received-bytes").textContent = receivedBytes.toLocaleString();
+        document.getElementById("received-frames").textContent = receivedFrames.toLocaleString();
+        document.getElementById("analysed-bytes").textContent = analyzedBytes.toLocaleString();
+        document.getElementById("analysed-frames").textContent = analyzedFrames.toLocaleString();
+    }
+
+    // Count every valid received frame, but avoid repainting the counters on
+    // every message of a high-throughput WebSocket stream.
+    function scheduleStatistics() {
+        if (statsScheduled) return;
+        statsScheduled = true;
+        requestAnimationFrame(() => {
+            statsScheduled = false;
+            updateStatistics();
+        });
+    }
     let lastAccepted = -Infinity;
     let fatalError = false;
+    let streamClosed = false;
 
     function showNotice(state, text) {
         notice.hidden = false;
@@ -71,19 +93,22 @@
         }
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.font = "13px monospace";
+        ctx.font = "12px monospace";
         const entries = [
             { color: colors.zeros, label: `ZEROS: ${zeros.toLocaleString()} (${(100 * zeros / total).toFixed(2)}%)` },
             { color: colors.ones, label: `ONES:  ${ones.toLocaleString()} (${(100 * ones / total).toFixed(2)}%)` }
         ];
         entries.forEach(({color, label}, i) => {
             const yy = 162 + i * 25;
+            const textWidth = ctx.measureText(label).width;
+            const legendWidth = 14 + 8 + textWidth;
+            const startX = Math.max(0, (canvas.width - legendWidth) / 2);
             ctx.fillStyle = color;
-            ctx.fillRect(14, yy - 7, 14, 14);
+            ctx.fillRect(startX, yy - 7, 14, 14);
             ctx.strokeStyle = colors.cyan;
-            ctx.strokeRect(14, yy - 7, 14, 14);
+            ctx.strokeRect(startX, yy - 7, 14, 14);
             ctx.fillStyle = colors.ones;
-            ctx.fillText(label, 38, yy);
+            ctx.fillText(label, startX + 22, yy);
         });
     }
 
@@ -118,10 +143,12 @@
 
     function render(data) {
         haveSample = true;
-        if (!fatalError) notice.hidden = true;
-        analyzed++;
+        if (!fatalError && !streamClosed) notice.hidden = true;
+        analyzedFrames++;
+        analyzedBytes += data.analyzedBytes;
+        scheduleStatistics();
         document.getElementById("entropy").textContent = data.entropy.toFixed(5);
-        info.textContent = `${data.totalBytes.toLocaleString()} BYTES RECEIVED; ${data.analyzedBytes.toLocaleString()} ANALYSED PER SAMPLE · FRAMES RECEIVED ${received} / ANALYSED ${analyzed}`;
+        info.textContent = `LATEST SAMPLE · ${data.totalBytes.toLocaleString()} BYTES DELIVERED · ${data.analyzedBytes.toLocaleString()}-BYTE PREFIX ANALYSED`;
         histogramPlot(data.histogram);
         mosaicPlot(data.mosaic);
         balancePlot(data.zeros, data.ones);
@@ -194,7 +221,10 @@
         ws.binaryType = "arraybuffer";
         ws.onopen = () => showNotice("waiting", "AWAITING FIRST SAMPLE");
         ws.onerror = () => { fatalError = true; showNotice("error", "STREAM ERROR — CHECK SERVER AND REQUEST LIMITS"); };
-        ws.onclose = () => { if (!fatalError) showNotice("disconnected", "STREAM CLOSED — RELOAD TO RETRY"); };
+        ws.onclose = () => {
+            streamClosed = true;
+            if (!fatalError) showNotice("disconnected", "STREAM CLOSED — RELOAD TO RETRY");
+        };
         ws.onmessage = event => {
             if (!(event.data instanceof ArrayBuffer) || event.data.byteLength === 0) {
                 fatalError = true;
@@ -202,7 +232,9 @@
                 ws.close(1002, "expected binary");
                 return;
             }
-            received++;
+            receivedFrames++;
+            receivedBytes += event.data.byteLength;
+            scheduleStatistics();
             const now = performance.now();
             if (now - lastAccepted < minDisplayGap && haveSample) return;
             lastAccepted = now;

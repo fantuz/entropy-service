@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Entropy Service — Service Status</title>
+  <meta name="description" content="Unified operational view of Entropy Service liveness, readiness, and metrics endpoints.">
+  <link rel="stylesheet" href="/theme.css">
+</head>
+<body class="page-home page-status">
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">Entropy Service / Operations</div>
+      <h1>Service Status</h1>
+      <p class="lede">A single browser view of the existing liveness, readiness, and Prometheus metrics endpoints. The underlying APIs remain unchanged.</p>
+      <p><a href="/">← Back to all endpoints</a></p>
+    </header>
+    <main>
+      <div class="status-grid" aria-label="Service health">
+        <section class="status-card" id="live-card" data-state="waiting">
+          <h2>HTTP liveness</h2>
+          <div class="status-value" id="live-value" role="status">Checking…</div>
+          <div class="status-detail"><a href="/live">GET /live</a></div>
+        </section>
+        <section class="status-card" id="ready-card" data-state="waiting">
+          <h2>Entropy readiness</h2>
+          <div class="status-value" id="ready-value" role="status">Checking…</div>
+          <div class="status-detail"><a href="/ready">GET /ready</a></div>
+        </section>
+        <section class="status-card" id="metrics-card" data-state="waiting">
+          <h2>Prometheus metrics</h2>
+          <div class="status-value" id="metrics-value" role="status">Checking…</div>
+          <div class="status-detail"><a href="/metrics-2">GET /metrics-2</a></div>
+        </section>
+      </div>
+      <h2>Operational snapshot</h2>
+      <dl class="status-summary">
+        <div><dt>Entropy source</dt><dd id="rng-source">—</dd></div>
+        <div><dt>DRBG backend</dt><dd id="rng-drbg">—</dd></div>
+        <div><dt>Reseed age</dt><dd id="reseed-age">—</dd></div>
+        <div><dt>Reseed failures</dt><dd id="reseed-failures">—</dd></div>
+        <div><dt>DRBG bytes generated*</dt><dd id="bytes-generated">—</dd></div>
+        <div><dt>Active WebSockets</dt><dd id="active-websockets">—</dd></div>
+      </dl>
+      <p class="note">*Generated-byte count includes internal DRBG seed derivation; it is not a network-throughput counter. The page updates approximately every five seconds. A liveness response does not imply that reseeding is healthy.</p>
+      <p class="status-links"><button type="button" id="status-refresh">Refresh now</button> <span id="status-updated" class="analysis-meta" aria-live="off">Not checked yet</span></p>
+      <details class="panel">
+        <summary>Compatible legacy endpoints</summary>
+        <p>The aliases below remain registered for existing clients. They do not represent separate DRBG instances or independent health checks. Scrape only one metrics endpoint.</p>
+        <p><a href="/health-1">/health-1</a> · <a href="/health-2">/health-2</a> · <a href="/metrics-1">/metrics-1</a></p>
+      </details>
+      <div class="panel"><p>The browser dashboard is informational. Monitoring systems should continue to query the underlying JSON and Prometheus routes directly.</p></div>
+    </main>
+    <footer><a href="/">All endpoints</a> · <a href="/api-gallery.html">Endpoint gallery</a> · <a href="https://github.com/fantuz/entropy-service">Documentation</a></footer>
+  </div>
+  <script src="/status-dashboard.js" defer></script>
+</body>
+</html>

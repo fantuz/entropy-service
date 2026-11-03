@@ -18,9 +18,9 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 
 	for _, path := range []string{
 		"/", "/theme.css", "/entropy-display.js",
-		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/file-upload.js",
+		"/entropy-display-worker.js", "/worker.js", "/stream-analysis.js", "/file-upload.js", "/status-dashboard.js",
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
-		"/api-sound.html", "/api-upload.html", "/api-stream.html",
+		"/api-sound.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 	} {
 		t.Run(path, func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestHomepageLinksAllPublicRoutes(t *testing.T) {
 
 	for _, route := range []string{
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
-		"/api-sound.html", "/api-upload.html", "/api-stream.html",
+		"/api-sound.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 		"/live", "/ready", "/health-1", "/health-2", "/metrics-1", "/metrics-2",
 		"/v1/data/random", "/v1/data/test", "/v1/meta/random",
 		"/v1/image/random", "/v1/image/heatmap", "/v1/qr/random",
@@ -119,5 +119,41 @@ func TestHomepageLinksAllPublicRoutes(t *testing.T) {
 		if !strings.Contains(content, route) {
 			t.Errorf("homepage does not mention public route %q", route)
 		}
+	}
+}
+
+func TestNewWebPagesContainRealEndpoints(t *testing.T) {
+	root, err := fs.Sub(webFS, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string][]string{
+		"api-gallery.html": {
+			"iframe", "/v1/image/random", "/v1/image/heatmap",
+			"/v1/qr/random", "/v1/meta/random?words=8",
+		},
+		"api-status.html": {
+			"/live", "/ready", "/metrics-2", "/health-1", "/health-2", "/metrics-1",
+		},
+		"api-stream.html": {
+			"received-bytes", "received-frames", "analysed-bytes", "analysed-frames",
+		},
+		"api-words.html": {"words-content", "page-words"},
+	}
+
+	for name, required := range tests {
+		t.Run(name, func(t *testing.T) {
+			data, err := fs.ReadFile(root, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for _, fragment := range required {
+				if !strings.Contains(string(data), fragment) {
+					t.Errorf("%s is missing %q", name, fragment)
+				}
+			}
+		})
 	}
 }

@@ -17,7 +17,11 @@
       <button type="submit">Apply</button>
     </form>
     <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
-    <p id="sample-info" class="analysis-meta" aria-live="off">No samples analysed yet.</p>
+    <div class="analysis-stats" aria-label="Stream statistics" aria-live="off">
+      <div class="analysis-stat-row"><span class="analysis-stat-title">Received</span><span><output id="received-bytes">0</output> bytes &middot; <output id="received-frames">0</output> frames</span></div>
+      <div class="analysis-stat-row"><span class="analysis-stat-title">Analysed</span><span><output id="analysed-bytes">0</output> bytes &middot; <output id="analysed-frames">0</output> frames</span></div>
+    </div>
+    <p id="sample-info" class="analysis-meta" aria-live="off">Awaiting a sample for analysis.</p>
 
     <div class="analysis-card">
       <h2 class="analysis-label">Shannon entropy · <span id="entropy" class="analysis-value">—</span> bits/byte</h2>

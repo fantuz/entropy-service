@@ -37,8 +37,9 @@
 
         const [pieCanvas, pie] = canvas("pie");
         const angle = result.zeros / (result.ones + result.zeros) * 2 * Math.PI;
+        const centerX = pieCanvas.width / 2;
         for (const [start, end, color] of [[0, angle, "#145b41"], [angle, 2 * Math.PI, "#a7ffcd"]]) {
-            pie.beginPath(); pie.moveTo(75, 75); pie.arc(75, 75, 60, start, end);
+            pie.beginPath(); pie.moveTo(centerX, 76); pie.arc(centerX, 76, 62, start, end);
             pie.fillStyle = color; pie.fill();
         }
         pie.save();
@@ -47,10 +48,10 @@
         pie.textBaseline = "middle";
         const labels = [`0: ${result.zeros}`, `1: ${result.ones}`];
         const keySize = 12, keyGap = 6;
-        const legendWidth = keySize + keyGap + Math.max(...labels.map(label => pie.measureText(label).width));
-        const legendX = (pieCanvas.width - legendWidth) / 2;
         labels.forEach((label, i) => {
-            const y = pieCanvas.height - 24 + i * 16;
+            const legendWidth = keySize + keyGap + pie.measureText(label).width;
+            const legendX = (pieCanvas.width - legendWidth) / 2;
+            const y = 167 + i * 25;
             pie.fillStyle = i === 0 ? "#145b41" : "#a7ffcd";
             pie.fillRect(legendX, y - keySize / 2, keySize, keySize);
             pie.strokeStyle = "#444";

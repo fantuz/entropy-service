@@ -129,13 +129,13 @@ h3 {
 </style>
 <link rel="stylesheet" href="/theme.css">
 </head>
-<body>
+<body class="page-words">
 
 <div class="panel">
     <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
     <div class="section">
         <h3>Words</h3>
-        <div id="words" class="words">—</div>
+        <div id="words" class="words"><div id="words-content" class="words-content">—</div></div>
     </div>
     <div class="section">
         <h3>SHA256</h3>
@@ -148,7 +148,7 @@ h3 {
 const params = new URLSearchParams(location.search);
 const query = params.toString();
 const status = document.getElementById("stream-notice");
-const words = document.getElementById("words");
+const words = document.getElementById("words-content");
 const hash = document.getElementById("hash");
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +

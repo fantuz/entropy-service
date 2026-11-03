@@ -199,3 +199,45 @@ code { font-size: .88em; }
 .analysis-controls input { width: min(9rem, 40vw); }
 .analysis-meta { color: var(--green); font-size: .88rem; font-variant-numeric: tabular-nums; }
 .analysis-value { color: var(--green-bright); }
+
+/* Endpoint gallery: embedded HTML/PNG views retain the existing homepage theme. */
+.page-gallery .gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.page-gallery .gallery-card { margin: 0; min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 1rem; }
+.page-gallery .gallery-card h2 { margin: .2rem 0 .5rem; font-size: 1.05rem; }
+.page-gallery .gallery-card p { margin: .4rem 0 .8rem; }
+.page-gallery .gallery-card iframe { display: block; width: 100%; height: 21rem; border: 1px solid var(--border); border-radius: 6px; background: #08120d; }
+.page-gallery .gallery-card--words iframe { height: 21rem; }
+.page-gallery .gallery-card small { display: block; margin-top: .75rem; color: var(--cyan); overflow-wrap: anywhere; }
+.page-gallery .gallery-card a { display: inline-block; margin-top: .6rem; }
+@media (max-width: 760px) { .page-gallery .gallery-grid { grid-template-columns: 1fr; } }
+
+/* Two independent telemetry rows: cumulative reception vs sampled analysis. */
+.analysis-stats { width: min(100%, 46rem); margin: 1rem auto; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-variant-numeric: tabular-nums; }
+.analysis-stat-row { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr); align-items: center; gap: .5rem; padding: .55rem 1rem; text-align: left; font-size: clamp(.8rem, 1.8vw, 1rem); }
+.analysis-stat-row + .analysis-stat-row { border-top: 1px solid var(--border); }
+.analysis-stat-title { color: var(--green-bright); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.analysis-stat-row output { color: var(--cyan); }
+.analysis-panel .analysis-card .analysis-label { text-align: center; }
+@media (max-width: 560px) { .analysis-stat-row { grid-template-columns: 1fr; gap: .05rem; text-align: center; } }
+
+/* Keep the word panel's geometry stable as phrases change length. */
+.page-words .words { display: flex; align-items: safe center; justify-content: center; block-size: clamp(12rem, 34svh, 20rem); min-block-size: 12rem; max-block-size: none; overflow-y: auto; scrollbar-gutter: stable; }
+.page-words .words-content { width: 100%; min-width: 0; text-align: center; }
+.page-words .stream-notice[hidden] { display: block !important; visibility: hidden; }
+@media (max-width: 600px) and (orientation: portrait) { .page-words .words { block-size: clamp(15rem, 45svh, 24rem); } }
+@media (max-width: 1024px) and (orientation: landscape) { .page-words .words { block-size: clamp(10rem, 45svh, 18rem); } }
+
+/* Curated service-status screen; all original API endpoints remain available. */
+.page-status .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.page-status .status-card { min-width: 0; padding: 1.2rem; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.page-status .status-card h2 { font-size: 1rem; margin: 0 0 .75rem; }
+.page-status .status-value { font-size: clamp(1rem, 2vw, 1.3rem); color: var(--green-bright); font-weight: 700; overflow-wrap: anywhere; }
+.page-status [data-state="degraded"] .status-value { color: var(--warn); }
+.page-status [data-state="error"] .status-value { color: var(--error); }
+.page-status .status-detail { font-size: .8rem; color: var(--muted); }
+.page-status .status-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin: 1rem 0; }
+.page-status .status-summary > div { padding: .8rem; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+.page-status .status-summary dt { color: var(--muted); font-size: .75rem; text-transform: uppercase; }
+.page-status .status-summary dd { margin: .2rem 0 0; color: var(--cyan); overflow-wrap: anywhere; }
+.page-status .status-links { text-align: center; margin-top: 1rem; }
+@media (max-width: 760px) { .page-status .status-grid { grid-template-columns: 1fr; } .page-status .status-summary { grid-template-columns: 1fr; } }
