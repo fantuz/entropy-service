@@ -34,6 +34,89 @@
           <div class="status-detail"><a href="/metrics-2">GET /metrics-2</a></div>
         </section>
       </div>
+      <section aria-labelledby="capacity-title" class="status-kpis">
+        <h2 id="capacity-title">Admission capacity &amp; pressure</h2>
+        <p class="sub">Estimated working-memory reservations and active admission slots, not actual RAM usage or QRNG buffer fill.</p>
+        <div class="status-pressure-grid">
+          <article class="status-pressure-card" id="kpi-httpMemory" data-state="unknown">
+            <h3>HTTP memory budget</h3>
+            <output id="kpi-httpMemory-value">—</output>
+            <progress id="kpi-httpMemory-meter" value="0" max="100" aria-label="HTTP memory budget utilization"></progress>
+            <p id="kpi-httpMemory-detail" class="status-pressure-detail">Estimated HTTP working-memory reservations</p>
+          </article>
+          <article class="status-pressure-card" id="kpi-wsMemory" data-state="unknown">
+            <h3>WebSocket memory budget</h3>
+            <output id="kpi-wsMemory-value">—</output>
+            <progress id="kpi-wsMemory-meter" value="0" max="100" aria-label="WebSocket memory budget utilization"></progress>
+            <p id="kpi-wsMemory-detail" class="status-pressure-detail">Estimated WebSocket working-memory reservations</p>
+          </article>
+          <article class="status-pressure-card" id="kpi-httpSlots" data-state="unknown">
+            <h3>Active HTTP slots</h3>
+            <output id="kpi-httpSlots-value">—</output>
+            <progress id="kpi-httpSlots-meter" value="0" max="100" aria-label="Active HTTP slots utilization"></progress>
+            <p id="kpi-httpSlots-detail" class="status-pressure-detail">Currently admitted generation requests</p>
+          </article>
+          <article class="status-pressure-card" id="kpi-wsSlots" data-state="unknown">
+            <h3>Active WebSocket slots</h3>
+            <output id="kpi-wsSlots-value">—</output>
+            <progress id="kpi-wsSlots-meter" value="0" max="100" aria-label="Active WebSocket slots utilization"></progress>
+            <p id="kpi-wsSlots-detail" class="status-pressure-detail">Currently admitted WebSocket connections</p>
+          </article>
+        </div>
+        <p class="status-kpi-note">Budget pressure = estimated memory reserved / configured admission budget. It is not Go heap or process RSS. The legacy software QRNG ring buffer is disabled; the historical 0% fill statistic is not an actual measurement.</p>
+      </section>
+      <section aria-labelledby="activity-title" class="status-kpis">
+        <h2 id="activity-title">Activity &amp; exhaustion signals</h2>
+        <p class="sub">Rates use consecutive successful Prometheus scrapes, approximately five seconds apart. First samples and counter resets require a new measurement interval.</p>
+        <div class="status-activity-grid">
+          <article class="status-activity-card">
+            <h3>DRBG generation rate</h3>
+            <output id="kpi-generation-rate">—</output>
+            <p>Includes internal seed derivation; not network throughput</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>WebSocket frames</h3>
+            <output id="kpi-ws-payload-rate">—</output>
+            <p>Successfully sent WS/WSS messages per second</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>HTTP requests</h3>
+            <output id="kpi-http-request-rate">—</output>
+            <p>All HTTP requests, including dashboard polling</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>WebSocket rejection pace</h3>
+            <output id="kpi-ws-reject-rate">—</output>
+            <p>Recent admission rejects, expressed per minute</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>HTTP rejection pace</h3>
+            <output id="kpi-http-reject-rate">—</output>
+            <p>Recent admission rejects, expressed per minute</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>Live DRBG instances</h3>
+            <output id="kpi-drbg-instances">—</output>
+            <p>Root and active child generators</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>Successful reseeds</h3>
+            <output id="kpi-reseed-successes">—</output>
+            <p>Cumulative successful root reseeds</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>WebSocket rejections</h3>
+            <output id="kpi-ws-rejections">—</output>
+            <p>Cumulative: slots, memory and oversized requests</p>
+          </article>
+          <article class="status-activity-card">
+            <h3>HTTP admission rejections</h3>
+            <output id="kpi-http-rejections">—</output>
+            <p>Cumulative: slots, memory and oversized requests</p>
+          </article>
+        </div>
+        <p class="status-kpi-note">Rejection pace is an interval estimate, not a percentage of all requests. Counters restart with the server. None of these figures represents physical entropy-buffer fullness or measured RAM pressure.</p>
+      </section>
       <h2>Operational snapshot</h2>
       <dl class="status-summary">
         <div><dt>Entropy source</dt><dd id="rng-source">—</dd></div>
@@ -54,6 +137,7 @@
     </main>
     <footer><a href="/">All endpoints</a> · <a href="/api-gallery.html">Endpoint gallery</a> · <a href="https://github.com/fantuz/entropy-service">Documentation</a></footer>
   </div>
+  <script src="/status-kpis.js" defer></script>
   <script src="/status-dashboard.js" defer></script>
 </body>
 </html>
