@@ -133,6 +133,7 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 	}
 
 	active := activeDRBG.Add(1)
+
 	for {
 		peak := peakDRBG.Load()
 		if active <= peak || peakDRBG.CompareAndSwap(peak, active) {
