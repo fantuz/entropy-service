@@ -69,6 +69,7 @@ assert.equal(document.getElementById("status-refresh").disabled, false);
 
 const [id, pending] = [...active.entries()][0];
 active.delete(id);
+blockMetrics = false; // All subsequent scrapes complete without the initial artificial hold.
 pending.fn();
 await flush();
 assert.equal(fetchCount, 6, "second round must start only after the scheduled delay");
