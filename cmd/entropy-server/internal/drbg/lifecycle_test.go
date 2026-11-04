@@ -49,6 +49,7 @@ func TestConnectionReaderClearsChildOnClose(t *testing.T) {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			parent := testGenerator(t, algorithm)
 			initial := ActiveInstances()
+
 			reader := NewConnectionReader(parent)
 			if _, err := reader.Read(make([]byte, 64)); err != nil {
 				t.Fatal(err)
@@ -84,6 +85,7 @@ func TestReseedStreamOutputMatchesLegacyDigest(t *testing.T) {
 		if err := d.Reseed(seed); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := ref.Reseed(seed); err != nil {
 			t.Fatal(err)
 		}
@@ -92,9 +94,11 @@ func TestReseedStreamOutputMatchesLegacyDigest(t *testing.T) {
 		if _, err := io.ReadFull(d, got); err != nil {
 			t.Fatal(err)
 		}
+
 		if _, err := io.ReadFull(ref, want); err != nil {
 			t.Fatal(err)
 		}
+
 		if !bytes.Equal(got, want) {
 			t.Fatal("reseed introduced a stream mismatch")
 		}
