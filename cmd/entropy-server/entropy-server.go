@@ -1223,7 +1223,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-
 	maxReseedAge := time.Duration(cfg.MaxReseedAgeMs) * time.Millisecond
 
 	fmt.Println("\n-------------------------------------------------")
