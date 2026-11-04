@@ -134,6 +134,7 @@ func TestReseedLoopRejectsInvalidSizesBeforeReading(t *testing.T) {
 			reseedLoop(t.Context(), source, 1, size, root)
 
 			after := root.GetMetadata()
+
 			if source.calls != 0 {
 				t.Fatal("invalid size caused a source read")
 			}
