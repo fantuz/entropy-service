@@ -309,42 +309,12 @@ func (d *DRBG) GetMetadata() Metadata {
 	}
 }
 
+// Derive draws a seed from the synchronized DRBG Read path.
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
-	_, err := d.Read(seed)
-	if err != nil {
-		return nil, err
-	}
-	return seed, nil
-}
-*/
-
-func (d *DRBG) Derive(seedSize int) ([]byte, error) {
-	seed := make([]byte, seedSize)
-	_, err := d.Read(seed)
-	if err != nil {
+	if _, err := d.Read(seed); err != nil {
 		return nil, err
 	}
 
 	return seed, nil
 }
-
-/*
-func (d *DRBG) WriteTo(w io.Writer, n int) error {
-    buf := d.entropyBuf.Get(n).([]byte)
-    // buf := d.bufPool.Get().([]byte)
-    // buf := d.entropyBuf.Get()
-    defer d.bufPool.Put(buf)
-
-    for n > 0 {
-        chunk := min(n, len(buf))
-        d.Fill(buf[:chunk])
-        _, err := w.Write(buf[:chunk])
-        if err != nil {
-            return err
-        }
-        n -= chunk
-    }
-    return nil
-}
-*/
