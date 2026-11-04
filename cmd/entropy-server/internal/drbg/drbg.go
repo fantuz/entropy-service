@@ -23,7 +23,6 @@ type DRBG struct {
 	// LOCKS
 	// Mu     sync.Mutex
 	mu     sync.Mutex
-	Stream cipher.Stream
 
 	// Crypto state
 	key             [32]byte
@@ -310,20 +309,6 @@ func (d *DRBG) GetMetadata() Metadata {
 	}
 }
 
-func (d *DRBG) ReadInto(dst []byte) {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
-	d.Stream.XORKeyStream(dst, dst)
-	// update counters, bytes generated, reseed checks, etc
-}
-
-func (d *DRBG) Write(p []byte) (int, error) {
-	d.ReadInto(p)
-
-	return len(p), nil
-}
-
-/*
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
 	_, err := d.Read(seed)
@@ -336,14 +321,12 @@ func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
-	// d.Read(seed)
 	_, err := d.Read(seed)
 	if err != nil {
 		return nil, err
 	}
 
 	return seed, nil
-	// return payload, nil
 }
 
 /*
