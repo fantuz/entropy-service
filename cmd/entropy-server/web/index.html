@@ -60,13 +60,6 @@
           <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
           <a class="card" href="/api-words.html"><strong>Word stream</strong><span>JSON dictionary words and SHA-256.</span><small class="path">WS /words</small></a>
         </div>
-        <div class="panel">
-          <strong>HTTP example · download 4,096 bytes</strong>
-          <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
-          <strong>WebSocket example · stream 4,096 bytes per message</strong>
-          <pre><code>ws://127.0.0.1:8080/stream?bytes=4096&amp;refresh=500</code></pre>
-          <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> and <code>wss://</code> when TLS is enabled. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
-        </div>
       </section>
 
       <section aria-labelledby="http-title">
@@ -100,6 +93,18 @@
         <div class="panel">
           <p>The configured source supplies seed material. ChaCha20 or AES-256-CTR generates the bulk response bytes; these are <strong>not</strong> independent fresh samples directly from the hardware. Visual checks can illustrate statistical patterns, but do not certify unpredictability or cryptographic suitability.</p>
           <p class="note">This homepage links the supported API routes and demos; internal JavaScript workers and CSS are intentionally omitted from the navigation but remain available to the browser. The stream-analysis page samples data for display and does not establish cryptographic quality.</p>
+          <strong>HTTP example · download 4,096 bytes</strong>
+          <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
+          <strong>WebSocket example · stream 4,096 bytes per message</strong>
+          <pre><code>curl --http1.1 --no-buffer --max-time 3 \
+  -H 'Connection: Upgrade' \
+  -H 'Upgrade: websocket' \
+  -H 'Sec-WebSocket-Version: 13' \
+  -H "Sec-WebSocket-Key: $(openssl rand -base64 16)" \
+  'http://127.0.0.1:8080/stream?bytes=4096&amp;refresh=500' \
+  --output stream.ws --write-out 'HTTP status: %{http_code}\n'</code></pre>
+          <p class="note">This curl command performs an HTTP/1.1 WebSocket upgrade: a successful handshake reports HTTP <code>101</code>. The resulting <code>stream.ws</code> contains raw WebSocket frames (including frame headers), <strong>not</strong> a plain file of random payload bytes. The endpoint streams continuously, so <code>--max-time 3</code> intentionally ends the capture with curl exit code 28. Use a WebSocket-aware client to decode messages.</p>
+          <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> for HTTP APIs and <code>wss://</code> for WebSocket clients when TLS is enabled; for a curl-based manual upgrade, use the corresponding <code>https://</code> URL. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
           <details><summary>Legacy navigation shortcuts (optional)</summary>
             <p>These browser-side redirect helpers are retained for old bookmarks; they are not separate API implementations.</p>
             <div class="legacy-links">
