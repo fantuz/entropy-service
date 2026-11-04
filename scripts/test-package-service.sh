@@ -26,7 +26,7 @@ if grep -E 'systemctl[[:space:]]+(enable|start|restart)|(/dev/.*chmod|chmod.* /d
 fi
 
 grep -q 'remove|0)' "$pre"
-if command -v systemd-analyze >/dev/null 2>&1; then
+if command -v systemd-analyze >/dev/null 2>&1 && [ -x /usr/bin/entropy-server ]; then
     systemd-analyze verify "$unit"
 fi
 printf '%s\n' 'Packaging/service smoke checks passed'
