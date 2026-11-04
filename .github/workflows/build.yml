@@ -45,6 +45,8 @@ jobs:
         run: node scripts/test-web-layout.mjs
       - name: Race-test entropy server
         run: go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
+      - name: Smoke-test packaged service configuration
+        run: sh scripts/test-package-service.sh
       - name: Run linters
         uses: golangci/golangci-lint-action@v9.3.0
         with:
