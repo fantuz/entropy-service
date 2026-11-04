@@ -37,6 +37,20 @@ Do not report security vulnerabilities through public forms.
 
 Do not commit device secrets, production TLS keys, credentials, or user data. When submitting a security finding, follow [SECURITY.md](SECURITY.md) rather than posting the details publicly.
 
+## Tagged release validation
+
+A `v*.*.*` tag triggers the release workflow against that **exact tagged
+commit**. The `validate` job must finish successfully before the
+token-bearing `release` job is eligible to publish any artifacts. Validation
+includes module tidiness, all Go tests, four browser regression suites, the
+server race detector, `golangci-lint`, and a GoReleaser snapshot build.
+Failure in any required check prevents publication.
+
+For a failed release workflow, **correct the source and create a new tag**.
+Do not assume that a successful `main` workflow on another commit validates
+the current tag. Ensure production keys, generated files and the tagged
+source tree are reviewed before tagging.
+
 ## Performance claims
 
 Keep benchmark commands, exact payloads, CPU, Go version, backend, seed source, concurrency, transport, TLS status, latency distribution and errors with the results. Prefer reproducible before/after comparisons on the same hardware. Clearly label **author-reported**, synthetic and isolated microbenchmark numbers, and distinguish payload throughput from hardware-entropy production. See [benchmark methodology](docs/benchmarks.md).

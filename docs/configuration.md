@@ -48,6 +48,20 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 
 `-buffer-qrng` is deprecated and ignored. `-buffer-entropy` is an unused legacy option; neither controls an active pool or ring buffer.
 
+Source selection opens and inspects the **actual file descriptor**. With
+`-require-device=true`, `-device` must be non-empty and the named character
+device must be opened successfully; **no startup fallback** is permitted.
+`-device=/dev/urandom -require-device=true` deliberately requires that OS
+character device, not a physical QRNG. To require a specific hardware device,
+name its path explicitly. With strict mode off, failure to open/validate the
+requested device selects `/dev/urandom`; if that also fails, the Go OS-backed
+`crypto/rand.Reader` is used. `X-RNG-Source` and `/ready`
+report the **actual selected reader**, not the originally requested path.
+Optional CPU mixing supplements seed bytes but does not replace this
+reported base source. This is **startup-only** fallback: an error from the
+already opened source during a later reseed does not switch readers.
+Source selection establishes neither entropy quality nor physical provenance.
+
 `-cpu-mix` prefers RDSEED, falls back to RDRAND, and takes precedence over `-rdrand-mix`. Mixing applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
 
 ## Client

@@ -20,10 +20,7 @@ type Reader interface {
 
 // DRBG represents a deterministic random byte generator with observability metadata.
 type DRBG struct {
-	// LOCKS
-	// Mu     sync.Mutex
-	mu     sync.Mutex
-	Stream cipher.Stream
+	mu sync.Mutex
 
 	// Crypto state
 	key             [32]byte
@@ -310,58 +307,12 @@ func (d *DRBG) GetMetadata() Metadata {
 	}
 }
 
-func (d *DRBG) ReadInto(dst []byte) {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
-	d.Stream.XORKeyStream(dst, dst)
-	// update counters, bytes generated, reseed checks, etc
-}
-
-func (d *DRBG) Write(p []byte) (int, error) {
-	d.ReadInto(p)
-
-	return len(p), nil
-}
-
-/*
+// Derive draws a seed from the synchronized DRBG Read path.
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
 	seed := make([]byte, seedSize)
-	_, err := d.Read(seed)
-	if err != nil {
-		return nil, err
-	}
-	return seed, nil
-}
-*/
-
-func (d *DRBG) Derive(seedSize int) ([]byte, error) {
-	seed := make([]byte, seedSize)
-	// d.Read(seed)
-	_, err := d.Read(seed)
-	if err != nil {
+	if _, err := d.Read(seed); err != nil {
 		return nil, err
 	}
 
 	return seed, nil
-	// return payload, nil
 }
-
-/*
-func (d *DRBG) WriteTo(w io.Writer, n int) error {
-    buf := d.entropyBuf.Get(n).([]byte)
-    // buf := d.bufPool.Get().([]byte)
-    // buf := d.entropyBuf.Get()
-    defer d.bufPool.Put(buf)
-
-    for n > 0 {
-        chunk := min(n, len(buf))
-        d.Fill(buf[:chunk])
-        _, err := w.Write(buf[:chunk])
-        if err != nil {
-            return err
-        }
-        n -= chunk
-    }
-    return nil
-}
-*/
