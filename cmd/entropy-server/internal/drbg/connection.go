@@ -91,6 +91,7 @@ func (c *ConnectionReader) Close() {
 
 	if !c.closed && c.child != nil {
 		_ = c.child.Close()
+
 		DecreaseActiveInstances(1)
 
 		c.child = nil
