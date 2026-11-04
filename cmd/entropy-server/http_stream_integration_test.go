@@ -275,3 +275,36 @@ func TestHTTPStreamingPreservesConservativeMemoryLimit(t *testing.T) {
 		t.Fatalf("memory admission unexpectedly relaxed: %d", w.Code)
 	}
 }
+
+func TestHTTPPrivateGeneratorReleasedOnSuccessAndError(t *testing.T) {
+	for _, algorithm := range []drbg.Algorithm{drbg.ChaCha20, drbg.AES256CTR} {
+		t.Run(algorithm.String(), func(t *testing.T) {
+			root := newBenchmarkDRBG(t, algorithm)
+			baseline := drbg.ActiveInstances()
+			budget := newHTTPRequestBudget(2, 1<<20)
+			handler := randomBytesHandler(root, 1<<25, 20, false, budget)
+
+			for _, tc := range []struct {
+				name string
+				path string
+				writer http.ResponseWriter
+			}{
+				{"success", "/v1/data/random?bytes=512", httptest.NewRecorder()},
+				{"invalid size", "/v1/data/random?bytes=0", httptest.NewRecorder()},
+				{"write failure", "/v1/data/random?bytes=65536", &shortOutputWriter{header: make(http.Header)}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					handler(tc.writer, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil))
+
+					if got := drbg.ActiveInstances(); got != baseline {
+						t.Fatalf("request leaked private generator: active=%d, baseline=%d", got, baseline)
+					}
+
+					if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
+						t.Fatalf("request leaked budget: %+v", usage)
+					}
+				})
+			}
+		})
+	}
+}
