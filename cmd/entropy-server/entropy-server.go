@@ -1266,6 +1266,7 @@ func main() {
 	} else {
 		log.Printf("Entropy mode: configured character device (%s); quality not independently verified", actualSource)
 	}
+
 	log.Printf("Entropy source: %s", actualSource)
 
 	fmt.Println("\t1) open entropy seed source")
