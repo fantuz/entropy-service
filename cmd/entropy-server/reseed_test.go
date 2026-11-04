@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -113,4 +114,35 @@ func observableTestDRBG(t *testing.T) *drbg.DRBG {
 	t.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
 
 	return &d
+}
+
+type countingSeedReader struct{ calls int }
+
+func (r *countingSeedReader) Read(_ []byte) (int, error) {
+	r.calls++
+
+	return 0, io.EOF
+}
+
+func TestReseedLoopRejectsInvalidSizesBeforeReading(t *testing.T) {
+	for _, size := range []int{-1, 0, 1, 31, 1<<20 + 1} {
+		t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
+			root := observableTestDRBG(t)
+			before := root.GetMetadata()
+			source := &countingSeedReader{}
+
+			reseedLoop(t.Context(), source, 1, size, root)
+
+			after := root.GetMetadata()
+			if source.calls != 0 {
+				t.Fatal("invalid size caused a source read")
+			}
+
+			if after.ReseedsTotal != before.ReseedsTotal ||
+				!after.LastReseedAt.Equal(before.LastReseedAt) ||
+				after.ReseedFailuresTotal != before.ReseedFailuresTotal+1 {
+				t.Fatal("invalid size changed freshness or failed to flag degraded state")
+			}
+		})
+	}
 }
