@@ -37,7 +37,6 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 					}
 
 					closeIfSupported(b, &d)
-
 				}
 			})
 
@@ -58,7 +57,6 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 
 				b.StopTimer()
 				closeIfSupported(b, &d)
-
 			})
 
 			b.Run("ChildCreateClose", func(b *testing.B) {
@@ -77,12 +75,10 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 					}
 
 					closeIfSupported(b, &child)
-
 				}
 
 				b.StopTimer()
 				closeIfSupported(b, &parent)
-
 			})
 
 			b.Run("WSOpenReadClose", func(b *testing.B) {
@@ -108,7 +104,6 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 
 				b.StopTimer()
 				closeIfSupported(b, &parent)
-
 			})
 
 			b.Run("Read64KiB", func(b *testing.B) {
@@ -131,7 +126,6 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 
 				b.StopTimer()
 				closeIfSupported(b, &d)
-
 			})
 		})
 	}
