@@ -124,7 +124,7 @@ For a quick tour, start the server and **open its base URL in a browser**. The c
 
 The server supports configurable seed sources, DRBG backends, timing and resource budgets; the client separately controls reception, analysis and terminal redraw rates. Server timing flags take integer **milliseconds**, whereas client timing flags accept Go durations such as `50ms`.
 
-Typical server options: `-device=/dev/urandom -enable-https=false -http=127.0.0.1:8080`; select `-drbg=aes-256-ctr` to compare the alternate backend. Use `-require-device=true` when physical-source availability is mandatory.
+Typical server options: `-device=/dev/urandom -enable-https=false -http=127.0.0.1:8080`; select `-drbg=chacha20` to override AES-256-CTR on non-ARM/non-RISC-V builds (ARM and RISC-V default to ChaCha20). Use `-require-device=true` when physical-source availability is mandatory.
 
 **[Complete server and client flags, defaults, and examples](docs/configuration.md)**
 
@@ -147,7 +147,7 @@ The service creates **one root DRBG**, seeded from a full 64-byte startup read a
 
 This lets independent bulk consumers use multiple CPU cores without holding one shared lock for all their output. Parent seed derivation and reseeding still synchronise, and each individual generator serialises its own reads. AES acceleration, message size, encoding, TLS, network capacity and client work determine actual scaling.
 
-Fresh entropy is read before taking the root generator's reseed lock. At the default settings, periodic reads nominally request `256 bytes / 250 ms = 1024 bytes/s`, in addition to startup/validation reads. This is seed-source demand, not the service's output throughput or a claim about measured physical entropy.
+Fresh entropy is read before taking the root generator's reseed lock. At the default settings, periodic reads nominally request `256 bytes / 15 s ≈ 17.1 bytes/s`, in addition to startup/validation reads. This is seed-source demand, not the service's output throughput or a claim about measured physical entropy.
 
 ### Security and source boundaries
 
@@ -158,7 +158,7 @@ resource budgets and deployment isolation actually guarantee—and what they
 do not.
 
 
-ChaCha20 and AES-256-CTR are selectable stream backends inside the project's own SHA-512-based seed/reseed construction. This is **not an implementation of NIST CTR_DRBG**, and the project makes no FIPS-validation or independent security-audit claim.
+AES-256-CTR (default on non-ARM/non-RISC-V) and ChaCha20 (default on ARM/RISC-V) are selectable stream backends inside the project's own SHA-512-based seed/reseed construction. This is **not an implementation of NIST CTR_DRBG**, and the project makes no FIPS-validation or independent security-audit claim.
 
 The suite can support laboratory work, application prototyping and integration experiments. It is not an HSM, key-management system, OpenSSL provider or certified entropy source. Remote randomness also introduces trust in the server and transport; keep private keys and sensitive seed material out of public diagnostic pages and logs.
 
