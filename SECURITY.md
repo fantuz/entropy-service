@@ -2,6 +2,19 @@
 
 Entropy Service is a research-oriented, self-hosted random-data distribution application. Its cryptographic design has **not** been independently audited or certified; no FIPS 140 validation or NIST CTR_DRBG conformance is claimed. Passing statistical tests is not evidence of cryptographic certification.
 
+## Current architectural assurance review
+
+This policy is a deployment checklist, not a cryptographic security guarantee.
+For **verified implementation boundaries, source-failure behavior, adversary
+assumptions, explicit out-of-scope threats and a prioritized risk register**,
+read [Security Boundaries & Threat Model](docs/security-boundaries.md).
+The accompanying [Full Architecture Review](docs/architecture-review.md)
+answers the five larger questions about architecture, cryptography,
+operational stability, performance reproducibility and project purpose.
+
+The reviewed version remains a **research-oriented application**, not a
+validated hardware entropy source, HSM or certified DRBG.
+
 ## Reporting vulnerabilities
 
 Please report suspected security vulnerabilities **privately**, preferably with GitHub's **Report a vulnerability** feature for this repository (if enabled). If private vulnerability reporting is unavailable, contact the repository maintainer privately through their GitHub profile before sharing details. Avoid posting exploits, private keys, service addresses, or sensitive logs in public issues. There is no promised response-time SLA.
