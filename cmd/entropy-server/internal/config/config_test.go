@@ -71,3 +71,24 @@ func TestHelpStatesTimingFormat(t *testing.T) {
 		t.Fatalf("ambiguous help: %s", output.String())
 	}
 }
+
+func TestReseedBufferSizeBounds(t *testing.T) {
+	for _, value := range []string{"-1", "0", "1", "31", "1048577"} {
+		if _, err := parseConfig([]string{"-buffer-reseed=" + value}, io.Discard); err == nil {
+			t.Errorf("buffer-reseed=%s must not permit a fresh-seed event", value)
+		}
+	}
+
+	for _, value := range []string{"32", "256", "1048576"} {
+		cfg, err := parseConfig([]string{"-buffer-reseed=" + value}, io.Discard)
+		if err != nil {
+			t.Errorf("buffer-reseed=%s unexpectedly rejected: %v", value, err)
+
+			continue
+		}
+
+		if cfg.ReseedSize <= 0 {
+			t.Fatalf("invalid size %d", cfg.ReseedSize)
+		}
+	}
+}
