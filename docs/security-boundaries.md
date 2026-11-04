@@ -103,6 +103,11 @@ unless the operator installs an external proxy. HTTP and HTTPS expose the
 | **B8 — Monitoring and debugging** | Readiness indicates seed freshness; pprof binds to loopback if enabled. | Public metrics reveal operational data; loopback profiling is sensitive to local users/tunnels. |
 | **B9 — Packaging/deployment** | Go tests, server race tests and lint run in build CI. | Packaged service defaults to root + plain HTTP bound to all interfaces; tag release workflow does not explicitly run build CI. |
 
+> **Historical baseline note:** This review captures the implementation as of
+> `3e4dfbe`. A subsequent change consolidated source selection and
+> corrected strict empty-path handling and actual-source labeling. Consult
+> [current configuration](configuration.md) for implementation behavior.
+>
 ## 4. Entropy-source behavior: exact failure policy
 
 ### 4.1 Startup
