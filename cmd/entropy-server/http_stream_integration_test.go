@@ -142,7 +142,7 @@ func newBenchmarkDRBG(tb testing.TB, algo drbg.Algorithm) *drbg.DRBG {
 		tb.Fatal(err)
 	}
 
-	tb.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
+	tb.Cleanup(func() { _ = d.Close() })
 
 	return &d
 }
@@ -179,7 +179,7 @@ func BenchmarkHTTPFullBufferBaseline(b *testing.B) {
 					buf := make([]byte, n)
 					_, err = io.ReadFull(&child, buf)
 
-					drbg.DecreaseActiveInstances(1)
+					_ = child.Close()
 
 					if err != nil {
 						b.Fatal(err)
