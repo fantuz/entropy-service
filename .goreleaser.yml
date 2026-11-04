@@ -9,7 +9,7 @@ builds:
     main: ./cmd/entropy-server
     binary: entropy-server
     ldflags:
-      - -s -w
+      - -s -w -X main.appVersion={{ .Version }}
     env:
       - CGO_ENABLED=0
     goos:

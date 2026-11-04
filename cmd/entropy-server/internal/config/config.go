@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
 
 const (
@@ -31,7 +33,7 @@ type Config struct {
 	HTTPSAddr        string
 	CertFile         string
 	KeyFile          string
-	LogLevel         string
+	LogLevel         string // Legacy field: unused.
 	DevicePath       string
 	DRBG             string
 	EnableHTTPS      bool
@@ -73,10 +75,10 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default /stream, /colors and /words WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.PageRefreshMs, "refresh", 5000, "Word page refresh in milliseconds (HTML rounds up to whole seconds)")
-	flags.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (maximum 20)")
+	flags.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (positive)")
 	flags.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Root reseed interval in milliseconds (1-10000)")
 	flags.IntVar(&cfg.MaxReseedAgeMs, maxReseedAgeFlag, 0, "Maximum seed age in milliseconds (0 = max(1000, four reseed intervals))")
-	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
+	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Deprecated; ignored (no separate entropy buffer)")
 	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Bytes supplied to each root reseed (32-1048576)")
 	flags.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Deprecated; ignored (reseeding reads the configured source directly)")
 	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum generated sample bytes (default 32 MiB; compact WebSocket messages add a 32-byte digest)")
@@ -113,36 +115,8 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		return nil, err
 	}
 
-	if err := cfg.validateTiming(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		fmt.Fprintln(output, err)
-		return nil, err
-	}
-
-	if cfg.ReseedSize < minReseedBytes || cfg.ReseedSize > maxReseedBytes {
-		err := fmt.Errorf("buffer-reseed must be between %d and %d bytes", minReseedBytes, maxReseedBytes)
-		fmt.Fprintln(output, err)
-
-		return nil, err
-	}
-
-	if cfg.WSMaxConnections < 1 || cfg.WSMemoryMiB < 1 || cfg.WSMemoryMiB > (1<<63-1)/(1<<20) {
-		err := errors.New("ws-max-connections and ws-memory-mib must be positive; memory budget must fit in int64 bytes")
-		fmt.Fprintln(output, err)
-
-		return nil, err
-	}
-
-	if cfg.HTTPMaxRequests < 1 || cfg.HTTPMemoryMiB < 1 || cfg.HTTPMemoryMiB > (1<<63-1)/(1<<20) {
-		err := errors.New("http-max-requests and http-memory-mib must be positive; memory budget must fit in int64 bytes")
-		fmt.Fprintln(output, err)
-
-		return nil, err
-	}
-
-	if cfg.BytesFingerprint < 1 || cfg.BytesFingerprint > 1<<25 {
-		err := errors.New("fingerprint must be between 1 and 33554432 bytes")
-		fmt.Fprintln(output, err)
-
 		return nil, err
 	}
 
@@ -167,6 +141,52 @@ func (cfg *Config) validateTiming() error {
 		if f.value < f.min || int64(f.value) > f.max {
 			return fmt.Errorf("%s must be between %d and %d milliseconds", f.name, f.min, f.max)
 		}
+	}
+
+	return nil
+}
+
+// Validate checks startup configuration before entropy devices are opened.
+// It also resolves the default readiness age for both CLI and direct callers.
+func (cfg *Config) Validate() error {
+	if cfg == nil {
+		return errors.New("nil server configuration")
+	}
+
+	if err := cfg.validateTiming(); err != nil {
+		return err
+	}
+
+	if cfg.ReseedSize < minReseedBytes || cfg.ReseedSize > maxReseedBytes {
+		return fmt.Errorf("buffer-reseed must be between %d and %d bytes", minReseedBytes, maxReseedBytes)
+	}
+
+	if cfg.MaxBytes < 1 || cfg.MaxBytes > 1<<25 {
+		return errors.New("max-bytes must be between 1 and 33554432")
+	}
+
+	if cfg.MaxWords < 1 {
+		return errors.New("words must be positive")
+	}
+
+	if cfg.BytesFingerprint < 1 || cfg.BytesFingerprint > 1<<25 {
+		return errors.New("fingerprint must be between 1 and 33554432 bytes")
+	}
+
+	if cfg.WSMaxConnections < 1 || cfg.WSMemoryMiB < 1 || cfg.WSMemoryMiB > (1<<63-1)/(1<<20) {
+		return errors.New("ws-max-connections and ws-memory-mib must be positive; memory budget must fit in int64 bytes")
+	}
+
+	if cfg.HTTPMaxRequests < 1 || cfg.HTTPMemoryMiB < 1 || cfg.HTTPMemoryMiB > (1<<63-1)/(1<<20) {
+		return errors.New("http-max-requests and http-memory-mib must be positive; memory budget must fit in int64 bytes")
+	}
+
+	if _, err := drbg.ParseAlgorithm(cfg.DRBG); err != nil {
+		return err
+	}
+
+	if cfg.MaxReseedAgeMs == 0 {
+		cfg.MaxReseedAgeMs = max(1000, 4*cfg.ReseedMs)
 	}
 
 	return nil

@@ -39,6 +39,9 @@ import (
 //go:embed web
 var webFS embed.FS
 
+// GoReleaser injects the release tag; development binaries report dev.
+var appVersion = "dev"
+
 type ClientPrefs struct {
 	Bytes   int `json:"bytes"`
 	Refresh int `json:"refresh"`
@@ -1220,30 +1223,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if cfg.ReseedSize < 32 || cfg.ReseedSize > 65536 {
-		log.Fatal("buffer-reseed must be between 32 and 65536 bytes")
-	}
-
-	// if cfg.MaxBytes > 33554432
-
-	/*
-		if cfg.MaxBytes > (1 << 25) {
-			panic(Red + "max-bytes should be <= 33554432 (32 MB)" + Reset)
-		}
-	*/
-
-	if cfg.MaxBytes < 1 || cfg.MaxBytes > (1<<25) {
-		panic(Red + "max-bytes must be between 1 and 33554432" + Reset)
-	}
-
-	if cfg.MaxWords < 1 {
-		panic(Red + "words must be positive" + Reset)
-	}
-
-	if cfg.MaxReseedAgeMs == 0 {
-		cfg.MaxReseedAgeMs = max(1000, 4*cfg.ReseedMs)
-	}
-
 	maxReseedAge := time.Duration(cfg.MaxReseedAgeMs) * time.Millisecond
 
 	fmt.Println("\n-------------------------------------------------")
@@ -1261,7 +1240,8 @@ func main() {
 	fmt.Println("Max request size KB          :", cfg.MaxBytes/1024)
 	fmt.Println("DRBG stream backend          :", algorithm)
 	fmt.Println("Readiness max seed age (ms)  :", cfg.MaxReseedAgeMs)
-	fmt.Println("Reseed Buffer size           :", cfg.SeedBuffer)
+	fmt.Println("Legacy entropy buffer       : ignored (-buffer-entropy)")
+	fmt.Println("Legacy QRNG buffer          : ignored (-buffer-qrng)")
 	fmt.Println("-------------------------------------------------")
 	fmt.Println("Max number of Bytes          :", cfg.MaxBytes)
 	fmt.Println("Maximum number of Words      :", cfg.MaxWords)
@@ -1331,7 +1311,7 @@ func main() {
 
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
 	fmt.Println("	4) set DRBG metadata (optional)")
-	root.SetMetadata("1.1.0", actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
+	root.SetMetadata(appVersion, actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
 	var tlsCfg *tls.Config
 
