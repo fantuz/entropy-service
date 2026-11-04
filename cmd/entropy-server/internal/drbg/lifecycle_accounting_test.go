@@ -71,6 +71,7 @@ func TestCloseCountsExactlyOnceUnderConcurrency(t *testing.T) {
 	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			baseline := ActiveInstances()
+
 			d, err := NewDRBGWithAlgorithm(testSeed(), algorithm)
 			if err != nil {
 				t.Fatal(err)
