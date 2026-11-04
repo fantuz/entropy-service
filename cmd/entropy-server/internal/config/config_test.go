@@ -16,7 +16,7 @@ func TestTimingDefaultsAndMillisecondOverrides(t *testing.T) {
 	}
 
 	if cfg.ReseedMs != 250 || cfg.RefreshRateMs != 5000 || cfg.RefreshColorMs != 1500 ||
-		cfg.PageRefreshMs != 5000 || cfg.MaxReseedAgeMs != 0 {
+		cfg.PageRefreshMs != 5000 || cfg.MaxReseedAgeMs != 1000 {
 		t.Fatalf("default timings changed: %+v", cfg)
 	}
 
@@ -90,5 +90,58 @@ func TestReseedBufferSizeBounds(t *testing.T) {
 		if cfg.ReseedSize <= 0 {
 			t.Fatalf("invalid size %d", cfg.ReseedSize)
 		}
+	}
+}
+
+func TestStartupConfigurationValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		invalid bool
+	}{
+		{"defaults", nil, false},
+		{"reseed upper bound", []string{"-buffer-reseed=1048576"}, false},
+		{"reseed too large", []string{"-buffer-reseed=1048577"}, true},
+		{"reseed too small", []string{"-buffer-reseed=31"}, true},
+		{"max-bytes zero", []string{"-max-bytes=0"}, true},
+		{"max-bytes oversized", []string{"-max-bytes=33554433"}, true},
+		{"words zero", []string{"-words=0"}, true},
+		{"unsupported DRBG", []string{"-drbg=unknown"}, true},
+		{"fingerprint oversized", []string{"-fingerprint=33554433"}, true},
+		{"ws connections zero", []string{"-ws-max-connections=0"}, true},
+		{"http requests zero", []string{"-http-max-requests=0"}, true},
+		{"ws memory overflow", []string{"-ws-memory-mib=8796093022208"}, true},
+		{"http memory zero", []string{"-http-memory-mib=0"}, true},
+		{"explicit readiness age", []string{"-max-reseed-age=9000"}, false},
+		{"derived readiness age", []string{"-reseed-ms=500"}, false},
+		{"legacy flags accepted", []string{"-buffer-entropy=0", "-buffer-qrng=0"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := parseConfig(tc.args, io.Discard)
+			if (err != nil) != tc.invalid {
+				t.Fatalf("parseConfig(%v): cfg=%+v err=%v, invalid=%t", tc.args, cfg, err, tc.invalid)
+			}
+			if err != nil { return }
+			if cfg.MaxReseedAgeMs <= 0 { t.Fatalf("unresolved max reseed age: %d", cfg.MaxReseedAgeMs) }
+			if tc.name == "derived readiness age" && cfg.MaxReseedAgeMs != 2000 {
+				t.Fatalf("derived age = %d, want 2000", cfg.MaxReseedAgeMs)
+			}
+		})
+	}
+}
+
+func TestValidateRejectsDirectInvalidConfiguration(t *testing.T) {
+	cfg, err := parseConfig(nil, io.Discard)
+	if err != nil { t.Fatal(err) }
+	cfg.MaxBytes = 1<<25 + 1
+	if err := cfg.Validate(); err == nil { t.Fatal("Validate accepted oversized max-bytes") }
+}
+
+func TestDeprecatedBufferHelp(t *testing.T) {
+	var output bytes.Buffer
+	_, _ = parseConfig([]string{"-help"}, &output)
+	for _, word := range []string{"buffer-qrng", "buffer-entropy", "Deprecated; ignored"} {
+		if !strings.Contains(output.String(), word) { t.Errorf("help lacks %s", word) }
 	}
 }
