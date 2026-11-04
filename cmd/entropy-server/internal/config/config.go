@@ -152,32 +152,42 @@ func (cfg *Config) Validate() error {
 	if cfg == nil {
 		return errors.New("nil server configuration")
 	}
+
 	if err := cfg.validateTiming(); err != nil {
 		return err
 	}
+
 	if cfg.ReseedSize < minReseedBytes || cfg.ReseedSize > maxReseedBytes {
 		return fmt.Errorf("buffer-reseed must be between %d and %d bytes", minReseedBytes, maxReseedBytes)
 	}
+
 	if cfg.MaxBytes < 1 || cfg.MaxBytes > 1<<25 {
 		return errors.New("max-bytes must be between 1 and 33554432")
 	}
+
 	if cfg.MaxWords < 1 {
 		return errors.New("words must be positive")
 	}
+
 	if cfg.BytesFingerprint < 1 || cfg.BytesFingerprint > 1<<25 {
 		return errors.New("fingerprint must be between 1 and 33554432 bytes")
 	}
+
 	if cfg.WSMaxConnections < 1 || cfg.WSMemoryMiB < 1 || cfg.WSMemoryMiB > (1<<63-1)/(1<<20) {
 		return errors.New("ws-max-connections and ws-memory-mib must be positive; memory budget must fit in int64 bytes")
 	}
+
 	if cfg.HTTPMaxRequests < 1 || cfg.HTTPMemoryMiB < 1 || cfg.HTTPMemoryMiB > (1<<63-1)/(1<<20) {
 		return errors.New("http-max-requests and http-memory-mib must be positive; memory budget must fit in int64 bytes")
 	}
+
 	if _, err := drbg.ParseAlgorithm(cfg.DRBG); err != nil {
 		return err
 	}
+
 	if cfg.MaxReseedAgeMs == 0 {
 		cfg.MaxReseedAgeMs = max(1000, 4*cfg.ReseedMs)
 	}
+
 	return nil
 }
