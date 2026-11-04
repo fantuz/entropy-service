@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/sha512"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -29,6 +30,7 @@ type DRBG struct {
 	cipher          cipher.Stream
 	algorithm       Algorithm
 	closed          bool
+	counted         bool // True until Close releases the constructor\'s instance count.
 	generated       uint64
 	Reseeded        time.Time
 	reseeds         uint64
@@ -87,9 +89,8 @@ var (
 // ceiling for both backends; reseeding resets the byte budget.
 const maxBytesPerKey uint64 = 1 << 38
 
-func DecreaseActiveInstances(quantity int64) {
-	activeDRBG.Add(-quantity)
-}
+// Derive is intended for bounded seed material, not bulk output.
+const maxDeriveBytes = 1 << 20
 
 func ActiveInstances() int64 {
 	return activeDRBG.Load()
@@ -149,6 +150,7 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 		nonce:     nonce,
 		cipher:    c,
 		algorithm: algorithm,
+		counted:   true,
 		algo:      algorithm.String(),
 		Reseeded:  time.Now(),
 	}, nil
@@ -156,6 +158,10 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 
 // NewConnectionDRBG derives an independent child with its parent's backend.
 func NewConnectionDRBG(d *DRBG) (DRBG, error) {
+	if d == nil {
+		return DRBG{}, errors.New("nil parent generator")
+	}
+
 	// Keep child seed material in an owned fixed-size buffer and discard it
 	// immediately after constructing the independent child.
 	var seed [64]byte
@@ -233,8 +239,9 @@ func (d *DRBG) Reseed(seed []byte) error {
 
 // Close clears the DRBG key/nonce fields we own, releases the cipher
 // reference and makes further reads or reseeds fail. It is idempotent and
-// serialized against Read/Reseed. Callers retain responsibility for existing
-// active-instance accounting. Opaque cipher implementation state and copies
+// serialized against Read/Reseed. Close releases the active-instance count
+// exactly once; callers must not manually decrement counters. Do not copy a
+// DRBG after its first use. Opaque cipher implementation state and copies
 // made by the Go runtime cannot be guaranteed erased.
 func (d *DRBG) Close() error {
 	d.mu.Lock()
@@ -248,6 +255,12 @@ func (d *DRBG) Close() error {
 	clear(d.nonce[:])
 	d.cipher = nil
 	d.closed = true
+
+	if d.counted {
+		d.counted = false
+
+		activeDRBG.Add(-1)
+	}
 
 	return nil
 }
@@ -366,10 +379,17 @@ func (d *DRBG) GetMetadata() Metadata {
 	}
 }
 
-// Derive draws a seed from the synchronized DRBG Read path.
+// Derive draws bounded seed material from the synchronized DRBG Read path.
+// Requests outside 1..maxDeriveBytes are rejected before allocating or reading.
 func (d *DRBG) Derive(seedSize int) ([]byte, error) {
+	if seedSize < 1 || seedSize > maxDeriveBytes {
+		return nil, fmt.Errorf("derive size must be between 1 and %d bytes", maxDeriveBytes)
+	}
+
 	seed := make([]byte, seedSize)
 	if _, err := d.Read(seed); err != nil {
+		clear(seed)
+
 		return nil, err
 	}
 

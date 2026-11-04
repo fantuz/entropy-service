@@ -46,7 +46,7 @@ func TestByteEndpointLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer drbg.DecreaseActiveInstances(1)
+	defer func() { _ = d.Close() }()
 
 	budget := newWebSocketBudget(128, 1<<30)
 	httpBudget := newHTTPRequestBudget(128, 512<<20)

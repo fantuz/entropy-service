@@ -111,7 +111,7 @@ func observableTestDRBG(t *testing.T) *drbg.DRBG {
 	}
 
 	d.SetMetadata("test", "/dev/test", "ignored", 250*time.Millisecond, 2048)
-	t.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
+	t.Cleanup(func() { _ = d.Close() })
 
 	return &d
 }

@@ -34,6 +34,9 @@ func TestWebSocketsUsePrivateGenerators(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				t.Cleanup(func() { _ = parent.Close() })
+				t.Cleanup(func() { _ = reference.Close() })
+
 				handler := wsBytesHandler(&parent, 1, 64, newWebSocketBudget(128, 1<<30))
 
 				switch path {
@@ -89,7 +92,9 @@ func TestWebSocketsUsePrivateGenerators(t *testing.T) {
 						t.Fatal("disconnect did not release the connection")
 					}
 
-					drbg.DecreaseActiveInstances(1) // reference child
+					if err := child.Close(); err != nil {
+						t.Fatal(err)
+					}
 				}
 			})
 		}

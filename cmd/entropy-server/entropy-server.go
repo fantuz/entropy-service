@@ -741,11 +741,7 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 
 			return
 		}
-		defer func() {
-			_ = child.Close()
-
-			drbg.DecreaseActiveInstances(1)
-		}()
+		defer func() { _ = child.Close() }()
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
 		/*
@@ -933,7 +929,6 @@ func wsBytesHandler(d *drbg.DRBG, refresh time.Duration) http.HandlerFunc {
 
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
-				// rng.DecreaseActiveInstances(-1)
 			default:
 				{
 					// log.Println("Nothing to see here")
@@ -1086,7 +1081,6 @@ func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.Han
 
 				metrics.AddBytesGenerated(len(buf))
 				metrics.AddWSPayloads(1)
-				// rng.DecreaseActiveInstances(-1)
 			default:
 				{
 					// d.Read(buf[:quantity])
@@ -1129,7 +1123,6 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*managed
 				if childerr != nil {
 					return ctx
 				}
-				// rng.DecreaseActiveInstances(-1)
 
 				// attach to context for handlers
 				// return context.WithValue(cctx, connDRBGKey, childDRBG)

@@ -61,6 +61,8 @@ func TestGeneratedBytesCountSuccessfulReadsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	t.Cleanup(func() { _ = child.Close() })
+
 	if _, err := child.Read(make([]byte, 23)); err != nil {
 		t.Fatal(err)
 	}

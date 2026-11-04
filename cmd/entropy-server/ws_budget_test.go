@@ -25,7 +25,7 @@ func budgetTestServer(t *testing.T, budget *webSocketBudget, secure bool) *httpt
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
+	t.Cleanup(func() { _ = parent.Close() })
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/stream", wsBinaryHandler(&parent, 60000, 64, 1<<25, budget))

@@ -35,6 +35,10 @@ func TestRandomBytesInheritsBackend(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			t.Cleanup(func() { _ = parent.Close() })
+			t.Cleanup(func() { _ = referenceParent.Close() })
+			t.Cleanup(func() { _ = child.Close() })
+
 			want := make([]byte, 64)
 			if _, err := io.ReadFull(&child, want); err != nil {
 				t.Fatal(err)

@@ -256,7 +256,7 @@ func wordTestDRBG(t *testing.T) *drbg.DRBG {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() { drbg.DecreaseActiveInstances(1) })
+	t.Cleanup(func() { _ = d.Close() })
 
 	return &d
 }

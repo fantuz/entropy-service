@@ -108,13 +108,13 @@ func TestByteFormatsUsePrivateGeneratorsAndReleaseBudget(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				defer drbg.DecreaseActiveInstances(1)
+				defer func() { _ = parent.Close() }()
 
 				reference, err := drbg.NewDRBGWithAlgorithm(seed, algorithm)
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer drbg.DecreaseActiveInstances(1)
+				defer func() { _ = reference.Close() }()
 
 				budget := newWebSocketBudget(4, 1<<20)
 
@@ -132,7 +132,7 @@ func TestByteFormatsUsePrivateGeneratorsAndReleaseBudget(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					defer drbg.DecreaseActiveInstances(1)
+					defer func() { _ = child.Close() }()
 
 					for range 2 {
 						kind, payload, err := conn.ReadMessage()

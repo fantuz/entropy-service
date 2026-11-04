@@ -27,6 +27,8 @@ func testGenerator(t *testing.T, algorithm Algorithm) *DRBG {
 		t.Fatal(err)
 	}
 
+	t.Cleanup(func() { _ = d.Close() })
+
 	return &d
 }
 
@@ -119,6 +121,8 @@ func TestBackendSeedAndReseedFixtures(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				t.Cleanup(func() { _ = legacy.Close() })
+
 				d = &legacy
 			}
 
@@ -167,10 +171,14 @@ func TestBackendReadContinuityAndChildren(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			t.Cleanup(func() { _ = first.Close() })
+
 			second, err := NewConnectionDRBG(a)
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			t.Cleanup(func() { _ = second.Close() })
 
 			if first.Algorithm() != algorithm || second.Algorithm() != algorithm {
 				t.Fatal("child did not inherit its parent's backend")
@@ -259,9 +267,14 @@ func TestBackendConcurrentReadsReseedsAndDerivation(t *testing.T) {
 						}
 
 						if child.Algorithm() != algorithm {
+							_ = child.Close()
+
 							t.Error("child backend changed during concurrent reseeding")
+
 							return
 						}
+
+						_ = child.Close()
 					}
 				}()
 			}
