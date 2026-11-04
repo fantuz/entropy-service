@@ -49,6 +49,46 @@ wc -c sample.bin
 ./bin/entropy-client -mode=stream -wsurl=ws://127.0.0.1:8080/stream -slice=65536 -refresh=100ms
 ```
 
+### WebSocket examples with curl
+
+With a curl build that supports the `ws://` protocol, you can pipe **8 MiB
+WebSocket payloads** directly into `rngtest`, without first writing a file:
+
+```sh
+# Requires curl with WS support, bc and rngtest (from rng-tools).
+curl --no-buffer -N "ws://127.0.0.1:8080/stream?bytes=$(echo 1024*1024*8 | bc)&refresh=500" --output - | rngtest --pipe >/dev/null
+```
+
+`rngtest` prints its statistical results to stderr; the redirected stdout
+contains only its passed-through blocks and is discarded. Stop the ongoing
+stream with Ctrl+C. This is a **statistical screening test**, not proof of
+unpredictability, validated entropy quality or cryptographic certification.
+Check `curl --version` for WS in the supported protocols; WebSocket support
+became non-experimental in curl 8.11.0 but can be disabled in a particular
+build. For curl documentation, see
+[WebSocket support](https://curl.se/docs/websocket.html).
+
+To inspect a WebSocket handshake on builds without native WS support, curl
+can instead request an HTTP/1.1 upgrade and capture the resulting **raw
+WebSocket frames**:
+
+```sh
+curl --http1.1 --no-buffer --max-time 3 \
+  -H 'Connection: Upgrade' \
+  -H 'Upgrade: websocket' \
+  -H 'Sec-WebSocket-Version: 13' \
+  -H "Sec-WebSocket-Key: $(openssl rand -base64 16)" \
+  'http://127.0.0.1:8080/stream?bytes=4096&refresh=500' \
+  --output stream.ws --write-out 'HTTP status: %{http_code}\n'
+```
+
+A successful upgrade reports HTTP `101`. Since the stream is continuous,
+the 3-second timeout deliberately terminates capture (curl exit code 28).
+Unlike native `ws://` retrieval, `stream.ws` includes WebSocket **frame
+headers** and is **not** directly suitable for piping to `rngtest`. Use
+`entropy-client` or a WS-aware client for decoded message payloads. For remote
+connections, prefer authenticated `wss://` behind an appropriate TLS boundary.
+
 Stop a running client or server with Ctrl+C. The homepage links to the canonical [byte preview](http://127.0.0.1:8080/api-bytes.html?bytes=4096&refresh=1000), [colours](http://127.0.0.1:8080/api-colors.html), [words](http://127.0.0.1:8080/api-words.html?words=8&refresh=1000), [harmonic sound](http://127.0.0.1:8080/api-sound.html), [file analysis](http://127.0.0.1:8080/api-upload.html) and [live stream-analysis](http://127.0.0.1:8080/api-stream.html?bytes=4096&refresh=500) pages.
 
 Build the **whole command packages**, not individual `.go` files: each binary now spans several source files. Without Make, use `go build -o ./bin/entropy-server ./cmd/entropy-server` and the corresponding `./cmd/entropy-client` command.
