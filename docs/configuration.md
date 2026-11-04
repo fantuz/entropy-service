@@ -4,7 +4,7 @@ Run either binary with `-help` for its complete flag list. Boolean values use `-
 
 ## Server
 
-All server timing flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=250`, not `250ms`. Sizes below are bytes unless explicitly labelled MiB.
+All server timing flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=15000`, not `15s`. Sizes below are bytes unless explicitly labelled MiB.
 
 ### Source and reseeding
 
@@ -12,12 +12,14 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 | --- | --- | --- |
 | `-device` | `/dev/qrandom0` | Source device; OS fallback is allowed unless required. |
 | `-require-device` | `false` | Fail startup if the requested device is unavailable. |
-| `-drbg` | `chacha20` | Backend: `chacha20` or `aes-256-ctr`. |
+| `-drbg` | `aes-256-ctr` on non-ARM/non-RISC-V; `chacha20` on ARM/RISC-V | Backend: `chacha20` or `aes-256-ctr`. An explicit flag always overrides the platform default. |
 | `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |
 | `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |
-| `-reseed-ms` | `250` | Root reseed interval: 1–10000 ms. |
+| `-reseed-ms` | `15000` | Root reseed interval: 1–60000 ms. |
 | `-buffer-reseed` | `256` | Bytes per root reseed: 32–1048576. |
-| `-max-reseed-age` | `0` | Readiness age limit in ms; zero selects `max(1000, 4 × reseed-ms)`. |
+| `-max-reseed-age` | `0` (effective 60000 ms) | Readiness age limit in ms; zero selects `max(1000, 4 × reseed-ms)`. |
+
+The architecture-based backend policy uses the binary's Go target architecture (`GOARCH`): `arm`, `arm64` and `riscv64` select ChaCha20; other builds select AES-256-CTR. This does **not** inspect AES acceleration at runtime: some non-ARM platforms without hardware AES may perform worse or have different side-channel characteristics. Operators may override with `-drbg=chacha20` or `-drbg=aes-256-ctr` after evaluating their CPU. Neither algorithm is claimed to be a NIST-certified DRBG. The 15-second reseed interval is a **service policy**, not a proven post-compromise recovery bound. The 60-second readiness-age threshold is monitoring only; an unhealthy `/ready` does not automatically stop output.
 
 ### Listeners and TLS
 

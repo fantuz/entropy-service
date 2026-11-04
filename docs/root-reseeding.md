@@ -9,7 +9,7 @@
 
 ```mermaid
 flowchart TD
-    A["Root DRBG active<br/>key K, nonce N, epoch e"] --> T["Ticker fires: default 250 ms"]
+    A["Root DRBG active<br/>key K, nonce N, epoch e"] --> T["Ticker fires: default 15,000 ms"]
     T --> V{"Configured buffer-reseed<br/>within 32..1048576 bytes?"}
     V -->|No| X["Reject configuration; no startup"]
     V -->|Yes| R["Read exactly N bytes from opened source"]
@@ -46,7 +46,7 @@ This is a **length precondition, not a min-entropy guarantee**: a hardware
 device could still return 32 predictable bytes, and the function cannot
 detect that from the length alone.
 
-Defaults remain `buffer-reseed=256` and `reseed-ms=250`.
+Defaults are `buffer-reseed=256` and `reseed-ms=15000` (15 seconds); the derived readiness age is 60 seconds unless overridden.
 The SHA-512 formula, cipher backend selection, state/output layout,
 current fail-open-on-source-error behavior, and all API contracts remain
 unchanged.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
@@ -15,7 +16,21 @@ const (
 	maxReseedAgeFlag = "max-reseed-age"
 	minReseedBytes   = 32
 	maxReseedBytes   = 1 << 20
+	defaultReseedMs  = 15000
+	maxReseedMs      = 60000
 )
+
+// defaultDRBGForArch chooses an initial stream backend by Go target ISA, not
+// by microbenchmark or by detecting AES instructions on the actual CPU.
+// Explicit -drbg always overrides this platform default.
+func defaultDRBGForArch(goarch string) string {
+	switch goarch {
+	case "arm", "arm64", "riscv64":
+		return string(drbg.ChaCha20)
+	default:
+		return string(drbg.AES256CTR)
+	}
+}
 
 type Config struct {
 	ReseedMs         int
@@ -71,12 +86,12 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
 	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flags.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
-	flags.StringVar(&cfg.DRBG, "drbg", "chacha20", "DRBG stream backend: chacha20 or aes-256-ctr")
+	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; explicit override allowed")
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default /stream, /colors and /words WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.PageRefreshMs, "refresh", 5000, "Word page refresh in milliseconds (HTML rounds up to whole seconds)")
 	flags.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (positive)")
-	flags.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Root reseed interval in milliseconds (1-10000)")
+	flags.IntVar(&cfg.ReseedMs, "reseed-ms", defaultReseedMs, "Root reseed interval in milliseconds (1-60000; default 15000)")
 	flags.IntVar(&cfg.MaxReseedAgeMs, maxReseedAgeFlag, 0, "Maximum seed age in milliseconds (0 = max(1000, four reseed intervals))")
 	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Deprecated; ignored (no separate entropy buffer)")
 	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Bytes supplied to each root reseed (32-1048576)")
@@ -131,7 +146,7 @@ func (cfg *Config) validateTiming() error {
 		value, min int
 		max        int64
 	}{
-		{"reseed-ms", cfg.ReseedMs, 1, 10000},
+		{"reseed-ms", cfg.ReseedMs, 1, maxReseedMs},
 		{"refresh-ms", cfg.RefreshRateMs, 1, maxMilliseconds},
 		{"refresh-colors-ms", cfg.RefreshColorMs, 1, maxMilliseconds},
 		{"refresh", cfg.PageRefreshMs, 1, maxMilliseconds},

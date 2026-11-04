@@ -136,7 +136,7 @@ uninterrupted hardware supply throughout the process lifetime.**
 ### 4.2 Source fails *after* startup
 
 The active reseed loop reads the **existing open reader** every configured
-interval (default 250 ms; default read 256 bytes). It does not automatically
+interval (default 15 seconds; default read 256 bytes). It does not automatically
 open `/dev/urandom`, replace the source, or switch the root to a new device.
 
 1. A read that returns an error or too few bytes increments failure metadata.

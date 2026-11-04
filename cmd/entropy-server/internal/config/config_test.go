@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -15,8 +16,8 @@ func TestTimingDefaultsAndMillisecondOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cfg.ReseedMs != 250 || cfg.RefreshRateMs != 5000 || cfg.RefreshColorMs != 1500 ||
-		cfg.PageRefreshMs != 5000 || cfg.MaxReseedAgeMs != 1000 {
+	if cfg.ReseedMs != 15000 || cfg.RefreshRateMs != 5000 || cfg.RefreshColorMs != 1500 ||
+		cfg.PageRefreshMs != 5000 || cfg.MaxReseedAgeMs != 60000 {
 		t.Fatalf("default timings changed: %+v", cfg)
 	}
 
@@ -53,7 +54,7 @@ func TestInvalidTimingArgumentsAreRejected(t *testing.T) {
 		{"-enable-https", "false", "-reseed-ms=1000"},
 		{"run", "-reseed-ms=1000"},
 		{"--", "-reseed-ms=1000"},
-		{"-reseed-ms=10001"},
+		{"-reseed-ms=60001"},
 	} {
 		if _, err := parseConfig(args, io.Discard); err == nil {
 			t.Errorf("arguments were silently ignored: %v", args)
@@ -160,6 +161,76 @@ func TestDeprecatedBufferHelp(t *testing.T) {
 	for _, word := range []string{"buffer-qrng", "buffer-entropy", "Deprecated; ignored"} {
 		if !strings.Contains(output.String(), word) {
 			t.Errorf("help lacks %s", word)
+		}
+	}
+}
+
+func TestDRBGPlatformDefaultsAndOverrides(t *testing.T) {
+	for _, tc := range []struct {
+		arch string
+		want string
+	}{
+		{"amd64", "aes-256-ctr"},
+		{"386", "aes-256-ctr"},
+		{"arm", "chacha20"},
+		{"arm64", "chacha20"},
+		{"riscv64", "chacha20"},
+		{"ppc64le", "aes-256-ctr"},
+	} {
+		t.Run(tc.arch, func(t *testing.T) {
+			if got := defaultDRBGForArch(tc.arch); got != tc.want {
+				t.Fatalf("arch %s: got %s, want %s", tc.arch, got, tc.want)
+			}
+		})
+	}
+
+	cfg, err := parseConfig(nil, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.DRBG != defaultDRBGForArch(runtime.GOARCH) {
+		t.Fatalf("actual GOARCH %s: default %q", runtime.GOARCH, cfg.DRBG)
+	}
+
+	for _, name := range []string{"chacha20", "aes-256-ctr"} {
+		cfg, err := parseConfig([]string{"-drbg=" + name}, io.Discard)
+		if err != nil {
+			t.Fatalf("explicit algorithm %s: %v", name, err)
+		}
+
+		if cfg.DRBG != name {
+			t.Fatalf("explicit override ignored: got %q, want %q", cfg.DRBG, name)
+		}
+	}
+}
+
+func TestReseedIntervalExtendedBoundsAndReadinessAge(t *testing.T) {
+	for _, tc := range []struct {
+		args         []string
+		wantInterval int
+		wantAge      int
+	}{
+		{nil, 15000, 60000},
+		{[]string{"-reseed-ms=10000"}, 10000, 40000},
+		{[]string{"-reseed-ms=15000"}, 15000, 60000},
+		{[]string{"-reseed-ms=60000"}, 60000, 240000},
+		{[]string{"-reseed-ms=15000", "-max-reseed-age=30000"}, 15000, 30000},
+	} {
+		cfg, err := parseConfig(tc.args, io.Discard)
+		if err != nil {
+			t.Fatalf("parseConfig(%v): %v", tc.args, err)
+		}
+
+		if cfg.ReseedMs != tc.wantInterval || cfg.MaxReseedAgeMs != tc.wantAge {
+			t.Fatalf("parseConfig(%v): interval=%d age=%d, want %d/%d",
+				tc.args, cfg.ReseedMs, cfg.MaxReseedAgeMs, tc.wantInterval, tc.wantAge)
+		}
+	}
+
+	for _, value := range []string{"0", "-1", "60001"} {
+		if _, err := parseConfig([]string{"-reseed-ms=" + value}, io.Discard); err == nil {
+			t.Errorf("unexpectedly accepted reseed-ms=%s", value)
 		}
 	}
 }
