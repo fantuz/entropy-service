@@ -207,9 +207,9 @@ func TestDRBGPlatformDefaultsAndOverrides(t *testing.T) {
 
 func TestReseedIntervalExtendedBoundsAndReadinessAge(t *testing.T) {
 	for _, tc := range []struct {
-		args []string
+		args         []string
 		wantInterval int
-		wantAge int
+		wantAge      int
 	}{
 		{nil, 15000, 60000},
 		{[]string{"-reseed-ms=10000"}, 10000, 40000},
