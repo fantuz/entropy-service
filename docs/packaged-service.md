@@ -113,7 +113,7 @@ liveness), the service logs, and connectivity:
 sudo systemctl restart entropy-server
 systemctl status entropy-server --no-pager
 journalctl -u entropy-server -b -n 100 --no-pager
-curl -fsSI http://127.0.0.1:8080/v1/data/random?bytes=32
+curl -fsS -D - -o /dev/null 'http://127.0.0.1:8080/v1/data/random?bytes=32'
 curl -fsS http://127.0.0.1:8080/ready
 ```
 
