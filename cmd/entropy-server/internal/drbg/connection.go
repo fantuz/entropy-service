@@ -43,18 +43,27 @@ func (c *ConnectionReader) Read(p []byte) (int, error) {
 		uint64(len(p)) > maxBytesPerKey-c.child.generated {
 		seed, epoch, err := c.parent.connectionSeed()
 		if err != nil {
+			clear(seed[:])
+
 			return 0, err
 		}
 
 		if c.child == nil {
-			child, err := NewDRBGWithAlgorithm(seed, c.parent.algorithm)
-			if err != nil {
-				return 0, err
+			child, newErr := NewDRBGWithAlgorithm(seed[:], c.parent.algorithm)
+			clear(seed[:])
+
+			if newErr != nil {
+				return 0, newErr
 			}
 
 			c.child = &child
-		} else if err := c.child.Reseed(seed); err != nil {
-			return 0, err
+		} else {
+			reseedErr := c.child.Reseed(seed[:])
+			clear(seed[:])
+
+			if reseedErr != nil {
+				return 0, reseedErr
+			}
 		}
 
 		c.epoch = epoch
@@ -64,12 +73,13 @@ func (c *ConnectionReader) Read(p []byte) (int, error) {
 }
 
 // connectionSeed keeps the derived seed and its epoch in the same snapshot.
-func (d *DRBG) connectionSeed() ([]byte, uint64, error) {
+func (d *DRBG) connectionSeed() ([64]byte, uint64, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	seed := make([]byte, 64)
-	_, err := d.readLocked(seed)
+	var seed [64]byte
+
+	_, err := d.readLocked(seed[:])
 
 	return seed, d.reseedEpoch.Load(), err
 }
@@ -80,6 +90,7 @@ func (c *ConnectionReader) Close() {
 	defer c.mu.Unlock()
 
 	if !c.closed && c.child != nil {
+		_ = c.child.Close()
 		DecreaseActiveInstances(1)
 
 		c.child = nil
