@@ -55,7 +55,7 @@ device must be opened successfully; **no startup fallback** is permitted.
 character device, not a physical QRNG. To require a specific hardware device,
 name its path explicitly. With strict mode off, failure to open/validate the
 requested device selects `/dev/urandom`; if that also fails, the Go OS-backed
-`crypto/rand.Reader` is used. `X-RNG-Source`, `/ready` and `/metrics-2`
+`crypto/rand.Reader` is used. `X-RNG-Source` and `/ready`
 report the **actual selected reader**, not the originally requested path.
 Optional CPU mixing supplements seed bytes but does not replace this
 reported base source. This is **startup-only** fallback: an error from the
