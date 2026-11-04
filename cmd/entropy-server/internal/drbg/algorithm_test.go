@@ -81,7 +81,7 @@ func TestAES256CTRKnownAnswer(t *testing.T) {
 	want := decodeTestHex(t, "601ec313775789a5b7a7f504bbf3d228"+
 		"f443e3ca4d62b59aca84e990cacaf5c5"+"2b0930daa23de94ce87017ba2d84988d"+"dfc9c58db67aada613c2dd08457941a6")
 
-	stream, err := newCipherStream(AES256CTR, key, counter)
+	stream, err := newCipherStream(AES256CTR, &key, &counter)
 	if err != nil {
 		t.Fatal(err)
 	}

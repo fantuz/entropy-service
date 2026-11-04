@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/sha512"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"sync"
@@ -27,6 +28,7 @@ type DRBG struct {
 	nonce           [aes.BlockSize]byte
 	cipher          cipher.Stream
 	algorithm       Algorithm
+	closed          bool
 	generated       uint64
 	Reseeded        time.Time
 	reseeds         uint64
@@ -116,15 +118,19 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 	}
 
 	h := sha512.Sum512(seed)
+	defer clear(h[:])
 
 	var (
 		key   [32]byte
 		nonce [aes.BlockSize]byte
 	)
+	defer clear(key[:])
+	defer clear(nonce[:])
+
 	copy(key[:], h[:32])
 	copy(nonce[:], h[32:48])
 
-	c, err := newCipherStream(algorithm, key, nonce)
+	c, err := newCipherStream(algorithm, &key, &nonce)
 	if err != nil {
 		return DRBG{}, err
 	}
@@ -150,12 +156,16 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 
 // NewConnectionDRBG derives an independent child with its parent's backend.
 func NewConnectionDRBG(d *DRBG) (DRBG, error) {
-	seed, err := d.Derive(64)
-	if err != nil {
+	// Keep child seed material in an owned fixed-size buffer and discard it
+	// immediately after constructing the independent child.
+	var seed [64]byte
+	defer clear(seed[:])
+
+	if _, err := d.Read(seed[:]); err != nil {
 		return DRBG{}, err
 	}
 
-	return NewDRBGWithAlgorithm(seed, d.algorithm)
+	return NewDRBGWithAlgorithm(seed[:], d.algorithm)
 }
 
 // Algorithm is immutable after construction, including across reseeds.
@@ -163,28 +173,46 @@ func (d *DRBG) Algorithm() Algorithm {
 	return d.algorithm
 }
 
-// Reseed mixes new entropy into the DRBG
+// Reseed mixes the current key with fresh seed bytes without assembling a
+// combined heap buffer. The resulting bytes and old visible state are cleared
+// after installing the new cipher; the caller still owns seed.
 func (d *DRBG) Reseed(seed []byte) error {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	h := sha512.Sum512(append(d.key[:], seed...))
+	if d.closed {
+		return io.ErrClosedPipe
+	}
+
+	// Streaming SHA-512 has the same digest as Sum512(append(oldKey, seed...)),
+	// without allocating an old-key-plus-seed concatenation.
+	h := sha512.New()
+	_, _ = h.Write(d.key[:])
+	_, _ = h.Write(seed)
+
+	var digest [sha512.Size]byte
+	defer clear(digest[:])
+
+	h.Sum(digest[:0])
 
 	var (
 		key   [32]byte
 		nonce [aes.BlockSize]byte
 	)
+	defer clear(key[:])
+	defer clear(nonce[:])
 
-	copy(key[:], h[:32])
-	copy(nonce[:], h[32:48])
+	copy(key[:], digest[:32])
+	copy(nonce[:], digest[32:48])
 
-	c, err := newCipherStream(d.algorithm, key, nonce)
+	c, err := newCipherStream(d.algorithm, &key, &nonce)
 	if err != nil {
 		return err
 	}
 
+	// Do not erase or replace usable state until the next cipher is ready.
+	clear(d.key[:])
+	clear(d.nonce[:])
 	d.key = key
 	d.nonce = nonce
 	d.cipher = c
@@ -193,7 +221,28 @@ func (d *DRBG) Reseed(seed []byte) error {
 	d.reseeds++
 	d.lastReseedError = ""
 	d.reseedEpoch.Add(1)
-	// activeDRBG.Add(-1)
+
+	return nil
+}
+
+// Close clears the DRBG key/nonce fields we own, releases the cipher
+// reference and makes further reads or reseeds fail. It is idempotent and
+// serialized against Read/Reseed. Callers retain responsibility for existing
+// active-instance accounting. Opaque cipher implementation state and copies
+// made by the Go runtime cannot be guaranteed erased.
+func (d *DRBG) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.closed {
+		return nil
+	}
+
+	clear(d.key[:])
+	clear(d.nonce[:])
+	d.cipher = nil
+	d.closed = true
+
 	return nil
 }
 
@@ -209,6 +258,10 @@ func (d *DRBG) Read(p []byte) (int, error) {
 
 // readLocked requires d.mu; seed derivation also snapshots the reseed epoch.
 func (d *DRBG) readLocked(p []byte) (int, error) {
+	if d.closed {
+		return 0, io.ErrClosedPipe
+	}
+
 	if uint64(len(p)) > maxBytesPerKey-d.generated {
 		return 0, errors.New("DRBG output limit reached: reseed required")
 	}

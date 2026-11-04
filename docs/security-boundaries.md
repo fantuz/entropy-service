@@ -218,6 +218,19 @@ post-compromise seed input may help recovery after reseeding, but this
 project-specific transition has not been formally analyzed for that property.
 Neither old output confidentiality nor post-compromise security is guaranteed.
 
+**Lifecycle hardening (post-review implementation):** Startup and periodic
+reseed input buffers are explicitly cleared after use. Per-request and
+WebSocket child seeds are cleared immediately after derivation; child
+generators now close by clearing their owned key and nonce fields,
+dropping cipher references, and rejecting further reads/reseeds.
+SHA-512 intermediate digest buffers are cleared when constructors/reseeds
+return, and reseeding no longer builds a concatenated old-key-plus-seed
+heap buffer. The root generator also closes on normal server return.
+These measures reduce the **duration of accessible application-owned
+copies**, but do not claim complete zeroization of Go heap, hash/cipher
+internals, runtime copies, swapped memory, crash dumps or dead process
+pages. `Close` does not replace operating-system process isolation.
+
 **Memory lifecycle:** key, nonce, derived seed, hash and cipher-state copies
 may live in Go-managed memory. Code does not systematically zero all temporary
 seeds or lock cryptographic pages out of swap/core dumps. The compiler/garbage
