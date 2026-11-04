@@ -2,6 +2,7 @@ package drbg
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"errors"
 	"io"
 	"testing"
@@ -75,32 +76,33 @@ func TestConnectionReaderClearsChildOnClose(t *testing.T) {
 	}
 }
 
-func TestReseedStreamOutputMatchesLegacyDigest(t *testing.T) {
-	// Existing known-answer fixtures additionally verify exact stream bytes.
+// The concatenation used before lifecycle hardening and the streaming
+// SHA-512 path must derive exactly the same key and nonce on both backends.
+func TestReseedKeepsLegacySHA512StateTransition(t *testing.T) {
 	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
-		d := testGenerator(t, algorithm)
-		ref := testGenerator(t, algorithm)
-		seed := bytes.Repeat([]byte{0x3c}, 256)
+		t.Run(algorithm.String(), func(t *testing.T) {
+			d := testGenerator(t, algorithm)
+			seed := bytes.Repeat([]byte{0x3c}, 256)
 
-		if err := d.Reseed(seed); err != nil {
-			t.Fatal(err)
-		}
+			var oldInput [32 + 256]byte
+			copy(oldInput[:32], d.key[:])
+			copy(oldInput[32:], seed)
 
-		if err := ref.Reseed(seed); err != nil {
-			t.Fatal(err)
-		}
+			digest := sha512.Sum512(oldInput[:])
+			clear(oldInput[:])
+			defer clear(digest[:])
 
-		got, want := make([]byte, 1024), make([]byte, 1024)
-		if _, err := io.ReadFull(d, got); err != nil {
-			t.Fatal(err)
-		}
+			if err := d.Reseed(seed); err != nil {
+				t.Fatal(err)
+			}
 
-		if _, err := io.ReadFull(ref, want); err != nil {
-			t.Fatal(err)
-		}
+			if !bytes.Equal(d.key[:], digest[:32]) || !bytes.Equal(d.nonce[:], digest[32:48]) {
+				t.Fatal("reseed changed the existing SHA-512 old-key plus seed transition")
+			}
 
-		if !bytes.Equal(got, want) {
-			t.Fatal("reseed introduced a stream mismatch")
-		}
+			if !bytes.Equal(seed, bytes.Repeat([]byte{0x3c}, 256)) {
+				t.Fatal("Reseed modified input owned by the caller")
+			}
+		})
 	}
 }
