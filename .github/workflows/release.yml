@@ -10,13 +10,53 @@ permissions:
   contents: read
 
 jobs:
-  release:
+  validate:
+    name: Validate tagged commit before publishing
     runs-on: ubuntu-24.04
-    # goreleaser needs write access to create the GitHub release and upload assets
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact release tag
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Ensure go.mod is already tidied
+        run: go mod tidy && git diff --exit-code -- go.mod go.sum
+      - name: Run all Go tests
+        run: go test ./...
+      - name: Test browser KPI calculations
+        run: node scripts/test-status-kpis.mjs
+      - name: Test status refresh scheduling
+        run: node scripts/test-status-refresh.mjs
+      - name: Test stream Shannon entropy alerts
+        run: node scripts/test-stream-entropy-alert.mjs
+      - name: Test browser layout and digest formatting
+        run: node scripts/test-web-layout.mjs
+      - name: Race-test entropy server
+        run: go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.12.2
+          args: --timeout=3m0s
+      - name: Validate snapshot packaging
+        uses: goreleaser/goreleaser-action@v7.2.3
+        with:
+          version: v2.17.0
+          args: release --snapshot --skip=publish --clean
+
+  release:
+    name: Publish only after full tag validation
+    needs: validate
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout exact release tag
         uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0
