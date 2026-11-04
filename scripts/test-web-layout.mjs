@@ -77,4 +77,19 @@ for (const id of ordered) {
 }
 assert.match(upload, /class="analysis-card upload-input-card"/);
 assert.match(upload, /class="analysis-card upload-entropy-card"/);
+// Homepage API examples belong under the output explanation, before legacy links.
+// The curl/WebSocket example uses a real HTTP/1.1 Upgrade request rather than
+// treating a ws:// URL as a plain HTTP download. Curl exposes raw WS framing.
+const home = html("index.html");
+const pos = value => home.indexOf(value);
+assert.ok(pos('id="ws-title"') < pos('id="scope-title"'));
+assert.ok(pos('id="scope-title"') < pos("HTTP example · download 4,096 bytes"));
+assert.ok(pos("HTTP example · download 4,096 bytes") < pos("WebSocket example · stream 4,096 bytes per message"));
+assert.ok(pos("WebSocket example · stream 4,096 bytes per message") < pos("Legacy navigation shortcuts (optional)"));
+assert.match(home, /Sec-WebSocket-Key: \$\(openssl rand -base64 16\)/);
+assert.match(home, /Sec-WebSocket-Version: 13/);
+assert.match(home, /Connection: Upgrade/);
+assert.match(home, /--max-time 3/);
+assert.match(home, /raw WebSocket frames/);
+assert.match(home, /bytes=4096&amp;refresh=500/);
 console.log("Browser layout and digest formatting: passed");
