@@ -90,6 +90,7 @@ func TestReseedKeepsLegacySHA512StateTransition(t *testing.T) {
 
 			digest := sha512.Sum512(oldInput[:])
 			clear(oldInput[:])
+
 			defer clear(digest[:])
 
 			if err := d.Reseed(seed); err != nil {
