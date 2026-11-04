@@ -101,7 +101,7 @@ unless the operator installs an external proxy. HTTP and HTTPS expose the
 | **B6 — Browser to WebSocket** | Gorilla's default host-based browser Origin policy. | An absent Origin is allowed; Origin is not client authentication. |
 | **B7 — Upload into server** | POST + octet-stream + 32 MiB body cap; bounded analysis and digest computation. | Untrusted data consumes CPU/bandwidth; uploads are disclosed to the server operator. |
 | **B8 — Monitoring and debugging** | Readiness indicates seed freshness; pprof binds to loopback if enabled. | Public metrics reveal operational data; loopback profiling is sensitive to local users/tunnels. |
-| **B9 — Packaging/deployment** | Go tests, server race tests and lint run in build CI. | Packaged service defaults to root + plain HTTP bound to all interfaces; tag release workflow does not explicitly run build CI. |
+| **B9 — Packaging/deployment** | Packaged unit defaults to a restricted unprivileged identity, loopback-only HTTP and explicit service activation; release CI runs Go/race/lint/snapshot checks. | Upgrading an already-enabled service preserves its running process until restart; operator must authorize QRNG permissions, certificate/access policy and wider exposure. |
 
 > **Historical baseline note:** This review captures the implementation as of
 > `3e4dfbe`. A subsequent change consolidated source selection and
@@ -112,7 +112,7 @@ unless the operator installs an external proxy. HTTP and HTTPS expose the
 
 ### 4.1 Startup
 
-The configured path defaults to `/dev/qrandom0`. Startup calls
+The standalone binary's configured path defaults to `/dev/qrandom0` (the packaged unit explicitly selects `/dev/urandom`). Startup calls
 `ResolveEntropyDevice`, validates that the selected path is a character
 device, opens it and requires a complete 64-byte read before initializing the
 root generator.
@@ -122,15 +122,13 @@ root generator.
 | Configured path missing / not a char device | Resolve to `/dev/urandom`; startup may proceed. | Startup fails. |
 | Chosen device fails to open **after** validation | `NewEntropySource` may fall back to Go `crypto/rand.Reader`. | Startup fails. |
 | Complete initial seed cannot be read | Startup fails; no root output is served. | Startup fails. |
-| Path supplied as empty string | Resolver selects `/dev/urandom`. | **Same behavior**: this is an edge case not currently enforcing a hardware-only policy. |
+| Path supplied as empty string | Fallback to the OS CSPRNG may be used. | Configuration is rejected: strict mode requires a nonempty device path. |
 | Source returns 64 bytes, but predictable or defective | Seed is accepted. | Seed is accepted. |
 
 `/dev/urandom` and Go's `crypto/rand.Reader` are **cryptographic OS sources**,
-not intentionally weak generators. The current console's fallback description
-using the word "weak" is misleading. The resolved path in metadata is not
-cryptographic proof of physical-source quality or provenance. A failed
-open after a successful source-path check can also leave metadata describing
-the chosen path while the actual `crypto/rand.Reader` is used.
+not intentionally weak generators. Any legacy fallback description using the word "weak" is misleading. The resolved path in metadata is not
+cryptographic proof of physical-source quality or provenance. Fallback may select an OS CSPRNG, but source metadata reports the actual
+opened reader rather than just the originally requested device.
 
 **`-require-device` protects only startup selection/opening, not an
 uninterrupted hardware supply throughout the process lifetime.**
@@ -232,17 +230,17 @@ internals, runtime copies, swapped memory, crash dumps or dead process
 pages. `Close` does not replace operating-system process isolation.
 
 **Memory lifecycle:** key, nonce, derived seed, hash and cipher-state copies
-may live in Go-managed memory. Code does not systematically zero all temporary
-seeds or lock cryptographic pages out of swap/core dumps. The compiler/garbage
+may live in Go-managed memory. The packaged service now sets `LimitCORE=0`,
+which restricts conventional core dumps but does not systematically erase
+Go heap/runtime copies, lock cryptographic pages out of swap or control all
+privileged crash collection. The compiler/garbage
 collector may copy objects, so clearing one buffer is not a comprehensive
 zeroization guarantee. Treat process memory, crash dumps and backup snapshots
 as sensitive.
 
-**Potential dormant API defect to investigate:** `DRBG.Write` calls
-`ReadInto`, which uses the exported `Stream` field; normal constructors
-initialize the private `cipher` field instead. The serving read path uses
-`Read`, but the exported `Write`/`ReadInto` helpers should be removed,
-fixed and tested, not assumed equivalent to the guarded `Read`.
+**API review note:** generator APIs outside normal serving routes should be
+checked against the same closed-state and derivation bounds as `Read`; do not
+assume auxiliary helper methods have identical security guarantees.
 
 ## 6. Network, API and privacy boundaries
 
@@ -298,11 +296,14 @@ an untrusted tunnel or proxy.
 ### Packaging defaults
 
 The supplied [systemd unit](../resources/systemd/entropy-server.service)
-starts as **root**, binds HTTP `:8080` and disables HTTPS. This is a
-convenient demonstration configuration, **not a secure production profile**.
-Run under a dedicated unprivileged identity with narrowly scoped device
-permissions; bind to loopback/private interfaces and configure the operator's
-TLS/authentication layer before exposure to untrusted networks.
+now uses an unprivileged systemd identity and binds HTTP only to
+`127.0.0.1:8080`, with HTTPS disabled. Installation does **not** enable or
+start the service. Its default source is `/dev/urandom`, and device cgroup
+access is deliberately restricted. See the [deployment and migration guide](packaged-service.md).
+These constraints do **not** supply authentication or TLS to remote clients.
+An existing enabled/running installation may retain old exposure until its
+next restart; widening a bind or switching to a hardware device requires
+explicit operator-reviewed configuration and appropriate permissions.
 
 ## 7. Threat scenarios and mitigation register
 
@@ -312,7 +313,7 @@ exposes the relevant capability. No exploit or penetration test is claimed.
 | ID | Scenario / target | Severity | Current control | Remaining action |
 | --- | --- | --- | --- | --- |
 | T01 | Internet client consumes or floods unauthenticated endpoints | **High** | Global payload and admission budgets | Private bind, authenticated proxy, per-client quotas and rate limits. |
-| T02 | Packaged daemon compromised while running as root | **High** | OS baseline protections | Dedicated user, minimal device permissions and systemd hardening. |
+| T02 | Packaged daemon compromise / privilege escape | **High** | Restricted systemd user, capabilities and filesystem/device access | Verify sandbox effectiveness on the target distribution and review optional device overrides. |
 | T03 | Public demo TLS key deployed as real server identity | **High** | Documentation warning | Unique private key, trusted certificate, rotation and restricted permissions. |
 | T04 | Faulty/malicious entropy device emits predictable seed | **High** for security-sensitive output | Complete source read, optional mixing | Hardware/driver evaluation and source health tests; no automatic entropy claims. |
 | T05 | Device disappears or blocks after startup | **Medium–High** availability/freshness | Failure counters, `/ready`, per-key ceiling | Cancellable/time-bounded source abstraction and configurable fail-closed mode. |
@@ -321,7 +322,7 @@ exposes the relevant capability. No exploit or penetration test is claimed.
 | T08 | Untrusted clients exhaust CPU, memory or bandwidth | **High** when exposed | Admission reservations and message limits | Rate limits and observed RSS/heap/load tests; distinguish rejection vs capacity. |
 | T09 | HTTP interceptor reads/substitutes random output | **High** if output is secret | Optional HTTPS listener | Require authenticated TLS or local trusted IPC; disallow plaintext at boundary. |
 | T10 | Browser embeds dashboard / probes sensitive status | **Medium** | Default WS origin check; no-store on health | Authentication and access policy for metrics/status; avoid treating Origin as credentials. |
-| T11 | Release tag publishes without complete release-gate tests | **Medium** supply-chain/process | Main/PR build CI exists | Run/check test + race + lint on release commit before publishing. |
+| T11 | Release validation bypass or packaging mismatch | **Medium** supply-chain/process | Tag workflow runs Go/race/lint/browser/snapshot checks before release | Review job permissions, verify signed artifacts as appropriate and test packages on target distributions. |
 | T12 | Users mistake statistical entropy display for device assurance | **Medium** interpretation | Documentation disclaimers | Keep diagnostic/cryptographic assurances explicitly separate. |
 | T13 | `DRBG.Write` / `ReadInto` invoked outside normal route | **Low–Medium** latent | Not identified as normal serving path | Add API test, remove stale helper or make it use guarded `Read`. |
 
