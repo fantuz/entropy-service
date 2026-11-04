@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+const sourceGoCryptoRand = "crypto/rand"
+
 // openCharacterEntropySource checks the actual opened file, not a prior Stat
 // of its pathname. This avoids accepting a replaced regular file or reporting
 // a device that was never successfully opened.
@@ -77,5 +79,5 @@ func selectEntropySource(
 
 	// This is the Go runtime's cryptographic OS source, not a weak PRNG.
 	// No silent fallback is possible once strict mode has been selected.
-	return io.NopCloser(rand.Reader), "crypto/rand", nil
+	return io.NopCloser(rand.Reader), sourceGoCryptoRand, nil
 }
