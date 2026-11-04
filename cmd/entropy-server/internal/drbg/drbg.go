@@ -20,9 +20,7 @@ type Reader interface {
 
 // DRBG represents a deterministic random byte generator with observability metadata.
 type DRBG struct {
-	// LOCKS
-	// Mu     sync.Mutex
-	mu     sync.Mutex
+	mu sync.Mutex
 
 	// Crypto state
 	key             [32]byte
