@@ -92,7 +92,7 @@ func readActivityCounters(ws *webSocketBudget, httpBudget *httpRequestBudget) ac
 
 func startActivityPeakMonitor(ctx context.Context, ws *webSocketBudget, httpBudget *httpRequestBudget) *activityPeakMonitor {
 	monitor := &activityPeakMonitor{}
-	monitor.observe(time.Now(), readActivityCounters(ws, httpBudget))
+	monitor.sample(ws, httpBudget)
 
 	go func() {
 		ticker := time.NewTicker(time.Second)
@@ -100,8 +100,8 @@ func startActivityPeakMonitor(ctx context.Context, ws *webSocketBudget, httpBudg
 
 		for {
 			select {
-			case at := <-ticker.C:
-				monitor.observe(at, readActivityCounters(ws, httpBudget))
+			case <-ticker.C:
+				monitor.sample(ws, httpBudget)
 			case <-ctx.Done():
 				return
 			}
@@ -109,4 +109,10 @@ func startActivityPeakMonitor(ctx context.Context, ws *webSocketBudget, httpBudg
 	}()
 
 	return monitor
+}
+
+// sample timestamps the actual completed counter read, not the scheduled tick.
+func (m *activityPeakMonitor) sample(ws *webSocketBudget, httpBudget *httpRequestBudget) {
+	current := readActivityCounters(ws, httpBudget)
+	m.observe(time.Now(), current)
 }
