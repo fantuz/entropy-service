@@ -9,7 +9,11 @@ import (
 	"time"
 )
 
-const maxReseedAgeFlag = "max-reseed-age"
+const (
+	maxReseedAgeFlag = "max-reseed-age"
+	minReseedBytes   = 32
+	maxReseedBytes   = 1 << 20
+)
 
 type Config struct {
 	ReseedMs         int
@@ -73,7 +77,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.ReseedMs, "reseed-ms", 250, "Root reseed interval in milliseconds (1-10000)")
 	flags.IntVar(&cfg.MaxReseedAgeMs, maxReseedAgeFlag, 0, "Maximum seed age in milliseconds (0 = max(1000, four reseed intervals))")
 	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Size of Entropy buffer in KB")
-	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Size of Reseed buffer in Bytes")
+	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Bytes supplied to each root reseed (32-1048576)")
 	flags.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Deprecated; ignored (reseeding reads the configured source directly)")
 	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum generated sample bytes (default 32 MiB; compact WebSocket messages add a 32-byte digest)")
 	flags.IntVar(&cfg.WSMaxConnections, "ws-max-connections", 128, "Maximum simultaneous entropy WebSockets across HTTP and HTTPS (positive)")
@@ -111,6 +115,13 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 	if err := cfg.validateTiming(); err != nil {
 		fmt.Fprintln(output, err)
+		return nil, err
+	}
+
+	if cfg.ReseedSize < minReseedBytes || cfg.ReseedSize > maxReseedBytes {
+		err := fmt.Errorf("buffer-reseed must be between %d and %d bytes", minReseedBytes, maxReseedBytes)
+		fmt.Fprintln(output, err)
+
 		return nil, err
 	}
 
