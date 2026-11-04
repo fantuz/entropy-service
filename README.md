@@ -142,6 +142,13 @@ Fresh entropy is read before taking the root generator's reseed lock. At the def
 
 ### Security and source boundaries
 
+**Formal review:** [Full Architecture & Assurance Assessment](docs/architecture-review.md)
+· [Security Boundaries & Threat Model](docs/security-boundaries.md). These
+explain what source failure, reseed freshness, private generators, TLS,
+resource budgets and deployment isolation actually guarantee—and what they
+do not.
+
+
 ChaCha20 and AES-256-CTR are selectable stream backends inside the project's own SHA-512-based seed/reseed construction. This is **not an implementation of NIST CTR_DRBG**, and the project makes no FIPS-validation or independent security-audit claim.
 
 The suite can support laboratory work, application prototyping and integration experiments. It is not an HSM, key-management system, OpenSSL provider or certified entropy source. Remote randomness also introduces trust in the server and transport; keep private keys and sensitive seed material out of public diagnostic pages and logs.
