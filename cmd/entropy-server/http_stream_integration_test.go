@@ -285,8 +285,8 @@ func TestHTTPPrivateGeneratorReleasedOnSuccessAndError(t *testing.T) {
 			handler := randomBytesHandler(root, 1<<25, 20, false, budget)
 
 			for _, tc := range []struct {
-				name string
-				path string
+				name   string
+				path   string
 				writer http.ResponseWriter
 			}{
 				{"success", "/v1/data/random?bytes=512", httptest.NewRecorder()},
