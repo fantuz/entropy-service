@@ -1,18 +1,8 @@
 #!/bin/sh
 set -e
 
-PID1=$(ps --no-headers -o comm 1)
-
-if [ "$PID1" != systemd ]; then
-	echo "Only systemd is supported but detected pid 1: $PID1"
-	exit 1
+# Register the unit when systemd is running, but never auto-enable, start
+# or restart it. Existing enabled/running installations are not modified.
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
 fi
-
-echo "Detected systemd as init system, proceeding"
-
-mkdir -p /var/lib/entropy-service
-
-systemctl daemon-reload
-
-systemctl enable entropy-server.service
-systemctl restart entropy-server.service
