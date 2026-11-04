@@ -92,4 +92,22 @@ assert.match(home, /Connection: Upgrade/);
 assert.match(home, /--max-time 3/);
 assert.match(home, /raw WebSocket frames/);
 assert.match(home, /bytes=4096&amp;refresh=500/);
+// The compatibility aliases now live alongside examples, directly before
+// the optional legacy navigation group, not in the top monitoring section.
+const compatibility = home.indexOf("Compatibility health and metrics aliases");
+const legacy = home.indexOf("Legacy navigation shortcuts (optional)");
+const scopeStart = home.indexOf('id="scope-title"');
+const statusStart = home.indexOf('id="status-title"');
+const browserStart = home.indexOf('id="explore-title"');
+assert.ok(statusStart < browserStart);
+assert.ok(scopeStart < compatibility && compatibility < legacy);
+assert.equal(home.split("Compatibility health and metrics aliases").length, 2);
+for (const route of ["/health-1", "/health-2", "/metrics-1"]) {
+    assert.match(home.slice(compatibility, legacy), new RegExp(route));
+}
+assert.ok(pos("WebSocket example · stream 8 MiB to rngtest") < compatibility);
+assert.match(home, /curl --no-buffer -N "ws:\/\/127\.0\.0\.1:8080\/stream\?bytes=\$\(echo 1024\*1024\*8 \| bc\)&amp;refresh=500"/);
+assert.match(home, /rngtest --pipe &gt;\/dev\/null|rngtest --pipe >\/dev\/null/);
+assert.match(home, /curl build supporting the/);
+
 console.log("Browser layout and digest formatting: passed");
