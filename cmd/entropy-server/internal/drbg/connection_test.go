@@ -22,6 +22,8 @@ func TestConnectionReaderStreamAndReseed(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			t.Cleanup(func() { _ = child.Close() })
+
 			for step := range 3 {
 				if step == 2 {
 					seed := bytes.Repeat([]byte{0x5a}, 256)
