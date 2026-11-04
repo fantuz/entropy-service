@@ -37,7 +37,7 @@ func (a Algorithm) String() string {
 	}
 }
 
-func newCipherStream(algorithm Algorithm, key [32]byte, nonce [aes.BlockSize]byte) (cipher.Stream, error) {
+func newCipherStream(algorithm Algorithm, key *[32]byte, nonce *[aes.BlockSize]byte) (cipher.Stream, error) {
 	switch algorithm {
 	case ChaCha20:
 		return chacha20.NewUnauthenticatedCipher(key[:], nonce[:chacha20.NonceSize])
