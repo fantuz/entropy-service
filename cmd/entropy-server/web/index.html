@@ -36,15 +36,6 @@
         </div>
       </section>
 
-      <section aria-labelledby="gallery-title">
-        <h2 id="gallery-title">HTTP endpoint gallery</h2>
-        <p class="sub">See server-generated images, heatmaps, QR codes and words in one synchronized gallery.</p>
-        <a class="card gallery-feature" href="/api-gallery.html">
-          <strong>Open the HTTP endpoint gallery</strong>
-          <span>Explore four live HTTP responses in framed previews, without leaving the Matrix-style interface.</span>
-          <small class="path">/api-gallery.html</small>
-        </a>
-      </section>
 
       <section aria-labelledby="status-title">
         <h2 id="status-title">Check the service</h2>
@@ -59,6 +50,26 @@
           <summary>Compatibility health and metrics aliases</summary>
 	  <p>The aliases return the same operational information, and remain reachable for existing clients: </br> <a href="/health-1">/health-1</a> </br> <a href="/health-2">/health-2</a> </br> <a href="/metrics-1">/metrics-1</a></p>
         </details>
+      </section>
+
+
+
+      <section aria-labelledby="ws-title">
+        <h2 id="ws-title">Live WebSocket endpoints</h2>
+        <p class="sub">Explore streaming demos; raw WebSocket routes require a WebSocket client, not an ordinary GET.</p>
+        <div class="grid websocket-grid">
+          <a class="card" href="/api-stream.html"><strong>Binary stream</strong><span>Raw binary frames, visualized by the stream-analysis page.</span><small class="path">WS /stream</small></a>
+          <a class="card" href="/api-bytes.html"><strong>Byte stream</strong><span>Compact binary digest + sample, or optional JSON formats.</span><small class="path">WS /bytes</small></a>
+          <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
+          <a class="card" href="/api-words.html"><strong>Word stream</strong><span>JSON dictionary words and SHA-256.</span><small class="path">WS /words</small></a>
+        </div>
+        <div class="panel">
+          <strong>HTTP example · download 4,096 bytes</strong>
+          <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
+          <strong>WebSocket example · stream 4,096 bytes per message</strong>
+          <pre><code>ws://127.0.0.1:8080/stream?bytes=4096&amp;refresh=500</code></pre>
+          <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> and <code>wss://</code> when TLS is enabled. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
+        </div>
       </section>
 
       <section aria-labelledby="http-title">
@@ -77,22 +88,14 @@
         </div>
       </section>
 
-      <section aria-labelledby="ws-title">
-        <h2 id="ws-title">Live WebSocket endpoints</h2>
-        <p class="sub">Explore streaming demos; raw WebSocket routes require a WebSocket client, not an ordinary GET.</p>
-        <div class="grid websocket-grid">
-          <a class="card" href="/api-stream.html"><strong>Binary stream</strong><span>Raw binary frames, visualized by the stream-analysis page.</span><small class="path">WS /stream</small></a>
-          <a class="card" href="/api-bytes.html"><strong>Byte stream</strong><span>Compact binary digest + sample, or optional JSON formats.</span><small class="path">WS /bytes</small></a>
-          <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
-          <a class="card" href="/api-words.html"><strong>Word stream</strong><span>JSON dictionary words and SHA-256.</span><small class="path">WS /words</small></a>
-        </div>
-        <div class="panel">
-          <strong>HTTP example · download 4,096 bytes</strong>
-          <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
-          <strong>WebSocket example · stream 4,096 bytes per message</strong>
-          <pre><code>ws://127.0.0.1:8080/stream?bytes=4096&amp;refresh=500</code></pre>
-          <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> and <code>wss://</code> when TLS is enabled. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
-        </div>
+      <section aria-labelledby="gallery-title">
+        <h2 id="gallery-title">HTTP endpoint gallery</h2>
+        <p class="sub">See server-generated images, heatmaps, QR codes and words in one synchronized gallery.</p>
+        <a class="card gallery-feature" href="/api-gallery.html">
+          <strong>Open the HTTP endpoint gallery</strong>
+          <span>Explore four live HTTP responses in framed previews, without leaving the Matrix-style interface.</span>
+          <small class="path">/api-gallery.html</small>
+        </a>
       </section>
 
       <section aria-labelledby="scope-title">
