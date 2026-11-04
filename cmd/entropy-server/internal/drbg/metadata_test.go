@@ -102,3 +102,40 @@ func TestConcurrentMetadataAndReseedFailureSnapshots(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestReseedRejectsUndersizedInputWithoutFreshnessClaim(t *testing.T) {
+	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+		t.Run(algorithm.String(), func(t *testing.T) {
+			d := testGenerator(t, algorithm)
+			reference := testGenerator(t, algorithm)
+			before := d.GetMetadata()
+			epoch := d.reseedEpoch.Load()
+
+			for _, size := range []int{0, 1, 31} {
+				if err := d.Reseed(make([]byte, size)); err == nil {
+					t.Fatalf("accepted %d-byte reseed as fresh", size)
+				}
+			}
+
+			after := d.GetMetadata()
+			if after.ReseedsTotal != before.ReseedsTotal ||
+				!after.LastReseedAt.Equal(before.LastReseedAt) ||
+				d.reseedEpoch.Load() != epoch || d.generated != reference.generated {
+				t.Fatal("invalid reseeds changed state or claimed successful freshness")
+			}
+
+			got, want := make([]byte, 128), make([]byte, 128)
+			if _, err := io.ReadFull(d, got); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := io.ReadFull(reference, want); err != nil || !bytes.Equal(got, want) {
+				t.Fatal("invalid reseed modified the deterministic output stream")
+			}
+
+			if err := d.Reseed(bytes.Repeat([]byte{0x51}, 32)); err != nil {
+				t.Fatalf("minimum supported reseed was rejected: %v", err)
+			}
+		})
+	}
+}
