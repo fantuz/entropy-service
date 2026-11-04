@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -126,10 +125,7 @@ func TestOpenCharacterEntropySourceRejectsRegularFile(t *testing.T) {
 		t.Fatal("a regular file must not count as an entropy device")
 	}
 
-	if !errors.Is(err, os.ErrNotExist) {
-		// A non-character-device error is expected, not a successful open.
-		if source != nil {
-			t.Fatal("rejected source must not return an open handle")
-		}
+	if source != nil {
+		t.Fatal("rejected source must not return an open handle")
 	}
 }
