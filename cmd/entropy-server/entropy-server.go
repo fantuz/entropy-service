@@ -1261,7 +1261,7 @@ func main() {
 
 	var seedReader io.Reader = qrngdev
 
-	if actualSource == DefaultCSPRNG || actualSource == "crypto/rand" {
+	if actualSource == DefaultCSPRNG || actualSource == sourceGoCryptoRand {
 		log.Printf("Entropy mode: operating-system CSPRNG (%s)", actualSource)
 	} else {
 		log.Printf("Entropy mode: configured character device (%s); quality not independently verified", actualSource)
