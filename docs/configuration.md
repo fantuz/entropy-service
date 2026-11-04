@@ -16,7 +16,7 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 | `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |
 | `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |
 | `-reseed-ms` | `250` | Root reseed interval: 1–10000 ms. |
-| `-buffer-reseed` | `256` | Bytes per root reseed: 32–65536. |
+| `-buffer-reseed` | `256` | Bytes per root reseed: 32–1048576. |
 | `-max-reseed-age` | `0` | Readiness age limit in ms; zero selects `max(1000, 4 × reseed-ms)`. |
 
 ### Listeners and TLS
@@ -25,7 +25,7 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 | --- | --- | --- |
 | `-http` | `:8080` | HTTP address; binds all interfaces by default. |
 | `-https` | `:8443` | HTTPS address; binds all interfaces by default. |
-| `-enable-https` | `true` | Enable HTTPS; the packaged service sets this to false. |
+| `-enable-https` | `true` | Enable HTTPS; the packaged service explicitly disables it. |
 | `-cert-file` | `cert.pem` | TLS certificate path. |
 | `-key-file` | `key.pem` | TLS private key path. |
 | `-debug` | `false` | Debug output and loopback pprof on port 6060. |
@@ -63,6 +63,8 @@ already opened source during a later reseed does not switch readers.
 Source selection establishes neither entropy quality nor physical provenance.
 
 `-cpu-mix` prefers RDSEED, falls back to RDRAND, and takes precedence over `-rdrand-mix`. Mixing applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
+
+The systemd package overrides standalone defaults: it is **not enabled or started** by installation, uses an unprivileged systemd identity, binds only to 127.0.0.1:8080, and requires /dev/urandom. Switching to a hardware QRNG requires explicit Unix/group and systemd device permissions. See [packaged deployment](packaged-service.md).
 
 ## Client
 
