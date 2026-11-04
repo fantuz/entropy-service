@@ -43,6 +43,38 @@ external access or invalidates old overrides.
 
 ## Hardware-specific operation: explicit opt-in
 
+> **Hardware verification deferred:** As of Patch C, access to `/dev/qrandom0`
+> has **not** been verified on the intended QRNG-equipped host. This does not
+> block an OS-CSPRNG installation: the packaged unit intentionally selects
+> `/dev/urandom` and does not touch `/dev/qrandom0`. Do **not** change its
+> `-device` argument to the hardware device until the checks below succeed.
+> An unprivileged service with `-require-device=true` will **fail startup**
+> if the configured device cannot be opened; it will not silently fall back.
+
+**On the QRNG-equipped host, when it becomes available:**
+
+```sh
+# Confirm that the driver created a usable character device.
+test -c /dev/qrandom0 && echo "QRNG node found" || echo "QRNG node missing"
+stat -c '%F %A %U:%G %a %n' /dev/qrandom0
+ls -l /dev/qrandom0
+
+# Inspect the effective service identity and sandbox, including local overrides.
+sudo systemctl cat entropy-server
+systemctl show entropy-server -p DynamicUser -p User -p Group -p SupplementaryGroups -p DevicePolicy
+getent group qrng || true
+```
+
+Interpret the results before editing anything:
+
+| Check | Expected action if it fails |
+| --- | --- |
+| Character device absent | Check the PCI card and kernel driver; don't add a permissive fallback pretending hardware is available. |
+| Device accessible only to root | Assign the device a restricted, *persistent* access policy through operator-managed udev/group settings; do not use `chmod 666`. |
+| Correct Unix group but denied inside service | Add/verify both `SupplementaryGroups` and a matching `DeviceAllow` drop-in. |
+| Device read fails or blocks | Diagnose driver/device separately; do not weaken the default service policy just to obtain a green status. |
+| Hardware-required service cannot start | Keep the default `/dev/urandom` profile for ordinary operation until QRNG access is established; use strict hardware mode only once ready. |
+
 Do not assume a root-readable QRNG device is available to the service's
 unprivileged identity. Check its real owner, group, mode, and driver behavior:
 
@@ -73,6 +105,22 @@ ExecStart=/usr/bin/entropy-server -http=127.0.0.1:8080 -enable-https=false -devi
 
 Apply with `sudo systemctl edit entropy-server`, followed by
 `sudo systemctl daemon-reload` and an explicitly approved restart.
+
+**After configuring hardware, validate the actual source** (not just service
+liveness), the service logs, and connectivity:
+
+```sh
+sudo systemctl restart entropy-server
+systemctl status entropy-server --no-pager
+journalctl -u entropy-server -b -n 100 --no-pager
+curl -fsSI http://127.0.0.1:8080/v1/data/random?bytes=32
+curl -fsS http://127.0.0.1:8080/ready
+```
+
+Confirm `X-RNG-Source` reports the intended source path and that readiness
+is healthy. A success from `/live` alone does not establish that the
+correct hardware source was opened, that reseeding continues successfully,
+or that the hardware output has adequate entropy quality.
 The package does not run `chmod`, `chown`, `udevadm`, `usermod`, or load
 kernel modules. Avoid world-readable QRNG device permissions; verify with
 `systemctl status` and `journalctl -u entropy-server`.
