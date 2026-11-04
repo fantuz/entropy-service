@@ -258,6 +258,7 @@ func (d *DRBG) Close() error {
 
 	if d.counted {
 		d.counted = false
+
 		activeDRBG.Add(-1)
 	}
 
