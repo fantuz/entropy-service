@@ -291,6 +291,7 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 	defer ticker.Stop()
 
 	seed := make([]byte, size)
+	defer clear(seed)
 
 	for {
 		select {
@@ -303,6 +304,8 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 				}
 
 				if _, err := io.ReadFull(source, seed); err != nil {
+					clear(seed)
+
 					if ctx.Err() != nil {
 						return
 					}
@@ -320,9 +323,12 @@ func reseedLoop(ctx context.Context, source io.Reader, interval, size int, gener
 					return
 				}
 
-				if err := d.Reseed(seed); err != nil {
-					log.Printf("reseed failed: %v", err)
-					d.RecordReseedFailure(err)
+				reseedErr := d.Reseed(seed)
+				clear(seed)
+
+				if reseedErr != nil {
+					log.Printf("reseed failed: %v", reseedErr)
+					d.RecordReseedFailure(reseedErr)
 
 					continue
 				}
@@ -721,7 +727,10 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 
 			return
 		}
-		defer drbg.DecreaseActiveInstances(1)
+		defer func() {
+			_ = child.Close()
+			drbg.DecreaseActiveInstances(1)
+		}()
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
 		/*
@@ -1300,9 +1309,13 @@ func main() {
 	fmt.Println("	3) initialize root DRBG")
 
 	root, err := drbg.NewDRBGWithAlgorithm(seed, algorithm)
+	clear(seed)
+
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	defer root.Close()
 
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
 	fmt.Println("	4) set DRBG metadata (optional)")
