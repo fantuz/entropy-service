@@ -92,6 +92,7 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 				}
 
 				var frame [4096]byte
+
 				b.ReportAllocs()
 				b.SetBytes(int64(len(frame)))
 				b.ResetTimer()
@@ -117,6 +118,7 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 				}
 
 				var buf [64 << 10]byte
+
 				b.ReportAllocs()
 				b.SetBytes(int64(len(buf)))
 				b.ResetTimer()
