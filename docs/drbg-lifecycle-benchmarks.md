@@ -106,7 +106,7 @@ and run with realistic CPU settings and concurrent workloads separately.
 - `NewClose` and `ChildCreateClose` quantify whether state cleaning,
   cipher creation and extra synchronization increase per-request overhead.
 - `Reseed256` captures the cost of the streaming SHA-512 transition plus
-  cleanup, **not** hardware source reads. At a 250 ms default interval, a
+  cleanup, **not** hardware source reads. At a 15-second default interval, a
   modest per-reseed CPU change will usually be small compared to continuous
   bulk output; measure instead of asserting.
 - `Read64KiB` checks for unintended hot-path slowdown, but does not
