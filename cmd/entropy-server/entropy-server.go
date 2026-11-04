@@ -287,6 +287,17 @@ func abs(x float64) float64 {
 // Active reseed loop: reads from the configured entropy source and updates
 // the serving generator. Former QRNGBuffer and reseed prototypes were unused.
 func reseedLoop(ctx context.Context, source io.Reader, interval, size int, generators ...*drbg.DRBG) {
+	// An internal caller must not bypass the CLI's size guard and allocate a
+	// negative/huge buffer or falsely claim freshness with an empty seed.
+	if size < 32 || size > 1<<20 {
+		err := fmt.Errorf("invalid reseed buffer size %d bytes (expected 32..1048576)", size)
+		for _, d := range generators {
+			d.RecordReseedFailure(err)
+		}
+
+		return
+	}
+
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 	defer ticker.Stop()
 
