@@ -729,6 +729,7 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 		}
 		defer func() {
 			_ = child.Close()
+
 			drbg.DecreaseActiveInstances(1)
 		}()
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
