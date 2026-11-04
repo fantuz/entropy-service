@@ -1259,6 +1259,8 @@ func main() {
 	}
 	defer qrngdev.Close()
 
+	var seedReader io.Reader = qrngdev
+
 	if actualSource == DefaultCSPRNG || actualSource == "crypto/rand" {
 		log.Printf("Entropy mode: operating-system CSPRNG (%s)", actualSource)
 	} else {
@@ -1269,20 +1271,20 @@ func main() {
 	fmt.Println("\t1) open entropy seed source")
 
 	if cfg.MixCPU {
-		qrngdev = rdrand.NewCPUMixer(qrngdev, func(err error) {
+		seedReader = rdrand.NewCPUMixer(seedReader, func(err error) {
 			log.Printf("CPU seed mixing unavailable: %v; continuing with configured entropy source", err)
 		})
 
 		log.Printf("Seed source: configured entropy source with optional CPU mixing (supported RDSEED=%t, RDRAND=%t)", rdrand.RDSEEDAvailable(), rdrand.Available())
 	} else if cfg.MixRDRAND {
-		mixed, err := rdrand.NewMixer(qrngdev, func(err error) {
+		mixed, err := rdrand.NewMixer(seedReader, func(err error) {
 			log.Printf("RDRAND mixing unavailable: %v; continuing with configured entropy source", err)
 		})
 		if err != nil {
 			log.Fatalf("enable RDRAND mixing: %v", err)
 		}
 
-		qrngdev = mixed
+		seedReader = mixed
 
 		log.Print("Seed source: configured entropy source with optional RDRAND mixing")
 	}
@@ -1290,7 +1292,7 @@ func main() {
 	fmt.Println("	2) read root DRBG seed")
 
 	seed := make([]byte, 64)
-	if _, err := io.ReadFull(qrngdev, seed); err != nil {
+	if _, err := io.ReadFull(seedReader, seed); err != nil {
 		log.Fatalf("read root seed: %v", err)
 	}
 
@@ -1431,7 +1433,7 @@ func main() {
 	// Run permanent reseed loop
 	fmt.Printf("	6) start reseed loop every %d ms\n", cfg.ReseedMs)
 
-	go reseedLoop(ctx, qrngdev, cfg.ReseedMs, cfg.ReseedSize, &root)
+	go reseedLoop(ctx, seedReader, cfg.ReseedMs, cfg.ReseedSize, &root)
 
 	log.Println(Cyan + "Entropy Server startup sequence completed successfully\n" + Reset)
 
