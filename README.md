@@ -86,17 +86,26 @@ sudo systemctl status entropy-server
 sudo journalctl -u entropy-server -f
 ```
 
-Packages install both binaries in `/usr/bin` and enable/start `entropy-server`. The supplied unit runs as root, listens on HTTP `:8080`, disables HTTPS and uses `/var/lib/entropy-service` as its working directory. Review those defaults for your deployment.
+Packages install both binaries in `/usr/bin` and an **opt-in**, loopback-only
+systemd unit. Package installation no longer enables or starts the daemon.
+The service uses a restricted, unprivileged systemd identity, explicitly
+requires `/dev/urandom`, and listens only on `127.0.0.1:8080` without HTTPS.
+Inspect before activation:
 
-Change flags with `sudo systemctl edit entropy-server`. For example, to require a hardware source and bind only to loopback:
-
-```ini
-[Service]
-ExecStart=
-ExecStart=/usr/bin/entropy-server -device=/dev/qrandom0 -require-device=true -enable-https=false -http=127.0.0.1:8080
+```sh
+sudo systemctl cat entropy-server
+sudo systemctl enable --now entropy-server
+curl --fail http://127.0.0.1:8080/live
 ```
 
-Then run `sudo systemctl daemon-reload` and `sudo systemctl restart entropy-server`. Browser assets are embedded in the binary: no `./web` copy, symlink or special working directory is needed. Rebuild the server when changing those assets.
+**Upgrades of existing installations** preserve current enablement and running
+state. Review device access, drop-ins and externally reachable listeners before
+an explicit restart. Hardware QRNGs require opt-in device/group permissions
+and a systemd `DeviceAllow` override; changing the executable flags alone
+will not grant access. See [packaged service and migration instructions](docs/packaged-service.md).
+The package does not change device ownership, create Unix users or modify
+udev rules. Browser assets are embedded in the binary.
+
 
 ## Use cases
 
@@ -216,7 +225,7 @@ Race tests require a supported platform and a C toolchain with cgo enabled. Pack
 
 The tracked tests cover DRBG backends/reads, reseed failures, private streams, validation, budgets, shutdown/cancellation, sound, file analysis, logging and client timing/metrics. Passing statistical checks is not a substitute for cryptographic review.
 
-Current build CI runs ordinary Go tests, **server race-detector tests**, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow publishes without its own test step. A mandatory race-test release gate and automated browser-interaction tests in CI remain pending.
+Current build CI runs ordinary Go tests, **server race-detector tests**, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow validates Go tests, race checks, lint, browser scripts and snapshot packaging before publishing. Hardware deployment and full interactive browser checks still require separate validation.
 
 ## Further reading
 
@@ -226,8 +235,8 @@ Current build CI runs ordinary Go tests, **server race-detector tests**, lint an
 
 Available features are documented above. The following are follow-up work or ideas, not capabilities shipped by this repository:
 
-- Enforce race checks before releases; expand browser regression coverage (especially real network disconnections and mobile rendering).
-- Use release-derived version metadata in health output.
+- Expand browser regression coverage (especially real network disconnections and mobile rendering).
+- Verify release-derived metadata and package/service smoke checks on every release.
 - Clarify source-failure policy and cancellation of blocking hardware reads.
 - Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
 - Improve deployment hardening: service identity/device permissions, authentication/access control, explicit optional origin allowlists for cross-host browser clients, and hardware-specific startup checks.

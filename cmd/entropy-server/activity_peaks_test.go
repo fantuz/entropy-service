@@ -88,3 +88,19 @@ func TestActivityPeakExposition(t *testing.T) {
 		t.Fatal("instance high-water metric is absent or lower than active count")
 	}
 }
+
+// TestActivityPeakActualCollectionTimestamp verifies that delayed counter
+// collection is attributed to the real observation time, never a stale tick.
+func TestActivityPeakActualCollectionTimestamp(t *testing.T) {
+	var monitor activityPeakMonitor
+
+	base := time.Unix(100, 0)
+	monitor.observe(base, activityPeakCounters{generatedBytes: 100})
+	// Simulate delayed counter collection from a tick scheduled one second
+	// later: the true elapsed time is four seconds.
+	monitor.observe(base.Add(4*time.Second), activityPeakCounters{generatedBytes: 900})
+
+	if got := monitor.snapshot().GeneratedBytesPerSecond; got != 200 {
+		t.Fatalf("delayed interval average = %v, want 200", got)
+	}
+}

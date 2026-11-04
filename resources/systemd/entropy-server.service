@@ -1,20 +1,47 @@
 [Unit]
-Description=Entropy Server
+Description=Entropy Server (local-only, unprivileged by default)
 After=network.target
+Documentation=https://github.com/fantuz/entropy-service/blob/main/docs/packaged-service.md
 
 [Service]
-User=root
-Group=root
 Type=simple
-WorkingDirectory=/var/lib/entropy-service
-# HTTPS is disabled by default so the service starts without pre-provisioned
-# certificates. To enable TLS, drop a cert/key into the working directory and
-# replace the line below with:
-#   ExecStart=/usr/bin/entropy-server -cert-file /var/lib/entropy-service/cert.pem -key-file /var/lib/entropy-service/key.pem
-ExecStart=/usr/bin/entropy-server -enable-https=false
+# systemd allocates a temporary, unprivileged UID/GID for this service.
+# No persistent user/group is created and no /dev permissions are altered.
+DynamicUser=yes
+User=entropy-service
+Group=entropy-service
+WorkingDirectory=/
+# The package does not expose any unauthenticated endpoint to the network.
+# Operators must opt in to wider binds/TLS and select access to a hardware RNG.
+ExecStart=/usr/bin/entropy-server -http=127.0.0.1:8080 -enable-https=false -device=/dev/urandom -require-device=true
 SyslogIdentifier=entropy-server
-Restart=always
-RestartSec=1
+Restart=on-failure
+RestartSec=5s
+
+# Minimal access: no root capabilities, writable system directories or core dumps.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+LimitCORE=0
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Keep the actual host /dev visible for optional operator-approved QRNGs.
+# The cgroup permits only /dev/urandom by default. Additional devices need
+# a drop-in DeviceAllow= path plus ordinary DAC permission (e.g. group/udev).
+DevicePolicy=closed
+DeviceAllow=/dev/urandom r
 
 [Install]
 WantedBy=multi-user.target

@@ -56,6 +56,10 @@ chmod 600 /tmp/entropy-dev-key.pem
 
 For production, use your organization's certificate lifecycle and replace self-signed testing certificates with appropriately trusted certificates. Do not commit replacement private keys to Git.
 
+## Packaged service hardening and migration
+
+The DEB/RPM unit is unprivileged, local-only and operator-started by default. It has no remote authentication, and disabling HTTPS is safe only for trusted local traffic. Installation does not grant new device access or alter ownership/udev configuration. Existing running/enabled installations retain their active process until explicitly restarted; inspect unit overrides and hardware permissions before upgrading. See [packaged deployment](docs/packaged-service.md).
+
 ## Security checklist
 
 1. Choose an allowed entropy source, enforce `-require-device=true` when required, and monitor reseed freshness.
