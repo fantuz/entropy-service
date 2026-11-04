@@ -184,6 +184,12 @@ func (d *DRBG) Reseed(seed []byte) error {
 		return io.ErrClosedPipe
 	}
 
+	// A zero/short input cannot establish a meaningful fresh-seed event.
+	// This is a length precondition, not an assertion of min-entropy.
+	if len(seed) < 32 {
+		return errors.New("reseed requires at least 32 input bytes")
+	}
+
 	// Streaming SHA-512 has the same digest as Sum512(append(oldKey, seed...)),
 	// without allocating an old-key-plus-seed concatenation.
 	h := sha512.New()
