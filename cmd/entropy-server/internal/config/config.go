@@ -16,8 +16,8 @@ const (
 	maxReseedAgeFlag = "max-reseed-age"
 	minReseedBytes   = 32
 	maxReseedBytes   = 1 << 20
-	defaultReseedMs   = 15000
-	maxReseedMs       = 60000
+	defaultReseedMs  = 15000
+	maxReseedMs      = 60000
 )
 
 // defaultDRBGForArch chooses an initial stream backend by Go target ISA, not
