@@ -61,35 +61,39 @@ For example, in a disposable checkout with no uncommitted changes:
 
 ```bash
 baseline=00e9b7b49a2ec749da51fd61b2111a24b3037fa7
-current=$(git rev-parse HEAD)
-mkdir -p ./benchmark-results
-
-git worktree add --detach ./benchmark-results/baseline-tree "$baseline"
+baseline_dir=$(mktemp -d)
+result_dir=$(mktemp -d)
+git worktree add --detach "$baseline_dir/tree" "$baseline"
 cp cmd/entropy-server/internal/drbg/lifecycle_bench_test.go \
-   ./benchmark-results/baseline-tree/cmd/entropy-server/internal/drbg/
+   "$baseline_dir/tree/cmd/entropy-server/internal/drbg/"
 (
-  cd ./benchmark-results/baseline-tree
+  cd "$baseline_dir/tree"
   GOMAXPROCS=1 go test ./cmd/entropy-server/internal/drbg \
     -run '^$' -bench '^BenchmarkDRBGLifecycle$' \
     -benchtime=1s -benchmem -count=5
-) | tee ./benchmark-results/baseline.txt
+) | tee "$result_dir/baseline.txt"
 
 GOMAXPROCS=1 go test ./cmd/entropy-server/internal/drbg \
   -run '^$' -bench '^BenchmarkDRBGLifecycle$' \
   -benchtime=1s -benchmem -count=5 \
-  | tee ./benchmark-results/current.txt
+  | tee "$result_dir/current.txt"
 
-# If installed, benchstat compares distributions of ns/op, B/op, allocs/op.
-benchstat ./benchmark-results/baseline.txt ./benchmark-results/current.txt
-git worktree remove ./benchmark-results/baseline-tree
+# Optional comparison when benchstat is installed:
+benchstat "$result_dir/baseline.txt" "$result_dir/current.txt"
+
+# Remove only the benchmark file copied into this disposable worktree.
+rm "$baseline_dir/tree/cmd/entropy-server/internal/drbg/lifecycle_bench_test.go"
+git worktree remove "$baseline_dir/tree"
+rmdir "$baseline_dir"
+echo "Raw benchmark results: $result_dir"
 ```
 
-**Important:** do not put worktree paths inside a Go module unless you
-understand the nested module behavior. A separate temporary directory
-outside the repository is preferable on restricted setups. The above
-example uses an untracked `benchmark-results/` directory for convenience;
-ensure it is excluded from commits and do not remove a worktree with local
-changes you want to keep.
+**Important:** the disposable baseline worktree is outside the
+repository. The commands keep raw results in a temporary directory and
+remove only the benchmark file copied into that newly created worktree.
+Verify the temporary paths before running destructive commands; never
+force-remove a worktree containing other work you want to preserve.
+If `benchstat` is not installed, omit that optional command.
 
 If `benchstat` is unavailable, preserve both raw outputs and compare
 `ns/op`, `B/op` and `allocs/op` manually. Performance interpretation
