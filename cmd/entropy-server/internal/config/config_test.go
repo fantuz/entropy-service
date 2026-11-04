@@ -95,8 +95,8 @@ func TestReseedBufferSizeBounds(t *testing.T) {
 
 func TestStartupConfigurationValidation(t *testing.T) {
 	tests := []struct {
-		name string
-		args []string
+		name    string
+		args    []string
 		invalid bool
 	}{
 		{"defaults", nil, false},
@@ -116,14 +116,22 @@ func TestStartupConfigurationValidation(t *testing.T) {
 		{"derived readiness age", []string{"-reseed-ms=500"}, false},
 		{"legacy flags accepted", []string{"-buffer-entropy=0", "-buffer-qrng=0"}, false},
 	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg, err := parseConfig(tc.args, io.Discard)
 			if (err != nil) != tc.invalid {
 				t.Fatalf("parseConfig(%v): cfg=%+v err=%v, invalid=%t", tc.args, cfg, err, tc.invalid)
 			}
-			if err != nil { return }
-			if cfg.MaxReseedAgeMs <= 0 { t.Fatalf("unresolved max reseed age: %d", cfg.MaxReseedAgeMs) }
+
+			if err != nil {
+				return
+			}
+
+			if cfg.MaxReseedAgeMs <= 0 {
+				t.Fatalf("unresolved max reseed age: %d", cfg.MaxReseedAgeMs)
+			}
+
 			if tc.name == "derived readiness age" && cfg.MaxReseedAgeMs != 2000 {
 				t.Fatalf("derived age = %d, want 2000", cfg.MaxReseedAgeMs)
 			}
@@ -133,15 +141,25 @@ func TestStartupConfigurationValidation(t *testing.T) {
 
 func TestValidateRejectsDirectInvalidConfiguration(t *testing.T) {
 	cfg, err := parseConfig(nil, io.Discard)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	cfg.MaxBytes = 1<<25 + 1
-	if err := cfg.Validate(); err == nil { t.Fatal("Validate accepted oversized max-bytes") }
+
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted oversized max-bytes")
+	}
 }
 
 func TestDeprecatedBufferHelp(t *testing.T) {
 	var output bytes.Buffer
+
 	_, _ = parseConfig([]string{"-help"}, &output)
+
 	for _, word := range []string{"buffer-qrng", "buffer-entropy", "Deprecated; ignored"} {
-		if !strings.Contains(output.String(), word) { t.Errorf("help lacks %s", word) }
+		if !strings.Contains(output.String(), word) {
+			t.Errorf("help lacks %s", word)
+		}
 	}
 }
