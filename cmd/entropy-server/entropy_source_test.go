@@ -95,7 +95,7 @@ func TestSelectEntropySourceStrictAndFallback(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			defer drbg.DecreaseActiveInstances(1)
+			defer func() { _ = d.Close() }()
 
 			d.SetMetadata("test", origin, "ignored", 0, 256)
 
