@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/tls"
 	"embed"
 	"encoding/base64"
@@ -283,29 +282,6 @@ func abs(x float64) float64 {
 	}
 
 	return x
-}
-
-func NewEntropySource(path string, require bool) (EntropySource, error) {
-	if path == "" {
-		if require {
-			return nil, errors.New("device required but not specified")
-		}
-
-		return rand.Reader, nil
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		if require {
-			return nil, fmt.Errorf("cannot open required device: %w", err)
-		}
-
-		log.Printf("Falling back to crypto/rand: %v\n", err)
-
-		return rand.Reader, nil
-	}
-
-	return f, nil
 }
 
 // Active reseed loop: reads from the configured entropy source and updates
@@ -1102,76 +1078,6 @@ func wsBinaryHandler(d *drbg.DRBG, refresh time.Duration, quantity int) http.Han
 }
 */
 
-func deviceExists(path string) error {
-	_, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("device %s does not exist", path)
-		}
-
-		return fmt.Errorf("error accessing device %s: %w", path, err)
-	}
-
-	return nil
-}
-
-func validateEntropyDevice(path string) error {
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-
-	// if mode&os.ModeCharDevice == 0
-
-	if info.Mode()&os.ModeCharDevice == 0 {
-		return fmt.Errorf("%s is not a character device", path)
-	}
-
-	mode := info.Mode()
-
-	if mode&os.ModeDevice == 0 {
-		return fmt.Errorf("%s exists but is not a device file", path)
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("cannot open %s: %w", path, err)
-	}
-	defer f.Close()
-
-	return nil
-}
-
-func ResolveEntropyDevice(path string, require bool) (string, error) {
-	// If no device specified use kernel CSPRNG
-	if path == "" {
-		return DefaultCSPRNG, nil
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		if require {
-			return "", fmt.Errorf("required device not available: %w", err)
-		}
-
-		log.Printf(Red+"Device %s unavailable, falling back to /dev/urandom"+Reset, path)
-
-		return DefaultCSPRNG, nil
-	}
-
-	if info.Mode()&os.ModeCharDevice == 0 {
-		if require {
-			return "", fmt.Errorf("%s is not a character device", path)
-		}
-
-		log.Printf("%s is not a device, falling back to /dev/urandom\n", path)
-
-		return DefaultCSPRNG, nil
-	}
-
-	return path, nil
-}
-
 // func startHTTP(ctx context.Context, addr string, handler http.Handler, master drbg.DRBG) (*http.Server, error)
 // func startHTTP(ctx context.Context, addr string, handler http.Handler, master *drbg.DRBG) (*http.Server, error)
 func startHTTP(ctx context.Context, addr string, handler http.Handler) (*managedServer, error) {
@@ -1345,36 +1251,22 @@ func main() {
 	fmt.Println("-------------------------------------------------")
 	fmt.Println()
 
-	// check for entropy source availability and access rights
-	dev, err := ResolveEntropyDevice(cfg.DevicePath, cfg.RequireDevice)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if derr := deviceExists(dev); derr != nil {
-		log.Fatal(derr)
-	}
-
-	verr := validateEntropyDevice(dev)
-	if verr != nil {
-		log.Fatal("Entropy device validation failed: ", verr)
-	}
-
-	if dev == "/dev/urandom" {
-		log.Println(Yellow + "Entropy mode: \"weak\" kernel CSPRNG fallback" + Reset)
-	} else {
-		log.Println(Green+"Entropy mode: robust RNG hardware device:", dev+Reset)
-	}
-
-	log.Printf("Entropy source: %s\n", dev)
-
-	fmt.Println("	1) open entropy seed source")
-
-	// qrngdev, _ := NewEntropySource(dev, cfg.RequireDevice)
-	qrngdev, err := NewEntropySource(dev, cfg.RequireDevice)
+	// Select and open exactly one source. Report the opened reader's identity,
+	// not merely the path requested before potential fallback.
+	qrngdev, actualSource, err := openEntropySource(cfg.DevicePath, cfg.RequireDevice)
 	if err != nil {
 		log.Fatalf("open entropy source: %v", err)
 	}
+	defer qrngdev.Close()
+
+	if actualSource == DefaultCSPRNG || actualSource == "crypto/rand" {
+		log.Printf("Entropy mode: operating-system CSPRNG (%s)", actualSource)
+	} else {
+		log.Printf("Entropy mode: configured character device (%s); quality not independently verified", actualSource)
+	}
+	log.Printf("Entropy source: %s", actualSource)
+
+	fmt.Println("\t1) open entropy seed source")
 
 	if cfg.MixCPU {
 		qrngdev = rdrand.NewCPUMixer(qrngdev, func(err error) {
@@ -1411,7 +1303,7 @@ func main() {
 
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
 	fmt.Println("	4) set DRBG metadata (optional)")
-	root.SetMetadata("1.1.0", dev, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
+	root.SetMetadata("1.1.0", actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
 	var tlsCfg *tls.Config
 
