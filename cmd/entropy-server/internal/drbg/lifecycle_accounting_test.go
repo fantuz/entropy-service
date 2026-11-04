@@ -151,7 +151,7 @@ func TestConnectionReaderFailedParentDerivationReleasesPriorChild(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if err := reader.Read(make([]byte, 64)); err != nil {
+	if _, err := reader.Read(make([]byte, 64)); err != nil {
 		// Existing private child is allowed to finish its current epoch.
 		// Force refresh below to check the parent error path.
 		if !errors.Is(err, io.ErrClosedPipe) {
