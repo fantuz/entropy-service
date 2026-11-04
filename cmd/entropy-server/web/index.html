@@ -32,10 +32,6 @@
           <a class="card" href="/ready"><strong>Readiness</strong><span>Inspect seed freshness and reseed errors.</span><small class="path">/ready</small></a>
           <a class="card" href="/metrics-2"><strong>Metrics</strong><span>Explore generation, reseeding and resource-budget counters.</span><small class="path">/metrics-2</small></a>
         </div>
-        <details class="panel">
-          <summary>Compatibility health and metrics aliases</summary>
-	  <p>The aliases return the same operational information, and remain reachable for existing clients: </br> <a href="/health-1">/health-1</a> </br> <a href="/health-2">/health-2</a> </br> <a href="/metrics-1">/metrics-1</a></p>
-        </details>
       </section>
 
       <section aria-labelledby="explore-title">
@@ -105,6 +101,17 @@
   --output stream.ws --write-out 'HTTP status: %{http_code}\n'</code></pre>
           <p class="note">This curl command performs an HTTP/1.1 WebSocket upgrade: a successful handshake reports HTTP <code>101</code>. The resulting <code>stream.ws</code> contains raw WebSocket frames (including frame headers), <strong>not</strong> a plain file of random payload bytes. The endpoint streams continuously, so <code>--max-time 3</code> intentionally ends the capture with curl exit code 28. Use a WebSocket-aware client to decode messages.</p>
           <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> for HTTP APIs and <code>wss://</code> for WebSocket clients when TLS is enabled; for a curl-based manual upgrade, use the corresponding <code>https://</code> URL. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
+          <strong>WebSocket example · stream 8 MiB to rngtest</strong>
+          <pre><code>curl --no-buffer -N "ws://127.0.0.1:8080/stream?bytes=$(echo 1024*1024*8 | bc)&amp;refresh=500" --output - | rngtest --pipe >/dev/null</code></pre>
+          <p class="note">Requires a curl build supporting the <code>ws</code> protocol (check <code>curl --version</code>), plus <code>bc</code> and <code>rngtest</code>. Native <code>ws://</code> transfers deliver WebSocket payload data, unlike the raw framed HTTP-upgrade capture above. <code>rngtest</code> reports statistics on stderr; <code>--pipe</code> passes accepted blocks to stdout, which is discarded here. These statistical tests do not certify entropy quality or cryptographic security.</p>
+          <details>
+            <summary>Compatibility health and metrics aliases</summary>
+            <p>These legacy routes return the same operational information and remain available for existing clients:
+              <a href="/health-1">/health-1</a> ·
+              <a href="/health-2">/health-2</a> ·
+              <a href="/metrics-1">/metrics-1</a>.
+            </p>
+          </details>
           <details><summary>Legacy navigation shortcuts (optional)</summary>
             <p>These browser-side redirect helpers are retained for old bookmarks; they are not separate API implementations.</p>
             <div class="legacy-links">
