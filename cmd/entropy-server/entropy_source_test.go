@@ -96,6 +96,7 @@ func TestSelectEntropySourceStrictAndFallback(t *testing.T) {
 			}
 
 			defer drbg.DecreaseActiveInstances(1)
+
 			d.SetMetadata("test", origin, "ignored", 0, 256)
 
 			if meta := d.GetMetadata(); meta.Source != tc.wantOrigin {
@@ -125,6 +126,7 @@ func TestOpenCharacterEntropySourceRejectsRegularFile(t *testing.T) {
 	source, err := openCharacterEntropySource(path)
 	if err == nil {
 		_ = source.Close()
+
 		t.Fatal("a regular file must not count as an entropy device")
 	}
 
