@@ -122,6 +122,7 @@ func TestBackendSeedAndReseedFixtures(t *testing.T) {
 				}
 
 				t.Cleanup(func() { _ = legacy.Close() })
+
 				d = &legacy
 			}
 
@@ -267,7 +268,9 @@ func TestBackendConcurrentReadsReseedsAndDerivation(t *testing.T) {
 
 						if child.Algorithm() != algorithm {
 							_ = child.Close()
+
 							t.Error("child backend changed during concurrent reseeding")
+
 							return
 						}
 
