@@ -86,15 +86,11 @@ func TestCloseCountsExactlyOnceUnderConcurrency(t *testing.T) {
 			var wg sync.WaitGroup
 
 			for range 32 {
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-
+				wg.Go(func() {
 					if err := d.Close(); err != nil {
 						t.Error(err)
 					}
-				}()
+				})
 			}
 
 			wg.Wait()

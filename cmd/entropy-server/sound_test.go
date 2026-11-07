@@ -193,18 +193,14 @@ func TestSoundConcurrencyLimit(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for range 2 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			w := httptest.NewRecorder()
 			handler(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/sound?duration_ms=250", nil))
 
 			if w.Code != http.StatusOK {
 				t.Errorf("admitted request: status=%d", w.Code)
 			}
-		}()
+		})
 	}
 
 	for range 2 {

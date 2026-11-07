@@ -238,17 +238,14 @@ func TestStreamingConcurrencyAndBudget(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			w := httptest.NewRecorder()
 			h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random?bytes=524288", nil))
 
 			if w.Code != http.StatusOK || w.Body.Len() != 524288 {
 				errs <- fmt.Errorf("status=%d bytes=%d", w.Code, w.Body.Len())
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

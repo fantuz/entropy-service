@@ -22,7 +22,7 @@ Entropy Service is a Go server and command-line client for generating, distribut
 
 ## Quick start
 
-Use **Go 1.24.4 or newer**, Git and Make. Linux is the primary deployment target; hardware devices also need their own working kernel driver and read permissions.
+Use **Go 1.26.10 or newer**, Git and Make. Linux is the primary deployment target; hardware devices also need their own working kernel driver and read permissions.
 
 ```sh
 git clone https://github.com/fantuz/entropy-service.git

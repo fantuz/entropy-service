@@ -56,11 +56,7 @@ func TestUint64Concurrent(t *testing.T) {
 	)
 
 	for range 32 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			for range 1024 {
 				_, err := Uint64()
 				if errors.Is(err, ErrUnavailable) {
@@ -69,7 +65,7 @@ func TestUint64Concurrent(t *testing.T) {
 					t.Errorf("unexpected sampling error: %v", err)
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

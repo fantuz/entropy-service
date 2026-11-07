@@ -18,10 +18,7 @@ func TestRateMeterConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for worker := range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			<-start
 
 			var previous uint64
@@ -47,7 +44,7 @@ func TestRateMeterConcurrentAccess(t *testing.T) {
 					t.Errorf("invalid rate: %v", rate)
 				}
 			}
-		}()
+		})
 	}
 
 	close(start)

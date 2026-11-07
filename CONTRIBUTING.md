@@ -4,7 +4,7 @@ Thanks for considering improvements. Contributions in Go, browser UX, documentat
 
 ## Environment
 
-- Go **1.24.4** or newer, Git, and a supported C toolchain for race testing.
+- Go **1.26.10** or newer, Git, and a supported C toolchain for race testing.
 - `golangci-lint` **2.12.2** to match current GitHub Actions configuration, where available.
 - GoReleaser for local release snapshots, only when packaging changes are involved.
 - The server supports local development with `-device=/dev/urandom`; no QRNG card is necessary to run ordinary tests.
@@ -17,6 +17,7 @@ go test ./...
 go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
 go vet ./...
 golangci-lint run --timeout=3m0s
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 ```
 
 The race detector requires a supported platform and a working C compiler with cgo enabled. `go test -race ./...` can provide broader coverage before releases. Browser resources are embedded at build time; rebuild and restart the server after editing `cmd/entropy-server/web/`.
@@ -43,7 +44,7 @@ A `v*.*.*` tag triggers the release workflow against that **exact tagged
 commit**. The `validate` job must finish successfully before the
 token-bearing `release` job is eligible to publish any artifacts. Validation
 includes module tidiness, all Go tests, four browser regression suites, the
-server race detector, `golangci-lint`, and a GoReleaser snapshot build.
+server race detector, `golangci-lint`, a reachable-vulnerability check, and a GoReleaser snapshot build.
 Failure in any required check prevents publication.
 
 For a failed release workflow, **correct the source and create a new tag**.

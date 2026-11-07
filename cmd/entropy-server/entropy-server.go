@@ -1452,15 +1452,11 @@ func main() {
 			continue
 		}
 
-		shutdown.Add(1)
-
-		go func() {
-			defer shutdown.Done()
-
+		shutdown.Go(func() {
 			if err := srv.Shutdown(shutdownCtx); err != nil {
 				log.Printf("shutdown %s: %v", srv.Addr, err)
 			}
-		}()
+		})
 	}
 
 	shutdown.Wait()

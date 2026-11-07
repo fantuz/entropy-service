@@ -33,6 +33,8 @@ jobs:
           go-version-file: go.mod
       - name: Ensure go.mod is already tidied
         run: go mod tidy && git diff --no-patch --exit-code
+      - name: Check reachable Go vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - name: Run tests
         run: go test ./...
       - name: Test browser KPI calculations

@@ -1,6 +1,6 @@
 module github.com/fantuz/entropy-service
 
-go 1.24.4
+go 1.26.10
 
 require (
 	github.com/8ff/diceware v1.0.0

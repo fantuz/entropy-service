@@ -262,11 +262,7 @@ func TestHTTPBudgetConcurrentAdmission(t *testing.T) {
 		codes := make(chan int, 64)
 
 		for range 64 {
-			wg.Add(1)
-
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				w := httptest.NewRecorder()
 
 				release, ok := budget.admit(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil), 1<<20)
@@ -275,7 +271,7 @@ func TestHTTPBudgetConcurrentAdmission(t *testing.T) {
 				} else {
 					codes <- w.Code
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
