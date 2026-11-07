@@ -32,6 +32,7 @@ type StreamTester struct {
 	sum      float64 // sum of x
 	sumSq    float64 // sum of x^2
 	sumProd  float64 // sum of x_i * x_{i+1}
+	first    byte
 	prev     byte
 	havePrev bool
 	pairs    uint64 // number of adjacent pairs counted
@@ -64,6 +65,8 @@ func (t *StreamTester) Add(b []byte) {
 		if t.havePrev {
 			t.sumProd += float64(t.prev) * x
 			t.pairs++
+		} else {
+			t.first = v
 		}
 
 		t.prev = v
@@ -131,18 +134,20 @@ func (t *StreamTester) computeMonobit() float64 {
 // computeSerial computes lag-1 autocorrelation r and approximate p-value.
 func (t *StreamTester) computeSerial() (r float64, pval float64) {
 	N := t.Total
-	if N < 3 || t.pairs == 0 {
+	if N < 4 || t.pairs == 0 {
 		return 0, 1.0
 	}
 
-	// Use sums we collected: sum = Σ x_i, sumSq = Σ x_i^2, sumProd = Σ x_i * x_{i+1}
-	// We compute r ≈ ( Σ x_i x_{i+1} - (Σ x_i)^2 / N ) / ( Σ x_i^2 - (Σ x_i)^2 / N )
+	// Match the batch diagnostic's global-mean lag-1 estimator. Adjacent
+	// pairs omit the last value on the left and the first value on the right.
+	// Keeping those endpoints makes the centered numerator exact across chunks.
 	total := float64(N)
-	// nPairs := float64(t.pairs)
+	mean := t.sum / total
+	pairSum := 2*t.sum - float64(t.first) - float64(t.prev)
 
-	numerator := t.sumProd - (t.sum*t.sum)/total
+	numerator := t.sumProd - mean*pairSum + float64(t.pairs)*mean*mean
 
-	denominator := t.sumSq - (t.sum*t.sum)/total
+	denominator := t.sumSq - t.sum*mean
 	if denominator == 0 {
 		return 0, 1.0
 	}
