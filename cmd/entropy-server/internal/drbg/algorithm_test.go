@@ -249,10 +249,7 @@ func TestBackendConcurrentReadsReseedsAndDerivation(t *testing.T) {
 			var wg sync.WaitGroup
 
 			for range 4 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-
+				wg.Go(func() {
 					buf := make([]byte, 4096)
 					for range 32 {
 						if _, err := io.ReadFull(d, buf); err != nil {
@@ -276,7 +273,7 @@ func TestBackendConcurrentReadsReseedsAndDerivation(t *testing.T) {
 
 						_ = child.Close()
 					}
-				}()
+				})
 			}
 
 			for i := range 16 {

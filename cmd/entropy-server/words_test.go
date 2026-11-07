@@ -144,11 +144,7 @@ func TestWordsConcurrentClients(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for count := 1; count <= 8; count++ {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			url := "ws" + strings.TrimPrefix(server.URL, "http") + "/words?words=" + strconv.Itoa(count) + "&refresh=1"
 
 			conn, response, err := websocket.DefaultDialer.DialContext(t.Context(), url, nil)
@@ -178,7 +174,7 @@ func TestWordsConcurrentClients(t *testing.T) {
 					t.Errorf("client wants %d words, got %q", count, frame.Words)
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

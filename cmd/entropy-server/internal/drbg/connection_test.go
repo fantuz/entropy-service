@@ -163,10 +163,7 @@ func TestConnectionReaderConcurrentReseeds(t *testing.T) {
 
 			var wg sync.WaitGroup
 			for range 8 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-
+				wg.Go(func() {
 					reader := NewConnectionReader(parent)
 					defer reader.Close()
 
@@ -177,7 +174,7 @@ func TestConnectionReaderConcurrentReseeds(t *testing.T) {
 							return
 						}
 					}
-				}()
+				})
 			}
 
 			for i := range 64 {

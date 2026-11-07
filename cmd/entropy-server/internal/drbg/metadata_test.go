@@ -82,16 +82,13 @@ func TestConcurrentMetadataAndReseedFailureSnapshots(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			for range 32 {
 				d.SetMetadata("test", "test", "ignored", time.Second, 2048)
 				_ = d.GetMetadata()
 				d.WriteHeaders(httptest.NewRecorder())
 			}
-		}()
+		})
 	}
 
 	for range 32 {

@@ -282,11 +282,7 @@ func TestWebSocketConcurrentAdmission(t *testing.T) {
 			var attempts sync.WaitGroup
 
 			for range 64 {
-				attempts.Add(1)
-
-				go func() {
-					defer attempts.Done()
-
+				attempts.Go(func() {
 					conn, response, err := budgetDial(server, "/stream?bytes=64")
 					if response != nil && response.Body != nil {
 						_ = response.Body.Close()
@@ -297,7 +293,7 @@ func TestWebSocketConcurrentAdmission(t *testing.T) {
 					} else if response == nil || response.StatusCode != http.StatusServiceUnavailable {
 						failures <- fmt.Errorf("unexpected dial failure: %w", err)
 					}
-				}()
+				})
 			}
 
 			attempts.Wait()
