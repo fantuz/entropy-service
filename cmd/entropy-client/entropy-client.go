@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -112,11 +111,11 @@ func run(ctx context.Context) error {
 		panic(Red + "refresh must be at least 1ms" + Reset)
 	}
 
-	fps := strconv.FormatInt(cfg.Refresh.Milliseconds(), 10)
-	rbytes := strconv.FormatInt(cfg.Slice, 10)
+	refhttpurl, refwsurl, err := requestEndpoints(cfg)
+	if err != nil {
+		return fmt.Errorf("configure entropy endpoint: %w", err)
+	}
 
-	refhttpurl := cfg.HTTPUrl + "?bytes=" + rbytes + "&refresh=" + fps
-	refwsurl := cfg.WSUrl + "?bytes=" + rbytes + "&refresh=" + fps
 	fpsdigit := 1000 / float64(cfg.Refresh.Milliseconds())
 
 	expectedbr := float64(cfg.Slice) * fpsdigit / (1 << 20)
