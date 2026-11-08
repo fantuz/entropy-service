@@ -95,19 +95,21 @@ func ActiveInstances() int64 {
 }
 */
 
+const preferenceCookieName = "entropy_prefs"
+
 func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 	data, err := json.Marshal(prefs)
 	if err != nil {
 		return err
 	}
 
-	// Non-sensitive UI preferences. Secure is intentionally left unset so the
-	// cookie also works when the server is reached over plain HTTP (the
-	// default when -enable-https=false).
+	// Always protect browser transport, including when TLS terminates at a
+	// reverse proxy. Request headers must not downgrade this policy.
 	cookie := &http.Cookie{
-		Name:     "entropy_prefs",
+		Name:     preferenceCookieName,
 		Value:    base64.StdEncoding.EncodeToString(data),
 		Path:     "/",
+		Secure:   true,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   86400, // 1 day
@@ -119,7 +121,7 @@ func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 }
 
 func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
-	c, err := r.Cookie("entropy_prefs")
+	c, err := r.Cookie(preferenceCookieName)
 	if err != nil {
 		return nil, err
 	}
@@ -668,15 +670,15 @@ body {
 		}
 		defer release()
 
-		if hasCookie {
-			_ = setPrefsCookie(w, prefs)
-		}
-
 		frame, err := newWordFrame(source, prefs.Words)
 		if err != nil {
 			http.Error(w, "word generation failed", http.StatusInternalServerError)
 
 			return
+		}
+
+		if hasCookie {
+			_ = setPrefsCookie(w, prefs)
 		}
 
 		// HTML meta refresh uses integer seconds, so round milliseconds up.
@@ -723,16 +725,7 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 		}
 		defer release()
 
-		if hasCookie {
-			// prefs := extractPrefs(r)
-			_ = setPrefsCookie(w, prefs)
-			// size = prefs.Bytes
-		}
-
 		size := prefs.Bytes
-
-		d.WriteHeaders(w)
-		w.Header().Set("Content-Type", "application/octet-stream")
 
 		// Create a per-request DRBG using the parent's selected backend.
 		child, err := drbg.NewConnectionDRBG(d)
@@ -742,6 +735,13 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 			return
 		}
 		defer func() { _ = child.Close() }()
+
+		if hasCookie {
+			_ = setPrefsCookie(w, prefs)
+		}
+
+		d.WriteHeaders(w)
+		w.Header().Set("Content-Type", "application/octet-stream")
 		// child, _ := qrng.Context().Value("conn_drbg").(*qrng.NewDRBG)
 
 		/*

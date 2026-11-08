@@ -54,10 +54,6 @@ linters:
         # G120: the only multipart handler bounds r.Body via MaxBytesReader
         # before ParseMultipartForm, so parsing is already limited.
         - G120
-        # G124: the prefs cookie holds non-sensitive UI settings and must work
-        # over plain HTTP (default when -enable-https=false); Secure is omitted
-        # deliberately while HttpOnly + SameSite=Lax are set.
-        - G124
     depguard:
       rules:
         main:

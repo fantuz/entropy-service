@@ -126,6 +126,11 @@ The standalone binary enables HTTPS by default and expects deployment-specific `
 
 Use `https://` and `wss://` for remote consumers. Configure authentication and access controls at the deployment boundary: the service has no built-in client authentication. The WebSocket upgrader uses Gorilla's default same-host browser origin policy; requests without an `Origin` header may still be admitted. Origin validation is not authentication. HTTP/2 is not enabled in the current listener setup.
 
+To remember byte/word preferences in a browser or a client's cookie jar, add
+`-cookie=true` and use the HTTPS API URLs. Preference cookies are always
+`Secure`, `HttpOnly` and `SameSite=Lax`; cookies remain disabled by default.
+See [cookie policy and a curl example](docs/configuration.md#preference-cookies).
+
 ### Install Linux packages
 
 The [Releases](https://github.com/fantuz/entropy-service/releases) page provides archives and `.deb`/`.rpm` packages for Linux amd64, armv7 and arm64. Download the package matching your system, then install that file:
