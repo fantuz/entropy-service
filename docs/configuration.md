@@ -86,7 +86,15 @@ Transport URLs are listed separately to keep the table readable:
 - `-url`: `http://127.0.0.1:8080/v1/data/random`
 - `-wsurl`: `ws://127.0.0.1:8080/stream`
 
-Pass **bare endpoints** to `-url` and `-wsurl`: the client appends its own `bytes` and `refresh` query parameters. Use `-slice` and `-refresh` to control them. The CLI consumes `/stream` raw messages, not `/bytes` compact envelopes.
+`-url` and `-wsurl` accept endpoints with existing query parameters. The client preserves other parameters, including repeated values, while `-slice` and `-refresh` replace any existing `bytes` and `refresh` values. Malformed query strings are rejected. Only the selected transport's endpoint is configured and used. The CLI consumes `/stream` raw messages, not `/bytes` compact envelopes.
+
+For example, this requests 64 KiB with a 100 ms refresh setting, overriding the values already in the URL:
+
+```sh
+./bin/entropy-client -mode=pull \
+  -url='http://127.0.0.1:8080/v1/data/random?bytes=1024&refresh=1000' \
+  -slice=65536 -refresh=100ms
+```
 
 ### Analysis and terminal display
 
