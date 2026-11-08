@@ -103,6 +103,7 @@ For example, this requests 64 KiB with a 100 ms refresh setting, overriding the 
 | `-analysis-bytes` | `1048576` | Maximum prefix bytes analysed per selected frame.<br>Range: 0 to 33554432; `0` selects the full frame. |
 | `-analysis-interval` | `250ms` | Minimum interval between analysed frames.<br>Non-negative; `0` analyses every frame. |
 | `-display-interval` | `1s` | Terminal redraw interval; minimum 1 ms.<br>Does not change the requested reception interval. |
+| `-shannon-threshold` | `7.999` | Minimum raw empirical Shannon estimate for `OK`, in bits/byte; finite value from 0 to 8, inclusive. |
 | `-dashboard` | `false` | Reception/analysis rates and histories of sampled statistics. |
 | `-matrix` | `false` | Compute and display the transition matrix for analysed samples. |
 | `-graph` | `false` | Shannon-entropy history of analysed samples. |
@@ -134,6 +135,15 @@ Add `-matrix` if transition-matrix analysis is also wanted. Setting only `-analy
 
 ### Reading the monitor
 
+The monitor shows one raw **Shannon entropy** estimate, in bits/byte, and one
+**Shannon assessment**: `OK` when the estimate is at least
+`-shannon-threshold`, otherwise `WARN`. No analysed data means `NO_SAMPLE` in
+reports. The threshold does not change the estimate. Chi-square, monobit and
+serial-correlation results remain independent reference measurements; they
+are not combined into another pass/fail badge. Optional histories use the
+same raw estimates. See [client experiments](client-experiments.md#shannon-entropy-and-its-assessment)
+for the formula, sample-size effects and interpretation.
+
 | Display | Meaning |
 | --- | --- |
 | `Requested rate` | Payload size divided by requested interval; a target, in MiB/s. |
@@ -145,6 +155,41 @@ Add `-matrix` if transition-matrix analysis is also wanted. Setting only `-analy
 
 `Total received`, `Transfer Rate` and `Analysed Rate` are shown with `-dashboard`. Throughput uses **MiB/s**: 1 MiB = 1,048,576 bytes. Analysis rates measure processing of sampled data, not physical entropy production. Receiver and monitor counters can differ briefly because frames may be in flight or queued and rate windows differ.
 
-The client performs startup diagnostics before normal monitoring; its reception-rate window is reset afterwards. With `-debug`, `Last WS receive` includes waiting for the server's next message; `WS runtime` sums message-read durations. `Last HTTP fetch` includes the complete response body; `HTTP cycle runtime` includes request pacing plus that fetch. Analysis is timed separately, and `Total runtime` is wall time since monitoring started. These are client-side timings, not pure network round-trip measurements.
+The interactive client samples the selected transport once, shows preflight
+diagnostics for three seconds, then resets the reception-rate window before
+monitoring. The former separate cumulative startup demonstration is removed,
+so startup and monitoring use the same diagnostics and threshold. With
+`-debug`, `Last WS receive` includes waiting for the server's next message;
+`WS runtime` sums message-read durations. `Last HTTP fetch` includes the
+complete response body; `HTTP cycle runtime` includes request pacing plus
+that fetch. Analysis is timed separately, and `Total runtime` is wall time
+since monitoring started. These are client-side timings, not pure network
+round-trip measurements.
+
+### Timed runs and reports
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `-duration` | `0s` | Non-negative measurement duration, e.g. `10m` or `3h`; zero runs until interrupted. Excludes interactive preflight. |
+| `-report` | empty | Write JSONL metadata, analysed samples and a final summary to a **new** file (mode 0600). `-` selects stdout and requires `-headless`. |
+| `-headless` | `false` | Skip interactive preflight and all terminal rendering, previews and bells; suitable for scripts and JSONL stdout. |
+
+The measurement clock includes connection establishment, reception, analysis
+and report-writing overhead. Expiry cancels pending network work and releases
+queued frames. An analysis or write already in progress and connection
+cleanup can make the process finish slightly after the requested duration.
+Without `-report`, no report is created; `-headless` alone runs quietly.
+With a writable report, normal duration expiry, Ctrl+C/SIGTERM and transport
+failures produce a final summary. A failed report write, sync or close is a
+command error; a broken destination or forced kill cannot guarantee a final
+record. `WARN` is an assessment, not a nonzero exit code.
+
+```sh
+./bin/entropy-client -mode=pull -slice=1048576 -refresh=50ms \
+  -headless -duration=10m -shannon-threshold=7.99 -report=pull-10m.jsonl
+```
+
+See [client experiments](client-experiments.md) for the JSONL contract, longer
+runs, payload comparisons and a report-analysis example.
 
 [Back to README](../README.md) · [Technical reference index](README.md)

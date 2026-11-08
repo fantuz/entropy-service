@@ -17,7 +17,6 @@ type Diagnostics struct {
 	SerialP   float64
 	Rate      *RateMeter
 	TMatrix   TransitionMatrix
-	Pass      bool
 	Notes     string
 }
 
@@ -35,11 +34,11 @@ func RunDiagnostics(data []byte) Diagnostics {
 }
 
 // RunDiagnosticsWithMatrix omits the transition-matrix pass when not requested.
-// All other statistics and the pass rule are identical to RunDiagnostics.
+// All other statistics are identical to RunDiagnostics.
 func RunDiagnosticsWithMatrix(data []byte, includeMatrix bool) Diagnostics {
 	n := len(data)
 	if n == 0 {
-		return Diagnostics{N: 0, Pass: false, Notes: "empty input"}
+		return Diagnostics{N: 0, Notes: "empty input"}
 	}
 
 	hist := computeHistogram(data)
@@ -56,9 +55,6 @@ func RunDiagnosticsWithMatrix(data []byte, includeMatrix bool) Diagnostics {
 
 	serialR, serialP := serialCorrelation(data)
 
-	// simple pass rule (thresholds to be tuned)
-	pass := !(monop < 0.01 || chi2p < 0.01 || shannon < 7.9 || math.Abs(serialR) > 0.05)
-
 	rate := NewRateMeter()
 	// rate.Update(len(data))
 
@@ -73,7 +69,6 @@ func RunDiagnosticsWithMatrix(data []byte, includeMatrix bool) Diagnostics {
 		SerialR:  serialR,
 		SerialP:  serialP,
 		TMatrix:  tm,
-		Pass:     pass,
 		Rate:     rate,
 		// Notes:    "ciao",
 	}

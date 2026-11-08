@@ -88,7 +88,7 @@ func (d *Dashboard) Render() {
 	total := ClientRateMeter.Total()
 	rate := ClientRateMeter.RateMiB()
 
-	fmt.Println("\nEntropy Health Monitor")
+	fmt.Println("\nSampled statistics history")
 	fmt.Println("----------------------------")
 	fmt.Printf("Total received     : %d MiB\n", total/1024/1024)
 	fmt.Printf("Transfer Rate      : %.3f MiB/s\n", rate)
@@ -99,7 +99,7 @@ func (d *Dashboard) Render() {
 	)
 
 	fmt.Printf(
-		"Entropy              %s\n",
+		"Shannon entropy      %s\n",
 		renderSeries(d.entropy, 7.995, 8.0),
 	)
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/client"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/tests"
@@ -19,8 +17,6 @@ import (
 type Stats struct {
 	TotalBytes int64
 	Rate       float64
-	Entropy    float64
-	Hist       [256]int
 }
 
 const (
@@ -40,82 +36,31 @@ const (
 	modeStream = "stream"
 )
 
-func drawUI(stats *Stats, result *diag.Diagnostics) {
+func drawUI(result *diag.Diagnostics, threshold float64) {
 	fmt.Print("\033[H\033[2J")
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
 	fmt.Println()
-
-	// t := (*diag.RateMeter).RateMbps()
-	// t := diag.NewRateMeter()
-	// t.Update(int(stats.Rate))
-
-	// fmt.Printf("Dashboard : %v\n", t)
-	// fmt.Printf("Dashboard : %q\n", t)
-	// fmt.Printf("Rate               : %.6f MB/s\n", stats.Rate/1024)
-	// fmt.Printf("Fetched            : %d KB\n", (stats.TotalBytes/1024))
-	// fmt.Printf("Meter     : %d\n", &t.Meter)
-	// fmt.Printf("Rate      : %d\n", &t.Rate)
-	// fmt.Printf("Fetched R : %d\n", &t.Bytes)
-	// fmt.Printf("Entropy            : %.4f bits/byte\n", stats.Entropy)
-
-	status := Green + "OK" + Reset
-	if stats.Entropy < 7.999 {
-		status = Red + "WARN" + Reset
-	}
-
-	fmt.Printf("Status             : %s\n", status)
-	fmt.Println()
-
-	// (*diag.RateMeter).Update(diag.RateMeter.rate, 1024)
-	// t.Update(len(data))
-	tests.PrintDiagnostics(result)
+	tests.PrintDiagnostics(os.Stdout, result, threshold)
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	err := run(ctx)
-	canceled := ctx.Err() != nil
 
 	stop()
 
-	if err != nil && !canceled {
+	if err != nil {
 		log.Print(err)
 		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context) error {
-	cfg := config.ParseConfig()
-	if err := cfg.ValidateAnalysis(); err != nil {
-		return err
-	}
+	return runConfigured(ctx, config.ParseConfig())
+}
 
-	if cfg.Mode != modePull && cfg.Mode != modeStream {
-		panic("mode must be pull or stream")
-	}
-	// flag.Parse()
-	//
-	// if cfg.WriteOut {
-	// 	//panic("Write Out Device issue")
-	// }
-	//
-	// if cfg.ShowDebug {
-	// 	//panic("Debug forbidden ;)")
-	// }
-
-	if cfg.Slice < 1 || cfg.Slice > 33554432 {
-		panic(Red + "slice must be between 1 and 33554432 bytes" + Reset)
-	}
-
-	if cfg.Refresh < time.Millisecond {
-		panic(Red + "refresh must be at least 1ms" + Reset)
-	}
-
-	refhttpurl, refwsurl, err := requestEndpoints(cfg)
-	if err != nil {
-		return fmt.Errorf("configure entropy endpoint: %w", err)
-	}
-
+// Interactive preflight is separate from the measured experiment.
+func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl string) error {
 	fpsdigit := 1000 / float64(cfg.Refresh.Milliseconds())
 
 	expectedbr := float64(cfg.Slice) * fpsdigit / (1 << 20)
@@ -132,19 +77,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("sample entropy: %w", err)
 	}
 
-	/*
-		for i:=0; i < 10; i++ {
-			result := diag.RunDiagnostics(testdata)
-			if result.Pass == true {
-				fmt.Printf("PASS                 : " + Green + "%v" + Reset + "\n", result.Pass)
-			} else {
-				fmt.Printf("PASS                 : " + Red + "%v"+ Reset + "\n", result.Pass)
-			}
-		}
-	*/
-
 	result := analysePayload(testdata, cfg)
-	// test := diag.NewRateMeter
 
 	fmt.Println()
 	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
@@ -152,7 +85,6 @@ func run(ctx context.Context) error {
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
-	// fmt.Println("Framerate            : " + strconv.Itoa(fpsdigit) + " FPS (1 frame every " + strconv.Itoa(int(cfg.Refresh.Milliseconds())) + "ms)")
 	fmt.Printf("Framerate            : %.2f FPS (1 frame every %dms)\n", float64(fpsdigit), int(cfg.Refresh.Milliseconds()))
 	fmt.Println("Refresh (ms)         :", cfg.Refresh)
 	fmt.Println("HTTP URL             : " + Cyan + refhttpurl + Reset)
@@ -189,55 +121,19 @@ func run(ctx context.Context) error {
 	fmt.Printf("Display interval     : %s\n", cfg.DisplayInterval)
 	fmt.Printf("Pre-flight analysed  : %d / %d bytes\n", result.N, len(testdata))
 
-	// fmt.Printf("Bitrate              : %f\n", result.Rate)
-	// fmt.Printf("Shannon entropy      : %.6f bits/byte\n", result.Shannon)
-	// fmt.Printf("Chi²                 : %.3f (p=%.6f)\n", result.Chi2, result.Chi2P)
-	// fmt.Printf("Monobit p-value      : %.6f\n", result.MonobitP)
-	// fmt.Printf("Serial ratio         : %.6f (p=%.6f)\n", result.SerialR, result.SerialP)
-	// fmt.Println("TLS Certificate      :", cfg.CertFile)
-	// fmt.Println("TLS Key              :", cfg.KeyFile)
-	// fmt.Println("----------------------------------------------")
-
 	if result.N > 0 {
-		fmt.Printf("PASS                 : " + Green + "Link Established" + Reset + "\n")
+		fmt.Println("Link                 : data received")
 	} else {
-		fmt.Printf("PASS                 : " + Red + "Link down / No data fetched" + Reset + "\n")
+		fmt.Println("Link                 : no data received")
 	}
 
 	fmt.Println("----------------------------------------------")
 
+	tests.PrintDiagnostics(os.Stdout, &result, cfg.ShannonThreshold)
+
 	if !waitContext(ctx, 3*time.Second) {
-		return nil
-	}
-
-	fmt.Print("\033[H\033[2J")
-	fmt.Println("\n----------------------------------------------")
-
-	diagnosticCtx, cancelDiagnostic := context.WithTimeout(ctx, 3*time.Second)
-
-	if cfg.Mode == modePull {
-		err = client.TestEntropyHTTP(diagnosticCtx, refhttpurl)
-	} else {
-		err = client.TestEntropyWS(diagnosticCtx, refwsurl)
-	}
-
-	cancelDiagnostic()
-
-	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	// A completed diagnostic time budget is expected for an ongoing stream.
-	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("entropy diagnostic: %w", err)
-	}
-
-	fmt.Println("----------------------------------------------")
-	fmt.Print("\a")
-
-	if !waitContext(ctx, 2*time.Second) {
-		return nil
-	}
-
-	return runMonitor(ctx, cfg, refhttpurl, refwsurl)
+	return nil
 }

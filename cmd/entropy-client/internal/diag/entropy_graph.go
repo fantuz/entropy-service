@@ -25,7 +25,7 @@ func (g *EntropyGraph) Add(v float64) {
 func (g *EntropyGraph) Render() {
 	// fmt.Print("\033[H\033[2J") // clear screen
 	// fmt.Print("\a")
-	fmt.Println("\nEntropy quality histogram")
+	fmt.Println("\nShannon entropy history (bits/byte, 0..8)")
 	fmt.Println("----------------")
 
 	for _, v := range g.values {
