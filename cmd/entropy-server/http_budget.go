@@ -102,8 +102,8 @@ func (b *httpRequestBudget) tryReserve(needed int64) (func(), int, string) {
 	}, 0, ""
 }
 
-// Fixed-size image, QR and sound routes reserve before rendering. Byte and
-// word routes admit inside their handlers, after validating the chosen size.
+// Fixed-size QR and sound routes reserve before rendering. Byte, word and
+// image routes admit inside their handlers, after validating the chosen size.
 func (b *httpRequestBudget) wrap(next http.HandlerFunc, needed int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		release, ok := b.admit(w, r, needed)

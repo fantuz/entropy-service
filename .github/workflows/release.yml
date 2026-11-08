@@ -61,6 +61,8 @@ jobs:
         run: node scripts/test-stream-entropy-alert.mjs
       - name: Test browser layout and digest formatting
         run: node scripts/test-web-layout.mjs
+      - name: Test synchronized HTTP gallery
+        run: node scripts/test_gallery.mjs
       - name: Race-test all Go packages
         run: make test-race
       - name: Smoke-test packaged service configuration

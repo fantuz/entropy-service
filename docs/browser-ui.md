@@ -10,10 +10,17 @@ Open `/api-gallery.html` for a framed view of these existing HTTP responses:
 
 | Frame | Actual HTTP route | Content |
 | --- | --- | --- |
-| Random image | `/v1/image/random` | RGB PNG (1024 × 1024) |
-| Heatmap | `/v1/image/heatmap` | Population-count PNG (1024 × 1024) |
+| RGB mosaic | `/v1/image/random?size=128` | Raw RGB sample pixels (128 × 128) |
+| Bit heatmap | `/v1/image/heatmap?size=128` | Byte one-bit counts, nine-colour PNG (128 × 128) |
 | QR code | `/v1/qr/random` | PNG QR code containing generated hex |
 | Words and digest | `/v1/meta/random?words=8` | Words and SHA-256 extracted from server-rendered HTML |
+
+The compact layout uses **four columns from 1100 px**, two columns from
+600–1099 px, and one column on narrower screens. The shorter subtitle shares
+the title's left edge and stays on one line at normal mobile/desktop widths.
+Refresh controls use one compact row where space permits; explanatory text
+is available under **About these previews**. Direct-response links remain
+available on every card, and the word sample retains its full SHA-256.
 
 The gallery requests all four endpoints together on one browser-controlled clock
 (default: approximately 10 seconds; adjustable from 5 to 120 seconds). It waits
@@ -22,13 +29,27 @@ Slow or failed requests retain their last successful preview. The word response
 is parsed rather than embedded as a self-refreshing iframe, so its HTTP meta
 refresh does not desynchronise the gallery. PNGs are displayed as returned by
 the server, with no added opaque iframe background or border; a QR code's own
-quiet zone is preserved for scanning. All previews share a common square region
-and short captions are constrained to one line. Binary downloads such as
+quiet zone is preserved for scanning. Previews share a square region on wide
+screens; the word panel is shorter on phones. Binary downloads such as
 `/v1/data/random` are not shown; use a client or `/api-bytes.html` instead.
+
+The two image previews request 128 × 128 samples and use nearest-neighbour
+scaling so neighbouring pixels remain visible rather than blending into a
+flat average. The RGB values are unchanged. The heatmap's labelled 0–8
+palette indicates **one-bits per byte**, not entropy quality. A 128-pixel
+sample has 64 times fewer pixels and consumes 64 times fewer generated
+bytes than a 1024-pixel sample. Image allocation/admission estimates scale
+with the requested area, and response sizes/encoding costs also decrease.
+The API still defaults to 1024 × 1024; callers can request any integer
+`size` from 64 to 1024. See [image parameters and mapping](api.md).
 
 **These are demonstration views**, not statistical evidence or an entropy
 certificate. The implementation does not introduce aliases such as
 `/v1/images` or `/v1/words`.
+
+[![Compact desktop gallery](images/gallery-desktop.png)](images/gallery-desktop.png)
+
+[Mobile layout](images/gallery-mobile.png)
 
 ## Stream-analysis counters
 

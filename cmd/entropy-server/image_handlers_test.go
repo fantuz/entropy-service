@@ -13,19 +13,18 @@ import (
 
 func TestImageHandlersProducePNGAndReleaseAdmission(t *testing.T) {
 	for _, tc := range []struct {
-		path        string
-		handler     func(*drbg.DRBG) http.HandlerFunc
-		size        image.Point
-		reservation int64
+		path    string
+		handler func(*drbg.DRBG, *httpRequestBudget) http.HandlerFunc
+		size    image.Point
 	}{
-		{"/v1/image/random", randomImageHandler, image.Pt(1024, 1024), 16 << 20},
-		{"/v1/image/heatmap", entropyHeatmapHandler, image.Pt(1024, 1024), 16 << 20},
-		{"/v1/qr/random", qrHandler, image.Pt(256, 256), 4 << 20},
+		{"/v1/image/random", randomImageHandler, image.Pt(1024, 1024)},
+		{"/v1/image/heatmap", entropyHeatmapHandler, image.Pt(1024, 1024)},
+		{"/v1/qr/random", func(d *drbg.DRBG, b *httpRequestBudget) http.HandlerFunc { return b.wrap(qrHandler(d), 4<<20) }, image.Pt(256, 256)},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			d := observableTestDRBG(t)
 			budget := newHTTPRequestBudget(1, 32<<20)
-			handler := budget.wrap(tc.handler(d), tc.reservation)
+			handler := tc.handler(d, budget)
 			response := httptest.NewRecorder()
 			handler(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil))
 

@@ -2,8 +2,8 @@
 
 (() => {
     const sources = [
-        { key: "image", path: "/v1/image/random", kind: "image" },
-        { key: "heatmap", path: "/v1/image/heatmap", kind: "image" },
+        { key: "image", path: "/v1/image/random?size=128", kind: "image" },
+        { key: "heatmap", path: "/v1/image/heatmap?size=128", kind: "image" },
         { key: "qr", path: "/v1/qr/random", kind: "image" },
         { key: "words", path: "/v1/meta/random?words=8", kind: "words" },
     ];
@@ -26,7 +26,7 @@
     function checkedInterval() {
         const seconds = Number(intervalInput.value);
         if (!Number.isInteger(seconds) || seconds < 5 || seconds > 120) {
-            announce("REFRESH INTERVAL MUST BE 5–120 SECONDS", "error");
+            announce("Use 5–120 seconds", "error");
             return false;
         }
         intervalMs = seconds * 1000;
@@ -104,7 +104,7 @@
         controller = new AbortController();
         const signal = controller.signal;
         const startedAt = Date.now();
-        announce("FETCHING SYNCHRONIZED BATCH", "loading");
+        announce("Loading batch…", "loading");
         // Prevent a slow endpoint from leaving every preview indefinitely waiting.
         const deadline = setTimeout(() => controller.abort(), Math.max(intervalMs, 15000));
         try {
@@ -125,12 +125,12 @@
                     document.querySelector(`[data-gallery-key="${source.key}"]`).dataset.state = "error";
                     // Preserve previous successful data, if any.
                     const placeholder = document.getElementById(`placeholder-${source.key}`);
-                    if (!placeholder.hidden) placeholder.textContent = "NO DATA — RETRYING";
+                    if (!placeholder.hidden) placeholder.textContent = "Retrying…";
                 }
             });
             cycles++;
-            announce(failed ? `BATCH ${cycles}: ${4 - failed}/4 UPDATED — RETRYING FAILED SOURCES` :
-                `BATCH ${cycles}: 4/4 PREVIEWS UPDATED`, failed ? "error" : "ready");
+            announce(failed ? `BATCH ${cycles} · ${4 - failed}/4 UPDATED · RETRYING` :
+                `BATCH ${cycles} · 4/4 UPDATED`, failed ? "error" : "ready");
         } finally {
             clearTimeout(deadline);
             controller = null;

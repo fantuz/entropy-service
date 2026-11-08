@@ -149,8 +149,8 @@ func TestHTTPBudgetRejectsBeforeGenerating(t *testing.T) {
 		"/random?bytes=65":                         randomBytesHandler(d, 1<<25, 20, false, budget),
 		"/test?bytes=65":                           randomHandler(d, 1<<25, budget),
 		"/words?words=" + strconv.Itoa(maximumInt): randomWordsHandler(source, maximumInt, 1000, 1<<25, false, budget),
-		"/image":   budget.wrap(randomImageHandler(d), 16<<20),
-		"/heatmap": budget.wrap(entropyHeatmapHandler(d), 16<<20),
+		"/image":   randomImageHandler(d, budget),
+		"/heatmap": entropyHeatmapHandler(d, budget),
 		"/qr":      budget.wrap(qrHandler(d), 4<<20),
 		"/sound":   budget.wrap(randomSoundHandler(d), 8<<20),
 	} {
