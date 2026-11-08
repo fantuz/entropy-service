@@ -42,7 +42,7 @@ The architecture-based backend policy uses the binary's Go target architecture (
 | `-refresh-colors-ms` | `1500` | Default `/stream`, `/colors` and `/words` WS interval in ms. |
 | `-refresh` | `5000` | HTTP word-page interval in ms; HTML rounds up to seconds. |
 | `-fingerprint` | `2097152` | Upload prefix analysed statistically; full-upload SHA-256 is unaffected. |
-| `-cookie` | `false` | Enable HTTP byte/word preference cookies. |
+| `-cookie` | `false` | Remember byte/word preferences in Secure, HttpOnly cookies; use HTTPS for browser persistence. |
 | `-ws-max-connections` | `128` | Shared WS connection limit. |
 | `-ws-memory-mib` | `1024` | Shared WS estimated memory budget in MiB. |
 | `-http-max-requests` | `128` | Separate HTTP work limit. |
@@ -67,6 +67,62 @@ Source selection establishes neither entropy quality nor physical provenance.
 `-cpu-mix` prefers RDSEED, falls back to RDRAND, and takes precedence over `-rdrand-mix`. Mixing applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
 
 The systemd package overrides standalone defaults: it is **not enabled or started** by installation, uses an unprivileged systemd identity, binds only to 127.0.0.1:8080, and requires /dev/urandom. Switching to a hardware QRNG requires explicit Unix/group and systemd device permissions. See [packaged deployment](packaged-service.md).
+
+### Preference cookies
+
+Cookies remain **opt-in** with `-cookie=true`. They remember byte and word
+counts for `/v1/data/random`, `/v1/meta/random` and `/paroleparoleparole`.
+The existing format also retains a numeric `refresh` field, which does not
+control the HTTP word page's refresh interval. Cookies contain no generated
+random bytes, credentials or authentication/session token. WebSocket routes
+and the other browser demos continue to use their explicit settings.
+
+The `entropy_prefs` cookie is host-only (`Domain` omitted), uses `Path=/`,
+`Secure`, `HttpOnly` and `SameSite=Lax`, and has a one-day `Max-Age`, renewed
+when preferences are saved. Keep HTTPS enabled or use HTTPS at your reverse
+proxy's browser-facing boundary. The server always sets `Secure`, including
+when the backend connection from a TLS-terminating proxy is plain HTTP;
+it does not infer cookie security from `X-Forwarded-Proto` or `Forwarded`.
+
+Browsers do not send Secure cookies over ordinary HTTP. Some clients treat
+localhost/loopback specially; use HTTPS rather than relying on that
+exception. Plain-HTTP endpoints remain usable with query parameters, but
+preference persistence over ordinary HTTP is deliberately unsupported.
+Cookies issued by an older version without `Secure` gain the attribute on
+their next cookie-enabled response; clear old site cookies if retiring an
+HTTP deployment.
+
+Explicit query parameters override stored values. Malformed cookie data is
+ignored, and individual values outside server limits fall back to defaults.
+The cookie is unsigned, untrusted preference input: it never increases
+`-max-bytes` or `-words`, bypasses admission budgets or authenticates a
+caller. Fresh cookie-mode defaults remain 512 KiB and 3 words, capped by
+server limits. Stored `refresh` does not change the server-configured HTTP
+word page refresh interval. Invalid/rejected requests and failed generator
+setup do not save preferences; a later response-write failure can occur
+after cookie headers have already been sent.
+
+For example, start the HTTPS server with a certificate trusted for
+`localhost` and opt in:
+
+```sh
+./bin/entropy-server -device=/dev/urandom -require-device=true -cookie=true \
+  -http=127.0.0.1:8080 -https=127.0.0.1:8443 \
+  -cert-file=/path/to/cert.pem -key-file=/path/to/key.pem
+
+# Save a 64 KiB preference, then reuse it without a bytes query parameter.
+curl --fail --cacert /path/to/cert.pem --cookie-jar prefs.txt \
+  'https://localhost:8443/v1/data/random?bytes=65536' -o first.bin
+curl --fail --cacert /path/to/cert.pem --cookie prefs.txt \
+  'https://localhost:8443/v1/data/random' -o second.bin
+```
+
+Both files are 65,536 bytes and contain separately generated responses.
+Omit `-cookie` or use `-cookie=false` for stateless operation: the server
+ignores incoming preference cookies and emits none. To remove previously
+stored preferences, clear this site's cookies in the browser or delete the
+local curl cookie jar. Cookie transport protection follows
+[CWE-614](https://cwe.mitre.org/data/definitions/614.html).
 
 ## Client
 

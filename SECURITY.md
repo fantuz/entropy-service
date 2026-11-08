@@ -39,6 +39,15 @@ Security fixes are maintained on a best-effort basis for the current `main` bran
 - Request-size limits and admission budgets reduce resource-exhaustion risk, but do not cap overall process RSS or eliminate all denial-of-service scenarios.
 - The optional `pprof` listener is for debugging and should remain bound to loopback.
 
+Preference cookies are disabled by default. With `-cookie=true`, the
+`entropy_prefs` cookie contains only numeric byte/word/refresh settings and
+is always `Secure`, `HttpOnly`, `SameSite=Lax` and host-only, with a one-day
+lifetime. Use HTTPS directly or at the reverse proxy's browser-facing
+boundary; untrusted forwarded headers never remove `Secure`. Cookie values
+are unsigned, validated user input and provide no authentication or resource
+limit exemption. Plain-HTTP deployments can use explicit query parameters.
+See [cookie policy, migration and examples](docs/configuration.md#preference-cookies).
+
 ## Important: public demonstration TLS private key
 
 The source repository contains `cmd/entropy-server/cert.pem` and **`cmd/entropy-server/key.pem`**. The private key is **publicly distributed** and must be treated as a *development fixture only*. **Never use it to protect a production endpoint.** Generate your own certificate and private key, restrict file permissions, and supply their paths via `-cert-file` and `-key-file`. Do not assume the bundled key is a secret simply because it has a `.pem` extension.

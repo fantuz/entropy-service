@@ -22,7 +22,16 @@ Sound defaults to 2500 ms and `bloom`, with 48 kHz, 16-bit mono output. It uses 
 
 Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. The dictionary currently comes from `github.com/8ff/diceware` and is loaded once.
 
-With `-cookie=true`, `/v1/data/random` and the HTTP word pages use validated preference cookies; explicit query values take precedence. Fresh cookie-mode defaults are 512 KiB and 3 words, bounded by server limits. A stored/query `refresh` preference does not override the HTTP word page's server-configured refresh interval.
+With `-cookie=true`, `/v1/data/random` and the HTTP word pages remember
+validated preferences in a host-only `entropy_prefs` cookie with `Secure`,
+`HttpOnly`, `SameSite=Lax`, `Path=/` and a one-day lifetime. Use HTTPS,
+directly or through a TLS-terminating reverse proxy, for persistence.
+Explicit query values take precedence. Fresh cookie-mode defaults are
+512 KiB and 3 words, bounded by server limits. A stored/query `refresh`
+preference does not override the HTTP word page's server-configured refresh
+interval. Cookies contain numeric preferences only, never entropy or an
+authentication token, and are ignored when the option is disabled. See
+[cookie policy and examples](configuration.md#preference-cookies).
 
 ## WebSockets
 
