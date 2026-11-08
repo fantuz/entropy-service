@@ -21,7 +21,7 @@
     <main>
       <section aria-label="Gallery refresh controls" class="gallery-controls panel">
         <label for="gallery-interval">Every</label>
-        <input id="gallery-interval" type="number" min="5" max="120" step="1" value="10" inputmode="numeric" aria-label="Refresh interval in seconds">
+        <input id="gallery-interval" type="number" min="0.5" max="120" step="0.5" value="2" inputmode="decimal" aria-label="Refresh interval in seconds">
         <span>s</span>
         <button id="gallery-refresh" type="button">Refresh</button>
         <span id="gallery-status" role="status" aria-live="polite">Waiting for samples</span>

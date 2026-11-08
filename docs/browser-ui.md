@@ -23,8 +23,9 @@ is available under **About these previews**. Direct-response links remain
 available on every card, and the word sample retains its full SHA-256.
 
 The gallery requests all four endpoints together on one browser-controlled clock
-(default: approximately 10 seconds; adjustable from 5 to 120 seconds). It waits
-for the batch to finish before swapping previews and never overlaps cycles.
+(default: approximately 2 seconds; adjustable from 0.5 to 120 seconds in
+0.5-second steps). It waits for the batch to finish before swapping previews
+and never overlaps cycles.
 Slow or failed requests retain their last successful preview. The word response
 is parsed rather than embedded as a self-refreshing iframe, so its HTTP meta
 refresh does not desynchronise the gallery. PNGs are displayed as returned by
@@ -32,6 +33,13 @@ the server, with no added opaque iframe background or border; a QR code's own
 quiet zone is preserved for scanning. Previews share a square region on wide
 screens; the word panel is shorter on phones. Binary downloads such as
 `/v1/data/random` are not shown; use a client or `/api-bytes.html` instead.
+
+At the 0.5-second minimum, one visible gallery targets two batches and eight
+HTTP requests per second; the two-second default targets two requests per
+second. Slow batches delay the next update rather than queueing overlapping
+work, and hidden tabs pause polling. This browser interval does not alter
+the standalone image `Refresh` hint, the server's HTTP word-page interval
+or other API/stream settings.
 
 The two image previews request 128 × 128 samples and use nearest-neighbour
 scaling so neighbouring pixels remain visible rather than blending into a
@@ -42,6 +50,13 @@ bytes than a 1024-pixel sample. Image allocation/admission estimates scale
 with the requested area, and response sizes/encoding costs also decrease.
 The API still defaults to 1024 × 1024; callers can request any integer
 `size` from 64 to 1024. See [image parameters and mapping](api.md).
+
+There are nine possible counts in an eight-bit byte: `00000000` has zero
+ones, `11110000` has four, and `11111111` has eight. Bit positions are eight
+separate locations; the heatmap counts how many are set. For uniform bytes,
+four is the most common count (70 of the 256 possible byte values), so the
+middle colours normally dominate. These count categories are unchanged by
+the refresh adjustment.
 
 **These are demonstration views**, not statistical evidence or an entropy
 certificate. The implementation does not introduce aliases such as
