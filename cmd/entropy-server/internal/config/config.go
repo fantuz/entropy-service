@@ -91,7 +91,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default /stream, /colors and /words WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.PageRefreshMs, "refresh", 5000, "Word page refresh in milliseconds (HTML rounds up to whole seconds)")
 	flags.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (positive)")
-	flags.IntVar(&cfg.ReseedMs, "reseed-ms", defaultReseedMs, "Root reseed interval in milliseconds (1-60000; default 15000)")
+	flags.IntVar(&cfg.ReseedMs, "reseed-ms", defaultReseedMs, "Root reseed interval in milliseconds (1-60000)")
 	flags.IntVar(&cfg.MaxReseedAgeMs, maxReseedAgeFlag, 0, "Maximum seed age in milliseconds (0 = max(1000, four reseed intervals))")
 	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Deprecated; ignored (no separate entropy buffer)")
 	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Bytes supplied to each root reseed (32-1048576)")
