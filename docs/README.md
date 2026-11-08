@@ -19,5 +19,6 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Statistical tests](statistical-tests.md) | `rngtest`, Dieharder and their limitations. |
 | [Security policy](../SECURITY.md) | Source/DRBG trust boundaries, exposure, disclosure and TLS keys. |
 | [Contribution guide](../CONTRIBUTING.md) | Build, race tests, lint, benchmark evidence and changes. |
+| [Go quality review](go-quality.md) | Go conventions, module/toolchain policy, measured coverage, remaining tests and README badge meanings. |
 
 The reference pages retain the detailed descriptions formerly contained in the README; measurements and API conventions are not rewritten as new guarantees.

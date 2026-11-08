@@ -11,7 +11,8 @@
 <!-- Check only what you actually ran. If not run, explain why. -->
 
 - [ ] `go test ./...`
-- [ ] `go test -race -count=1 -timeout=10m ./cmd/entropy-server/...`
+- [ ] `make test-race` (all Go packages)
+- [ ] `make coverage` (inspect affected code paths)
 - [ ] `go vet ./...`
 - [ ] `golangci-lint run --timeout=3m0s`
 - [ ] Browser or CLI smoke test (if relevant)

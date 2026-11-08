@@ -2,14 +2,15 @@ package transport
 
 import (
 	"crypto/tls"
-	"log"
+	"fmt"
 )
 
-// newTLSConfig builds a TLS 1.3–only config suitable for high-throughput APIs.
-func NewTLSConfig(certFile, keyFile string) *tls.Config {
+// NewTLSConfig loads a certificate and builds a TLS 1.3-only configuration.
+// The caller owns startup failure handling; this helper never exits the process.
+func NewTLSConfig(certFile, keyFile string) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		log.Fatalf("failed to load TLS certificate: %v", err)
+		return nil, fmt.Errorf("load TLS certificate: %w", err)
 	}
 
 	return &tls.Config{
@@ -18,7 +19,6 @@ func NewTLSConfig(certFile, keyFile string) *tls.Config {
 		// TLS 1.3 handles cipher selection internally
 		Certificates: []tls.Certificate{cert},
 
-		// ClientAuth: tls.VerifyClientCertIfGiven,
 		ClientAuth: tls.NoClientCert,
 
 		// Fast, modern curves
@@ -27,10 +27,7 @@ func NewTLSConfig(certFile, keyFile string) *tls.Config {
 			tls.CurveP256,
 		},
 
-		// remove below comment to enable HTTP/2
-		// NextProtos: []string{"h2", "http/1.1"},
-
 		// Enable session resumption (important for API workloads)
 		SessionTicketsDisabled: false,
-	}
+	}, nil
 }

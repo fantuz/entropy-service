@@ -1245,6 +1245,15 @@ func main() {
 	fmt.Println("-------------------------------------------------")
 	fmt.Println()
 
+	// Validate HTTPS before opening a device or reading hardware seed material.
+	var tlsCfg *tls.Config
+	if cfg.EnableHTTPS {
+		tlsCfg, err = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// Select and open exactly one source. Report the opened reader's identity,
 	// not merely the path requested before potential fallback.
 	qrngdev, actualSource, err := openEntropySource(cfg.DevicePath, cfg.RequireDevice)
@@ -1305,23 +1314,6 @@ func main() {
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
 	fmt.Println("	4) set DRBG metadata (optional)")
 	root.SetMetadata(appVersion, actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
-
-	var tlsCfg *tls.Config
-
-	/*
-		tlsCfg := transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
-		cert, crterr := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-		if crterr != nil {
-			log.Fatal(crterr)
-		}
-
-		tlsCfg.Certificates = []tls.Certificate{cert}
-		tlsCfg.ClientAuth = tls.NoClientCert
-	*/
-
-	if cfg.EnableHTTPS {
-		tlsCfg = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
-	}
 
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
 	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
