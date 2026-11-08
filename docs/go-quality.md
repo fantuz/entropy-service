@@ -166,6 +166,7 @@ tests should not require a physical QRNG or external services.
 | Last commit | Most recent commit on `main`, not the date of the latest published binary. |
 | Latest release / downloads | GitHub release metadata and asset-download counts, excluding Git clones and other distribution channels. |
 | License / golangci-lint | License metadata and the fact that lint is configured; build details show the actual lint result. |
+| Stars / open issues | GitHub community activity, linking to stargazers and issues. Counts are not measures of correctness, security or adoption; open issues exclude pull requests. |
 
 Badges may be cached by GitHub/Shields. Open the linked workflow, module or
 release for the underlying result; no badge asserts general Go compliance

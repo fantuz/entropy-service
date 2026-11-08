@@ -11,6 +11,9 @@
 [![GitHub all releases](https://img.shields.io/github/downloads/fantuz/entropy-service/total)](https://github.com/fantuz/entropy-service/releases)
 [![Last commit](https://img.shields.io/github/last-commit/fantuz/entropy-service/main)](https://github.com/fantuz/entropy-service/commits/main)
 
+[![GitHub stars](https://img.shields.io/github/stars/fantuz/entropy-service?style=flat&logo=github)](https://github.com/fantuz/entropy-service/stargazers)
+[![Open issues](https://img.shields.io/github/issues/fantuz/entropy-service?logo=github)](https://github.com/fantuz/entropy-service/issues)
+
 **Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
 Entropy Service is a Go server and command-line client for generating, distributing, and inspecting pseudorandom data from a cryptographic deterministic random bit generator (DRBG). It supports hardware or operating-system seed sources; ChaCha20 and AES-256-CTR backends; bounded HTTP and WebSocket delivery; and a browser-based showcase for experiments and diagnostics.
