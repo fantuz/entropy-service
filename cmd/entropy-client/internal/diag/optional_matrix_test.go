@@ -17,7 +17,7 @@ func TestOptionalMatrixPreservesOtherStatistics(t *testing.T) {
 
 	if light.N != full.N || light.Histogram != full.Histogram || light.Shannon != full.Shannon ||
 		light.Chi2 != full.Chi2 || light.Chi2P != full.Chi2P || light.MonobitP != full.MonobitP ||
-		light.SerialR != full.SerialR || light.SerialP != full.SerialP || light.Pass != full.Pass {
+		light.SerialR != full.SerialR || light.SerialP != full.SerialP {
 		t.Fatal("omitting matrix changed unrelated statistics")
 	}
 }

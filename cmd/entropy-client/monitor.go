@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,9 @@ type monitorState struct {
 	frames        uint64
 	samples       uint64
 	analysedBytes uint64
+	okSamples     uint64
+	warnSamples   uint64
+	deviceErrors  uint64
 	sampleBytes   int
 	preview       string
 	started       time.Time
@@ -45,7 +49,7 @@ func analysePayload(data []byte, cfg *config.Config) diag.Diagnostics {
 
 // Reception is counted for every frame. Statistics describe only selected
 // frames and their configured prefix; no unanalysed bytes are credited to them.
-func (m *monitorState) observe(frame client.StreamFrame, now time.Time) {
+func (m *monitorState) observe(frame client.StreamFrame, now time.Time) bool {
 	m.frames++
 	m.stats.TotalBytes += int64(len(frame.Data))
 	m.lastReceive = frame.ReceiveWait
@@ -53,8 +57,8 @@ func (m *monitorState) observe(frame client.StreamFrame, now time.Time) {
 	m.receiveTime += frame.ReceiveWait
 	atomic.AddUint64(&diag.BytesFetched, uint64(len(frame.Data)))
 
-	if m.cfg.AnalysisInterval > 0 && now.Before(m.nextAnalysis) {
-		return
+	if len(frame.Data) == 0 || (m.cfg.AnalysisInterval > 0 && now.Before(m.nextAnalysis)) {
+		return false
 	}
 
 	started := time.Now()
@@ -65,18 +69,27 @@ func (m *monitorState) observe(frame client.StreamFrame, now time.Time) {
 	m.samples++
 	m.analysedBytes += uint64(m.latest.N)
 	m.sampleBytes = len(frame.Data)
-	m.hasSample = true
-	m.stats.Entropy = m.latest.Shannon
-	m.stats.Hist = m.latest.Histogram
-	m.preview = hex.EncodeToString(frame.Data[:min(64, len(frame.Data))])
 
-	if m.cfg.ShowGraph {
+	m.hasSample = true
+	if diag.ShannonAssessment(&m.latest, m.cfg.ShannonThreshold) == diag.ShannonOK {
+		m.okSamples++
+	} else {
+		m.warnSamples++
+	}
+
+	if m.cfg.ShowPreview && !m.cfg.Headless {
+		m.preview = hex.EncodeToString(frame.Data[:min(64, len(frame.Data))])
+	}
+
+	if m.graph != nil {
 		m.graph.Add(m.latest.Shannon)
 	}
 
-	if m.cfg.ShowDashboard {
+	if m.dashboard != nil {
 		m.dashboard.Add(m.latest)
 	}
+
+	return true
 }
 
 func (m *monitorState) render() {
@@ -88,7 +101,7 @@ func (m *monitorState) render() {
 	}
 
 	m.stats.Rate = float64(m.stats.TotalBytes) / elapsed.Seconds()
-	drawUI(&m.stats, &m.latest)
+	drawUI(&m.latest, m.cfg.ShannonThreshold)
 	fmt.Printf("Received           : %d frames, %.3f MiB\n", m.frames, float64(m.stats.TotalBytes)/(1<<20))
 	fmt.Printf("Average received   : %.3f MiB/s\n", m.stats.Rate/(1<<20))
 	fmt.Printf("Analysis samples   : %d / %d received frames\n", m.samples, m.frames)
@@ -132,8 +145,16 @@ func (m *monitorState) render() {
 	}
 }
 
-func runMonitor(parent context.Context, cfg *config.Config, httpURL, wsURL string) error {
+func runMonitor(parent context.Context, m *monitorState, report *runReport, httpURL, wsURL string) (string, error) {
+	cfg := m.cfg
+
 	ctx, cancel := context.WithCancel(parent)
+	if cfg.Duration > 0 {
+		cancel()
+
+		ctx, cancel = context.WithDeadline(parent, m.started.Add(cfg.Duration))
+	}
+
 	defer cancel()
 
 	diag.ClientRateMeter.Reset()
@@ -148,7 +169,11 @@ func runMonitor(parent context.Context, cfg *config.Config, httpURL, wsURL strin
 
 		frames, err = client.StreamEntropy(ctx, wsURL)
 		if err != nil {
-			return fmt.Errorf("open entropy stream: %w", err)
+			if contextEnded(ctx) {
+				return stopReason(parent), nil
+			}
+
+			return reasonTransportError, fmt.Errorf("open entropy stream: %w", err)
 		}
 	} else {
 		out := make(chan client.StreamFrame, 1)
@@ -165,7 +190,13 @@ func runMonitor(parent context.Context, cfg *config.Config, httpURL, wsURL strin
 		}
 	}()
 
-	m := monitorState{cfg: cfg, started: time.Now(), graph: diag.NewEntropyGraph(60), dashboard: diag.NewDashboard(60)}
+	if cfg.ShowGraph && !cfg.Headless {
+		m.graph = diag.NewEntropyGraph(60)
+	}
+
+	if cfg.ShowDashboard && !cfg.Headless {
+		m.dashboard = diag.NewDashboard(60)
+	}
 
 	display := time.NewTicker(cfg.DisplayInterval)
 	defer display.Stop()
@@ -173,33 +204,68 @@ func runMonitor(parent context.Context, cfg *config.Config, httpURL, wsURL strin
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return stopReason(parent), nil
 		case <-display.C:
-			m.render()
+			if !cfg.Headless {
+				m.render()
+			}
 		case frame, ok := <-frames:
 			if !ok {
-				if ctx.Err() != nil {
-					return nil
+				if contextEnded(ctx) {
+					return stopReason(parent), nil
 				}
 
 				select {
 				case err := <-failures:
-					return err
+					return reasonTransportError, err
 				default:
-					return errors.New("entropy stream closed")
+					return reasonTransportError, errors.New("entropy stream closed")
 				}
+			}
+
+			if contextEnded(ctx) {
+				frame.Release()
+
+				return stopReason(parent), nil
 			}
 
 			if cfg.WriteOut && len(frame.Data) > 0 {
 				if err := device.Write("/dev/urandom", frame.Data); err != nil {
-					fmt.Println("device write error:", err)
+					m.deviceErrors++
+
+					log.Println("device write error:", err)
 				}
 			}
 
-			m.observe(frame, time.Now())
+			analysed := m.observe(frame, time.Now())
 			frame.Release()
+
+			if analysed {
+				if err := report.sample(m); err != nil {
+					return reasonReportError, err
+				}
+			}
 		}
 	}
+}
+
+func stopReason(parent context.Context) string {
+	if contextEnded(parent) {
+		return reasonInterrupted
+	}
+
+	return reasonDuration
+}
+
+// Socket deadlines may fire just before the context timer is scheduled.
+func contextEnded(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		return true
+	}
+
+	deadline, ok := ctx.Deadline()
+
+	return ok && !time.Now().Before(deadline)
 }
 
 func pullFrames(ctx context.Context, cfg *config.Config, endpoint string, out chan<- client.StreamFrame, failures chan<- error) {

@@ -10,6 +10,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Full architecture review](architecture-review.md) | Five-question assurance assessment, component map, findings and remediation roadmap. |
 | [Security boundaries & threat model](security-boundaries.md) | Trust boundaries, seed failure modes, adversaries, explicit non-guarantees and prioritized threat register. |
 | [Configuration](configuration.md) | Server and client flags, timing semantics, source selection and client analysis settings. |
+| [Client experiments](client-experiments.md) | Configurable Shannon assessment, timed/headless runs, JSONL schema and reproducible experiments. |
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
 | [API reference](api.md) | HTTP/WebSocket routes, parameters, formats, browser pages, upload protocol and health checks. |
 | [Operations](operations.md) | Memory and concurrency budgets, readiness, shutdown behavior, profiling and diagnostics. |

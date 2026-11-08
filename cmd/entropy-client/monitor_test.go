@@ -43,6 +43,24 @@ func TestMonitorCountsAllBytesButOnlyAnalysesSelectedPrefixes(t *testing.T) {
 	}
 }
 
+func TestEmptyFrameDoesNotConsumeAnalysisInterval(t *testing.T) {
+	cfg := &config.Config{AnalysisInterval: time.Hour}
+	m := monitorState{cfg: cfg}
+	start := time.Now()
+
+	if m.observe(client.StreamFrame{}, start) || m.samples != 0 || m.hasSample {
+		t.Fatal("empty frame was treated as an analysed sample")
+	}
+
+	if !m.observe(client.StreamFrame{Data: []byte{1}}, start.Add(time.Millisecond)) {
+		t.Fatal("empty frame delayed the first real sample")
+	}
+
+	if m.frames != 2 || m.stats.TotalBytes != 1 || m.samples != 1 || m.analysedBytes != 1 {
+		t.Fatalf("empty-frame accounting differs: %+v", m.counts())
+	}
+}
+
 var analysisBenchmarkSink int
 
 func BenchmarkClientAnalysis16MiB(b *testing.B) {
