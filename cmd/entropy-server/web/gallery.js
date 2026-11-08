@@ -11,7 +11,7 @@
     const refreshButton = document.getElementById("gallery-refresh");
     const status = document.getElementById("gallery-status");
     const urls = new Map();
-    let intervalMs = 10000;
+    let intervalMs = 2000;
     let timer = null;
     let controller = null;
     let busy = false;
@@ -25,8 +25,8 @@
 
     function checkedInterval() {
         const seconds = Number(intervalInput.value);
-        if (!Number.isInteger(seconds) || seconds < 5 || seconds > 120) {
-            announce("Use 5–120 seconds", "error");
+        if (!Number.isFinite(seconds) || seconds < 0.5 || seconds > 120 || !Number.isInteger(seconds * 2)) {
+            announce("Use 0.5–120 s in 0.5 s steps", "error");
             return false;
         }
         intervalMs = seconds * 1000;
