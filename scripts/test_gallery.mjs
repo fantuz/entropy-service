@@ -81,7 +81,7 @@ assert.ok(startup, "Initial synchronized cycle is scheduled");
 const pending = startup.callback();
 for (let i = 0; i < 12; i++) await Promise.resolve();
 assert.deepEqual([...paths].sort(), [
-    "/v1/image/random", "/v1/image/heatmap", "/v1/qr/random", "/v1/meta/random?words=8",
+    "/v1/image/random?size=128", "/v1/image/heatmap?size=128", "/v1/qr/random", "/v1/meta/random?words=8",
 ].sort());
 assert.equal(elements.get("preview-image").hidden, true, "Do not render images while words remain pending");
 assert.equal(elements.get("preview-words").hidden, true);
@@ -94,7 +94,7 @@ assert.equal(elements.get("preview-heatmap").hidden, false);
 assert.equal(elements.get("preview-qr").hidden, false);
 assert.equal(elements.get("preview-words").hidden, false);
 assert.equal(elements.get("gallery-word-text").textContent, "alpha beta gamma");
-assert.match(elements.get("gallery-status").textContent, /4\/4 PREVIEWS UPDATED/);
+assert.match(elements.get("gallery-status").textContent, /4\/4 UPDATED/);
 assert.ok([...timers.values()].some(t => t.delay >= 300), "Next refresh should be scheduled");
 
 // On a partially failed cycle, preserve the QR image and refresh other cards.

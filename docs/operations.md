@@ -7,6 +7,7 @@ The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket hand
 | Incoming WebSocket message | 1 KiB maximum; the server does not need large client messages. |
 | Entropy WebSockets | At most 128 admitted connections and 1024 MiB estimated working memory, shared across HTTP/HTTPS. Reservations last until disconnect. |
 | HTTP generation and file analysis | At most 128 admitted requests and 512 MiB estimated working memory, shared across HTTP/HTTPS. Probes and static files are excluded. |
+| RGB/bit-count images | Square size 64–1024, default 1024; gallery previews use 128. Reservation: 64 KiB request overhead + 1 MiB PNG scratch + 16 bytes per pixel, before allocation. |
 | Sound synthesis | An additional two simultaneous synthesis/download slots. |
 | CLI receive queue | One queued WS message; other in-flight reader/consumer buffers can also exist. |
 | Network lifecycle | Context-driven cancellation, WS write deadlines and a shared five-second server shutdown deadline. |

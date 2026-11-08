@@ -74,7 +74,7 @@ A `v*.*.*` tag triggers the release workflow against that **exact tagged
 commit**. The `validate` job must finish successfully before the
 token-bearing `release` job is eligible to publish any artifacts. Validation
 includes module tidiness/checksum verification, Go coverage reports, all-package
-race and vet checks, pure-Go DRBG/CPU-random fallback tests, four browser
+race and vet checks, pure-Go DRBG/CPU-random fallback tests, five browser
 regression suites, `golangci-lint`, a reachable-vulnerability check, and a
 GoReleaser snapshot build.
 Failure in any required check prevents publication.
