@@ -7,6 +7,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [DRBG construction](drbg-construction.md) | Byte-level root/child state transitions, reseed diagram, and limits of the cryptographic assurance claim. |
 | [Process-memory hardening](process-memory-hardening.md) | Opt-in systemd protection, core-dump caveats and host security checklist. |
 | [DRBG lifecycle benchmarks](drbg-lifecycle-benchmarks.md) | Reproducible microbenchmark suite, before/after comparison, and interpretation. |
+| [Barzakh-521 evaluation](barzakh-evaluation.md) | Separate research proposal, pinned upstream timings, compatibility findings and gates before backend integration. |
 | [Full architecture review](architecture-review.md) | Five-question assurance assessment, component map, findings and remediation roadmap. |
 | [Security boundaries & threat model](security-boundaries.md) | Trust boundaries, seed failure modes, adversaries, explicit non-guarantees and prioritized threat register. |
 | [Configuration](configuration.md) | Server and client flags, timing semantics, source selection and client analysis settings. |
