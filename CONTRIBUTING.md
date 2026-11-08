@@ -14,13 +14,43 @@ Thanks for considering improvements. Contributions in Go, browser UX, documentat
 ```sh
 make build
 go test ./...
-go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
+make test-race
+make coverage
+go test -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand
 go vet ./...
 golangci-lint run --timeout=3m0s
+go mod tidy -diff
+go mod verify
 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 ```
 
-The race detector requires a supported platform and a working C compiler with cgo enabled. `go test -race ./...` can provide broader coverage before releases. Browser resources are embedded at build time; rebuild and restart the server after editing `cmd/entropy-server/web/`.
+The race detector requires a supported platform and a working C compiler with
+cgo enabled. `make test-race` runs all Go packages, including client lifecycle
+and reporting tests. `make coverage` writes `coverage/coverage.out`,
+`coverage/summary.txt` and `coverage/coverage.html`; inspect affected error
+paths as well as the overall percentage. Browser resources are embedded at
+build time; rebuild and restart the server after editing
+`cmd/entropy-server/web/`.
+
+## Go conventions and modules
+
+Follow [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) and
+the repository's formatter/linter configuration. Use `make fmt`; add comments
+for exported declarations, preserve conventional initialisms (`HTTP`, `URL`,
+`ID`), return errors from helpers, and leave process exit decisions at the
+command boundary. Wrap errors with `%w` when callers need `errors.Is` or
+`errors.As`. State ownership of buffers, goroutines and `Close`/`Release`
+operations; pass contexts explicitly and make blocking work cancellable
+where the underlying API permits it. Avoid unrelated renaming or formatting
+churn and stale commented-out implementations.
+
+Keep one root `go.mod` for both commands. `go 1.26.10` is the minimum supported
+toolchain and security-patch baseline; it is not a request to create a module
+for each executable. Commit dependency changes with `go.sum`, test explicit
+version updates, and run `go mod tidy -diff`, `go mod verify` and
+`govulncheck`. Do not edit checksums manually or add dependencies solely to
+improve a badge. See [the Go quality review](docs/go-quality.md) for the
+measured coverage, module policy and remaining work.
 
 ## Workflow
 
@@ -43,8 +73,10 @@ Do not commit device secrets, production TLS keys, credentials, or user data. Wh
 A `v*.*.*` tag triggers the release workflow against that **exact tagged
 commit**. The `validate` job must finish successfully before the
 token-bearing `release` job is eligible to publish any artifacts. Validation
-includes module tidiness, all Go tests, four browser regression suites, the
-server race detector, `golangci-lint`, a reachable-vulnerability check, and a GoReleaser snapshot build.
+includes module tidiness/checksum verification, Go coverage reports, all-package
+race and vet checks, pure-Go DRBG/CPU-random fallback tests, four browser
+regression suites, `golangci-lint`, a reachable-vulnerability check, and a
+GoReleaser snapshot build.
 Failure in any required check prevents publication.
 
 For a failed release workflow, **correct the source and create a new tag**.

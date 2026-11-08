@@ -1,10 +1,15 @@
 # entropy-service
 
 [![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go)](https://golangci-lint.run/)
-[![build](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml)
-![Latest GitHub release](https://img.shields.io/github/release/fantuz/entropy-service.svg)
+[![build](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml?query=branch%3Amain)
+[![Go version](https://img.shields.io/github/go-mod/go-version/fantuz/entropy-service?logo=go)](go.mod)
+[![CodeQL](https://github.com/fantuz/entropy-service/actions/workflows/github-code-scanning/codeql/badge.svg?branch=main)](https://github.com/fantuz/entropy-service/actions/workflows/github-code-scanning/codeql?query=branch%3Amain)
+[![release workflow](https://github.com/fantuz/entropy-service/actions/workflows/release.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/release.yml)
+
+[![Latest GitHub release](https://img.shields.io/github/release/fantuz/entropy-service.svg)](https://github.com/fantuz/entropy-service/releases/latest)
 [![GitHub license](https://img.shields.io/github/license/fantuz/entropy-service)](LICENSE)
-![GitHub all releases](https://img.shields.io/github/downloads/fantuz/entropy-service/total)
+[![GitHub all releases](https://img.shields.io/github/downloads/fantuz/entropy-service/total)](https://github.com/fantuz/entropy-service/releases)
+[![Last commit](https://img.shields.io/github/last-commit/fantuz/entropy-service/main)](https://github.com/fantuz/entropy-service/commits/main)
 
 **Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
@@ -260,10 +265,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution workflow, race-
 | `make build-server` | Build the server. |
 | `make build-client` | Build the client. |
 | `make test` | Run `go test ./...`. |
+| `make test-race` | Race-test all Go packages, including server and client. |
+| `make coverage` | Run all Go tests with cross-package instrumentation; write a profile, summary and HTML report under `./coverage`. |
 | `make lint` | Run golangci-lint. |
 | `make fmt` | Run the configured golangci-lint formatters. |
 | `make release-snapshot` | Build local GoReleaser snapshot artifacts in `./dist`. |
-| `make clean` | Remove `./bin` and `./dist`. |
+| `make clean` | Remove generated `./bin`, `./dist` and `./coverage` output. |
 
 Formatting/linting require [golangci-lint](https://golangci-lint.run/); packaging requires [GoReleaser](https://goreleaser.com/install/). CI currently uses golangci-lint 2.12.2. For local release preparation, also run:
 
@@ -275,7 +282,17 @@ Race tests require a supported platform and a C toolchain with cgo enabled. Pack
 
 The tracked tests cover DRBG backends/reads, reseed failures, private streams, validation, budgets, shutdown/cancellation, sound, file analysis, logging and client timing/metrics. Passing statistical checks is not a substitute for cryptographic review.
 
-Current build CI runs ordinary Go tests, **server race-detector tests**, lint and a GoReleaser snapshot for relevant main-branch pushes/PRs; Markdown-only changes are excluded. The tag-triggered release workflow validates Go tests, race checks, lint, browser scripts and snapshot packaging before publishing. Hardware deployment and full interactive browser checks still require separate validation.
+Build CI collects Go statement coverage, race-tests **all Go packages**, checks
+the pure-Go DRBG/CPU-random fallback, runs vet/lint, verifies module tidiness
+and checksums, checks reachable vulnerabilities, tests browser scripts and
+builds a GoReleaser snapshot. Successful build runs expose coverage in their
+job summary and a downloadable `go-coverage` artifact retained for 14 days.
+Markdown-only changes are excluded. The release workflow runs the same Go
+quality checks against the tagged commit before publishing.
+
+See [Go conventions, module policy and coverage review](docs/go-quality.md)
+for the measured baseline, remaining test gaps and badge meanings. Hardware
+deployment and full interactive browser checks still require separate validation.
 
 ## Further reading
 

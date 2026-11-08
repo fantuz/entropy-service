@@ -27,11 +27,32 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Ensure go.mod is already tidied
-        run: go mod tidy && git diff --exit-code -- go.mod go.sum
+        run: go mod tidy -diff
+      - name: Verify cached module checksums
+        run: go mod verify
       - name: Check reachable Go vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-      - name: Run all Go tests
-        run: go test ./...
+      - name: Run Go tests and collect coverage
+        run: make coverage
+      - name: Summarize Go statement coverage
+        run: |
+          {
+            printf '### Go statement coverage\n\n```text\n'
+            awk '/^total:/' coverage/summary.txt
+            printf '```\n\nFull profile, per-function summary and HTML: `go-coverage` artifact (14 days).\n'
+            printf 'Statement coverage measures exercised code, not cryptographic assurance.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Go coverage report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: go-coverage
+          path: coverage/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Vet all Go packages
+        run: go vet ./...
+      - name: Test pure-Go DRBG and CPU-random fallback
+        run: go test -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand
       - name: Test browser KPI calculations
         run: node scripts/test-status-kpis.mjs
       - name: Test status refresh scheduling
@@ -40,8 +61,8 @@ jobs:
         run: node scripts/test-stream-entropy-alert.mjs
       - name: Test browser layout and digest formatting
         run: node scripts/test-web-layout.mjs
-      - name: Race-test entropy server
-        run: go test -race -count=1 -timeout=10m ./cmd/entropy-server/...
+      - name: Race-test all Go packages
+        run: make test-race
       - name: Smoke-test packaged service configuration
         run: sh scripts/test-package-service.sh
       - name: Run linters
