@@ -40,10 +40,11 @@
             return {bytes:output.subarray(0,used),encoding:`HTTP body prefix · ${response.headers.get("Content-Type")||"unspecified type"}`};
         } catch(failure) {
             if(timeout.signal.aborted&&!signal.aborted)throw new Error("HTTP source timed out");
+            if(failure instanceof TypeError)throw new Error("Browser HTTP fetch failed: the target may block CORS or redirects, or be unreachable. Choose a registered server source for ordinary web pages.");
             throw failure;
         } finally {clearTimeout(timer);signal.removeEventListener("abort",stop);if(reader){await reader.cancel().catch(()=>{});reader.releaseLock();}}
     }
-    async function start(options,{signal,emit,ready,end,error,video}) {
+    async function start(options,{signal,emit,ready,end,error,video,previewEnabled=()=>false,previewCanvas}) {
         const {kind,size,refresh}=options;
         if(["crypto","counter","constant","pattern"].includes(kind)) {
             let sequence=0;ready();
@@ -72,14 +73,24 @@
             const url=helpers.endpoint(options.url,"websocket");
             const socket=new WebSocket(url);socket.binaryType="arraybuffer";
             const timer=setTimeout(()=>{socket.close();if(!signal.aborted)error(new Error("WebSocket connection timed out"));},10000);
-            const close=()=>{clearTimeout(timer);socket.close();};guard(signal,close);
-            socket.onopen=()=>{clearTimeout(timer);if(!signal.aborted)ready();};
+            const close=()=>{clearTimeout(timer);socket.close();if(options.camera&&previewCanvas){previewCanvas.hidden=true;previewCanvas.width=previewCanvas.width;}};guard(signal,close);
+            socket.onopen=()=>{clearTimeout(timer);if(!signal.aborted){if(options.camera){socket.send(JSON.stringify(options.credentials));options.credentials=null;}ready();}};
             socket.onmessage=event=>{
                 if(signal.aborted)return;
                 if(!(event.data instanceof ArrayBuffer)||!event.data.byteLength||event.data.byteLength>helpers.MAX_BYTES){
                     close();error(new Error("Source must send nonempty binary messages up to 1 MiB"));return;
                 }
-                emit(new Uint8Array(event.data),"Binary WebSocket message");
+                const bytes=new Uint8Array(event.data);
+                if(options.camera){
+                    const {width,height}=options.camera;
+                    if(options.preview&&previewEnabled()&&bytes.length===width*height*3){
+                        if(previewCanvas.width!==width)previewCanvas.width=width;if(previewCanvas.height!==height)previewCanvas.height=height;
+                        const rgba=new Uint8ClampedArray(width*height*4);
+                        for(let i=0,j=0;i<bytes.length;i+=3,j+=4){rgba[j]=bytes[i];rgba[j+1]=bytes[i+1];rgba[j+2]=bytes[i+2];rgba[j+3]=255;}
+                        previewCanvas.getContext("2d").putImageData(new ImageData(rgba,width,height),0,0);previewCanvas.hidden=false;
+                    }
+                    emit(bytes.subarray(0,size),`Decoded RGB8 ${width}×${height} row-major prefix · network camera`);
+                }else emit(bytes,options.registeredKind==="webpage"?"Registered HTTP body prefix":"Binary WebSocket message");
             };
             socket.onerror=()=>{if(!signal.aborted)error(new Error("WebSocket failed: check address, Origin policy, TLS and bridge availability"));};
             socket.onclose=event=>{
@@ -98,7 +109,7 @@
             const close=()=>{cancelTimer();stream.getTracks().forEach(track=>track.stop());if(video.srcObject===stream){video.pause();video.srcObject=null;video.hidden=true;}};
             guard(signal,close);
             try {
-                video.srcObject=stream;video.hidden=false;await video.play();
+                video.srcObject=stream;video.hidden=!previewEnabled();await video.play();
                 if(signal.aborted)throw aborted();
                 const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
                 const context=canvas.getContext("2d",{willReadFrequently:true});

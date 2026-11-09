@@ -646,7 +646,7 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 /* Experimental sources share the analysis grid and keep source controls local. */
 .page-lab .lab-only[hidden] { display: none; }
 .page-lab .lab-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:.6rem; margin:.8rem 0; }
-.page-lab input[type="text"] { border:1px solid var(--border); background:var(--surface-raised); border-radius:10px; padding:.65rem .8rem; width:14rem; max-width:100%; }
+.page-lab input[type="text"],.page-lab input[type="password"] { border:1px solid var(--border); background:var(--surface-raised); border-radius:10px; padding:.65rem .8rem; width:14rem; max-width:100%; min-width:0; }
 .page-lab .lab-url { flex:1 1 25rem; }
 .page-lab .lab-url input { width:100%; }
 .page-lab .lab-file { flex:1 1 24rem; }
@@ -657,3 +657,21 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .page-lab th,.page-lab td { border-bottom:1px solid var(--border); padding:.65rem; min-width:6rem; }
 .page-lab caption { color:var(--muted); text-align:left; padding:.5rem; }
 @media(max-width:420px) { .page-lab .lab-file,.page-lab .lab-url { grid-column:1 / -1; } }
+
+/* Source configuration and optional camera previews. */
+.page-lab .lab-menu {display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:1rem;margin:1rem 0;}
+.page-lab #lab-video,.page-lab #lab-network-preview {display:block;max-width:100%;width:min(100%,640px);height:auto;margin:1rem auto;border:1px solid var(--border);border-radius:8px;}
+.page-lab #lab-video[hidden],.page-lab #lab-network-preview[hidden],.page-lab .lab-preview-card[hidden] {display:none;}
+.lab-body-preview {white-space:pre-wrap;overflow-wrap:anywhere;max-height:16rem;overflow:auto;text-align:left;}
+.lab-registration {color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:12px;width:min(850px,94vw);max-height:90vh;padding:1.25rem;box-sizing:border-box;}
+.lab-registration::backdrop {background:#000b;}
+.lab-registration .analysis-controls {justify-content:stretch;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+.lab-registration label {display:flex;flex-direction:column;gap:.4rem;min-width:0;margin:.5rem 0;}
+.lab-registration label[hidden] {display:none;}
+.lab-registration input,.lab-registration select,.lab-registration textarea {width:100%;box-sizing:border-box;min-width:0;}
+.page-lab .lab-registration input:not([type="file"]) {background:var(--surface-raised);border:1px solid var(--border);border-radius:10px;padding:.65rem .8rem;width:100%;}
+.lab-registration textarea {font:inherit;color:inherit;background:transparent;border:1px solid var(--border);padding:.6rem;border-radius:6px;}
+.lab-registration .registration-wide {grid-column:1/-1;}
+.lab-registration pre {white-space:pre-wrap;overflow-wrap:anywhere;}
+@media(max-width:600px){.lab-registration .analysis-controls{grid-template-columns:1fr;}}
+@media(max-width:420px){.page-lab .analysis-controls input[type="text"],.page-lab .analysis-controls input[type="password"]{width:100%;}}

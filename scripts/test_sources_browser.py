@@ -133,6 +133,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port):
                 assert number(page,"lab-input-bytes")==4
         # Stop while permission acquisition is unresolved; late tracks must close.
         page.locator("#lab-kind").select_option("camera")
+        page.locator("#lab-show-preview").check()
         page.evaluate("mediaDelay=250")
         page.locator("#lab-start").click();page.locator("#lab-stop").click()
         page.evaluate("mediaDelay=0")

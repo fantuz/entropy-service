@@ -49,7 +49,7 @@
         onError(message){stop("error",message);},
         onSelectionChange(){workspace.clear("Window changed · sample again to analyse the new selection.");lastAccepted=-Infinity;buttons();}
     });
-    function stopTransport(){controller?.abort();controller=null;const close=cleanup;cleanup=null;if(close)close();meter.stop(performance.now());running=false;updateMeters();}
+    function stopTransport(){controller?.abort();controller=null;const close=cleanup;cleanup=null;if(close)close();if(options)options.credentials=null;meter.stop(performance.now());running=false;updateMeters();}
     function stop(state="disconnected",message="Source stopped · plots frozen"){
         finishing=false;stopTransport();workspace.setFrozen(true);paused=false;status(state,message);buttons();
     }
@@ -84,6 +84,7 @@
         const output=helpers.transform(bytes,options.transform,previous);
         previous=options.transform==="xor"?bytes.slice():null;
         $("lab-source-info").textContent=`${options.label} · ${encoding} · representation: ${options.transform}`;
+        if($("lab-body-preview")&&(options.selection==="http"||options.registeredKind==="webpage"))$("lab-body-preview").textContent=new TextDecoder().decode(bytes.subarray(0,2048));
         updateMeters();
         if(!output){status("waiting","XOR warming up · needs two equal-length samples");return;}
         lastInput={bytes:output,encoding,frame,time:Date.now(),captureTime:now};
@@ -104,13 +105,23 @@
             url.searchParams.set("bytes",size);url.searchParams.set("refresh",refresh);
             if(websocket)url.protocol=url.protocol==="https:"?"wss:":"ws:";
             result.kind=websocket?"websocket":"http";result.url=url.href;result.label+=` · ${base.host}`;
-        }else if(selected==="bridge"){
+        }else if(selected==="bridge"||selected==="rtsp"||(selected==="http"&&$("lab-http-route")?.value==="registered")){
             const source=catalog.sources.find(value=>value.id===$("lab-registered").value);
             if(!source||!catalog.allowed)throw new Error("No permitted registered source: check -lab-sources and loopback/-lab-allow-remote access");
             if(size>Math.min(source.max_bytes,catalog.max_bytes))throw new Error("Sample exceeds the registered source byte limit");
             const url=new URL("/lab/stream",location.href);url.protocol=location.protocol==="https:"?"wss:":"ws:";
             url.searchParams.set("source",source.id);url.searchParams.set("bytes",size);url.searchParams.set("refresh",refresh);
             result.kind="websocket";result.registeredId=source.id;result.registeredKind=source.kind;result.url=url.href;result.label=`Registered ${source.name} (${source.kind})`;
+            if(selected==="rtsp"){
+                if(!source.width)throw new Error("Choose a registered RTSP/ONVIF camera");
+                result.camera={width:source.width,height:source.height};result.preview=$("lab-show-preview").checked;
+                result.credentials={username:$("lab-camera-user").value,password:$("lab-camera-password").value};
+                if(result.credentials.password&&!result.credentials.username)throw new Error("Enter a camera username with the password");
+                if((result.credentials.username||result.credentials.password)&&location.protocol!=="https:"&&!["localhost","127.0.0.1","[::1]"].includes(location.hostname))throw new Error("Use HTTPS to send camera credentials to a remote entropy-server");
+                if(result.preview&&source.width*source.height*3>catalog.max_bytes)throw new Error("Preview exceeds server byte limit; choose a smaller registered camera size or disable preview");
+                $("lab-camera-password").value="";
+                url.searchParams.set("preview",result.preview?"1":"0");result.url=url.href;
+            }
         }else if(selected==="http"||selected==="websocket"){
             const url=helpers.endpoint($("lab-url").value,selected);result.url=url.href;result.label+=` · ${url.host}`;
         }
@@ -120,12 +131,14 @@
         let requested;try{requested=readOptions();}catch(error){status("error",error.message);return;}
         if(!requested)return;
         stopTransport();generation++;options=requested;once=single;finishing=false;paused=false;running=true;
+        if($("lab-body-preview"))$("lab-body-preview").textContent="";
         lastInput=null;previous=null;frame=0;analysedBytes=0;analysedFrames=0;lastAccepted=-Infinity;lastSubmittedFrame=0;
         meter.reset(performance.now());workspace.clear();workspace.setFrozen(false);controller=new AbortController();
         const signal=controller.signal,token=generation;
         status("waiting","Connecting or awaiting source permission…");buttons();updateMeters();
         try{
             const close=await window.EntropyLabAdapters.start(options,{signal,video:$("lab-video"),
+                previewEnabled:()=>$("lab-show-preview").checked,previewCanvas:$("lab-network-preview"),
                 ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");}},
                 emit:(bytes,encoding)=>capture(bytes,encoding,token),
                 end:message=>{if(token===generation&&!signal.aborted)finish(message);},
@@ -136,19 +149,42 @@
     }
     function sourceFields(){
         const kind=$("lab-kind").value;
+        const serverHTTP=kind==="http"&&$("lab-http-route")?.value==="registered";
+        if($("lab-registered")){
+            const select=$("lab-registered"),selected=select.value;
+            const available=catalog.sources.filter(source=>document.body.dataset.lab==="sources"?source.width>0:serverHTTP?["http","webpage","entropy-http"].includes(source.kind):!source.width);
+            if(select.dataset.ids!==available.map(source=>source.id).join("|")){
+                select.replaceChildren();
+                for(const source of available){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;select.append(option);}
+                if(!available.length){const option=document.createElement("option");option.value="";option.textContent="No matching registrations";select.append(option);}
+                if(available.some(source=>source.id===selected))select.value=selected;
+                select.dataset.ids=available.map(source=>source.id).join("|");
+            }
+        }
         document.querySelectorAll("[data-modes]").forEach(label=>{
             label.hidden=!label.dataset.modes.split(" ").includes(kind);
+            if(label.querySelector("#lab-url"))label.hidden=label.hidden||serverHTTP;
+            if(label.querySelector("#lab-registered")&&kind==="http")label.hidden=!serverHTTP;
+            if(label.querySelector("#lab-page-preset"))label.hidden=label.hidden||serverHTTP;
             label.querySelectorAll("input,select").forEach(control=>{control.disabled=label.hidden;});
         });
-        if($("lab-url"))$("lab-url").required=["peer-ws","peer-http","http","websocket"].includes(kind);
+        if($("lab-url"))$("lab-url").required=["peer-ws","peer-http","http","websocket"].includes(kind)&&!serverHTTP;
         if($("lab-file"))$("lab-file").required=kind==="file";
+        $("lab-preview-card").hidden=!["camera","rtsp"].includes(kind);
         const source=catalog.sources.find(value=>value.id===$("lab-registered")?.value);
-        const limit=kind==="bridge"?Math.min(catalog.max_bytes,source?.max_bytes||helpers.MAX_BYTES):helpers.MAX_BYTES;
+        if($("lab-body-card"))$("lab-body-card").hidden=kind!=="http"&&!(kind==="bridge"&&source?.kind==="webpage");
+        const limit=kind==="bridge"||kind==="rtsp"||serverHTTP?Math.min(catalog.max_bytes,source?.max_bytes||helpers.MAX_BYTES):helpers.MAX_BYTES;
         $("lab-bytes").max=limit;if(Number($("lab-bytes").value)>limit)$("lab-bytes").value=limit;
     }
     $("lab-config").addEventListener("submit",event=>{event.preventDefault();void start(false);});
+    $("lab-show-preview").addEventListener("change",()=>{
+        if($("lab-kind").value==="rtsp"&&running)stop("disconnected","Preview changed · Start to apply");
+        $("lab-video").hidden=!$("lab-show-preview").checked||!$("lab-video").srcObject;
+        if(!$("lab-show-preview").checked){$("lab-network-preview").hidden=true;$("lab-network-preview").width=$("lab-network-preview").width;}
+    });
+    $("lab-page-preset")?.addEventListener("change",()=>{if($("lab-page-preset").value)$("lab-url").value=$("lab-page-preset").value;});
     $("lab-once").addEventListener("click",()=>void start(true));$("lab-stop").addEventListener("click",()=>stop());
-    $("lab-config").addEventListener("change",()=>{stop();workspace.clear();lastInput=null;$("lab-source-info").textContent="No source active.";sourceFields();status("waiting","Settings changed · Start or Sample once to apply");buttons();});
+    $("lab-config").addEventListener("change",()=>{stop();workspace.clear();lastInput=null;if($("lab-body-preview"))$("lab-body-preview").textContent="";$("lab-source-info").textContent="No source active.";sourceFields();status("waiting","Settings changed · Start or Sample once to apply");buttons();});
     $("pause-plots").addEventListener("click",()=>{paused=!paused;workspace.setFrozen(paused);lastAccepted=-Infinity;buttons();status("ready",paused?"Receiving · plots paused":"Source active");});
     document.addEventListener("visibilitychange",()=>{if(document.hidden&&running)stop("disconnected","Hidden tab · source stopped");});
     function download(blob,name){
@@ -176,8 +212,9 @@
             const response=await fetch("/lab/sources",{cache:"no-store"});if(!response.ok)throw new Error("Source catalog unavailable");catalog=await response.json();
             if(!Array.isArray(catalog.sources))throw new Error("Invalid source catalog");
             $("lab-registered").replaceChildren();
-            for(const source of catalog.sources){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;$("lab-registered").append(option);}
-            if(!catalog.sources.length){const option=document.createElement("option");option.value="";option.textContent="No sources registered";$("lab-registered").append(option);}
+            const available=catalog.sources.filter(source=>document.body.dataset.lab==="sources"?source.width>0:!source.width);
+            for(const source of available){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;$("lab-registered").append(option);}
+            if(!available.length){const option=document.createElement("option");option.value="";option.textContent="No sources registered";$("lab-registered").append(option);}
             $("lab-catalog-info").textContent=`${catalog.sources.length} registered source(s) · bridge ${catalog.allowed?"available":"restricted to loopback clients"} · operator setup: -lab-sources=FILE`;
             sourceFields();
         }catch(error){$("lab-catalog-info").textContent=error.message;}

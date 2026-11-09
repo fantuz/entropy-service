@@ -19,10 +19,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func testRegistry(t *testing.T, config Config) *Registry {
+func testRegistry(t *testing.T, configs ...Config) *Registry {
 	t.Helper()
 
-	registry, err := New([]Config{config})
+	registry, err := New(configs)
 	if err != nil {
 		t.Fatal(err)
 	}

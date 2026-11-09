@@ -310,7 +310,7 @@ See [Go conventions, module policy and coverage review](docs/go-quality.md)
 for the measured baseline, remaining test gaps and badge meanings. Hardware
 deployment and full interactive browser checks still require separate validation.
 
-The [experimental source/socket labs](docs/source-labs.md) add browser generators/media, source metering/comparisons, binary downloads and registered peer/self/device connections.
+The [experimental source/socket labs](docs/source-labs.md) add browser generators/media, RTSP/ONVIF cameras, optional previews, metering/comparisons, binary downloads and registered peer/self/device connections. An assisted configurator prepares source registries; web-page sources support bounded body prefixes and random URL pools.
 
 ## Further reading
 

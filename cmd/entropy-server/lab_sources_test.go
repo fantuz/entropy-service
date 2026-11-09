@@ -49,7 +49,7 @@ func TestLabAccessCatalogAndValidation(t *testing.T) {
 		t.Fatal("forwarded header bypassed loopback restriction")
 	}
 
-	for _, query := range []string{"source=missing", "source=private&source=private", "source=private&bytes=1048577", "source=private&refresh=0", "source=private&refresh=20&refresh=21", "source=private&bytes=8&bytes=9", "source=private&refesh=20", "source=private&bytes=%zz", "source=private&bytes=8;refresh=20"} {
+	for _, query := range []string{"source=missing", "source=private&source=private", "source=private&bytes=1048577", "source=private&refresh=0", "source=private&refresh=20&refresh=21", "source=private&bytes=8&bytes=9", "source=private&refesh=20", "source=private&bytes=%zz", "source=private&bytes=8;refresh=20", "source=private&preview=1"} {
 		request = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/stream?"+query, nil)
 		request.RemoteAddr = "127.0.0.1:1234"
 		recorder = httptest.NewRecorder()
@@ -59,6 +59,49 @@ func TestLabAccessCatalogAndValidation(t *testing.T) {
 			t.Fatalf("invalid query reached source admission: %s %d", query, recorder.Code)
 		}
 	}
+}
+
+func TestLabCameraHandshakeAndShutdown(t *testing.T) {
+	registry, err := lab.New([]lab.Config{{ID: "camera", Kind: "rtsp", Endpoint: "rtsp://127.0.0.1:8554/live", Width: 160, Height: 120}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+
+	budget := newWebSocketBudget(1, 32<<20)
+	testServer := httptest.NewUnstartedServer(labStreamHandler(registry, budget, lab.MaxBytes, false))
+	server := newManagedServer(t.Context(), testServer.Config)
+
+	testServer.Start()
+	defer testServer.Close()
+
+	for _, payload := range []string{"null", `{"username":42}`, `{"username":"","unknown":true}`} {
+		conn := budgetConnect(t, testServer, "/lab/stream?source=camera&bytes=32&refresh=20")
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+		if _, _, err := conn.ReadMessage(); !websocket.IsCloseError(err, websocket.ClosePolicyViolation) {
+			t.Fatalf("invalid credential frame accepted: %v", err)
+		}
+
+		_ = conn.Close()
+
+		waitBudgetActive(t, budget, 0)
+	}
+
+	conn := budgetConnect(t, testServer, "/lab/stream?source=camera&bytes=32&refresh=20")
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	waitBudgetActive(t, budget, 0)
 }
 
 func TestLabEntropyPeerAndSelfConnections(t *testing.T) {

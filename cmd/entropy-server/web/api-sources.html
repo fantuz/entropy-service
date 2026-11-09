@@ -11,11 +11,12 @@
   <main class="panel analysis-panel">
     <h1>Experimental Source Lab</h1>
     <p>Generate, inspect and compare browser sources. Start grants access only to the source you select; Stop releases it.</p>
+    <nav class="lab-menu" aria-label="Lab tools"><button type="button" id="lab-create-source">Register a source…</button><a href="/api-socket.html">Socket lab</a></nav>
     <section class="analysis-card" aria-labelledby="lab-source-title">
       <h2 class="analysis-label" id="lab-source-title">Source &amp; sampling</h2>
       <form id="lab-config">
         <div class="analysis-controls">
-          <label>Source <select id="lab-kind"><option value="crypto">Web Crypto</option><option value="counter">Counter 0…255</option><option value="constant">Constant byte</option><option value="pattern">Repeating hex pattern</option><option value="file">Local file</option><option value="camera">Camera pixels</option><option value="microphone">Microphone PCM</option><option value="serial">Serial port</option></select></label>
+          <label>Source <select id="lab-kind"><option value="crypto">Web Crypto</option><option value="counter">Counter 0…255</option><option value="constant">Constant byte</option><option value="pattern">Repeating hex pattern</option><option value="file">Local file</option><option value="camera">Camera pixels</option><option value="rtsp">Network camera · RTSP / ONVIF</option><option value="microphone">Microphone PCM</option><option value="serial">Serial port</option></select></label>
           <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="1048576" value="65536" required></label>
           <label>Cadence (ms) <input id="lab-refresh" type="number" min="20" max="60000" value="500" required></label>
           <label>Representation <select id="lab-transform"><option value="raw">Original bytes</option><option value="xor">XOR previous sample</option><option value="lsb">LSB → 0/255</option></select></label>
@@ -25,13 +26,15 @@
           <label class="lab-only" data-modes="camera" hidden>Pixel format <select id="lab-format"><option value="rgb">RGB8</option><option value="rgba">RGBA8 (includes alpha)</option></select></label>
           <label class="lab-only" data-modes="camera" hidden>Capture size <select id="lab-resolution"><option value="160x120">160 × 120</option><option value="320x240" selected>320 × 240</option><option value="640x480">640 × 480</option></select></label>
           <label class="lab-only" data-modes="serial" hidden>Baud <select id="lab-baud"><option>9600</option><option>19200</option><option>57600</option><option selected>115200</option><option>230400</option></select></label>
+          <label class="lab-only" data-modes="rtsp" hidden>Registered camera <select id="lab-registered"><option value="">Loading cameras…</option></select></label>
+          <label class="lab-only" data-modes="rtsp" hidden>Camera username <input id="lab-camera-user" type="text" maxlength="256" autocomplete="off"></label>
+          <label class="lab-only" data-modes="rtsp" hidden>Camera password <input id="lab-camera-password" type="password" maxlength="1024" autocomplete="off"></label>
         </div>
         <div class="lab-actions"><button id="lab-start" type="submit">Start</button><button id="lab-once" type="button">Sample once</button><button id="lab-stop" type="button" disabled>Stop</button></div>
       </form>
       <p id="lab-status" class="stream-notice" role="status" aria-live="polite" data-state="waiting">Choose a source, then Start or Sample once.</p>
       <p id="lab-source-info" class="analysis-meta">No source active.</p>
       <p id="lab-catalog-info" class="note"></p>
-      <video id="lab-video" muted playsinline hidden aria-label="Local camera preview"></video>
       <details><summary>Source notes</summary><p class="note">Camera/microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the file lab for detailed local-file seeking.</p><p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. XOR needs two equal-length samples; LSB expands each low bit to a full byte. All transformations are labelled. Plots describe the representation and do not certify cryptographic entropy.</p></details>
     </section>
     <div class="analysis-stats" aria-label="Sample meters" aria-live="off">
@@ -40,7 +43,7 @@
       <div class="analysis-stat-row"><span class="analysis-stat-title">Analysed</span><span><output id="lab-analysis-bytes">0</output> bytes · <output id="lab-analysis-frames">0</output> windows</span></div>
     </div>
     <section class="analysis-card shared-controls" aria-labelledby="selection-title">
-      <h2 class="analysis-label" id="selection-title">Shared analysis window</h2>
+      <h2 class="analysis-label" id="selection-title">Analysis window &amp; byte offset</h2>
       <div class="analysis-controls">
         <label>Window cap <select id="analysis-size"><option value="4096">4 KiB</option><option value="16384">16 KiB</option><option value="65536" selected>64 KiB</option><option value="262144">256 KiB</option><option value="1048576">1 MiB</option></select></label>
         <label>Start byte in sample <input id="analysis-offset" type="number" min="0" max="1048575" value="0" step="1" required></label>
@@ -55,6 +58,13 @@
       <div class="lab-actions"><button id="lab-record" type="button" disabled>Record measurement</button><button id="lab-download" type="button" disabled>Download selected bytes</button><button id="lab-export" type="button" disabled>Export measurements</button><button id="lab-clear-records" type="button">Clear measurements</button></div>
       <p class="note">Record up to 50 measurements across sources. Download contains the selected representation/window. Measurements are kept for this browser tab across both labs; export them to keep a copy.</p>
       <div class="lab-table-wrap"><table id="lab-measurements"><caption>Recorded source measurements</caption><thead><tr><th>Source</th><th>Representation</th><th>Window bytes</th><th>Shannon bits/B</th><th>Sampled MB/s</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="analysis-card lab-preview-card" id="lab-preview-card" aria-labelledby="lab-preview-title" hidden>
+      <h2 class="analysis-label" id="lab-preview-title">Camera preview</h2>
+      <label class="checkbox-label"><input type="checkbox" id="lab-show-preview"> Show preview</label>
+      <p class="note">Off by default. Hiding the preview saves display work; sampling still captures camera pixels until Stop. Network preview changes apply on the next Start.</p>
+      <video id="lab-video" muted playsinline hidden aria-label="Local camera preview"></video>
+      <canvas id="lab-network-preview" hidden role="img" aria-label="Decoded network camera preview"></canvas>
     </section>
     <!-- BEGIN SHARED ANALYSIS -->
     <div class="analysis-grid">
@@ -150,6 +160,7 @@
   <script src="/analysis-workspace.js" defer></script>
   <script src="/lab-samples.js" defer></script>
   <script src="/lab-adapters.js" defer></script>
+  <script src="/lab-registration.js" defer></script>
   <script src="/source-lab.js" defer></script>
 </body>
 </html>

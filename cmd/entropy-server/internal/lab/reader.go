@@ -2,9 +2,11 @@ package lab
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +19,10 @@ import (
 )
 
 var ErrTooLarge = errors.New("source sample exceeds requested byte limit")
+
+type HTTPStatusError struct{ Code int }
+
+func (e *HTTPStatusError) Error() string { return fmt.Sprintf("upstream HTTP status %d", e.Code) }
 
 type Stream struct {
 	mu       sync.Mutex
@@ -57,6 +63,10 @@ func (s *Stream) Close() error {
 }
 
 func (r *Registry) Open(ctx context.Context, id string, count, refresh int) (*Stream, error) {
+	return r.OpenAuthenticated(ctx, id, count, refresh, Credentials{})
+}
+
+func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refresh int, credentials Credentials) (*Stream, error) {
 	c, ok := r.sources[id]
 	if !ok {
 		return nil, errors.New("unknown source ID")
@@ -72,26 +82,60 @@ func (r *Registry) Open(ctx context.Context, id string, count, refresh int) (*St
 	defer cancel()
 
 	switch c.Kind {
-	case sourceHTTP, sourceEntropyHTTP:
+	case sourceHTTP, sourceEntropyHTTP, sourceWebpage:
 		stream.read = func(readCtx context.Context, n int) ([]byte, error) {
 			endpoint := sourceURL(c, n, refresh)
+			client := r.client
+
+			if c.Kind == sourceWebpage {
+				if len(c.URLs) > 0 {
+					index, err := rand.Int(rand.Reader, big.NewInt(int64(len(c.URLs)+1)))
+					if err != nil {
+						return nil, err
+					}
+
+					if index.Int64() > 0 {
+						endpoint = c.URLs[index.Int64()-1]
+					}
+				}
+
+				copyClient := *r.client
+				original, _ := url.Parse(endpoint)
+				copyClient.CheckRedirect = func(request *http.Request, via []*http.Request) error {
+					if len(via) >= 3 || !sameOrigin(request.URL, original) || request.URL.User != nil {
+						return http.ErrUseLastResponse
+					}
+
+					return nil
+				}
+				client = &copyClient
+			}
 
 			request, err := http.NewRequestWithContext(readCtx, http.MethodGet, endpoint, nil)
 			if err != nil {
 				return nil, err
 			}
 
-			response, err := r.client.Do(request)
+			if c.Kind == sourceWebpage {
+				request.Header.Set("User-Agent", "entropy-service source-lab (+https://github.com/fantuz/entropy-service)")
+			}
+
+			response, err := client.Do(request)
 			if err != nil {
 				return nil, err
 			}
 			defer response.Body.Close()
 
 			if response.StatusCode < 200 || response.StatusCode > 299 {
-				return nil, fmt.Errorf("upstream HTTP status %d", response.StatusCode)
+				return nil, &HTTPStatusError{Code: response.StatusCode}
 			}
 
-			data, err := io.ReadAll(io.LimitReader(response.Body, int64(n)+1))
+			limit := int64(n) + 1
+			if c.Kind == sourceWebpage {
+				limit = int64(n)
+			}
+
+			data, err := io.ReadAll(io.LimitReader(response.Body, limit))
 			if len(data) > n {
 				return nil, ErrTooLarge
 			}
@@ -216,6 +260,10 @@ func (r *Registry) Open(ctx context.Context, id string, count, refresh int) (*St
 
 		stream.close = device.Close
 		stream.read = device.Read
+	case sourceRTSP, sourceONVIF:
+		if err := r.openCamera(ctx, dialCtx, stream, c, refresh, credentials); err != nil {
+			return nil, err
+		}
 	default:
 		return nil, errors.New("unsupported source")
 	}
