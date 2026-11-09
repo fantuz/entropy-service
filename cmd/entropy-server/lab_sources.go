@@ -19,7 +19,12 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 )
 
-const labRefreshQuery = "refresh"
+const (
+	labRefreshQuery    = "refresh"
+	labUDPSource       = "udp"
+	labTCPSource       = "tcp"
+	labHTTPStatusEvent = "http-status"
+)
 
 func labAllowed(r *http.Request, allowRemote bool) bool {
 	if allowRemote {
@@ -71,7 +76,7 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 		}
 
 		for name := range query {
-			if name != "source" && name != "bytes" && name != labRefreshQuery && name != "preview" {
+			if name != "source" && name != "bytes" && name != labRefreshQuery && name != "preview" && name != "events" {
 				http.Error(w, "unknown source query parameter", http.StatusBadRequest)
 				return
 			}
@@ -89,6 +94,17 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 		}
 
 		camera := source.Width > 0
+		events := false
+
+		if values, present := query["events"]; present {
+			if len(values) != 1 || values[0] != "1" {
+				http.Error(w, "events must be supplied once as 1", http.StatusBadRequest)
+				return
+			}
+
+			events = true
+		}
+
 		preview := false
 
 		if values, present := query["preview"]; present {
@@ -172,8 +188,14 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 		upstream, err := registry.OpenAuthenticated(ctx, source.ID, count, refresh, credentials)
 		if err != nil {
 			reason := "Registered source unavailable"
-			if camera {
+
+			switch {
+			case camera:
 				reason = "Camera unavailable; check registration, credentials and FFmpeg"
+			case source.Kind == labUDPSource:
+				reason = "UDP bind failed; use a local server address and an unused port"
+			case source.Kind == labTCPSource:
+				reason = "TCP connection failed; check the producer is listening on its host/port"
 			}
 
 			labClose(conn, websocket.CloseTryAgainLater, reason)
@@ -181,6 +203,15 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 			return
 		}
 		defer upstream.Close()
+
+		if events {
+			if err := labEvent(conn, struct {
+				Type string `json:"type"`
+				Kind string `json:"kind"`
+			}{Type: "source-ready", Kind: source.Kind}); err != nil {
+				return
+			}
+		}
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
 		defer ticker.Stop()
@@ -196,6 +227,16 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 				}
 
 				data, readErr := upstream.Read(ctx, readCount)
+				if info := upstream.HTTPInfo(); events && info.Status != 0 {
+					if err := labEvent(conn, struct {
+						lab.HTTPInfo
+
+						Type string `json:"type"`
+					}{Type: labHTTPStatusEvent, HTTPInfo: info}); err != nil {
+						return
+					}
+				}
+
 				if len(data) > 0 {
 					_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 					if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
@@ -211,13 +252,27 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 					case errors.Is(readErr, io.EOF):
 						labClose(conn, websocket.CloseNormalClosure, "Source reached EOF")
 					case errors.Is(readErr, lab.ErrTooLarge):
-						labClose(conn, websocket.CloseMessageTooBig, "Source exceeds requested byte limit")
+						labClose(conn, websocket.CloseMessageTooBig, "Frame/datagram exceeds Sample bytes; increase the limit or reduce source message size")
 					default:
 						reason := "Source read failed or timed out"
 
 						var statusError *lab.HTTPStatusError
 						if errors.As(readErr, &statusError) {
 							reason = "HTTP source returned status " + strconv.Itoa(statusError.Code)
+							if statusError.RedirectBlocked {
+								reason = "HTTP redirect " + strconv.Itoa(statusError.Code) + " blocked by source policy; register the final URL as webpage"
+							}
+						}
+
+						var timeout net.Error
+						if errors.Is(readErr, context.DeadlineExceeded) || (errors.As(readErr, &timeout) && timeout.Timeout()) {
+							if source.Kind == labUDPSource {
+								reason = "UDP timed out; send nonempty datagrams to the server listen address"
+							}
+
+							if source.Kind == labTCPSource {
+								reason = "TCP timed out; producer must send bytes without waiting for a request"
+							}
 						}
 
 						if camera {
@@ -236,6 +291,23 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 			}
 		}
 	}
+}
+
+func labEvent(conn *websocket.Conn, value any) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		return err
+	}
+
+	metrics.AddWSPayloads(1)
+	metrics.AddWSPayloadBytes(uint64(len(data)))
+
+	return nil
 }
 
 func labClose(conn *websocket.Conn, code int, reason string) {

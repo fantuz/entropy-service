@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import json
+import http.server
 from pathlib import Path
 import signal
 import socket
@@ -14,6 +15,22 @@ import time
 import urllib.request
 
 from test_stream_browser import assert_layout, number, set_value, wait_paint
+
+
+class HTTPFixture(http.server.BaseHTTPRequestHandler):
+    body=b"HTTP body sample\n"*1024
+
+    def log_message(self,*args):pass
+
+    def do_GET(self):
+        if self.path in ["/cors","/redirect","/created"]:
+            self.send_response(302 if self.path=="/redirect" else 201 if self.path=="/created" else 200)
+            self.send_header("Access-Control-Allow-Origin","*")
+            if self.path!="/cors":self.send_header("Location","/cors" if self.path=="/redirect" else "/must-not-follow")
+        else:self.send_response(200)
+        self.send_header("Content-Type","text/plain");self.end_headers()
+        assert self.path!="/must-not-follow","201 Location was followed"
+        with contextlib.suppress(BrokenPipeError,ConnectionResetError):self.wfile.write(b"created" if self.path=="/created" else self.body)
 
 
 def free_port(kind=socket.SOCK_STREAM):
@@ -51,7 +68,7 @@ class FixtureTCP(socketserver.ThreadingTCPServer):
     allow_reuse_address=True
 
 
-def browser_checks(base, peer, artifacts, chromium, udp_port):
+def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
     from playwright.sync_api import expect, sync_playwright
     with sync_playwright() as playwright:
         browser=playwright.chromium.launch(executable_path=chromium,headless=True,args=["--no-sandbox","--disable-dev-shm-usage","--use-fake-ui-for-media-stream","--use-fake-device-for-media-stream"])
@@ -171,15 +188,16 @@ def browser_checks(base, peer, artifacts, chromium, udp_port):
         page.locator("#lab-once").click();expect(page.locator("#lab-status")).to_have_attribute("data-state","error")
         page.locator("#lab-kind").select_option("bridge")
         page.wait_for_function("document.getElementById('lab-registered').options.length>=5")
-        for source in ["peer-ws","peer-http","self-ws","device","tcp","unix"]:
+        for source in ["peer-ws","peer-http","self-ws","raw-ws","device","tcp","unix"]:
             page.locator("#lab-registered").select_option(source);page.locator("#lab-once").click()
             expect(page.locator("#lab-download")).to_be_enabled(timeout=15000)
             assert number(page,"lab-input-bytes")==4096
             expect(page.locator("#sample-info")).to_contain_text(source)
         page.locator("#lab-registered").select_option("udp")
         page.locator("#lab-start").click()
+        expect(page.locator("#lab-transport-info")).to_contain_text("UDP listener bound")
         with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as sender:
-            for _ in range(10):sender.sendto(bytes(range(256))*4,("127.0.0.1",udp_port));page.wait_for_timeout(30)
+            sender.sendto(bytes(range(256))*4,("127.0.0.1",udp_port))
         expect(page.locator("#lab-download")).to_be_enabled();page.locator("#lab-stop").click()
         expect(page.locator("#entropy")).to_have_text("8.00000")
         page.locator("#lab-record").click()
@@ -187,10 +205,57 @@ def browser_checks(base, peer, artifacts, chromium, udp_port):
         assert_layout(page,2);page.screenshot(path=str(artifacts/"socket-desktop.png"),full_page=True)
         page.set_viewport_size({"width":390,"height":844});wait_paint(page);assert_layout(page,1)
         page.screenshot(path=str(artifacts/"socket-mobile.png"),full_page=True)
+        page.set_viewport_size({"width":1440,"height":1000})
+        # A short, live TCP producer must advance without filling 64 KiB or closing.
+        page.locator("#lab-registered").select_option("tcp-short");page.locator("#lab-bytes").fill("65536")
+        page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled(timeout=2000)
+        assert 0<number(page,"lab-input-bytes")<65536 and number(page,"lab-input-frames")==1
+        expect(page.locator("#lab-transport-info")).to_contain_text("TCP producer connected")
+        # Metadata stays separate from binary sampling; oversized WS frames give actionable feedback.
+        page.locator("#lab-registered").select_option("raw-ws");page.locator("#lab-bytes").fill("128")
+        page.locator("#lab-once").click();expect(page.locator("#lab-status")).to_have_attribute("data-state","error")
+        expect(page.locator("#lab-status")).to_contain_text("Sample bytes")
+        page.locator("#lab-kind").select_option("http");page.locator("#lab-http-route").select_option("registered")
+        page.locator("#lab-bytes").fill("1024")
+        for source in ["created","redirect"]:
+            page.locator("#lab-registered").select_option(source);page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
+            expect(page.locator("#lab-transport-info")).to_contain_text("201 Created" if source=="created" else "1 redirect")
+            if source=="created":expect(page.locator("#lab-transport-info")).to_contain_text("not a redirect")
+        page.locator("#lab-create-source").click();dialog=page.locator("#lab-registration")
+        dialog.locator('[name="id"]').fill("ws-draft");dialog.locator('[name="kind"]').select_option("websocket")
+        dialog.locator('[name="endpoint"]').fill("http://127.0.0.1:8081/stream");dialog.locator('button[type="submit"]').click()
+        expect(dialog.locator("#registration-status")).to_contain_text("ws://")
+        assert "camera" not in dialog.locator("#registration-status").text_content().lower()
+        expect(dialog.locator("#registration-camera-note")).to_be_hidden()
+        dialog.locator("#registration-use-example").click();expect(dialog.locator('[name="endpoint"]')).to_have_value("ws://127.0.0.1:8081/stream?bytes=4096&refresh=500")
+        dialog.locator('button[type="submit"]').click();expect(dialog.locator("#registration-status")).to_contain_text("not active yet")
+        dialog.locator('[name="kind"]').select_option("entropy-ws");dialog.locator('[name="endpoint"]').fill("ws://127.0.0.1:8081/stream");dialog.locator('button[type="submit"]').click()
+        expect(dialog.locator("#registration-status")).to_contain_text("http://127.0.0.1:8081")
+        for kind,example in [("onvif","http://192.168.1.100/onvif/device_service"),("udp","127.0.0.1:9002")]:
+            dialog.locator('[name="kind"]').select_option(kind);expect(dialog.locator("#registration-example")).to_contain_text(example)
+        expect(dialog.locator("#registration-camera-note")).to_be_hidden()
+        page.set_viewport_size({"width":390,"height":844});dialog.evaluate("node=>node.scrollTop=0")
+        assert dialog.evaluate("node=>node.scrollWidth<=node.clientWidth+1")
+        dialog.screenshot(path=str(artifacts/"registration-feedback-mobile.png"))
+        dialog.locator("#registration-close").click()
+        # No startup registry: direct CORS-enabled pages/redirects work; CORS denial is explained.
+        page.goto(peer+"/api-socket.html")
+        expect(page.locator("#lab-catalog-info")).to_contain_text("No registered sources are active")
+        page.locator("#lab-kind").select_option("http");page.locator("#lab-bytes").fill("1024")
+        assert page.locator("#lab-page-preset option").count()==8
+        page.locator("#lab-url").fill(http_url+"/redirect");page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
+        expect(page.locator("#lab-transport-info")).to_contain_text("redirect followed")
+        page.locator("#lab-url").fill(http_url+"/created");page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
+        expect(page.locator("#lab-transport-info")).to_contain_text("201 Created")
+        page.locator("#lab-url").fill(http_url+"/no-cors");page.locator("#lab-once").click();expect(page.locator("#lab-status")).to_have_attribute("data-state","error")
+        expect(page.locator("#lab-route-help")).to_contain_text("CORS")
+        page.locator("#lab-http-route").select_option("registered")
+        expect(page.locator("#lab-route-help")).to_contain_text("No HTTP sources are active")
+        page.locator("#lab-once").click();expect(page.locator("#lab-status")).to_contain_text("-lab-sources=lab-sources.json")
         assert not errors,errors
         browser.close()
         return {"browser_errors":errors,"desktop":desktop,"comparison_records":len(records["records"]),
-            "checks":"generators, exact binary/JSON downloads, XOR/LSB, metering/pause, media/serial release, late permission cancellation, file EOF, self/peer HTTP+WS, registered TCP/UDP/Unix/device, Origin policy, desktop/mobile"}
+            "checks":"generators, exact binary/JSON downloads, XOR/LSB, metering/pause, media/serial release, late permission cancellation, file EOF, self/peer HTTP+WS, registered TCP/UDP/Unix/device, short TCP reads, UDP readiness, WebSocket schema feedback, 201/redirects, CORS without a registry, Origin policy, desktop/mobile"}
 
 
 def main():
@@ -201,6 +266,21 @@ def main():
     args=parser.parse_args();args.artifacts.mkdir(parents=True,exist_ok=True)
     binary=args.server_binary.resolve();a,b,udp=free_port(),free_port(),free_port(socket.SOCK_DGRAM)
     with tempfile.TemporaryDirectory(prefix="entropy-lab-",dir="/tmp") as temp,contextlib.ExitStack() as stack:
+        web=http.server.ThreadingHTTPServer(("127.0.0.1",0),HTTPFixture)
+        stack.callback(web.server_close);stack.callback(web.shutdown);threading.Thread(target=web.serve_forever,daemon=True).start()
+        http_url=f"http://127.0.0.1:{web.server_port}"
+        short_port=free_port()
+        fixture_log=stack.enter_context((args.artifacts/"socket-fixture.log").open("w"))
+        producer=subprocess.Popen(["python3",str(Path(__file__).with_name("lab_socket_fixture.py")),"tcp","--port",str(short_port),"--interval","0.1"],stdout=fixture_log,stderr=fixture_log)
+        def stop_producer():
+            if producer.poll() is None:producer.terminate()
+            producer.wait(timeout=5)
+        stack.callback(stop_producer)
+        for _ in range(100):
+            try:
+                with socket.create_connection(("127.0.0.1",short_port),timeout=.1):break
+            except OSError:time.sleep(.02)
+        else:raise RuntimeError("TCP demo producer failed to listen")
         tcp=FixtureTCP(("127.0.0.1",0),BytesHandler);stack.callback(tcp.server_close);stack.callback(tcp.shutdown)
         threading.Thread(target=tcp.serve_forever,daemon=True).start()
         unix_path=str(Path(temp)/"source.sock")
@@ -211,6 +291,10 @@ def main():
             {"id":"peer-ws","kind":"entropy-ws","endpoint":f"http://127.0.0.1:{b}"},
             {"id":"peer-http","kind":"entropy-http","endpoint":f"http://127.0.0.1:{b}"},
             {"id":"self-ws","kind":"entropy-ws","endpoint":f"http://127.0.0.1:{a}"},
+            {"id":"raw-ws","kind":"websocket","endpoint":f"ws://127.0.0.1:{b}/stream?bytes=4096&refresh=20"},
+            {"id":"tcp-short","kind":"tcp","endpoint":f"127.0.0.1:{short_port}"},
+            {"id":"created","kind":"webpage","endpoint":http_url+"/created"},
+            {"id":"redirect","kind":"webpage","endpoint":http_url+"/redirect"},
             {"id":"device","kind":"device","endpoint":"/dev/urandom"},
             {"id":"tcp","kind":"tcp","endpoint":f"127.0.0.1:{tcp.server_address[1]}"},
             {"id":"udp","kind":"udp","endpoint":f"127.0.0.1:{udp}"},
@@ -222,7 +306,7 @@ def main():
             for port,extra,name in [(b,(),"peer"),(a,("-lab-sources="+str(config_path),),"server")]:
                 log=stack.enter_context((args.artifacts/(name+".log")).open("w"))
                 processes.append(serve_process(binary,port,log,extra))
-            results=browser_checks(f"http://127.0.0.1:{a}",f"http://127.0.0.1:{b}",args.artifacts,args.chromium,udp)
+            results=browser_checks(f"http://127.0.0.1:{a}",f"http://127.0.0.1:{b}",args.artifacts,args.chromium,udp,http_url)
         finally:
             for process in processes:process.send_signal(signal.SIGTERM)
             for process in processes:process.wait(timeout=10)

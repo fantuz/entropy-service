@@ -18,7 +18,7 @@
         void tick();
         return close;
     }
-    async function httpPrefix(url,count,signal) {
+    async function httpPrefix(url,count,signal,info) {
         const timeout=new AbortController();
         const stop=()=>timeout.abort();
         signal.addEventListener("abort",stop,{once:true});
@@ -26,7 +26,8 @@
         let reader;
         try {
             if(signal.aborted)throw aborted();
-            const response=await fetch(url,{signal:timeout.signal,credentials:"omit",redirect:"error",cache:"no-store"});
+            const response=await fetch(url,{signal:timeout.signal,credentials:"omit",redirect:"follow",cache:"no-store"});
+            info(window.EntropyLabRegistration.httpStatus(response.status,response.redirected));
             if(!response.ok)throw new Error(`HTTP source returned ${response.status}`);
             if(!response.body)throw new Error("HTTP source has no readable response body");
             reader=response.body.getReader();
@@ -37,14 +38,14 @@
                 const take=Math.min(value.length,count-used);output.set(value.subarray(0,take),used);used+=take;
             }
             if(!used)throw new Error("HTTP source returned no bytes");
-            return {bytes:output.subarray(0,used),encoding:`HTTP body prefix · ${response.headers.get("Content-Type")||"unspecified type"}`};
+            return {bytes:output.subarray(0,used),encoding:`HTTP ${response.status} body prefix · ${response.headers.get("Content-Type")||"unspecified type"}`};
         } catch(failure) {
             if(timeout.signal.aborted&&!signal.aborted)throw new Error("HTTP source timed out");
             if(failure instanceof TypeError)throw new Error("Browser HTTP fetch failed: the target may block CORS or redirects, or be unreachable. Choose a registered server source for ordinary web pages.");
             throw failure;
         } finally {clearTimeout(timer);signal.removeEventListener("abort",stop);if(reader){await reader.cancel().catch(()=>{});reader.releaseLock();}}
     }
-    async function start(options,{signal,emit,ready,end,error,video,previewEnabled=()=>false,previewCanvas}) {
+    async function start(options,{signal,emit,ready,end,error,video,previewEnabled=()=>false,previewCanvas,info=()=>{}}) {
         const {kind,size,refresh}=options;
         if(["crypto","counter","constant","pattern"].includes(kind)) {
             let sequence=0;ready();
@@ -67,16 +68,30 @@
         }
         if(kind==="http") {
             const url=helpers.endpoint(options.url,"http");ready();
-            return periodic(signal,refresh,async()=>{const sample=await httpPrefix(url,size,signal);if(!signal.aborted)emit(sample.bytes,sample.encoding);},error);
+            return periodic(signal,refresh,async()=>{const sample=await httpPrefix(url,size,signal,info);if(!signal.aborted)emit(sample.bytes,sample.encoding);},error);
         }
         if(kind==="websocket") {
             const url=helpers.endpoint(options.url,"websocket");
             const socket=new WebSocket(url);socket.binaryType="arraybuffer";
+            let sourceReady=false;
             const timer=setTimeout(()=>{socket.close();if(!signal.aborted)error(new Error("WebSocket connection timed out"));},10000);
             const close=()=>{clearTimeout(timer);socket.close();if(options.camera&&previewCanvas){previewCanvas.hidden=true;previewCanvas.width=previewCanvas.width;}};guard(signal,close);
-            socket.onopen=()=>{clearTimeout(timer);if(!signal.aborted){if(options.camera){socket.send(JSON.stringify(options.credentials));options.credentials=null;}ready();}};
+            socket.onopen=()=>{clearTimeout(timer);if(!signal.aborted){if(options.camera){socket.send(JSON.stringify(options.credentials));options.credentials=null;}if(!options.events)ready();}};
             socket.onmessage=event=>{
                 if(signal.aborted)return;
+                if(options.events&&typeof event.data==="string"){
+                    try{
+                        if(event.data.length>1024)throw new Error("Bridge metadata exceeds limit");
+                        const value=JSON.parse(event.data),kind=options.registeredKind;
+                        if(value.type==="source-ready"&&value.kind===kind&&!sourceReady){
+                            sourceReady=true;ready();
+                            info(kind==="udp"?"UDP listener bound on entropy-server · send nonempty datagrams to its registered local address.":kind==="tcp"?"TCP producer connected · waiting for available bytes; no request or handshake is sent.":options.camera?"Camera decoder started · waiting for RGB bytes.":"Registered source opened · waiting for data.");
+                        }else if(value.type==="http-status"&&sourceReady&&Number.isInteger(value.status)&&value.status>=100&&value.status<=599&&Number.isInteger(value.redirects)&&value.redirects>=0&&value.redirects<=2){
+                            info(window.EntropyLabRegistration.httpStatus(value.status,value.redirects));
+                        }else throw new Error("Unexpected bridge metadata");
+                    }catch(failure){close();error(failure);}
+                    return;
+                }
                 if(!(event.data instanceof ArrayBuffer)||!event.data.byteLength||event.data.byteLength>helpers.MAX_BYTES){
                     close();error(new Error("Source must send nonempty binary messages up to 1 MiB"));return;
                 }

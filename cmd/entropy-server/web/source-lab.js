@@ -2,6 +2,10 @@
 
 (() => {
     const $=id=>document.getElementById(id), helpers=window.EntropyLabSamples;
+    const guidance=window.EntropyLabRegistration;
+    function browserExample(kind){const example=guidance.schemaFor(kind).example;return location.protocol==="https:"?example.replace(/^http:/,"https:").replace(/^ws:/,"wss:"):example;}
+    function endpoint(raw,protocol,kind){try{return helpers.endpoint(raw,protocol);}catch(error){throw new Error(`${error.message}. Example: ${browserExample(kind)}`);}}
+    if($("lab-page-preset"))for(const preset of guidance.pagePresets){const option=document.createElement("option");option.value=preset.url;option.textContent=preset.label;$("lab-page-preset").append(option);}
     const meter=new helpers.Meter(), storageKey="entropy-service:lab:measurements:v1", records=[];
     try {
         const raw=sessionStorage.getItem(storageKey);
@@ -99,7 +103,7 @@
             value:Number($("lab-constant")?.value||0),pattern:selected==="pattern"?helpers.pattern($("lab-pattern").value):Uint8Array.of(0,255),
             file:$("lab-file")?.files[0],resolution:$("lab-resolution")?.value||"320x240",format:$("lab-format")?.value||"rgb",baud:Number($("lab-baud")?.value||115200)};
         if(selected==="self-ws"||selected==="self-http"||selected==="peer-ws"||selected==="peer-http"){
-            const base=selected.startsWith("self")?new URL(location.href):helpers.endpoint($("lab-url").value,"http");
+            const base=selected.startsWith("self")?new URL(location.href):endpoint($("lab-url").value,"http",selected==="peer-ws"?"entropy-ws":"entropy-http");
             const websocket=selected.endsWith("ws");
             const url=new URL(websocket?"/stream":"/v1/data/random",base);
             url.searchParams.set("bytes",size);url.searchParams.set("refresh",refresh);
@@ -107,11 +111,13 @@
             result.kind=websocket?"websocket":"http";result.url=url.href;result.label+=` · ${base.host}`;
         }else if(selected==="bridge"||selected==="rtsp"||(selected==="http"&&$("lab-http-route")?.value==="registered")){
             const source=catalog.sources.find(value=>value.id===$("lab-registered").value);
-            if(!source||!catalog.allowed)throw new Error("No permitted registered source: check -lab-sources and loopback/-lab-allow-remote access");
+            if(!source)throw new Error("No active matching source: save the registry on the server and restart with -lab-sources=lab-sources.json");
+            if(!catalog.allowed)throw new Error("Bridge access is restricted: use a loopback client or the operator's -lab-allow-remote configuration");
             if(size>Math.min(source.max_bytes,catalog.max_bytes))throw new Error("Sample exceeds the registered source byte limit");
             const url=new URL("/lab/stream",location.href);url.protocol=location.protocol==="https:"?"wss:":"ws:";
             url.searchParams.set("source",source.id);url.searchParams.set("bytes",size);url.searchParams.set("refresh",refresh);
-            result.kind="websocket";result.registeredId=source.id;result.registeredKind=source.kind;result.url=url.href;result.label=`Registered ${source.name} (${source.kind})`;
+            url.searchParams.set("events","1");
+            result.kind="websocket";result.events=true;result.registeredId=source.id;result.registeredKind=source.kind;result.url=url.href;result.label=`Registered ${source.name} (${source.kind})`;
             if(selected==="rtsp"){
                 if(!source.width)throw new Error("Choose a registered RTSP/ONVIF camera");
                 result.camera={width:source.width,height:source.height};result.preview=$("lab-show-preview").checked;
@@ -123,7 +129,7 @@
                 url.searchParams.set("preview",result.preview?"1":"0");result.url=url.href;
             }
         }else if(selected==="http"||selected==="websocket"){
-            const url=helpers.endpoint($("lab-url").value,selected);result.url=url.href;result.label+=` · ${url.host}`;
+            const url=endpoint($("lab-url").value,selected,selected);result.url=url.href;result.label+=` · ${url.host}`;
         }
         return result;
     }
@@ -131,6 +137,7 @@
         let requested;try{requested=readOptions();}catch(error){status("error",error.message);return;}
         if(!requested)return;
         stopTransport();generation++;options=requested;once=single;finishing=false;paused=false;running=true;
+        $("lab-transport-info").textContent="";
         if($("lab-body-preview"))$("lab-body-preview").textContent="";
         lastInput=null;previous=null;frame=0;analysedBytes=0;analysedFrames=0;lastAccepted=-Infinity;lastSubmittedFrame=0;
         meter.reset(performance.now());workspace.clear();workspace.setFrozen(false);controller=new AbortController();
@@ -138,6 +145,7 @@
         status("waiting","Connecting or awaiting source permission…");buttons();updateMeters();
         try{
             const close=await window.EntropyLabAdapters.start(options,{signal,video:$("lab-video"),
+                info(message){if(token===generation&&!signal.aborted)$("lab-transport-info").textContent=message;},
                 previewEnabled:()=>$("lab-show-preview").checked,previewCanvas:$("lab-network-preview"),
                 ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");}},
                 emit:(bytes,encoding)=>capture(bytes,encoding,token),
@@ -169,9 +177,23 @@
             label.querySelectorAll("input,select").forEach(control=>{control.disabled=label.hidden;});
         });
         if($("lab-url"))$("lab-url").required=["peer-ws","peer-http","http","websocket"].includes(kind)&&!serverHTTP;
+        if($("lab-url-label")){
+            const sourceKind=kind==="websocket"?"websocket":kind==="peer-ws"?"entropy-ws":kind==="peer-http"?"entropy-http":"webpage",schema=guidance.schemaFor(sourceKind);
+            $("lab-url-label").textContent=schema.label;$("lab-url").placeholder=browserExample(sourceKind);
+        }
         if($("lab-file"))$("lab-file").required=kind==="file";
         $("lab-preview-card").hidden=!["camera","rtsp"].includes(kind);
         const source=catalog.sources.find(value=>value.id===$("lab-registered")?.value);
+        if($("lab-route-help")){
+            let hint="";
+            if(kind==="http"){
+                if(serverHTTP)hint=source?"Server route: reads a registered endpoint using entropy-server's network access. "+guidance.schemaFor(source.kind).help:"No HTTP sources are active. Download/import a registry, restart with -lab-sources=lab-sources.json, then select its source ID here.";
+                else hint="Browser route: the target must allow CORS; this page cannot grant that permission. Try HTTPBin or the public README examples. For ordinary pages, register a webpage source and restart with -lab-sources=lab-sources.json.";
+                if(!serverHTTP){const preset=guidance.pagePresets.find(p=>p.url===$("lab-page-preset").value);if(preset)hint=preset.hint+" "+hint;}
+            }else if(kind==="bridge"&&source)hint=guidance.schemaFor(source.kind).help;
+            else if(["websocket","peer-ws","peer-http"].includes(kind))hint=guidance.schemaFor(kind==="websocket"?kind:kind==="peer-ws"?"entropy-ws":"entropy-http").help;
+            $("lab-route-help").textContent=hint;
+        }
         if($("lab-body-card"))$("lab-body-card").hidden=kind!=="http"&&!(kind==="bridge"&&source?.kind==="webpage");
         const limit=kind==="bridge"||kind==="rtsp"||serverHTTP?Math.min(catalog.max_bytes,source?.max_bytes||helpers.MAX_BYTES):helpers.MAX_BYTES;
         $("lab-bytes").max=limit;if(Number($("lab-bytes").value)>limit)$("lab-bytes").value=limit;
@@ -184,7 +206,7 @@
     });
     $("lab-page-preset")?.addEventListener("change",()=>{if($("lab-page-preset").value)$("lab-url").value=$("lab-page-preset").value;});
     $("lab-once").addEventListener("click",()=>void start(true));$("lab-stop").addEventListener("click",()=>stop());
-    $("lab-config").addEventListener("change",()=>{stop();workspace.clear();lastInput=null;if($("lab-body-preview"))$("lab-body-preview").textContent="";$("lab-source-info").textContent="No source active.";sourceFields();status("waiting","Settings changed · Start or Sample once to apply");buttons();});
+    $("lab-config").addEventListener("change",()=>{stop();workspace.clear();lastInput=null;$("lab-transport-info").textContent="";if($("lab-body-preview"))$("lab-body-preview").textContent="";$("lab-source-info").textContent="No source active.";sourceFields();status("waiting","Settings changed · Start or Sample once to apply");buttons();});
     $("pause-plots").addEventListener("click",()=>{paused=!paused;workspace.setFrozen(paused);lastAccepted=-Infinity;buttons();status("ready",paused?"Receiving · plots paused":"Source active");});
     document.addEventListener("visibilitychange",()=>{if(document.hidden&&running)stop("disconnected","Hidden tab · source stopped");});
     function download(blob,name){
@@ -215,7 +237,7 @@
             const available=catalog.sources.filter(source=>document.body.dataset.lab==="sources"?source.width>0:!source.width);
             for(const source of available){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;$("lab-registered").append(option);}
             if(!available.length){const option=document.createElement("option");option.value="";option.textContent="No sources registered";$("lab-registered").append(option);}
-            $("lab-catalog-info").textContent=`${catalog.sources.length} registered source(s) · bridge ${catalog.allowed?"available":"restricted to loopback clients"} · operator setup: -lab-sources=FILE`;
+            $("lab-catalog-info").textContent=catalog.sources.length?`${catalog.sources.length} registered source(s) · bridge ${catalog.allowed?"available":"restricted to loopback clients"} · operator setup: -lab-sources=FILE`:document.body.dataset.lab==="sources"?"No network-camera registrations are active. Local browser sources work without a registry. Install the prepared JSON and restart with -lab-sources=lab-sources.json to add network cameras.":"No registered sources are active. Preparing JSON here does not load it: save it on the server and restart with -lab-sources=lab-sources.json. Browser HTTP still needs target-site CORS permission.";
             sourceFields();
         }catch(error){$("lab-catalog-info").textContent=error.message;}
     })();

@@ -1,0 +1,6 @@
+{
+  "sources": [
+    {"id": "demo-tcp", "name": "TCP counter producer", "kind": "tcp", "endpoint": "127.0.0.1:9001", "timeout_ms": 10000},
+    {"id": "demo-udp", "name": "UDP counter listener", "kind": "udp", "endpoint": "127.0.0.1:9002", "max_bytes": 65507, "timeout_ms": 60000}
+  ]
+}

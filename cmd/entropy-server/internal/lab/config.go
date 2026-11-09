@@ -22,6 +22,7 @@ import (
 
 const (
 	sourceHTTP        = "http"
+	sourceHTTPS       = "https"
 	sourceWS          = "websocket"
 	sourceEntropyHTTP = "entropy-http"
 	sourceEntropyWS   = "entropy-ws"
@@ -197,7 +198,7 @@ func (c *Config) validate() error {
 			return errors.New("invalid source URL; userinfo and fragments are not allowed")
 		}
 
-		allowed := u.Scheme == sourceHTTP || u.Scheme == "https"
+		allowed := u.Scheme == sourceHTTP || u.Scheme == sourceHTTPS
 		if c.Kind == sourceWS {
 			allowed = u.Scheme == "ws" || u.Scheme == "wss"
 		}
@@ -273,7 +274,7 @@ func sameOrigin(a, b *url.URL) bool {
 			return u.Port()
 		}
 
-		if u.Scheme == "https" {
+		if u.Scheme == sourceHTTPS {
 			return "443"
 		}
 

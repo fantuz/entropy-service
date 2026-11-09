@@ -230,9 +230,15 @@ func TestTCPAndUnixEOF(t *testing.T) {
 		}
 
 		data, err := stream.Read(t.Context(), 32)
+		if err == nil {
+			if _, nextErr := stream.Read(t.Context(), 32); !errors.Is(nextErr, io.EOF) {
+				t.Fatalf("missing stream EOF: %v", nextErr)
+			}
+		}
+
 		_ = stream.Close()
 
-		if !errors.Is(err, io.EOF) || string(data) != "fixture" {
+		if (err != nil && !errors.Is(err, io.EOF)) || string(data) != "fixture" {
 			t.Fatalf("lost partial EOF: %q %v", data, err)
 		}
 

@@ -186,4 +186,12 @@ meters/analyses the chosen prefix. `webpage` registrations return bounded HTTP
 body prefixes and can randomly select from an operator-configured URL pool.
 Both lab pages include an assisted JSON registry configurator.
 
+Optional `events=1` adds text metadata frames: `{"type":"source-ready","kind":"udp"}`
+after the upstream opens/binds, and HTTP status frames such as
+`{"type":"http-status","status":201,"redirects":0,"location_present":true}`.
+These omit endpoint and Location URLs. Without `events`, frames remain binary
+samples. Browser input/sample meters exclude metadata; server WS serving totals
+include its payload bytes/messages. TCP/Unix reads now return available bytes
+up to the selected limit, rather than waiting to fill a sample.
+
 [Back to README](../README.md) · [Technical reference index](README.md)

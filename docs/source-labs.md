@@ -104,7 +104,7 @@ The socket page supports:
   rules. The default entropy-server WS policy rejects other browser origins;
   a registered server-side peer link avoids weakening that policy.
 - **Binary WebSocket URL / HTTP body prefix**: inspect an explicit endpoint.
-  HTTP credentials are omitted and redirects rejected; reads stop at the
+  HTTP credentials are omitted; browser redirects follow normal CORS rules. Reads stop at the
   requested prefix. WebSocket sources must supply binary messages.
 - **Registered server source**: choose an operator-provided source ID. The
   receiving entropy-server opens the pinned upstream; the browser connects to
@@ -145,10 +145,10 @@ Only the configured sources are opened, and only on a client Start action.
 | `entropy-http` | Base HTTP(S) URL | Uses `/v1/data/random` with selected `bytes`/`refresh`. |
 | `websocket` | Full WS(S) URL | Binary messages with read limit/deadline; no redirects or text-frame decoding. |
 | `http` | Full HTTP(S) URL | GET body must fit the requested byte limit; rejects redirects/status errors and empty bodies. |
-| `webpage` | Full HTTP(S) URL, optional additional `urls` | Reads a bounded body prefix; follows at most two redirects on the same origin. A pool chooses one configured URL per sample. |
+| `webpage` | Full HTTP(S) URL, optional additional `urls` | Reads a bounded body prefix; follows at most two same-origin redirects or same-host default-port HTTP→HTTPS upgrades. A pool chooses one configured URL per sample. |
 | `rtsp` | Full `rtsp://` camera URL, without credentials | FFmpeg over TCP; decodes/resizes to RGB8. Username/password arrive in the initial WS message. |
 | `onvif` | Explicit HTTP(S) Device service URL | ONVIF Media1 capabilities/profiles/stream URI lookup, followed by RTSP decoding. Optional `profile_token` selects a profile. |
-| `tcp` | `host:port` | Connects and reads raw stream bytes, with partial final EOF support. |
+| `tcp` | `host:port` | Connects to a producer and returns available stream bytes up to the requested limit, without waiting to fill the sample. TCP has no message boundaries. |
 | `udp` | Local `host:port` | Binds a receiver; another process sends datagrams there. Preserves datagram boundaries and rejects oversize packets without silently truncating them. One active receiver per address. |
 | `unix` | Absolute Unix stream socket path | Connects to a byte-producing helper. |
 | `device` | Absolute readable Linux device/file/FIFO path | Read-only, nonblocking I/O with polling/deadlines. A device must support byte reads; `/dev/video0` can require external driver setup. Browser camera capture or a Unix-socket helper is more portable. |
@@ -200,12 +200,30 @@ server files, or retrieve private endpoint paths from the catalog. Imported
 registries are limited to 64 KiB/32 entries and duplicate IDs are rejected.
 Camera passwords do not belong in this file and are rejected in URL userinfo.
 
+The builder displays a type-specific example, an explicit **Use example** button
+and validation errors containing the expected schema. Camera credential guidance
+appears only for RTSP/ONVIF. Common endpoint forms are:
+
+| Registration kind | Example | Meaning |
+| --- | --- | --- |
+| `websocket` | `ws://127.0.0.1:8081/stream?bytes=4096&refresh=500` or `wss://host/path` | Complete binary WebSocket endpoint. Its messages must fit the capture's Sample bytes limit. |
+| `entropy-ws` | `http://127.0.0.1:8081` or `https://host:8443` | HTTP(S) **base** of another entropy-server; `/stream`, bytes and refresh are added automatically. |
+| `onvif` | `http://192.168.1.100/onvif/device_service` | Device service address, not the video feed. Media1 discovery obtains the RTSP URI. Actual path/port depends on the camera. |
+| `rtsp` | `rtsp://192.168.1.100:554/Streaming/Channels/102` | Direct camera stream, without URL userinfo. |
+| `tcp` | `127.0.0.1:9001` | Producer to connect to; no `tcp://` prefix. |
+| `udp` | `127.0.0.1:9002` | Local listener to bind on entropy-server; no `udp://` prefix. IPv6 requires brackets, e.g. `[::1]:9002`. |
+
+Generic WebSocket sources must push binary frames without a subscription or
+initial application request. Text/JSON feeds and echo-only services need a
+protocol adapter. If sampling entropy-server output, `entropy-ws` is easier:
+it keeps the upstream frame length aligned with the capture controls.
+
 ## HTTP bodies and random web pages
 
 **HTTP body prefix** samples response-body bytes, including HTML, text, JSON
 and binary data; it does not render a remote web page. In **Browser · needs
 CORS** mode, the target must allow the lab's browser origin. Ordinary sites
-often do not. Browser redirects and HTTPS-to-HTTP mixed content are rejected;
+often do not. Browser redirects follow the browser's normal CORS policy; HTTPS-to-HTTP mixed content is rejected.
 CORS/network failures now explain the registered-server alternative. Page
 presets fill the URL without automatically fetching it.
 
@@ -217,19 +235,106 @@ code without exposing endpoint details. The text preview displays the first
 2,048 sampled bytes as UTF-8 via `textContent`; HTML/scripts are never executed.
 
 Unlike strict binary `http` registrations, `webpage` stops at the requested byte
-prefix even when the page is larger. It follows up to two redirects that retain
-the exact original scheme/host/port. Cross-origin redirects are rejected; use
-the final URL instead. There is no cookie jar or browser-cookie forwarding.
+prefix even when the page is larger. It follows up to two redirects on the same
+origin, with HTTP→HTTPS upgrades allowed on the same hostname's default ports
+(80→443). A later downgrade back to HTTP is rejected. Different hosts, other
+port changes and longer chains are rejected; register the final URL instead.
+There is no cookie jar or browser-cookie forwarding.
 Only operator-registered URLs are fetched server-side.
 
 A `webpage` source may contain up to 16 additional `urls`. Each read chooses
 uniformly among the primary `endpoint` and those entries, using Go's crypto RNG.
-The example file pairs Example.org with RFC 4086; a configured Wikipedia
+The example file includes Example.org, RFC text and CORS-enabled examples; a configured Wikipedia
 `https://en.wikipedia.org/wiki/Special:Random` endpoint can also follow its
 same-origin page redirect. Site access and content can change. Web content is
 structured comparison material, not evidence of unpredictable entropy. A pool's
 measurement records describe the ensemble/source ID; private upstream URLs are
 not exposed in the catalog or exported per-frame metadata.
+
+### Examples and CORS without a registry
+
+Without `-lab-sources`, browser HTTP fetch is still usable for targets that grant
+CORS permission. A CORS failure does not imply an incorrect URL or a broken RNG:
+it means the browser cannot expose that response to this page. Permission must
+come from the target site, usually through `Access-Control-Allow-Origin`.
+Enabling CORS on entropy-server cannot grant permission for another site.
+
+The selector and registry builder provide seven presets. Selecting a preset
+fills the address; Start performs the request. External availability and site
+policies can change.
+
+| Preset | URL | Suggested route |
+| --- | --- | --- |
+| Example.org HTML | `https://example.org/` | Registered `webpage` when browser CORS is denied. |
+| RFC 4086, randomness | `https://www.rfc-editor.org/rfc/rfc4086.txt` | Browser mode currently works; registered `webpage` is also available. |
+| Random Wikipedia article | `https://en.wikipedia.org/wiki/Special:Random` | Registered `webpage`; includes a redirect and may have site-specific restrictions. |
+| 4,096 binary bytes | `https://httpbin.org/bytes/4096` | Browser mode usually works; public CORS example. |
+| Structured JSON | `https://httpbin.org/json` | Browser mode usually works; public CORS example. |
+| Project README text | `https://raw.githubusercontent.com/fantuz/entropy-service/main/README.md` | Browser mode usually works. |
+| RFC 1149, avian carriers | `https://www.rfc-editor.org/rfc/rfc1149.txt` | Browser mode currently works. |
+
+For ordinary pages that block CORS: prepare a `webpage` registration, download
+the JSON, put it on the **server host**, restart the existing server command
+with `-lab-sources=lab-sources.json`, then choose **HTTP body prefix → Registered
+server source**. Adding to the browser draft does not activate a registration.
+The catalog/route help now states explicitly when no matching sources are active.
+
+HTTP **201 Created** is a successful response, not a redirect. Its body is
+sampled normally; a `Location` header identifies the created resource and is not
+automatically followed. Actual redirect statuses are 301, 302, 303, 307 and 308.
+Transport feedback now displays the response status and whether redirects were
+followed, separately from the statistical sample. A successful response with an
+empty body has no bytes to analyse. Browser redirect following remains subject
+to CORS and mixed-content restrictions; registered `webpage` redirects obey the
+host/port/upgrade policy above. Strict `http` sources continue to reject redirects.
+
+### TCP/UDP demonstrations and waiting for data
+
+Registered socket addresses belong to the entropy-server host/network, not the
+computer running the browser. `127.0.0.1` refers to the server itself.
+
+- **TCP** connects to a listening producer and reads available bytes up to the
+  chosen limit. It no longer waits to fill the entire requested sample. It sends
+  no HTTP request, TLS handshake, echo payload or subscription command; services
+  that wait for one will remain idle until the source timeout.
+- **UDP** binds a local address and waits for another process to send nonempty
+  datagrams there. A remote sensor's IP is not a local bind address. Both sides
+  must use matching IPv4/IPv6 addresses, and each datagram must fit Sample bytes.
+  One active listener can bind a given address/port. Allow inbound UDP if using a
+  remote producer; start with loopback for a local demonstration.
+
+The page acknowledges a successful UDP bind or TCP connection, so waiting for
+data can be distinguished from connection/bind failures. Bounds, timeouts and
+registration limits still apply. Use Auto FFT for short samples; a TCP read does
+not promise an application message or the full selected FFT length.
+
+To reproduce locally, use [the two-source demo registry](../resources/lab-socket-demo.json).
+On the server host, start this deterministic TCP producer in another terminal:
+
+```sh
+python3 scripts/lab_socket_fixture.py tcp --port 9001 --bytes 512 --interval 0.25
+```
+
+For an OS-seeded local demo, start the server with:
+
+```sh
+./bin/entropy-server -device=/dev/urandom -require-device=true \
+  -enable-https=false -http=127.0.0.1:8080 \
+  -lab-sources=resources/lab-socket-demo.json
+```
+
+Open `/api-socket.html`, select **Registered server source → demo-tcp**, and Start.
+Even with Sample bytes at 65,536, the 512-byte producer should advance the plots.
+For UDP, select **demo-udp**, Start, wait for **UDP listener bound**, then run:
+
+```sh
+python3 scripts/lab_socket_fixture.py udp --host 127.0.0.1 --port 9002 --bytes 512 --interval 0.25
+```
+
+The demo's UDP timeout is 60 seconds; if it expires before the sender starts,
+press Start again. The helper generates a repeating counter as a predictable
+control, not random entropy; use Ctrl-C to stop it. The TCP helper serves one
+client at a time.
 
 ## RTSP and ONVIF cameras
 
