@@ -1,0 +1,66 @@
+RNG_test using PractRand version 0.95
+RNG = RNG_stdin64, seed = unknown
+test set = core, folding = standard (64 bit)
+
+rng=RNG_stdin64, seed=unknown
+length= 1 megabyte (2^20 bytes), time= 0.1 seconds
+  Test Name                         Raw       Processed     Evaluation
+  BCFN(2+0,13-7,T)                  R>+99999  p = 0           FAIL !!!!!!!!
+  BCFN(2+1,13-7,T)                  R>+99999  p = 0           FAIL !!!!!!!!
+  BCFN(2+2,13-8,T)                  R=+90156  p = 0           FAIL !!!!!!!!
+  BCFN(2+3,13-8,T)                  R=+43780  p = 0           FAIL !!!!!!!!
+  BCFN(2+4,13-8,T)                  R=+21431  p =  5e-5440    FAIL !!!!!!!!
+  BCFN(2+5,13-9,T)                  R=+12134  p =  1e-2727    FAIL !!!!!!!!
+  BCFN(2+6,13-9,T)                  R= +5993  p =  7e-1348    FAIL !!!!!!!!
+  DC6-9x1Bytes-1                    R>+99999  p = 0           FAIL !!!!!!!!
+  Gap-16:A                          R=+96472  p = 0           FAIL !!!!!!!!
+  Gap-16:B                          R>+99999  p = 0           FAIL !!!!!!!!
+  FPF-14+6/16:cross                 R>+99999  p = 0           FAIL !!!!!!!!
+  BRank(12):128(2)                  R= +3748  p~=  3e-1129    FAIL !!!!!!!!
+  BRank(12):256(1)                  R= +5405  p~=  3e-1628    FAIL !!!!!!!!
+  mod3n(5):(0,9-6)                  R=+82739  p = 0           FAIL !!!!!!!!
+  mod3n(5):(1,9-6)                  R=+41630  p = 0           FAIL !!!!!!!!
+  mod3n(5):(2,9-6)                  R=+20782  p =  1e-7126    FAIL !!!!!!!!
+  mod3n(5):(3,9-6)                  R=+10357  p =  3e-3552    FAIL !!!!!!!!
+  mod3n(5):(4,9-6)                  R= +5145  p =  5e-1765    FAIL !!!!!!!!
+  mod3n(5):(5,9-6)                  R= +2539  p =  2.0e-871   FAIL !!!!!!!
+  mod3n(5):(6,9-6)                  R= +1236  p =  1.3e-424   FAIL !!!!!!!
+  mod3n(5):(7,9-6)                  R=+584.4  p =  3.4e-201   FAIL !!!!!!
+  mod3n(5):(8,9-6)                  R=+263.8  p =  2.8e-91    FAIL !!!!!
+  [Low16/64]BCFN(2+0,13-8,T)        R=+99310  p = 0           FAIL !!!!!!!!
+  [Low16/64]BCFN(2+1,13-8,T)        R=+46929  p = 0           FAIL !!!!!!!!
+  [Low16/64]BCFN(2+2,13-9,T)        R=+25905  p =  6e-5822    FAIL !!!!!!!!
+  [Low16/64]BCFN(2+3,13-9,T)        R=+12571  p =  7e-2826    FAIL !!!!!!!!
+  [Low16/64]BCFN(2+4,13-9,T)        R= +6146  p =  3e-1382    FAIL !!!!!!!!
+  [Low16/64]DC6-9x1Bytes-1          R=+55728  p = 0           FAIL !!!!!!!!
+  [Low16/64]Gap-16:A                R=+41301  p = 0           FAIL !!!!!!!!
+  [Low16/64]Gap-16:B                R=+91347  p = 0           FAIL !!!!!!!!
+  [Low16/64]FPF-14+6/16:cross       R>+99999  p = 0           FAIL !!!!!!!!
+  [Low16/64]BRank(12):128(2)        R= +3748  p~=  3e-1129    FAIL !!!!!!!!
+  [Low16/64]mod3n(5):(0,9-6)        R=+19670  p =  1e-6773    FAIL !!!!!!!!
+  [Low16/64]mod3n(5):(1,9-6)        R= +9881  p =  3e-3403    FAIL !!!!!!!!
+  [Low16/64]mod3n(5):(2,9-6)        R= +4918  p =  4e-1694    FAIL !!!!!!!!
+  [Low16/64]mod3n(5):(3,9-6)        R= +2436  p =  1.9e-839   FAIL !!!!!!!
+  [Low16/64]mod3n(5):(4,9-6)        R= +1195  p =  4.1e-412   FAIL !!!!!!!
+  [Low16/64]mod3n(5):(5,9-6)        R=+574.0  p =  1.8e-198   FAIL !!!!!!
+  [Low16/64]mod3n(5):(6,9-6)        R=+263.8  p =  1.2e-91    FAIL !!!!!
+  [Low4/64]BCFN(2+0,13-9,T)         R=+28535  p =  5e-6413    FAIL !!!!!!!!
+  [Low4/64]BCFN(2+1,13-9,T)         R=+13476  p =  4e-3029    FAIL !!!!!!!!
+  [Low4/64]BCFN(2+2,13-9,T)         R= +6459  p =  5e-1505    FAIL !!!!!!!!
+  [Low4/64]DC6-9x1Bytes-1           R=+24257  p = 0           FAIL !!!!!!!!
+  [Low4/64]Gap-16:A                 R=+16692  p = 0           FAIL !!!!!!!!
+  [Low4/64]Gap-16:B                 R=+27079  p = 0           FAIL !!!!!!!!
+  [Low4/64]FPF-14+6/16:cross        R=+96349  p = 0           FAIL !!!!!!!!
+  [Low4/64]BRank(12):128(1)         R= +2650  p~=  9.8e-799   FAIL !!!!!!!
+  [Low4/64]mod3n(5):(0,9-6)         R= +3918  p =  3e-1395    FAIL !!!!!!!!
+  [Low4/64]mod3n(5):(1,9-6)         R= +1960  p =  2.4e-698   FAIL !!!!!!!
+  [Low4/64]mod3n(5):(2,9-6)         R=+967.0  p =  5.9e-345   FAIL !!!!!!!
+  [Low4/64]mod3n(5):(3,9-6)         R=+470.6  p =  3.0e-168   FAIL !!!!!
+  [Low1/64]BCFN(2+0,13-9,T)         R= +7115  p =  8e-1658    FAIL !!!!!!!!
+  [Low1/64]DC6-9x1Bytes-1           R= +9680  p =  4e-4777    FAIL !!!!!!!!
+  [Low1/64]Gap-16:A                 R= +6491  p =  1e-4201    FAIL !!!!!!!!
+  [Low1/64]Gap-16:B                 R= +8433  p =  2e-5007    FAIL !!!!!!!!
+  [Low1/64]FPF-14+6/16:cross        R=+21234  p = 0           FAIL !!!!!!!!
+  [Low1/64]mod3n(5):(0,9-6)         R= +1299  p =  7.9e-435   FAIL !!!!!!!
+  [Low1/64]mod3n(5):(1,9-6)         R=+646.4  p =  8.5e-217   FAIL !!!!!!
+  [Low1/64]mod3n(5):(2,9-6)         R=+315.5  p =  3.1e-106   FAIL !!!!!

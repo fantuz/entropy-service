@@ -104,6 +104,38 @@ func TestAES256CTRKnownAnswer(t *testing.T) {
 	}
 }
 
+func TestChaCha20RFC8439KnownAnswer(t *testing.T) {
+	// RFC 8439 section 2.4.2, counter=1; exercise the actual backend factory.
+	var (
+		key   [32]byte
+		nonce [16]byte
+	)
+
+	copy(key[:], decodeTestHex(t, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"))
+	copy(nonce[:], decodeTestHex(t, "000000000000004a00000000"))
+
+	input := []byte("Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.")
+	want := decodeTestHex(t, "6e2e359a2568f98041ba0728dd0d6981e97e7aec1d4360c20a27afccfd9fae0b"+
+		"f91b65c5524733ab8f593dabcd62b3571639d624e65152ab8f530c359f0861d8"+
+		"07ca0dbf500d6a6156a38e088a22b65e52bc514d16ccf806818ce91ab7793736"+
+		"5af90bbf74a35be6b40b8eedf2785e42874d")
+
+	stream, err := newCipherStream(ChaCha20, &key, &nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The factory starts at counter zero. Consume one full block, then apply
+	// the published counter-one fixture without depending on a concrete type.
+	var skipped [64]byte
+	stream.XORKeyStream(skipped[:], skipped[:])
+	stream.XORKeyStream(input, input)
+
+	if !bytes.Equal(input, want) {
+		t.Fatal("ChaCha20 differs from RFC 8439 section 2.4.2")
+	}
+}
+
 func TestBackendSeedAndReseedFixtures(t *testing.T) {
 	for _, tc := range []struct {
 		algorithm Algorithm

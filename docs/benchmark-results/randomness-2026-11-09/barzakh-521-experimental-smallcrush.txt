@@ -1,0 +1,330 @@
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                 Starting SmallCrush
+                 Version: TestU01 1.2.3
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+smarsa_BirthdaySpacings test:
+-----------------------------------------------
+   N =  1,  n = 5000000,  r =  0,    d = 1073741824,    t = 2,    p = 1
+
+
+      Number of cells = d^t = 1152921504606846976
+      Lambda = Poisson mean =      27.1051
+
+
+----------------------------------------------------
+Total expected number = N*Lambda      :      27.11
+Total observed number                 :      27
+p-value of test                       :    0.53
+
+
+-----------------------------------------------
+CPU time used                    :  00:00:01.19
+
+Generator state:
+
+
+
+
+***********************************************************
+Test sknuth_Collision calling smultin_Multinomial
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+smultin_Multinomial test:
+-----------------------------------------------
+   N =  1,  n = 5000000,  r =  0,   d = 65536,   t =  2,
+       Sparse =   TRUE
+
+       GenerCell = smultin_GenerCellSerial
+       Number of cells = d^t =         4294967296
+       Expected number per cell =  1 /  858.99346
+       EColl = n^2 / (2k) =  2910.383046
+       Hashing =   TRUE
+
+       Collision test,    Mu =      2909.2534,    Sigma =    53.8957
+
+-----------------------------------------------
+Test Results for Collisions
+
+Expected number of collisions = Mu    :     2909.25
+Observed number of collisions         :     2932
+p-value of test                       :    0.34
+
+-----------------------------
+Total number of cells containing j balls
+
+  j =  0                              :       4289970228
+  j =  1                              :          4994137
+  j =  2                              :             2930
+  j =  3                              :                1
+  j =  4                              :                0
+  j =  5                              :                0
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.64
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+sknuth_Gap test:
+-----------------------------------------------
+   N =  1,  n = 200000,  r = 22,   Alpha =        0,   Beta  = 0.00390625
+
+
+-----------------------------------------------
+Number of degrees of freedom          : 1114
+Chi-square statistic                  : 1160.14
+p-value of test                       :    0.16
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.70
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+sknuth_SimpPoker test:
+-----------------------------------------------
+   N =  1,  n = 400000,  r = 24,   d =   64,   k =   64
+
+
+-----------------------------------------------
+Number of degrees of freedom          :   19
+Chi-square statistic                  :   16.60
+p-value of test                       :    0.62
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.62
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+sknuth_CouponCollector test:
+-----------------------------------------------
+   N =  1,  n = 500000,  r = 26,   d =   16
+
+
+-----------------------------------------------
+Number of degrees of freedom          :   44
+Chi-square statistic                  :   39.70
+p-value of test                       :    0.66
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.48
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+sknuth_MaxOft test:
+-----------------------------------------------
+   N =  1,  n = 2000000,  r =  0,   d = 100000,   t =  6
+
+      Number of categories = 100000
+      Expected number per category  = 20.00
+
+
+-----------------------------------------------
+Number of degrees of freedom          : 99999
+Chi-square statistic                  : 1.01e+5
+p-value of test                       :    0.09
+
+
+-----------------------------------------------
+Anderson-Darling statistic            :    0.94
+p-value of test                       :    0.06
+
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.46
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+svaria_WeightDistrib test:
+-----------------------------------------------
+   N =  1,  n = 200000,  r = 27,  k = 256,  Alpha =      0,  Beta =  0.125
+
+
+-----------------------------------------------
+Number of degrees of freedom          :   41
+Chi-square statistic                  :   39.50
+p-value of test                       :    0.54
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.73
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+smarsa_MatrixRank test:
+-----------------------------------------------
+   N =  1,  n = 20000,  r = 20,    s = 10,    L = 60,    k = 60
+
+
+-----------------------------------------------
+Number of degrees of freedom          :    3
+Chi-square statistic                  :    5.52
+p-value of test                       :    0.14
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.41
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+sstring_HammingIndep test:
+-----------------------------------------------
+   N =  1,  n = 500000,  r = 20,   s = 10,   L = 300,   d = 0
+
+
+
+Counters with expected numbers >= 10
+-----------------------------------------------
+Number of degrees of freedom          : 2209
+Chi-square statistic                  : 2259.69
+p-value of test                       :    0.22
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.71
+
+Generator state:
+
+
+
+
+***********************************************************
+HOST = 6fc92d5bfbab, Linux
+
+entropy-service decoded bytes, little-endian 32-bit words
+
+
+swalk_RandomWalk1 test:
+-----------------------------------------------
+   N =  1,  n = 1000000,  r =  0,   s = 30,   L0 =  150,   L1 =  150
+
+
+
+-----------------------------------------------
+Test on the values of the Statistic H
+
+Number of degrees of freedom          :   52
+ChiSquare statistic                   :   56.01
+p-value of test                       :    0.33
+
+
+-----------------------------------------------
+Test on the values of the Statistic M
+
+Number of degrees of freedom          :   52
+ChiSquare statistic                   :   60.72
+p-value of test                       :    0.19
+
+
+-----------------------------------------------
+Test on the values of the Statistic J
+
+Number of degrees of freedom          :   75
+ChiSquare statistic                   :   84.11
+p-value of test                       :    0.22
+
+
+-----------------------------------------------
+Test on the values of the Statistic R
+
+Number of degrees of freedom          :   44
+ChiSquare statistic                   :   42.07
+p-value of test                       :    0.55
+
+
+-----------------------------------------------
+Test on the values of the Statistic C
+
+Number of degrees of freedom          :   26
+ChiSquare statistic                   :   17.00
+p-value of test                       :    0.91
+
+
+-----------------------------------------------
+CPU time used                    :  00:00:00.58
+
+Generator state:
+
+
+
+
+
+========= Summary results of SmallCrush =========
+
+ Version:          TestU01 1.2.3
+ Generator:        entropy-service decoded bytes, little-endian 32-bit words
+ Number of statistics:  15
+ Total CPU time:   00:00:06.57
+
+ All tests were passed

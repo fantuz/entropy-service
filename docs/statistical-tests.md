@@ -1,5 +1,10 @@
 # Statistical tests
 
+For PractRand, NIST STS, TestU01, measured costs across all three backends
+and a bounded manual GitHub Actions workflow, see the
+[screening protocol and recorded results](randomness-screening.md).
+These are statistical diagnostics, not a standards-compliance certificate.
+
 Use `rngtest` for a quick regression screen and Dieharder for a broader statistical battery. These tests assess statistical behaviour, not maximum throughput or cryptographic certification. The HTTP examples test the **served DRBG output**, not the QRNG device before your software generator.
 
 On Debian/Ubuntu, install the tools if needed:

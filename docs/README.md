@@ -18,6 +18,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Benchmarks](benchmarks.md) | Measured encoding cost and HTTP throughput, original `wrk` output and reproducibility guidance. |
 | [Root reseeding review](root-reseeding.md) | Seed input-size hardening, failure semantics, state-transition diagram and tests. |
 | [Statistical tests](statistical-tests.md) | `rngtest`, Dieharder and their limitations. |
+| [Randomness screening](randomness-screening.md) | PractRand/NIST/TestU01 results for three backends, runtime budgets and an optional manual workflow. |
 | [Security policy](../SECURITY.md) | Source/DRBG trust boundaries, exposure, disclosure and TLS keys. |
 | [Contribution guide](../CONTRIBUTING.md) | Build, race tests, lint, benchmark evidence and changes. |
 | [Go quality review](go-quality.md) | Go conventions, module/toolchain policy, measured coverage, remaining tests and README badge meanings. |

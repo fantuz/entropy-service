@@ -1,0 +1,86 @@
+name: Statistical randomness screen
+
+on:
+  workflow_dispatch:
+    inputs:
+      mib:
+        description: MiB tested per backend; statistical screening only
+        type: choice
+        default: "64"
+        options: ["64", "256", "1024"]
+
+permissions:
+  contents: read
+
+jobs:
+  screen:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [aes-256-ctr, chacha20, barzakh-521-experimental]
+    env:
+      BACKEND: ${{ matrix.backend }}
+      SAMPLE_MIB: ${{ inputs.mib }}
+      GOMAXPROCS: "2"
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Prepare optional statistical tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/screen-venv"
+          "$RUNNER_TEMP/screen-venv/bin/pip" install websockets==16.0
+          python3 scripts/build_practrand.py "$RUNNER_TEMP/practrand"
+          go build -tags=experimental_barzakh -o bin/entropy-server-screen ./cmd/entropy-server
+      - name: Capture decoded binary stream
+        run: |
+          case "$SAMPLE_MIB" in 64|256|1024) ;; *) exit 2 ;; esac
+          mkdir -p results
+          ./bin/entropy-server-screen -drbg="$BACKEND" -device=/dev/urandom -require-device=true \
+            -enable-https=false -http=127.0.0.1:8080 > results/server.log 2>&1 &
+          echo "SCREEN_SERVER_PID=$!" >> "$GITHUB_ENV"
+          ready=false
+          for attempt in $(seq 1 100); do
+            if curl -fsS http://127.0.0.1:8080/ready -o results/ready.json; then ready=true; break; fi
+            sleep 0.1
+          done
+          "$ready"
+          "$RUNNER_TEMP/screen-venv/bin/python" scripts/capture_randomness.py \
+            --output sample.bin --bytes "$(( (SAMPLE_MIB + 1) * 1048576 ))" --timeout 600 > results/capture.json
+          cp sample.bin.json results/sample-manifest.json
+          cp "$RUNNER_TEMP/practrand/provenance.json" results/tool-provenance.json
+          printf '%s\n' "$GITHUB_SHA" > results/server-commit.txt
+      - name: Run PractRand and retain review flags
+        run: |
+          timeout 600 "$RUNNER_TEMP/practrand/RNG_test" stdin64 \
+            -tlmin 64MB -tlmax "${SAMPLE_MIB}MB" < sample.bin > results/practrand.log 2>&1
+          python3 scripts/assess_practrand.py --manifest sample.bin.json --report results/practrand.log \
+            --bytes "$(( SAMPLE_MIB * 1048576 ))" > results/assessment.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads(Path('results/assessment.json').read_text())
+          if result['review_required']:
+              print('::warning::Statistical flags require review; they do not establish a generator defect.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Statistical screen: ' + os.environ['BACKEND'] + '\n\n```json\n')
+              summary.write(json.dumps(result, indent=2) + '\n```\n\n')
+              summary.write('A completed job is not cryptographic certification. Raw samples are not uploaded.\n')
+          PY
+      - name: Stop the local test server
+        if: always()
+        run: |
+          if [ -n "${SCREEN_SERVER_PID:-}" ]; then kill "$SCREEN_SERVER_PID" || true; fi
+      - name: Retain diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: randomness-${{ matrix.backend }}
+          path: results/
+          retention-days: 14
