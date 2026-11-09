@@ -86,7 +86,8 @@ var (
 )
 
 // ChaCha20 has 2^32 blocks of 64 bytes per key. Use the same operational
-// ceiling for both backends; reseeding resets the byte budget.
+// ceiling for all backends; this is not a Barzakh security bound.
+// Reseeding resets the byte budget.
 const maxBytesPerKey uint64 = 1 << 38
 
 // Derive is intended for bounded seed material, not bulk output.
@@ -225,6 +226,7 @@ func (d *DRBG) Reseed(seed []byte) error {
 	// Do not erase or replace usable state until the next cipher is ready.
 	clear(d.key[:])
 	clear(d.nonce[:])
+	clearStreamState(d.cipher)
 	d.key = key
 	d.nonce = nonce
 	d.cipher = c
@@ -253,6 +255,7 @@ func (d *DRBG) Close() error {
 
 	clear(d.key[:])
 	clear(d.nonce[:])
+	clearStreamState(d.cipher)
 	d.cipher = nil
 	d.closed = true
 

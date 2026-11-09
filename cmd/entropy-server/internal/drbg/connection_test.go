@@ -10,7 +10,7 @@ import (
 )
 
 func TestConnectionReaderStreamAndReseed(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			parent, reference := testGenerator(t, algorithm), testGenerator(t, algorithm)
 
@@ -65,7 +65,7 @@ func TestConnectionReaderStreamAndReseed(t *testing.T) {
 }
 
 func TestConnectionReaderBudgetFailureAndCleanup(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			parent := testGenerator(t, algorithm)
 			instances := ActiveInstances()

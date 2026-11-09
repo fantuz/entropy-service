@@ -8,7 +8,26 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
+
+func TestExperimentalDRBGSelection(t *testing.T) {
+	_, backendErr := drbg.ParseAlgorithm(string(drbg.Barzakh521))
+
+	cfg, err := parseConfig([]string{"-drbg=" + string(drbg.Barzakh521)}, io.Discard)
+	if backendErr != nil {
+		if err == nil || !strings.Contains(err.Error(), "experimental_barzakh") {
+			t.Fatalf("normal build accepted experimental selection: %v", err)
+		}
+
+		return
+	}
+
+	if err != nil || cfg.DRBG != string(drbg.Barzakh521) {
+		t.Fatalf("tagged build rejected experimental selection: %v", err)
+	}
+}
 
 func TestTimingDefaultsAndMillisecondOverrides(t *testing.T) {
 	cfg, err := parseConfig(nil, io.Discard)

@@ -24,7 +24,7 @@ func BenchmarkDRBGLifecycle(b *testing.B) {
 		reseed[i] = byte(i)
 	}
 
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		b.Run(string(algorithm), func(b *testing.B) {
 			b.Run("NewClose", func(b *testing.B) {
 				b.ReportAllocs()

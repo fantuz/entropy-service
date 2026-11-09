@@ -1,5 +1,10 @@
 # Security policy and deployment boundaries
 
+The optional `experimental_barzakh` build includes a research-only
+Barzakh-521 backend using variable-time arithmetic. It has no independent
+security audit and is unsuitable for secrets. Normal release builds exclude
+it. See [its construction and limitations](docs/experimental-barzakh.md).
+
 Entropy Service is a research-oriented, self-hosted random-data distribution application. Its cryptographic design has **not** been independently audited or certified; no FIPS 140 validation or NIST CTR_DRBG conformance is claimed. Passing statistical tests is not evidence of cryptographic certification.
 
 ## Current architectural assurance review

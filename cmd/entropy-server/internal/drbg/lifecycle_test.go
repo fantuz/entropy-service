@@ -9,7 +9,7 @@ import (
 )
 
 func TestKeyLifecycleCloseAndReseed(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 			if err := d.Reseed(bytes.Repeat([]byte{0x42}, 256)); err != nil {
@@ -46,7 +46,7 @@ func TestKeyLifecycleCloseAndReseed(t *testing.T) {
 }
 
 func TestConnectionReaderClearsChildOnClose(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			parent := testGenerator(t, algorithm)
 			initial := ActiveInstances()
@@ -79,7 +79,7 @@ func TestConnectionReaderClearsChildOnClose(t *testing.T) {
 // The concatenation used before lifecycle hardening and the streaming
 // SHA-512 path must derive exactly the same key and nonce on both backends.
 func TestReseedKeepsLegacySHA512StateTransition(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 			seed := bytes.Repeat([]byte{0x3c}, 256)

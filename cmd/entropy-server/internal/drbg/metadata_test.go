@@ -13,7 +13,7 @@ import (
 )
 
 func TestReseedFailurePreservesStreamAndRecovery(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d, reference := testGenerator(t, algorithm), testGenerator(t, algorithm)
 			before := d.GetMetadata()
@@ -103,7 +103,7 @@ func TestConcurrentMetadataAndReseedFailureSnapshots(t *testing.T) {
 }
 
 func TestReseedRejectsUndersizedInputWithoutFreshnessClaim(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 			reference := testGenerator(t, algorithm)

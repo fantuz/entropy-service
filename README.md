@@ -191,6 +191,12 @@ Typical server options: `-device=/dev/urandom -enable-https=false -http=127.0.0.
 
 **[Complete server and client flags, defaults, and examples](docs/configuration.md)**
 
+For local research, an optional original Go implementation of the published
+Barzakh-521 scalar construction is available with the
+`experimental_barzakh` build tag and `-drbg=barzakh-521-experimental`.
+It uses variable-time arithmetic and is unsuitable for secrets; see
+[experimental build instructions, provenance and patent limitations](docs/experimental-barzakh.md).
+
 ## Architecture
 
 ```mermaid

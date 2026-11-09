@@ -1053,6 +1053,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if algorithm.Experimental() {
+		log.Print("EXPERIMENTAL Barzakh-521: variable-time arithmetic, no independent security audit; use for local research only")
+	}
+
 	maxReseedAge := time.Duration(cfg.MaxReseedAgeMs) * time.Millisecond
 
 	fmt.Println("\n-------------------------------------------------")
