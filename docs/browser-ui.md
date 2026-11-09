@@ -347,10 +347,10 @@ regression script also covers full-file SHA versus window scope, large FFTs,
 file playback/EOF, seek and replacement races, bounded reads, cancellation,
 HTTP failure and recovery, and desktop/mobile alignment.
 
-For a possible next experiment, see the [source-lab proposal](source-lab-proposal.md)
-covering WebSockets, HTTP, Web Crypto, camera/audio and device adapters.
+The [experimental source/socket labs](source-labs.md) reuse the same panels for
+WebSockets, HTTP, Web Crypto, camera/audio and registered device adapters.
 
-The four `WS /...` route labels in the homepage's WebSocket cards are pinned
+The `WS /...` route labels in the homepage's WebSocket cards are pinned
 to the card bottoms so they align even when text wraps at different zoom
 levels.
 

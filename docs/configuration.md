@@ -47,6 +47,10 @@ See [construction, provenance and patent limitations](experimental-barzakh.md).
 | `-refresh-colors-ms` | `1500` | Default `/stream`, `/colors` and `/words` WS interval in ms. |
 | `-refresh` | `5000` | HTTP word-page interval in ms; HTML rounds up to seconds. |
 | `-fingerprint` | `2097152` | Upload prefix analysed statistically; full-upload SHA-256 is unaffected. |
+| `-lab-sources` | empty | Strict JSON registry of experimental peers/devices/sockets; opens sources on demand. |
+| `-lab-allow-remote` | `false` | Permit non-loopback clients to use registered lab bridges. |
+| `-lab-max-connections` | `8` | Separate simultaneous bridge limit. |
+| `-lab-memory-mib` | `32` | Separate estimated bridge working-memory budget; not RSS. |
 | `-cookie` | `false` | Remember byte/word preferences in Secure, HttpOnly cookies; use HTTPS for browser persistence. |
 | `-ws-max-connections` | `128` | Shared WS connection limit. |
 | `-ws-memory-mib` | `1024` | Shared WS estimated memory budget in MiB. |
@@ -252,5 +256,9 @@ record. `WARN` is an assessment, not a nonzero exit code.
 
 See [client experiments](client-experiments.md) for the JSONL contract, longer
 runs, payload comparisons and a report-analysis example.
+
+See [experimental source/socket labs](source-labs.md) and the
+[registry example](../resources/lab-sources.example.json) for peer/self links,
+protocols, deadlines and exposure rules.
 
 [Back to README](../README.md) · [Technical reference index](README.md)

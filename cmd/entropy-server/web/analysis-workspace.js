@@ -125,7 +125,7 @@
             invalidate();
             if (onSampleNeeded(last) || !last) return;
             queued = {buffer: last.buffer.slice(0), totalBytes: last.totalBytes, offset: last.offset,
-                frame: last.frame, time: last.time, captureTime: last.captureTime, sourceId: last.sourceId, epoch, reanalysis: true, fftOptions: fftOptions()};
+                frame: last.frame, time: last.time, captureTime: last.captureTime, sourceId: last.sourceId, sourceName: last.sourceName, representation: last.representation, encoding: last.encoding, epoch, reanalysis: true, fftOptions: fftOptions()};
             pump();
         }
         function clearMarkers() { markers = []; drawMarkers(); }

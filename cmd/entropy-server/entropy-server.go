@@ -27,6 +27,7 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/lab"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/listener"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
@@ -1062,6 +1063,14 @@ func main() {
 
 	cfg := config.ParseConfig()
 
+	labRegistry, err := lab.Load(cfg.LabSources)
+	if err != nil {
+		log.Fatalf("lab configuration: %v", err)
+	}
+	defer labRegistry.Close()
+
+	log.Printf("Experimental lab: %d registered sources, loopback_only=%t, max_connections=%d", len(labRegistry.List()), !cfg.LabAllowRemote, cfg.LabMaxConnections)
+
 	algorithm, err := drbg.ParseAlgorithm(cfg.DRBG)
 	if err != nil {
 		log.Fatal(err)
@@ -1200,6 +1209,9 @@ func main() {
 	mux.HandleFunc("/stream", wsBinaryHandler(&root, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/colors", wsBytesHandler(&root, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/bytes", wsBytesHandler(&root, cfg.RefreshRateMs, cfg.MaxBytes, wsBudget))
+	labBudget := newWebSocketBudget(cfg.LabMaxConnections, cfg.LabMemoryMiB*(1<<20))
+	mux.HandleFunc("/lab/sources", labCatalogHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote))
+	mux.HandleFunc("/lab/stream", labStreamHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote))
 	mux.HandleFunc("/files", uploadHandler(cfg.BytesFingerprint, httpBudget))
 
 	mux.HandleFunc("/words", wsWordsHandler(&root, cfg.MaxWords, cfg.RefreshColorMs, wsBudget))

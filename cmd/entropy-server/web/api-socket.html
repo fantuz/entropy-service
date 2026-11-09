@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Entropy Service — Experimental Socket Lab</title>
+  <link rel="stylesheet" href="/theme.css">
+</head>
+<body class="page-analysis page-analysis-lab page-lab" data-lab="socket">
+  <main class="panel analysis-panel">
+    <h1>Experimental Socket Lab</h1>
+    <p>Connect this server to a peer or itself, inspect binary endpoints, or read an operator-registered socket or device.</p>
+    <section class="analysis-card" aria-labelledby="lab-source-title">
+      <h2 class="analysis-label" id="lab-source-title">Source &amp; sampling</h2>
+      <form id="lab-config">
+        <div class="analysis-controls">
+          <label>Source <select id="lab-kind"><option value="self-ws">This instance · WebSocket</option><option value="self-http">This instance · HTTP</option><option value="peer-ws">Entropy-server peer · WebSocket</option><option value="peer-http">Entropy-server peer · HTTP</option><option value="websocket">Binary WebSocket URL</option><option value="http">HTTP body prefix</option><option value="bridge">Registered server source</option></select></label>
+          <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="1048576" value="65536" required></label>
+          <label>Cadence (ms) <input id="lab-refresh" type="number" min="20" max="60000" value="500" required></label>
+          <label>Representation <select id="lab-transform"><option value="raw">Original bytes</option><option value="xor">XOR previous sample</option><option value="lsb">LSB → 0/255</option></select></label>
+          <label class="lab-only lab-url" data-modes="peer-ws peer-http websocket http" hidden>Peer base URL or endpoint <input id="lab-url" type="text" inputmode="url" placeholder="http://127.0.0.1:8081" spellcheck="false"></label>
+          <label class="lab-only" data-modes="bridge" hidden>Registered source <select id="lab-registered"><option value="">Loading source catalog…</option></select></label>
+        </div>
+        <div class="lab-actions"><button id="lab-start" type="submit">Start</button><button id="lab-once" type="button">Sample once</button><button id="lab-stop" type="button" disabled>Stop</button></div>
+      </form>
+      <p id="lab-status" class="stream-notice" role="status" aria-live="polite" data-state="waiting">Choose a source, then Start or Sample once.</p>
+      <p id="lab-source-info" class="analysis-meta">No source active.</p>
+      <p id="lab-catalog-info" class="note"></p>
+      <video id="lab-video" muted playsinline hidden aria-label="Local camera preview"></video>
+      <details><summary>Connect entropy-server instances</summary><p class="note">For a server-side A → B link, register B in A's JSON source file, start A with <code>-lab-sources=lab.json</code>, then choose Registered server source. Set the base URL to A itself for a server-side self-link. Direct peer modes follow browser CORS/Origin rules.</p><pre>{"sources":[{"id":"peer","kind":"entropy-ws","endpoint":"http://127.0.0.1:8081"}]}</pre><p class="note">The operator controls registrations and bridge access. Loopback clients are allowed by default; remote access needs <code>-lab-allow-remote</code> and appropriate deployment access controls.</p></details>
+      <details><summary>Source notes</summary><p class="note">Direct URLs use browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. A peer connection consumes its output without feeding it back into DRBG seeding. UDP registrations listen for datagrams at the configured address.</p><p class="note">Cadence controls HTTP, entropy-server links and registered bridges. Direct WebSocket messages arrive on their own clock and are analysed whole, up to 1 MiB; sample size controls request/read sizes for the other adapters. XOR needs two equal-length samples; LSB expands each low bit to a full byte. All transformations are labelled. Plots describe the representation and do not certify cryptographic entropy.</p></details>
+    </section>
+    <div class="analysis-stats" aria-label="Sample meters" aria-live="off">
+      <div class="analysis-stat-row"><span class="analysis-stat-title">Input samples</span><span><output id="lab-input-bytes">0</output> bytes · <output id="lab-input-frames">0</output> samples</span></div>
+      <div class="analysis-stat-row"><span class="analysis-stat-title">Sampled rate</span><span><output id="lab-rate">—</output> MB/s · mean interval <output id="lab-interval">—</output> ms</span></div>
+      <div class="analysis-stat-row"><span class="analysis-stat-title">Analysed</span><span><output id="lab-analysis-bytes">0</output> bytes · <output id="lab-analysis-frames">0</output> windows</span></div>
+    </div>
+    <section class="analysis-card shared-controls" aria-labelledby="selection-title">
+      <h2 class="analysis-label" id="selection-title">Shared analysis window</h2>
+      <div class="analysis-controls">
+        <label>Window cap <select id="analysis-size"><option value="4096">4 KiB</option><option value="16384">16 KiB</option><option value="65536" selected>64 KiB</option><option value="262144">256 KiB</option><option value="1048576">1 MiB</option></select></label>
+        <label>Start byte in sample <input id="analysis-offset" type="number" min="0" max="1048575" value="0" step="1" required></label>
+        <label>Display limit <select id="display-fps"><option value="1">1 fps</option><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option></select></label>
+        <button id="pause-plots" type="button" disabled>Plots frozen</button>
+      </div>
+      <p id="sample-info" class="analysis-meta">Awaiting a sample for analysis.</p>
+      <p class="note">Pause freezes analysis while input metering continues. Stop releases the source. Rates count sampled application bytes, excluding protocol overhead, and depend on cadence. FFT units remain cycles/byte for every source.</p>
+    </section>
+    <section class="analysis-card" aria-labelledby="lab-compare-title">
+      <h2 class="analysis-label" id="lab-compare-title">Measurements &amp; output</h2>
+      <div class="lab-actions"><button id="lab-record" type="button" disabled>Record measurement</button><button id="lab-download" type="button" disabled>Download selected bytes</button><button id="lab-export" type="button" disabled>Export measurements</button><button id="lab-clear-records" type="button">Clear measurements</button></div>
+      <p class="note">Record up to 50 measurements across sources. Download contains the selected representation/window. Measurements are kept for this browser tab across both labs; export them to keep a copy.</p>
+      <div class="lab-table-wrap"><table id="lab-measurements"><caption>Recorded source measurements</caption><thead><tr><th>Source</th><th>Representation</th><th>Window bytes</th><th>Shannon bits/B</th><th>Sampled MB/s</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <!-- BEGIN SHARED ANALYSIS -->
+    <div class="analysis-grid">
+      <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
+        <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>
+        <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span>bits/byte</span></p>
+        <label class="entropy-threshold-control" for="entropy-threshold">Red alert below
+          <input id="entropy-threshold" type="number" min="1" max="8" step="0.00001" value="7.99990" inputmode="decimal"> <span>bits/byte</span>
+        </label>
+        <p class="entropy-alert-message" id="entropy-alert-message" role="status" aria-live="polite">AWAITING FIRST ANALYSIS SAMPLE</p>
+        <p class="entropy-alert-hint">Finite-sample estimate. High thresholds can trigger on healthy samples.</p>
+        <p id="byte-statistics" class="analysis-meta">Mean / standard deviation / range: —</p>
+      </section>
+      <section class="analysis-card balance-card" aria-labelledby="balance-title">
+        <h2 class="analysis-label" id="balance-title">Bit balance · Yin/Yang</h2>
+        <div class="balance-layout"><canvas id="pie" width="180" height="180" role="img" aria-label="Zero and one bit proportions"></canvas>
+          <div class="balance-legend"><p class="zero-key" id="zero-count">Zeros: —</p><p class="one-key" id="one-count">Ones: —</p><p class="note">50% reference per position</p></div>
+        </div>
+        <details id="bit-rates"><summary>Eight bit-position rates</summary><div class="bit-rate-grid" id="bit-rate-grid"></div><p class="note">Fraction of ones, MSB (7) to LSB (0). Each uses the same selected bytes.</p></details>
+      </section>
+      <section class="analysis-card plot-card trace-card" aria-labelledby="trace-title">
+        <h2 class="analysis-label" id="trace-title">Byte trace</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Visible bytes <select id="trace-span"><option value="128">128</option><option value="512">512</option><option value="1024" selected>1,024</option><option value="8192">8,192</option><option value="all">Whole window</option></select></label>
+          <label>Draw <select id="trace-style"><option value="line">Line</option><option value="steps">Steps</option><option value="dots">Dots</option></select></label>
+          <label>Pan (window offset) <input id="trace-start" type="range" min="0" max="0" value="0" step="1"><output id="trace-start-value">0</output></label>
+        </div>
+        <div class="trace-wrap" id="trace-wrap"><canvas id="wave" class="diagnostic-plot" width="800" height="240" role="img" aria-describedby="trace-info" aria-label="Byte trace, values 0 to 255 against byte offset"></canvas><span class="trace-marker" id="marker-a" hidden>A</span><span class="trace-marker" id="marker-b" hidden>B</span></div>
+        <div class="plot-readouts">
+          <p class="analysis-meta" id="trace-info">Zoom out preserves min/max per display column.</p>
+          <label class="cursor-control">Inspect byte <input id="trace-cursor" type="range" min="0" max="0" value="0" step="1"></label>
+          <output id="trace-reading" class="analysis-meta">Byte: —</output>
+          <p class="note">Hover or use the slider. Freeze the plots, then click two bytes for A/B measurements.</p>
+          <button id="clear-markers" type="button">Clear A/B</button><output id="marker-reading" class="analysis-meta"></output>
+        </div>
+      </section>
+      <section class="analysis-card plot-card histogram-card" aria-labelledby="histogram-title">
+        <h2 class="analysis-label" id="histogram-title">Byte histogram · all 256 values</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Units <select id="histogram-unit"><option value="percent">Percent</option><option value="count">Count</option></select></label>
+          <label>Scale <select id="histogram-scale"><option value="detail">Fixed · 0–1%</option><option value="full">Fixed · 0–100%</option><option value="auto">Auto · labelled</option></select></label>
+        </div>
+        <canvas id="histogram" class="diagnostic-plot" width="800" height="240" role="img" aria-label="Byte-frequency histogram with uniform reference"></canvas>
+        <div class="plot-readouts">
+          <p class="analysis-meta" id="histogram-info">Dashed line: uniform reference, 100/256 = 0.390625%.</p>
+          <p class="note">Yellow caps mark clipped bars; use full scale to see concentrated distributions. A flat histogram alone does not imply unpredictability.</p>
+        </div>
+      </section>
+      <section class="analysis-card plot-card spectrum-card" aria-labelledby="spectrum-title">
+        <h2 class="analysis-label" id="spectrum-title">Power spectrum</h2>
+        <div class="plot-controls">
+          <div class="analysis-controls compact-controls">
+            <label>FFT points <select id="fft-size"><option value="auto">Auto · up to 8,192</option><option value="512">512</option><option value="2048">2,048</option><option value="8192">8,192</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
+            <label>Window <select id="fft-window"><option value="hann">Hann</option><option value="rectangular">Rectangular</option></select></label>
+            <label>Average power <select id="fft-average"><option value="1">1 sample</option><option value="4">4 samples</option><option value="16">16 samples</option></select></label>
+            <label class="checkbox-label"><input id="fft-demean" type="checkbox" checked>Remove mean</label>
+          </div>
+          <details><summary>Frequency zoom &amp; fixed dB scale</summary><div class="analysis-controls compact-controls">
+            <label>Min (cycles/byte) <input id="fft-min" type="number" min="0" max="0.49999" step="0.001" value="0"></label>
+            <label>Max (cycles/byte) <input id="fft-max" type="number" min="0.00001" max="0.5" step="0.001" value="0.5"></label>
+            <label>Floor (dB) <input id="fft-floor" type="number" min="-160" max="40" value="-60"></label>
+            <label>Ceiling (dB) <input id="fft-ceiling" type="number" min="-150" max="100" value="50"></label>
+          </div><p id="fft-scale-error" class="form-error" role="status"></p></details>
+        </div>
+        <canvas id="fft" class="diagnostic-plot" width="800" height="240" role="img" aria-label="One-sided power spectral density in cycles per byte"></canvas>
+        <div class="plot-readouts">
+          <p id="fftvalue" class="analysis-meta">Awaiting FFT input.</p>
+          <p class="note">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.</p>
+        </div>
+      </section>
+      <section class="analysis-card plot-card waterfall-card" aria-labelledby="waterfall-title">
+        <h2 class="analysis-label" id="waterfall-title">Socket waterfall · sample history</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Colour mode <select id="waterfall-mode"><option value="rgb">RGB</option><option value="vivid">Vivid hue</option><option value="gray">Grayscale</option><option value="bit">Bit plane</option></select></label>
+          <label>Bit plane <select id="waterfall-bit" aria-describedby="waterfall-help"><option value="7">7 · MSB</option><option value="6">6</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option><option value="0">0 · LSB</option></select></label>
+          <label>Bytes/row <select id="waterfall-bytes"><option value="auto" selected>Auto · large</option><option value="128">128</option><option value="256">256</option><option value="512">512</option><option value="1024">1,024</option></select></label>
+          <label>History rows <select id="waterfall-rows"><option value="16" selected>16 · large</option><option value="32">32 rows</option><option value="64">64 rows</option><option value="240">All (240 max)</option></select></label>
+          <button id="clear-history" type="button">Clear history</button>
+        </div>
+        <canvas id="mosaic" class="diagnostic-plot waterfall-plot" width="800" height="240" role="img" aria-label="Historical byte colours, newest sample at top"></canvas>
+        <div class="plot-readouts">
+          <p id="waterfall-info" class="analysis-meta">0 / 240 samples</p>
+          <p class="note" id="waterfall-help">Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.</p>
+        </div>
+      </section>
+    </div>
+    <!-- END SHARED ANALYSIS -->
+    <p><a href="/api-sources.html">Source lab</a> · <a href="/api-socket.html">Socket lab</a> · <a href="/api-upload.html">File lab</a> · <a href="/">All endpoints</a></p>
+  </main>
+  <script src="/analysis-math.js" defer></script>
+  <script src="/analysis-plots.js" defer></script>
+  <script src="/stream-entropy-alert.js" defer></script>
+  <script src="/analysis-workspace.js" defer></script>
+  <script src="/lab-samples.js" defer></script>
+  <script src="/lab-adapters.js" defer></script>
+  <script src="/source-lab.js" defer></script>
+</body>
+</html>

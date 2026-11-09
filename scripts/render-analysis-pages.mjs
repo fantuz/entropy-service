@@ -1,4 +1,4 @@
-// The embedded HTML stays static; both labs take chart markup from one source.
+// The embedded HTML stays static; all labs take chart markup from one source.
 import {readFileSync, writeFileSync} from "node:fs";
 const root = new URL("../cmd/entropy-server/", import.meta.url);
 const template = readFileSync(new URL("webtemplates/analysis-panels.html", root), "utf8");
@@ -6,6 +6,8 @@ const check = process.argv.includes("--check");
 let stale = false;
 for (const [name, values] of [
     ["api-stream.html", {trace_hint: "Pause, then click two bytes for A/B measurements.", waterfall_title: "Colour waterfall · sample history"}],
+    ["api-sources.html", {trace_hint: "Freeze the plots, then click two bytes for A/B measurements.", waterfall_title: "Source waterfall · sample history"}],
+    ["api-socket.html", {trace_hint: "Freeze the plots, then click two bytes for A/B measurements.", waterfall_title: "Socket waterfall · sample history"}],
     ["api-upload.html", {trace_hint: "Click two bytes for A/B measurements while playback is paused.", waterfall_title: "File waterfall · window history"}]
 ]) {
     const url = new URL("web/" + name, root), html = readFileSync(url, "utf8");

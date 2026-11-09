@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {"id": "peer-ws", "name": "Entropy Server B · WebSocket", "kind": "entropy-ws", "endpoint": "http://127.0.0.1:8081"},
+    {"id": "peer-http", "name": "Entropy Server B · HTTP", "kind": "entropy-http", "endpoint": "http://127.0.0.1:8081"},
+    {"id": "self-ws", "name": "This server · registered self-link", "kind": "entropy-ws", "endpoint": "http://127.0.0.1:8080"},
+    {"id": "raw-ws", "name": "Binary WebSocket fixture", "kind": "websocket", "endpoint": "ws://127.0.0.1:9003/binary", "max_bytes": 65536},
+    {"id": "raw-http", "name": "HTTP byte fixture", "kind": "http", "endpoint": "http://127.0.0.1:9004/sample.bin", "max_bytes": 65536},
+    {"id": "tcp", "name": "TCP byte source", "kind": "tcp", "endpoint": "127.0.0.1:9001"},
+    {"id": "udp", "name": "UDP receiver", "kind": "udp", "endpoint": "127.0.0.1:9002", "max_bytes": 65536},
+    {"id": "unix", "name": "Local Unix stream", "kind": "unix", "endpoint": "/tmp/entropy-source.sock"},
+    {"id": "urandom", "name": "Linux OS random device", "kind": "device", "endpoint": "/dev/urandom"}
+  ]
+}

@@ -1,10 +1,11 @@
-# Proposal: a browser source lab
+# Source-lab design and access model
 
-A page such as `api-sources.html` would be a useful extension of the stream and
+The implemented `api-sources.html` and `api-socket.html` extend the stream and
 file labs: feed different byte sources into the same histogram, byte trace,
-PSD, Yin/Yang, bit rates and waterfall. `api-socket.html` would also work as a
-name, but “sources” better describes cameras, audio and generated controls.
-This is a proposal; this PR does not create the page or start new listeners.
+PSD, Yin/Yang, bit rates and waterfall. The source page covers browser devices
+and generators; the socket page covers network inputs and registered server-side
+bridges. See [the source-lab guide](source-labs.md)
+for the implemented controls, peer/self-link examples and operational limits.
 
 ## Sources and access
 
@@ -24,12 +25,12 @@ for arbitrary Linux device access. Browser devices belong to the viewer's comput
 adapter. Camera APIs expose processed frames rather than guaranteed raw sensor
 samples; audio may be resampled or processed too.
 
-## Small first implementation
+## Implementation and extension points
 
-Start with browser-local sources: registered WebSocket/HTTP endpoints, Web
-Crypto, deterministic controls and the existing file adapter. Camera/audio can
-follow behind explicit Start/Stop actions. This provides interesting comparisons
-without needing to expose the server's filesystem or sockets.
+The current implementation includes browser WebSocket/HTTP, Web Crypto,
+deterministic controls, local files, camera/audio and Web Serial. Start/Stop
+actions own resource acquisition and cleanup. Registered adapters cover server
+peers, raw TCP/UDP/Unix sockets and readable Linux devices with explicit limits.
 
 The analysis workspace now has a common byte-input interface in
 `web/analysis-workspace.js`. Source adapters can supply bounded buffers plus
