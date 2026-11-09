@@ -36,7 +36,12 @@ def assert_layout(page, columns):
       columns: getComputedStyle(document.querySelector('.stream-grid')).gridTemplateColumns.split(' ').length,
       plots: [...document.querySelectorAll('.diagnostic-plot')].map(c => ({
         id:c.id, width:c.clientWidth, height:c.clientHeight, backing:c.width,
-        label:c.getAttribute('aria-label')
+        label:c.getAttribute('aria-label'), top:c.getBoundingClientRect().top, bottom:c.getBoundingClientRect().bottom
+      })),
+      cards:[...document.querySelectorAll('.stream-grid > .analysis-card')].map(c => ({
+        top:c.getBoundingClientRect().top,bottom:c.getBoundingClientRect().bottom,
+        left:c.getBoundingClientRect().left,right:c.getBoundingClientRect().right,
+        padding:getComputedStyle(c).padding
       }))
     })""")
     assert not result["overflow"], result
@@ -45,6 +50,49 @@ def assert_layout(page, columns):
         assert plot["height"] >= 230 and plot["width"] >= 200, plot
         assert abs(plot["backing"] - plot["width"] * min(3, page.evaluate("devicePixelRatio"))) <= 3, plot
         assert plot["label"], plot
+    assert len({card["padding"] for card in result["cards"]}) == 1, result
+    if columns == 2:
+        for index in range(0, len(result["cards"]), 2):
+            a, b = result["cards"][index:index+2]
+            assert abs(a["top"]-b["top"]) <= 1 and abs(a["bottom"]-b["bottom"]) <= 1, result
+        for index in [0, 2]:
+            a, b = result["plots"][index:index+2]
+            assert abs(a["top"]-b["top"]) <= 1 and abs(a["bottom"]-b["bottom"]) <= 1, result
+    else:
+        assert max(card["left"] for card in result["cards"])-min(card["left"] for card in result["cards"]) <= 1, result
+        assert max(card["right"] for card in result["cards"])-min(card["right"] for card in result["cards"]) <= 1, result
+    return result
+
+
+def assert_waterfall_pixels(page):
+    result = page.evaluate("""() => {
+      const c = document.createElement('canvas');
+      c.style.cssText='position:absolute;left:-1000px;width:311px;height:240px';
+      document.body.append(c);
+      try {
+        const bytes=Uint8Array.from({length:1024},(_,i)=>i%3===0?255:0);
+        const rows=Array.from({length:240},(_,i)=>({bytes,time:200000-i*500,frame:240-i}));
+        const sample = view => Array.from(c.getContext('2d').getImageData(
+          Math.round((53+view.cellWidth/2)*Math.min(devicePixelRatio,3)),
+          Math.round((23+view.cellHeight/2)*Math.min(devicePixelRatio,3)),1,1).data);
+        const auto=EntropyPlots.waterfall(c,rows), rgb=sample(auto);
+        const grayView=EntropyPlots.waterfall(c,rows,{mode:'gray'}), gray=sample(grayView);
+        const bitView=EntropyPlots.waterfall(c,rows,{mode:'bit',bit:7}), bit=sample(bitView);
+        bytes[0]=0;
+        const vividView=EntropyPlots.waterfall(c,rows,{mode:'vivid'}), vivid=sample(vividView);
+        const all=EntropyPlots.waterfall(c,rows,{historyRows:240});
+        c.style.width='583px';
+        const wide=EntropyPlots.waterfall(c,rows);
+        return {auto,wide,all,retained:rows.length,rgb,gray,bit,vivid};
+      } finally {c.remove();}
+    }""")
+    assert result["auto"]["shownRows"] == 16 and result["all"]["shownRows"] == 240
+    assert result["retained"] == 240
+    assert result["auto"]["cellWidth"] >= 12 and result["auto"]["cellHeight"] >= 10
+    assert result["auto"]["rowBytes"] == 60 and result["wide"]["rowBytes"] == 129
+    assert result["rgb"] == [255, 0, 0, 255], result
+    assert result["gray"] == result["bit"] == [255, 255, 255, 255], result
+    assert result["vivid"] == [242, 36, 36, 255], result
     return result
 
 
@@ -64,6 +112,14 @@ def run_browser(base, artifacts, chromium):
         page.locator("#fft-size").select_option("65536")
         expect(page.locator("#fftvalue")).to_contain_text("65,536 points")
         expect(page.locator("#sample-info")).to_contain_text("1,048,576) analysed")
+        expect(page.locator("#waterfall-bit")).to_be_enabled()
+        # Open and use the actual native dropdown while RGB is selected.
+        page.locator("#waterfall-bit").click()
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("Enter")
+        expect(page.locator("#waterfall-bit")).to_have_value("6")
+        expect(page.locator("#waterfall-mode")).to_have_value("bit")
+        page.locator("#waterfall-mode").select_option("rgb")
         page.locator("#fft-average").select_option("4")
         expect(page.locator("#fftvalue")).to_contain_text("4 frame(s)")
         page.locator("#pause-plots").click()
@@ -86,13 +142,13 @@ def run_browser(base, artifacts, chromium):
         page.screenshot(path=str(artifacts / "stream-desktop.png"), full_page=True)
         # View changes preserve capture/history and don't count repeated analysis.
         history = page.locator("#waterfall-info").inner_text().split(" selected frames")[0]
-        for mode in ["gray", "bit", "rgb"]:
+        for mode in ["vivid", "gray", "bit", "rgb"]:
             page.locator("#waterfall-mode").select_option(mode)
             wait_paint(page)
             assert page.locator("#waterfall-info").inner_text().startswith(history)
-        page.locator("#waterfall-mode").select_option("bit")
         expect(page.locator("#waterfall-bit")).to_be_enabled()
         page.locator("#waterfall-bit").select_option("0")
+        expect(page.locator("#waterfall-mode")).to_have_value("bit")
         page.locator("#waterfall-bytes").select_option("1024")
         page.locator("#trace-span").select_option("128")
         page.locator("#trace-style").select_option("steps")
@@ -115,13 +171,27 @@ def run_browser(base, artifacts, chromium):
         expect(page.locator("#fft-scale-error")).to_contain_text("Keeping the last valid scale")
         set_value(page, "fft-max", ".5")
         expect(page.locator("#fft-scale-error")).to_have_text("")
+        wait_paint(page)
+        assert_layout(page, 2)  # Shared plot rows remain aligned with expanded FFT controls.
+        waterfall_pixels = assert_waterfall_pixels(page)
+        page.locator("#waterfall-rows").select_option("240")
+        wait_paint(page)
+        assert page.locator("#waterfall-info").inner_text().startswith(history)
+        page.locator("#waterfall-rows").select_option("16")
         for width in [390, 320, 768]:
             page.set_viewport_size({"width": width, "height": 844})
             wait_paint(page)
             assert_layout(page, 1)
         page.set_viewport_size({"width": 390, "height": 844})
         wait_paint(page)
+        page.locator("#waterfall-mode").select_option("rgb")
+        page.locator("#waterfall-bytes").select_option("auto")
+        wait_paint(page)
         page.screenshot(path=str(artifacts / "stream-mobile.png"), full_page=True)
+        page.locator("#waterfall-mode").select_option("vivid")
+        wait_paint(page)
+        page.locator(".waterfall-card").screenshot(path=str(artifacts / "waterfall-vivid-mobile.png"))
+        page.locator("#waterfall-mode").select_option("rgb")
         page.locator("#pause-plots").click()
         set_value(page, "analysis-offset", 1024)
         page.locator("#analysis-size").select_option("4096")
@@ -178,8 +248,8 @@ def run_browser(base, artifacts, chromium):
         expect(page.locator("#stream-notice")).to_have_attribute("data-state", "error")
         assert not errors, errors
         browser.close()
-        return {"desktop": desktop, "bounded_history": bounded, "browser_errors": errors,
-            "checks": "pause/reception, frozen reanalysis, trace A/B, power average, all colour modes, large/short FFT, offsets, 320/390/768/1440px, shared upload FFT, exact Base64, invalid query"}
+        return {"desktop": desktop, "bounded_history": bounded, "waterfall_pixels": waterfall_pixels, "browser_errors": errors,
+            "checks": "native bit dropdown, aligned card borders and plot rows, enlarged/adaptive waterfall cells, raw/palette pixel fidelity, pause/reception, frozen reanalysis, trace A/B, power average, all colour modes, large/short FFT, offsets, 320/390/768/1440px, shared upload FFT, exact Base64, invalid query"}
 
 
 def main():

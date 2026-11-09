@@ -128,9 +128,11 @@
             `${displayFFT.size.toLocaleString()} points · Δf ${displayFFT.binWidth.toPrecision(4)} cycles/byte · ${displayFFT.window} · ${displayFFT.averages} frame(s) · input mean ${displayFFT.mean.toFixed(3)}` :
             `Needs ${$("fft-size").value === "auto" ? "at least 32" : Number($("fft-size").value).toLocaleString()} bytes in the selected window; received ${bytes.length.toLocaleString()}.`;
         const mode = $("waterfall-mode").value;
-        $("waterfall-bit").disabled = mode !== "bit";
-        plots.waterfall($("mosaic"), history.rows, {mode, bit: Number($("waterfall-bit").value), rowBytes: Number($("waterfall-bytes").value), offset: last.offset});
-        $("waterfall-info").textContent = `${history.rows.length} / ${history.capacity} selected frames · newest at top · ${history.rows.length ? ((history.rows[0].time - history.rows[history.rows.length - 1].time) / 1000).toFixed(1) : "0.0"} seconds captured · ${mode === "rgb" ? "RGB triplets" : mode === "gray" ? "0 = black, 255 = white" : "bit " + $("waterfall-bit").value + ": 0 = black, 1 = white"}`;
+        const requestedBytes = $("waterfall-bytes").value;
+        const view = plots.waterfall($("mosaic"), history.rows, {mode, bit: Number($("waterfall-bit").value),
+            rowBytes: requestedBytes === "auto" ? "auto" : Number(requestedBytes),
+            historyRows: Number($("waterfall-rows").value), offset: last.offset});
+        $("waterfall-info").textContent = `${history.rows.length} / ${history.capacity} selected frames · showing latest ${view?.shownRows || 0} · ${view?.rowBytes || 0} bytes/row · newest at top · ${mode === "rgb" ? "RGB triplets" : mode === "vivid" ? "hue 0–255: red → green → blue → red" : mode === "gray" ? "0 = black, 255 = white" : "bit " + $("waterfall-bit").value + ": 0 = black, 1 = white"}`;
     }
     function invalidate() { epoch++; queued = null; pending = null; average.reset(); }
     function reanalyze() {
@@ -167,7 +169,11 @@
     });
     for (const id of ["fft-size", "fft-window", "fft-demean"]) $(id).addEventListener("change", reanalyze);
     $("fft-average").addEventListener("change", () => { average.reset(); displayFFT = last?.fft ? {...last.fft, averages: 1} : null; redraw(); });
-    for (const id of ["trace-span", "trace-style", "histogram-unit", "histogram-scale", "waterfall-mode", "waterfall-bit", "waterfall-bytes"]) $(id).addEventListener("change", redraw);
+    for (const id of ["trace-span", "trace-style", "histogram-unit", "histogram-scale", "waterfall-mode", "waterfall-bytes", "waterfall-rows"]) $(id).addEventListener("change", redraw);
+    $("waterfall-bit").addEventListener("change", () => {
+        $("waterfall-mode").value = "bit";
+        redraw();
+    });
     $("trace-start").addEventListener("input", redraw);
     $("trace-cursor").addEventListener("input", () => { cursor = Number($("trace-cursor").value); readCursor(); });
     for (const id of ["fft-min", "fft-max", "fft-floor", "fft-ceiling"]) $(id).addEventListener("change", () => {
