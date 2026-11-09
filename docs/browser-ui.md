@@ -70,8 +70,8 @@ certificate. The implementation does not introduce aliases such as
 
 `/api-stream.html` keeps the histogram, byte trace, power spectrum, historical
 colour waterfall and symbolic Yin/Yang bit balance. Wide screens use two
-columns; at 860 CSS pixels and below the cards form one column in reading
-order. Plots retain a 240–260 CSS-pixel height (250 on mobile) and use the
+columns with aligned card borders and shared heading/control/plot rows; at 860 CSS pixels and below the cards form one column in reading
+order. Plots retain a 240 CSS-pixel height (250 on mobile) and use the
 screen pixel ratio, capped at three, rather than stretching an 800-pixel bitmap.
 
 [![Desktop stream lab](images/stream-lab-desktop.png)](images/stream-lab-desktop.png)
@@ -188,14 +188,33 @@ top. Retain **up to 240 rows**, each copying at most 1,024 raw bytes from the
 start of the shared window (245,760 raw history bytes maximum). One, two or
 three age labels refer to monotonic capture timestamps, so pauses and skipped
 frames create real age gaps. Row spacing is uniform per selected frame, not a
-uniform time axis. The caption shows row count and captured time span.
+uniform time axis. The caption shows retained/visible row counts and bytes per row.
 
-Choose **RGB** (three successive bytes per cell), **grayscale** (one byte,
-0 black / 255 white), or **bit plane** (choose bit 7…0, 0 black / 1 white).
-Switching colour mode or bytes/row (128, 256, 512 or 1,024) redraws retained raw
-history. Missing bytes and incomplete RGB triplets are blank. On narrow plots,
-cells can share display pixels; reduce bytes/row to inspect individual cells.
-Clear history explicitly, or change the shared capture selection to start anew.
+The default view shows the **latest 16 retained rows**, giving each row a
+readable height. Select 32, 64 or **all retained rows** (up to 240) for a longer
+view. These choices never discard stored history. The caption distinguishes
+retained frames from visible rows; age ticks describe the visible subset.
+
+**Bytes/row** defaults to **Auto**, fitting roughly 12 CSS pixels per colour
+cell on desktop and mobile. Auto selects complete RGB triplets; other modes use
+one byte per cell. The horizontal scale and caption report the actual byte
+range after a viewport or mode change. Fixed 128/256/512/1,024-byte rows remain
+available for denser comparisons.
+
+Choose **RGB** (three successive raw bytes per cell), **grayscale** (one byte,
+0 black / 255 white), **bit plane** (choose bit 7…0, 0 black / 1 white), or
+**vivid hue** (one byte per bright colour). The bit selector is always enabled;
+choosing a bit switches to bit-plane mode without changing capture, counters
+or history. Vivid hue uses `H = 360 × byte/256`, saturation 85%, value 95%
+(HSV). This is a display palette; it never changes bytes, statistics or the
+FFT. RGB remains the default direct-channel representation.
+
+[Mobile vivid-hue example](images/waterfall-vivid-mobile.png)
+
+Switching colours, bytes/row or visible rows redraws retained raw history.
+Missing bytes and incomplete RGB triplets are blank. Fixed large byte counts
+can still share display pixels on narrow plots. Clear history explicitly, or
+change the shared capture selection to start anew.
 
 ### Regression checks
 
@@ -223,7 +242,7 @@ python3 scripts/test_stream_browser.py --chromium /usr/bin/chromium \
 The optional script starts and shuts down its own loopback server using
 `/dev/urandom`, exercises live reception/pause, frozen reanalysis, trace A/B,
 power averages, all waterfall modes, large/short FFTs, offset handling,
-320/390/768/1440-pixel layouts, a deterministic counter fixture, file upload,
+320/390/768/1440-pixel layouts with paired borders/plot alignment, native bit-selector operation, adaptive cells and raw/palette pixel fidelity, a deterministic counter fixture, file upload,
 exact copyable Base64 and query validation. It saves screenshots, JSON results
 and shutdown logs under the supplied artifacts directory. It does not modify
 an existing server. Browser timings depend on host/browser and exclude a claim

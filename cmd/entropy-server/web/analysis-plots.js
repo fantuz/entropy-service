@@ -14,8 +14,8 @@
         ctx.font = "11px monospace";
         return {ctx, width, height, left: 53, top: 23, right: width - 14, bottom: height - 43};
     }
-    function axes(canvas, {xmin, xmax, ymin, ymax, xlabel, ylabel, xformat = n => String(Math.round(n)), yformat = n => String(Math.round(n))}) {
-        const p = prepare(canvas), {ctx, left, top, right, bottom, width, height} = p;
+    function axes(canvas, {xmin, xmax, ymin, ymax, xlabel, ylabel, xformat = n => String(Math.round(n)), yformat = n => String(Math.round(n))}, p = prepare(canvas)) {
+        const {ctx, left, top, right, bottom, width, height} = p;
         p.x = value => left + (value - xmin) / (xmax - xmin || 1) * (right - left);
         p.y = value => bottom - (value - ymin) / (ymax - ymin || 1) * (bottom - top);
         ctx.fillStyle = color.text; ctx.strokeStyle = color.grid; ctx.lineWidth = 1;
@@ -124,14 +124,29 @@
         }
     }
     const scratch = document.createElement("canvas");
-    function waterfall(canvas, rows, {mode = "rgb", bit = 7, rowBytes = 256, offset = 0} = {}) {
+    // Optional display palette, independent of byte statistics and raw RGB mode.
+    const vivid = Array.from({length: 256}, (_, byte) => {
+        const hue = byte * 6 / 256, chroma = .95 * .85, base = .95 - chroma;
+        const secondary = chroma * (1 - Math.abs(hue % 2 - 1));
+        const channels = [[chroma, secondary, 0], [secondary, chroma, 0], [0, chroma, secondary],
+            [0, secondary, chroma], [secondary, 0, chroma], [chroma, 0, secondary]][Math.floor(hue)];
+        return channels.map(value => Math.round((value + base) * 255));
+    });
+    function waterfall(canvas, rows, {mode = "rgb", bit = 7, rowBytes = "auto", historyRows = 16, offset = 0} = {}) {
         if (!rows.length) { empty(canvas, "Awaiting history"); return; }
+        const p = prepare(canvas);
+        const bytesPerCell = mode === "rgb" ? 3 : 1;
+        if (rowBytes === "auto") {
+            rowBytes = Math.min(Math.floor(1024 / bytesPerCell), Math.max(1, Math.floor((p.right - p.left) / 12))) * bytesPerCell;
+        }
+        // Keep the full history in the caller; only the visible subset is enlarged.
+        rows = rows.slice(0, historyRows);
         const latest = rows[0].time, oldest = rows[rows.length - 1].time;
-        const p = axes(canvas, {xmin: offset, xmax: offset + rowBytes - 1, ymin: 0, ymax: Math.max(1, rows.length),
+        axes(canvas, {xmin: offset, xmax: offset + rowBytes - 1, ymin: 0, ymax: Math.max(1, rows.length),
             xlabel: "Byte offset in frame", ylabel: "History · newest at top", yformat: n => {
                 const row = rows[Math.min(rows.length - 1, Math.max(0, rows.length - 1 - Math.round(n)))];
                 return ((latest - row.time) / 1000).toFixed(1) + "s";
-            }});
+            }}, p);
         const columns = mode === "rgb" ? Math.ceil(rowBytes / 3) : rowBytes;
         scratch.width = columns; scratch.height = rows.length;
         const work = scratch.getContext("2d"), image = work.createImageData(columns, rows.length);
@@ -142,6 +157,9 @@
                 if (index >= count || (mode === "rgb" && index + 2 >= count)) continue;
                 if (mode === "rgb") {
                     image.data[i] = row.bytes[index]; image.data[i + 1] = row.bytes[index + 1]; image.data[i + 2] = row.bytes[index + 2];
+                } else if (mode === "vivid") {
+                    const channels = vivid[row.bytes[index]];
+                    image.data[i] = channels[0]; image.data[i + 1] = channels[1]; image.data[i + 2] = channels[2];
                 } else {
                     const value = mode === "bit" ? ((row.bytes[index] >>> bit) & 1) * 255 : row.bytes[index];
                     image.data[i] = image.data[i + 1] = image.data[i + 2] = value;
@@ -163,7 +181,8 @@
             p.ctx.fillText(((latest - rows[middle].time) / 1000).toFixed(1) + "s", p.left - 6,
                 p.top + (middle + .5) / rows.length * visibleHeight + 4);
         }
-        return {oldest, latest};
+        return {oldest, latest, shownRows: rows.length, rowBytes, columns,
+            cellWidth: (p.right - p.left) / columns, cellHeight: visibleHeight / rows.length};
     }
     globalThis.EntropyPlots = Object.freeze({empty, histogram, trace, spectrum, balance, waterfall});
 })();

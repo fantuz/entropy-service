@@ -583,7 +583,7 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 /* Stream lab: two columns on desktop, readable fixed-height plots on phones. */
 .page-stream { padding: 1rem .65rem; }
 .page-stream .analysis-panel { width: min(100%, 92rem); max-width: 92rem; padding: clamp(.8rem, 2vw, 1.6rem); }
-.page-stream .stream-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+.page-stream .stream-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: stretch; }
 .page-stream .stream-grid > .analysis-card { margin: 0; min-width: 0; }
 .page-stream .analysis-card { padding: .9rem; }
 .page-stream .analysis-controls { gap: .7rem; }
@@ -599,7 +599,14 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .page-stream .note { font-size: .8rem; text-align: left; }
 .page-stream .analysis-meta { font-size: .79rem; text-align: left; }
 .page-stream .diagnostic-plot, .page-upload #fft { width: 100%; height: 240px; }
-.page-stream .waterfall-plot { height: 260px; }
+/* Subgrid keeps paired headings, toolbars, plots and card borders aligned. */
+.page-stream .plot-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: .3rem; }
+.page-stream .plot-card > .analysis-label { margin: .35rem 0; }
+.page-stream .plot-card > .analysis-controls,
+.page-stream .plot-controls .analysis-controls { margin: .4rem 0; }
+.page-stream .plot-card .diagnostic-plot { margin: 0; }
+.page-stream .plot-controls, .page-stream .plot-readouts { min-width: 0; }
+.page-stream .plot-readouts > .analysis-meta:first-child { margin-top: .7rem; }
 .page-stream #sample-info { min-height: 3.2em; }
 .page-stream .balance-layout { display: flex; align-items: center; justify-content: center; gap: 1rem; }
 .page-stream .analysis-panel #pie { width: 148px; height: 148px; flex: 0 0 148px; margin: 0; }
@@ -620,6 +627,7 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .page-stream .analysis-help { margin-top: 1rem; }
 @media (max-width: 860px) {
   .page-stream .stream-grid { grid-template-columns: minmax(0, 1fr); }
+  .page-stream .plot-card { display: block; grid-row: auto; }
   .page-stream .analysis-controls { justify-content: flex-start; }
   .page-stream .balance-layout { justify-content: flex-start; }
   .page-stream .diagnostic-plot { height: 250px; }
