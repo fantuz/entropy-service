@@ -1,0 +1,187 @@
+{
+  "server_commit": "0f542cb9703124c4475da4cfbfb6af0d5babdab1",
+  "source": "required /dev/urandom; no physical QRNG",
+  "reseed_ms": 15000,
+  "transport": "decoded binary WebSocket /stream; 1 MiB messages, refresh=1ms",
+  "capture_bytes_per_backend": 1074790400,
+  "tooling": {
+    "PractRand": "official pre0.95",
+    "PractRand_archive_sha256": "5738c322ccb983b63fbe693f305afa2a7c73e64a80b303c9139278c453ce27b4",
+    "NIST_STS": "2.1.2",
+    "NIST_archive_sha256": "0238d2f1d26e120e3cc748ed2d4c674cdc636de37fc4027c76cc2a394fff9157",
+    "TestU01": "1.2.3, umontreal-simul/TestU01-2009@57e98bf33880daedc930739c81e39b89a8d24dba"
+  },
+  "results": [
+    {
+      "backend": "aes-256-ctr",
+      "capture": {
+        "backend": "aes-256-ctr",
+        "bytes": 1074790400,
+        "sha256": "0882c6f50eacedca61ad082ce11a137151331983f2bbb91b83785cde3609e127",
+        "wall_seconds": 4.353851684951223,
+        "chunk_bytes": 1048576,
+        "transport": "decoded WebSocket /stream",
+        "source": "required /dev/urandom",
+        "reseed_ms": 15000,
+        "server_commit": "0f542cb9703124c4475da4cfbfb6af0d5babdab1"
+      },
+      "practrand": {
+        "backend": "aes-256-ctr",
+        "returncode": 0,
+        "wall_seconds": 17.183543494029436,
+        "target_bytes": 1073741824,
+        "flags": [
+          "Gap-16:A                          R=  +5.0  p =  1.0e-3   unusual"
+        ],
+        "severe_failures": false
+      },
+      "nist100": {
+        "backend": "aes-256-ctr",
+        "returncode": 1,
+        "wall_seconds": 187.18615003704326,
+        "rows": 188,
+        "flagged_rows": [],
+        "summary_exists": true,
+        "eligible_excursion_sequences": [
+          59
+        ]
+      },
+      "excursions200": {
+        "backend": "aes-256-ctr",
+        "returncode": 1,
+        "wall_seconds": 2.5218300329870544,
+        "rows": 26,
+        "flagged_rows": [],
+        "summary_exists": true,
+        "eligible_sequences": [
+          119
+        ]
+      },
+      "smallcrush": {
+        "backend": "aes-256-ctr",
+        "battery": "smallcrush",
+        "returncode": 0,
+        "wall_seconds": 6.444442338019144,
+        "statistics": 15,
+        "all_passed": true,
+        "input_bytes": 907396560
+      }
+    },
+    {
+      "backend": "chacha20",
+      "capture": {
+        "backend": "chacha20",
+        "bytes": 1074790400,
+        "sha256": "4db0b4062ee316e36c3c67cdc0b5036ac61b127b827d9336cc140b9f76ee50ee",
+        "wall_seconds": 2.3731165200006217,
+        "chunk_bytes": 1048576,
+        "transport": "decoded WebSocket /stream",
+        "source": "required /dev/urandom",
+        "reseed_ms": 15000,
+        "server_commit": "0f542cb9703124c4475da4cfbfb6af0d5babdab1"
+      },
+      "practrand": {
+        "backend": "chacha20",
+        "returncode": 0,
+        "wall_seconds": 21.177861492033117,
+        "target_bytes": 1073741824,
+        "flags": [],
+        "severe_failures": false
+      },
+      "nist100": {
+        "backend": "chacha20",
+        "returncode": 1,
+        "wall_seconds": 172.12352186598582,
+        "rows": 188,
+        "flagged_rows": [],
+        "summary_exists": true,
+        "eligible_excursion_sequences": [
+          55
+        ]
+      },
+      "excursions200": {
+        "backend": "chacha20",
+        "returncode": 1,
+        "wall_seconds": 2.5713786259875633,
+        "rows": 26,
+        "flagged_rows": [],
+        "summary_exists": true,
+        "eligible_sequences": [
+          120
+        ]
+      },
+      "smallcrush": {
+        "backend": "chacha20",
+        "battery": "smallcrush",
+        "returncode": 0,
+        "wall_seconds": 7.626454481040128,
+        "statistics": 15,
+        "all_passed": true,
+        "input_bytes": 907255716
+      }
+    },
+    {
+      "backend": "barzakh-521-experimental",
+      "capture": {
+        "backend": "barzakh-521-experimental",
+        "bytes": 1074790400,
+        "sha256": "34197af6203b90757f43bca9eeda107feb0f9bf7dee70e7bb593384092fee508",
+        "wall_seconds": 252.89832587097771,
+        "chunk_bytes": 1048576,
+        "transport": "decoded WebSocket /stream",
+        "source": "required /dev/urandom",
+        "reseed_ms": 15000,
+        "server_commit": "0f542cb9703124c4475da4cfbfb6af0d5babdab1"
+      },
+      "practrand": {
+        "backend": "barzakh-521-experimental",
+        "returncode": 0,
+        "wall_seconds": 20.41492730099708,
+        "target_bytes": 1073741824,
+        "flags": [
+          "FPF-14+6/16:all                   R=  -4.6  p =1-4.9e-4   unusual",
+          "[Low16/64]Gap-16:A                R=  +5.0  p =  1.0e-3   unusual"
+        ],
+        "severe_failures": false
+      },
+      "nist100": {
+        "backend": "barzakh-521-experimental",
+        "returncode": 1,
+        "wall_seconds": 183.60269042296568,
+        "rows": 188,
+        "flagged_rows": [],
+        "summary_exists": true,
+        "eligible_excursion_sequences": [
+          52
+        ]
+      },
+      "excursions200": {
+        "backend": "barzakh-521-experimental",
+        "returncode": 1,
+        "wall_seconds": 2.521458384988364,
+        "rows": 26,
+        "flagged_rows": [],
+        "summary_exists": true,
+        "eligible_sequences": [
+          119
+        ]
+      },
+      "smallcrush": {
+        "backend": "barzakh-521-experimental",
+        "battery": "smallcrush",
+        "returncode": 0,
+        "wall_seconds": 6.631766327016521,
+        "statistics": 15,
+        "all_passed": true,
+        "input_bytes": 908004048
+      }
+    }
+  ],
+  "limitations": [
+    "one served sample per backend, multiple tests reuse the same data",
+    "default periodic reseeding; not uninterrupted un-reseeded generator tests",
+    "not security certification, SP800-90A conformance or SP800-90B source assessment",
+    "PractRand0.94 aborted; updated tester reran identical saved input",
+    "NIST excursion families supplemented to 200 sequences for every backend after eligibility was too low in the initial Barzakh sample"
+  ]
+}

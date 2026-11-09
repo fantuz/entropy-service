@@ -65,6 +65,8 @@ jobs:
         run: node scripts/test-web-layout.mjs
       - name: Test synchronized HTTP gallery
         run: node scripts/test_gallery.mjs
+      - name: Test statistical capture and report contracts
+        run: python3 -m unittest discover -s scripts -p 'test_capture_randomness.py'
       - name: Race-test all Go packages
         run: make test-race
       - name: Smoke-test packaged service configuration
