@@ -86,7 +86,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
 	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
 	flags.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
-	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; explicit override allowed")
+	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; barzakh-521-experimental requires -tags=experimental_barzakh")
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default /stream, /colors and /words WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.PageRefreshMs, "refresh", 5000, "Word page refresh in milliseconds (HTML rounds up to whole seconds)")

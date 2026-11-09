@@ -5,6 +5,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | Document | Contents |
 | --- | --- |
 | [DRBG construction](drbg-construction.md) | Byte-level root/child state transitions, reseed diagram, and limits of the cryptographic assurance claim. |
+| [Experimental Barzakh-521](experimental-barzakh.md) | Opt-in original Go scalar backend, build instructions, exact mapping, tests and licensing/patent boundary. |
 | [Process-memory hardening](process-memory-hardening.md) | Opt-in systemd protection, core-dump caveats and host security checklist. |
 | [DRBG lifecycle benchmarks](drbg-lifecycle-benchmarks.md) | Reproducible microbenchmark suite, before/after comparison, and interpretation. |
 | [Full architecture review](architecture-review.md) | Five-question assurance assessment, component map, findings and remediation roadmap. |

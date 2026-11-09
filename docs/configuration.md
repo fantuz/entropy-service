@@ -32,6 +32,11 @@ The architecture-based backend policy uses the binary's Go target architecture (
 | `-key-file` | `key.pem` | TLS private key path. |
 | `-debug` | `false` | Debug output and loopback pprof on port 6060. |
 
+An explicit `-tags=experimental_barzakh` build additionally accepts
+`-drbg=barzakh-521-experimental` for local research. The variable-time Go
+implementation is excluded from normal releases and unsuitable for secrets.
+See [construction, provenance and patent limitations](experimental-barzakh.md).
+
 ### Output and resource budgets
 
 | Flag | Default | Purpose |

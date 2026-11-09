@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+func testAlgorithms() []Algorithm {
+	algorithms := []Algorithm{ChaCha20, AES256CTR}
+	if barzakhEnabled {
+		algorithms = append(algorithms, Barzakh521)
+	}
+
+	return algorithms
+}
+
 func testSeed() []byte {
 	seed := make([]byte, 64)
 	for i := range seed {
@@ -44,7 +53,7 @@ func decodeTestHex(t *testing.T, value string) []byte {
 }
 
 func TestAlgorithmValidation(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		got, err := ParseAlgorithm(string(algorithm))
 		if err != nil || got != algorithm {
 			t.Fatalf("parse %q: %q, %v", algorithm, got, err)
@@ -147,7 +156,7 @@ func TestBackendSeedAndReseedFixtures(t *testing.T) {
 }
 
 func TestBackendReadContinuityAndChildren(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			a, b := testGenerator(t, algorithm), testGenerator(t, algorithm)
 
@@ -200,7 +209,7 @@ func TestBackendReadContinuityAndChildren(t *testing.T) {
 }
 
 func TestBackendLimitAndMetadata(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 			d.SetMetadata("test", "test", "incorrect caller label", time.Second, 256)
@@ -242,7 +251,7 @@ func TestBackendLimitAndMetadata(t *testing.T) {
 }
 
 func TestBackendConcurrentReadsReseedsAndDerivation(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 

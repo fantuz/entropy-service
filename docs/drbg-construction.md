@@ -1,5 +1,9 @@
 # DRBG construction specification (implementation baseline)
 
+This baseline describes normal AES/ChaCha builds. The opt-in
+[experimental Barzakh-521 mapping](experimental-barzakh.md) uses the same
+outer seed/reseed lifecycle with a different, variable-time generator.
+
 > **Status:** descriptive specification of the current Entropy Service
 > construction, reviewed against `main` at `b183df363b3e75cd9863a0a9a24c28bb68720fd9`.
 > **Not** a proof of security, certified DRBG design, SP 800-90A CTR_DRBG,

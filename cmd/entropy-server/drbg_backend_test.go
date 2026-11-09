@@ -11,7 +11,12 @@ import (
 )
 
 func TestRandomBytesInheritsBackend(t *testing.T) {
-	for _, algorithm := range []drbg.Algorithm{drbg.ChaCha20, drbg.AES256CTR} {
+	algorithms := []drbg.Algorithm{drbg.ChaCha20, drbg.AES256CTR}
+	if _, err := drbg.ParseAlgorithm(string(drbg.Barzakh521)); err == nil {
+		algorithms = append(algorithms, drbg.Barzakh521)
+	}
+
+	for _, algorithm := range algorithms {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			seed := bytes.Repeat([]byte{0x5a}, 64)
 

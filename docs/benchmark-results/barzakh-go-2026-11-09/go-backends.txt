@@ -1,0 +1,36 @@
+goos: linux
+goarch: amd64
+pkg: github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkDRBGLifecycle/chacha20/NewClose         	  832264	       731.1 ns/op	     432 B/op	       3 allocs/op
+BenchmarkDRBGLifecycle/chacha20/NewClose         	  718548	       706.7 ns/op	     432 B/op	       3 allocs/op
+BenchmarkDRBGLifecycle/chacha20/NewClose         	  835911	       698.0 ns/op	     432 B/op	       3 allocs/op
+BenchmarkDRBGLifecycle/chacha20/NewClose         	  747150	       717.1 ns/op	     432 B/op	       3 allocs/op
+BenchmarkDRBGLifecycle/chacha20/NewClose         	  767222	       712.4 ns/op	     432 B/op	       3 allocs/op
+BenchmarkDRBGLifecycle/chacha20/Read64KiB        	    5851	    106285 ns/op	 616.61 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/chacha20/Read64KiB        	    5961	    105492 ns/op	 621.24 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/chacha20/Read64KiB        	    5408	    105295 ns/op	 622.40 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/chacha20/Read64KiB        	    5853	    105213 ns/op	 622.89 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/chacha20/Read64KiB        	    5923	    108244 ns/op	 605.45 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/NewClose      	  631261	       949.6 ns/op	    1280 B/op	       4 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/NewClose      	  618412	       948.1 ns/op	    1280 B/op	       4 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/NewClose      	  565551	       960.0 ns/op	    1280 B/op	       4 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/NewClose      	  640251	       967.4 ns/op	    1280 B/op	       4 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/NewClose      	  555990	       953.4 ns/op	    1280 B/op	       4 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/Read64KiB     	   57525	     10606 ns/op	6179.05 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/Read64KiB     	   57068	     10400 ns/op	6301.72 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/Read64KiB     	   55428	     10496 ns/op	6243.84 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/Read64KiB     	   57542	     10682 ns/op	6135.36 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/aes-256-ctr/Read64KiB     	   58902	     10473 ns/op	6257.36 MB/s	       0 B/op	       0 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/NewClose         	  156490	      3350 ns/op	    1320 B/op	      14 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/NewClose         	  173790	      3384 ns/op	    1320 B/op	      14 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/NewClose         	  175611	      3368 ns/op	    1320 B/op	      14 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/NewClose         	  176606	      3370 ns/op	    1320 B/op	      14 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/NewClose         	  169460	      3354 ns/op	    1320 B/op	      14 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/Read64KiB        	      45	  13801956 ns/op	   4.75 MB/s	 3424229 B/op	   30722 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/Read64KiB        	      46	  13748549 ns/op	   4.77 MB/s	 3424228 B/op	   30722 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/Read64KiB        	      44	  13808204 ns/op	   4.75 MB/s	 3424229 B/op	   30722 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/Read64KiB        	      45	  13648160 ns/op	   4.80 MB/s	 3424230 B/op	   30722 allocs/op
+BenchmarkDRBGLifecycle/barzakh-521-experimental/Read64KiB        	      46	  13501442 ns/op	   4.85 MB/s	 3424229 B/op	   30722 allocs/op
+PASS
+ok  	github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg	19.598s

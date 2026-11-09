@@ -9,7 +9,7 @@ import (
 )
 
 func TestDeriveRejectsInvalidSizeWithoutConsumingStream(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 			reference := testGenerator(t, algorithm)
@@ -47,7 +47,7 @@ func TestDeriveRejectsInvalidSizeWithoutConsumingStream(t *testing.T) {
 }
 
 func TestDeriveAfterCloseAndOnExhaustedGenerator(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			d := testGenerator(t, algorithm)
 			d.generated = maxBytesPerKey
@@ -68,7 +68,7 @@ func TestDeriveAfterCloseAndOnExhaustedGenerator(t *testing.T) {
 }
 
 func TestCloseCountsExactlyOnceUnderConcurrency(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			baseline := ActiveInstances()
 
@@ -107,7 +107,7 @@ func TestCloseCountsExactlyOnceUnderConcurrency(t *testing.T) {
 }
 
 func TestFailedChildConstructionLeavesInstanceCountUnchanged(t *testing.T) {
-	for _, algorithm := range []Algorithm{ChaCha20, AES256CTR} {
+	for _, algorithm := range testAlgorithms() {
 		t.Run(algorithm.String(), func(t *testing.T) {
 			parent := testGenerator(t, algorithm)
 			baseline := ActiveInstances()
