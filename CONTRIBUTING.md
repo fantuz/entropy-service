@@ -109,3 +109,4 @@ Experimental-source checks: `node scripts/test-lab-samples.mjs` and
 The latter uses fake media and local fixtures; it does not activate real devices.
 The optional `scripts/test_lab_cameras.py` uses FFmpeg and a supplied MediaMTX
 binary for authenticated RTSP and mocked ONVIF/HTTP browser integration.
+It also requires test-only Python packages `playwright` and `defusedxml`.

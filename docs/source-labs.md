@@ -251,6 +251,14 @@ There is no multicast discovery, PTZ control or ONVIF certification claim.
 Media2-only/vendor authentication differences may require using the camera's
 RTSP URL directly.
 
+The ONVIF UsernameToken wire format mandates SHA-1 over nonce, timestamp and
+password. It is an interoperable challenge-response digest, not a password
+database or DRBG construction; substituting a costly password-storage hash
+would break camera interoperability. CodeQL's password-hashing rule flags this
+protocol use and its test verification, which need maintainer security review.
+Prefer HTTPS ONVIF services where supported and keep camera traffic within a
+trusted network.
+
 Decode sizes are 160×120, 320×240 (default) and 640×480; `max_bytes`, if supplied,
 must equal width×height×3. Samples are prefixes of row-major RGB8 frames. Preview
 requires a complete frame to fit the server byte limit. The decoder samples at
@@ -282,6 +290,7 @@ go test -race ./cmd/entropy-server/internal/lab ./cmd/entropy-server
 make build-server
 python3 scripts/test_sources_browser.py --artifacts /tmp/entropy-source-lab
 # Optional real RTSP decoder + synthetic camera/ONVIF/HTTP fixtures:
+# Install test-only Python dependencies first: pip install playwright defusedxml
 python3 scripts/test_lab_cameras.py --mediamtx /path/to/mediamtx --artifacts /tmp/entropy-camera-lab
 ```
 

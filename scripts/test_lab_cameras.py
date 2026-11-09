@@ -10,6 +10,7 @@ import contextlib
 import hashlib
 import http.server
 import json
+import os
 from pathlib import Path
 import signal
 import socket
@@ -17,7 +18,10 @@ import subprocess
 import tempfile
 import threading
 import time
-import xml.etree.ElementTree as ET
+import urllib.error
+import urllib.request
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from test_sources_browser import free_port, serve_process
 from test_stream_browser import assert_layout, number, wait_paint
@@ -44,8 +48,11 @@ class WebFixture(http.server.BaseHTTPRequestHandler):
         with contextlib.suppress(BrokenPipeError,ConnectionResetError):self.wfile.write(BODY)
 
     def do_POST(self):
-        data=self.rfile.read(int(self.headers["Content-Length"]))
-        root=ET.fromstring(data)
+        length=int(self.headers.get("Content-Length","0"))
+        if not 0<length<=65536:self.send_error(413);return
+        data=self.rfile.read(length)
+        try:root=ET.fromstring(data,forbid_dtd=True)
+        except (ET.ParseError,DefusedXmlException):self.send_error(400);return
         values={node.tag.rsplit("}",1)[-1]:node.text for node in root.iter()}
         expected=base64.b64encode(hashlib.sha1(base64.b64decode(values["Nonce"])+values["Created"].encode()+PASSWORD.encode()).digest()).decode()
         assert values["Username"]==USER and values["Password"]==expected and PASSWORD.encode() not in data
@@ -156,16 +163,15 @@ authInternalUsers:
   ips: [127.0.0.1]
   permissions: [{{action: publish, path: lab}}]
 - user: {USER}
-  pass: {PASSWORD}
   permissions: [{{action: read, path: lab}}]
 paths:
   lab:
 ''')
         processes=[]
-        def launch(command,name):
-            log=stack.enter_context((args.artifacts/(name+".log")).open("w"));process=subprocess.Popen(command,stdout=log,stderr=log,cwd=tmp);processes.append(process);return process
+        def launch(command,name,env=None):
+            log=stack.enter_context((args.artifacts/(name+".log")).open("w"));process=subprocess.Popen(command,stdout=log,stderr=log,cwd=tmp,env=env);processes.append(process);return process
         try:
-            launch([str(args.mediamtx.resolve()),str(cfg)],"mediamtx")
+            launch([str(args.mediamtx.resolve()),str(cfg)],"mediamtx",{**os.environ,"MTX_AUTHINTERNALUSERS_1_PASS":PASSWORD})
             for _ in range(100):
                 try:
                     with socket.create_connection(("127.0.0.1",rtsp),timeout=.1):break
@@ -176,6 +182,11 @@ paths:
             web=http.server.ThreadingHTTPServer(("127.0.0.1",0),WebFixture)
             stack.callback(web.server_close);stack.callback(web.shutdown);threading.Thread(target=web.serve_forever,daemon=True).start()
             web_url=f"http://127.0.0.1:{web.server_port}"
+            for payload,code in [(b'<!DOCTYPE x [<!ENTITY a "expanded">]><x>&a;</x>',400),(b"x"*65537,413)]:
+                request=urllib.request.Request(web_url+"/device",data=payload,method="POST")
+                try:urllib.request.urlopen(request,timeout=2).close()
+                except urllib.error.HTTPError as failure:assert failure.code==code
+                else:raise AssertionError("unsafe SOAP fixture input was accepted")
             sources={"sources":[
                 {"id":"camera","kind":"rtsp","endpoint":f"rtsp://127.0.0.1:{rtsp}/lab","width":160,"height":120},
                 {"id":"onvif","kind":"onvif","endpoint":web_url+"/device","width":160,"height":120},
