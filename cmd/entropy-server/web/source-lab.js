@@ -37,9 +37,11 @@
         requestAnimationFrame(()=>{
             meterScheduled=false;const data=meter.snapshot(performance.now());
             $("lab-input-bytes").textContent=data.bytes.toLocaleString();$("lab-input-frames").textContent=data.frames.toLocaleString();
+            $("lab-input-unit").textContent=data.frames===1?"sample":"samples";
             $("lab-rate").textContent=data.bytesPerSecond===null?"—":(data.bytesPerSecond/1e6).toFixed(4);
             $("lab-interval").textContent=data.meanIntervalMs===null?"—":data.meanIntervalMs.toFixed(2);
             $("lab-analysis-bytes").textContent=analysedBytes.toLocaleString();$("lab-analysis-frames").textContent=analysedFrames.toLocaleString();
+            $("lab-analysis-unit").textContent=analysedFrames===1?"window":"windows";
         });
     }
     const workspace=window.EntropyWorkspace({kind:"stream",
@@ -215,16 +217,30 @@
     $("lab-download").addEventListener("click",()=>{const sample=workspace.sample;if(sample?.sourceId===generation)download(new Blob([sample.buffer.slice(0)],{type:"application/octet-stream"}),`entropy-lab-${options.kind}-${options.transform}.bin`);});
     function renderRecords(){
         const body=$("lab-measurements").tBodies[0];body.replaceChildren();
-        for(const record of records){const row=document.createElement("tr");for(const value of [record.source,record.representation,record.window.bytes,record.statistics.entropy.toFixed(5),record.meter.bytesPerSecond===null?"—":(record.meter.bytesPerSecond/1e6).toFixed(4)]){const cell=document.createElement("td");cell.textContent=value;row.append(cell);}body.append(row);}
+        const labels=["Source","Representation","Window bytes","Shannon bits/B","Session sampled MB/s"];
+        for(const record of records){
+            const row=document.createElement("tr");row.setAttribute("role","row");
+            const values=[record.source,record.representation,record.window.bytes.toLocaleString(),record.statistics.entropy.toFixed(5),record.meter.bytesPerSecond===null?"—":(record.meter.bytesPerSecond/1e6).toFixed(4)];
+            values.forEach((value,index)=>{
+                const cell=document.createElement("td"),content=document.createElement("span");cell.setAttribute("role","cell");cell.dataset.label=labels[index];content.textContent=value;cell.append(content);
+                if(index===0){
+                    const note=document.createElement("small");note.className="lab-record-note";
+                    note.textContent=`${record.frozen?"Frozen":"Live"} sample #${record.window.frame} · ${record.capturedAt?new Date(record.capturedAt).toLocaleTimeString():"capture time unavailable"}`;
+                    content.append(note);cell.title=`Captured: ${record.capturedAt||"unavailable (older record)"}\nRecorded: ${record.recordedAt||record.timestamp}\nMeters describe the source session at recording time.`;
+                }
+                row.append(cell);
+            });body.append(row);
+        }
         try{sessionStorage.setItem(storageKey,JSON.stringify(records));}catch(_){}
         buttons();
     }
     $("lab-record").addEventListener("click",()=>{
         const sample=workspace.sample;if(sample?.sourceId!==generation)return;
-        records.push({timestamp:new Date().toISOString(),source:sample.sourceName,encoding:sample.encoding,representation:sample.representation,
+        const recordedAt=new Date().toISOString(),now=performance.now();
+        records.push({timestamp:recordedAt,recordedAt,capturedAt:new Date(sample.time).toISOString(),sampleAgeMs:Math.max(0,now-sample.captureTime),source:sample.sourceName,encoding:sample.encoding,representation:sample.representation,
             sourceKind:options.selection,transportKind:options.kind,registeredSource:options.registeredId||null,upstreamKind:options.registeredKind||null,settings:{sampleBytes:options.size,cadenceMs:options.refresh,cadenceApplied:options.cadenceApplied},window:{offset:sample.offset,bytes:sample.analyzedBytes,frame:sample.frame},
             statistics:{entropy:sample.entropy,mean:sample.mean,stddev:sample.stddev,ones:sample.ones,zeros:sample.zeros,bitOnes:Array.from(sample.bitOnes)},
-            meter:meter.snapshot(performance.now()),frozen:workspace.frozen});
+            meter:{...meter.snapshot(now),scope:"source-session",measuredAt:recordedAt},frozen:workspace.frozen});
         if(records.length>50)records.shift();renderRecords();
     });
     $("lab-clear-records").addEventListener("click",()=>{records.length=0;renderRecords();});

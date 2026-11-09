@@ -90,6 +90,15 @@ sampled rate, intervals and frozen state. Records survive navigation between
 the two labs within the same browser tab using `sessionStorage` where available.
 Storage restrictions fall back to in-memory records. **Export measurements**
 saves `entropy-lab-measurements-v1` JSON; it contains summaries, not sample bytes.
+Each new record includes `capturedAt` (when the browser received the represented
+sample), `recordedAt` (when **Record measurement** was clicked) and `sampleAgeMs`
+using the browser's monotonic clock. The legacy `timestamp` remains an alias of
+`recordedAt`. `meter.scope` is `source-session` and `meter.measuredAt` matches
+`recordedAt`: the rate/byte/frame totals include reception while plots are paused,
+whereas `window.frame` and `statistics` describe the frozen sample. This makes a
+paused comparison explicit without attributing newer bytes to older statistics.
+Older records from the same tab still load and show “capture time unavailable”.
+The comparison table becomes labelled measurement cards on narrow screens.
 **Download selected bytes** saves the exact latest selected representation and
 window as a binary file. Export/download are explicit local browser actions.
 
@@ -199,6 +208,33 @@ The configurator prepares a file locally; it does not activate sources, write
 server files, or retrieve private endpoint paths from the catalog. Imported
 registries are limited to 64 KiB/32 entries and duplicate IDs are rejected.
 Camera passwords do not belong in this file and are rejected in URL userinfo.
+
+The draft list supports **Edit**, ID renaming and **Remove**. **Save registration**
+updates the selected entry; **Cancel edit** keeps the existing entry.
+**Clear form** discards an unfinished new entry without deleting draft sources.
+Validation feedback appears beside the relevant field. The heading, **Close** button and
+export actions stay visible while the form scrolls on desktop and mobile.
+
+An **Unsaved changes** indicator covers both the registry and unfinished form
+edits. The browser warns before leaving a page with unsaved changes, and replacing
+or resetting an unsaved draft asks before discarding it. Closing the dialog keeps
+the draft on the current page. Copying JSON or requesting its download marks that
+registry version exported; unfinished form edits must still be saved or cancelled.
+Verify a requested download completed before navigating away. The draft is held
+only in page memory, with no automatic storage of endpoint URLs or profile tokens.
+Browser navigation warnings depend on browser support and cannot guarantee
+recovery after a tab/process crash.
+
+Imports preserve valid settings and reject inconsistent fields instead of
+silently rewriting them. Camera defaults match the server: 320×240 RGB, 230,400
+bytes and a 10,000-ms timeout; other sources default to 1 MiB and 5,000 ms.
+Explicit camera sizes require the matching RGB frame byte count. Names, endpoint
+paths/URLs and ONVIF profile tokens use the server's UTF-8 **byte** limits, not
+JavaScript character counts. A shared browser/Go fixture checks these defaults,
+source-specific fields and limits in CI. The server remains the authority when
+loading a registry. Resetting or editing a draft invalidates pending imports;
+an older asynchronous read cannot replace newer work. A failed import keeps the
+last valid draft, and the same file can be selected again after correction.
 
 The builder displays a type-specific example, an explicit **Use example** button
 and validation errors containing the expected schema. Camera credential guidance
@@ -418,4 +454,5 @@ all-site compatibility.
 [Socket lab desktop](images/socket-lab-desktop.png) ·
 [Socket lab mobile](images/socket-lab-mobile.png)
 
-[Assisted registration on mobile](images/source-registration-mobile.png)
+[Assisted registration on mobile](images/source-registration-mobile.png) ·
+[Measurement cards on mobile](images/source-measurements-mobile.png)
