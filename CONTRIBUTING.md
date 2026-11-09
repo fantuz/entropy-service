@@ -96,9 +96,13 @@ The project uses the [MIT License](LICENSE); contributions are submitted under t
 
 ### Shared analysis panels
 
-Stream and upload controls use `cmd/entropy-server/web/analysis-workspace.js`. Edit the common card
+Stream, upload and experimental source/socket controls use `cmd/entropy-server/web/analysis-workspace.js`. Edit the common card
 markup in `cmd/entropy-server/webtemplates/analysis-panels.html`, then run
 `node scripts/render-analysis-pages.mjs`. The generated HTML is committed;
 `node scripts/render-analysis-pages.mjs --check` runs in CI. See
 [the browser guide](docs/browser-ui.md#shared-file-analysis-workspace) for optional
 real Chromium checks of both labs.
+
+Experimental-source checks: `node scripts/test-lab-samples.mjs` and
+`python3 scripts/test_sources_browser.py --artifacts /tmp/entropy-source-lab`.
+The latter uses fake media and local fixtures; it does not activate real devices.

@@ -247,7 +247,7 @@ The homepage at `/` is the interactive entry point. Common API routes include:
 
 The stream and upload labs share analysis windows up to 1 MiB, FFTs up to 65,536 points, labelled plots, paused byte inspection, optional bit-position rates and a historical colour waterfall, with desktop/mobile layouts. The [file workspace](docs/browser-ui.md#shared-file-analysis-workspace) adds bounded local seeking/playback while preserving server upload analysis and full-file SHA-256. See [controls and mathematics](docs/browser-ui.md#stream-analysis-shared-window-and-controls). Normal shutdown prints a [served-traffic executive summary](docs/operations.md#shutdown-executive-summary).
 
-Interactive demonstrations live at `/api-bytes.html`, `/api-stream.html`, `/api-words.html`, `/api-colors.html`, `/api-sound.html`, and `/api-upload.html`. They are **browser pages**, not API version prefixes.
+Interactive demonstrations live at `/api-bytes.html`, `/api-stream.html`, `/api-words.html`, `/api-colors.html`, `/api-sound.html`, `/api-upload.html`, `/api-sources.html` and `/api-socket.html`. They are **browser pages**, not API version prefixes.
 
 **[Complete HTTP/WebSocket endpoint, parameter and format reference](docs/api.md)**
 
@@ -309,6 +309,8 @@ quality checks against the tagged commit before publishing.
 See [Go conventions, module policy and coverage review](docs/go-quality.md)
 for the measured baseline, remaining test gaps and badge meanings. Hardware
 deployment and full interactive browser checks still require separate validation.
+
+The [experimental source/socket labs](docs/source-labs.md) add browser generators/media, source metering/comparisons, binary downloads and registered peer/self/device connections.
 
 ## Further reading
 

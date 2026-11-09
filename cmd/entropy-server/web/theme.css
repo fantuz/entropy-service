@@ -642,3 +642,18 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .page-upload #file-controls:disabled { opacity: .55; }
 
 .page-upload #server-report-content { max-height: 20rem; text-align: left; }
+
+/* Experimental sources share the analysis grid and keep source controls local. */
+.page-lab .lab-only[hidden] { display: none; }
+.page-lab .lab-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:.6rem; margin:.8rem 0; }
+.page-lab input[type="text"] { border:1px solid var(--border); background:var(--surface-raised); border-radius:10px; padding:.65rem .8rem; width:14rem; max-width:100%; }
+.page-lab .lab-url { flex:1 1 25rem; }
+.page-lab .lab-url input { width:100%; }
+.page-lab .lab-file { flex:1 1 24rem; }
+.page-lab #lab-video { width:min(100%,20rem); border:1px solid var(--border); border-radius:12px; }
+.page-lab #lab-video[hidden] { display:none; }
+.page-lab .lab-table-wrap { overflow:auto; }
+.page-lab table { width:100%; border-collapse:collapse; font-size:.8rem; text-align:left; }
+.page-lab th,.page-lab td { border-bottom:1px solid var(--border); padding:.65rem; min-width:6rem; }
+.page-lab caption { color:var(--muted); text-align:left; padding:.5rem; }
+@media(max-width:420px) { .page-lab .lab-file,.page-lab .lab-url { grid-column:1 / -1; } }

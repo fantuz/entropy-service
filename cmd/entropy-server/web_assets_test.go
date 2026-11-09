@@ -18,9 +18,9 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 
 	for _, path := range []string{
 		"/", "/theme.css", "/entropy-display.js",
-		"/entropy-display-worker.js", "/worker.js", "/analysis-math.js", "/analysis-plots.js", "/analysis-workspace.js", "/stream-analysis.js", "/stream-entropy-alert.js", "/file-upload.js", "/status-dashboard.js", "/status-kpis.js", "/gallery.js",
+		"/entropy-display-worker.js", "/worker.js", "/analysis-math.js", "/analysis-plots.js", "/analysis-workspace.js", "/lab-samples.js", "/lab-adapters.js", "/source-lab.js", "/stream-analysis.js", "/stream-entropy-alert.js", "/file-upload.js", "/status-dashboard.js", "/status-kpis.js", "/gallery.js",
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
-		"/api-sound.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
+		"/api-sound.html", "/api-sources.html", "/api-socket.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 	} {
 		t.Run(path, func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestHomepageLinksAllPublicRoutes(t *testing.T) {
 
 	for _, route := range []string{
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
-		"/api-sound.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
+		"/api-sound.html", "/api-sources.html", "/api-socket.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 		"/live", "/ready", "/health-1", "/health-2", "/metrics-1", "/metrics-2",
 		"/v1/data/random", "/v1/data/test", "/v1/meta/random",
 		"/v1/image/random", "/v1/image/heatmap", "/v1/qr/random",

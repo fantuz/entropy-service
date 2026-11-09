@@ -33,34 +33,38 @@ func defaultDRBGForArch(goarch string) string {
 }
 
 type Config struct {
-	ReseedMs         int
-	MaxReseedAgeMs   int
-	ReseedSize       int
-	MaxBytes         int
-	QRNGBuffer       int
-	SeedBuffer       int
-	MaxWords         int
-	PageRefreshMs    int
-	BytesFingerprint int
-	RefreshRateMs    int
-	RefreshColorMs   int
-	HTTPAddr         string
-	HTTPSAddr        string
-	CertFile         string
-	KeyFile          string
-	LogLevel         string // Legacy field: unused.
-	DevicePath       string
-	DRBG             string
-	EnableHTTPS      bool
-	RequireDevice    bool
-	MixRDRAND        bool
-	MixCPU           bool
-	ShowDebug        bool
-	WantsCookie      bool
-	WSMaxConnections int
-	WSMemoryMiB      int64
-	HTTPMaxRequests  int
-	HTTPMemoryMiB    int64
+	LabSources        string
+	LabAllowRemote    bool
+	LabMaxConnections int
+	LabMemoryMiB      int64
+	ReseedMs          int
+	MaxReseedAgeMs    int
+	ReseedSize        int
+	MaxBytes          int
+	QRNGBuffer        int
+	SeedBuffer        int
+	MaxWords          int
+	PageRefreshMs     int
+	BytesFingerprint  int
+	RefreshRateMs     int
+	RefreshColorMs    int
+	HTTPAddr          string
+	HTTPSAddr         string
+	CertFile          string
+	KeyFile           string
+	LogLevel          string // Legacy field: unused.
+	DevicePath        string
+	DRBG              string
+	EnableHTTPS       bool
+	RequireDevice     bool
+	MixRDRAND         bool
+	MixCPU            bool
+	ShowDebug         bool
+	WantsCookie       bool
+	WSMaxConnections  int
+	WSMemoryMiB       int64
+	HTTPMaxRequests   int
+	HTTPMemoryMiB     int64
 }
 
 func ParseConfig() *Config {
@@ -81,6 +85,10 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags := flag.NewFlagSet("entropy-server", flag.ContinueOnError)
 	flags.SetOutput(output)
 
+	flags.StringVar(&cfg.LabSources, "lab-sources", "", "Experimental source registry JSON file (device/socket/peer endpoints are configured by the operator)")
+	flags.BoolVar(&cfg.LabAllowRemote, "lab-allow-remote", false, "Allow non-loopback clients to use registered experimental source bridges")
+	flags.IntVar(&cfg.LabMaxConnections, "lab-max-connections", 8, "Maximum simultaneous experimental source bridges")
+	flags.Int64Var(&cfg.LabMemoryMiB, "lab-memory-mib", 32, "Experimental bridge working-memory budget in MiB")
 	flags.StringVar(&cfg.HTTPAddr, "http", ":8080", "HTTP listen address")
 	flags.StringVar(&cfg.HTTPSAddr, "https", ":8443", "HTTPS listen address")
 	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
@@ -186,6 +194,10 @@ func (cfg *Config) Validate() error {
 
 	if cfg.BytesFingerprint < 1 || cfg.BytesFingerprint > 1<<25 {
 		return errors.New("fingerprint must be between 1 and 33554432 bytes")
+	}
+
+	if cfg.LabMaxConnections < 1 || cfg.LabMemoryMiB < 1 || cfg.LabMemoryMiB > (1<<63-1)/(1<<20) {
+		return errors.New("lab-max-connections and lab-memory-mib must be positive; memory budget must fit in int64 bytes")
 	}
 
 	if cfg.WSMaxConnections < 1 || cfg.WSMemoryMiB < 1 || cfg.WSMemoryMiB > (1<<63-1)/(1<<20) {

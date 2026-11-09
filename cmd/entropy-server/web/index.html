@@ -44,6 +44,8 @@
           <a class="card" href="/api-sound.html"><strong>Sound</strong><span>Generate and play short harmonically synthesised clips.</span><small class="path">/api-sound.html</small></a>
           <a class="card" href="/api-upload.html"><strong>File analysis</strong><span>Upload a file to inspect its byte statistics and SHA-256 digest.</span><small class="path">/api-upload.html</small></a>
           <a class="card" href="/api-stream.html"><strong>Live stream analysis</strong><span>Histogram, RGB mosaic, Yin/Yang, waveform and FFT of selected binary samples.</span><small class="path">/api-stream.html</small></a>
+          <a class="card" href="/api-sources.html"><strong>Experimental source lab</strong><span>Generate, meter and compare Web Crypto, patterns, files, camera, audio and serial samples.</span><small class="path">/api-sources.html</small></a>
+          <a class="card" href="/api-socket.html"><strong>Experimental socket lab</strong><span>Connect this instance or a peer, inspect HTTP/WS data and registered devices.</span><small class="path">/api-socket.html</small></a>
         </div>
       </section>
 
@@ -54,6 +56,7 @@
           <a class="card" href="/api-stream.html"><strong>Binary stream</strong><span>Raw binary frames, visualized by the stream-analysis page.</span><small class="path">WS /stream</small></a>
           <a class="card" href="/api-bytes.html"><strong>Byte stream</strong><span>Compact binary digest + sample, or optional JSON formats.</span><small class="path">WS /bytes</small></a>
           <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
+          <a class="card" href="/api-socket.html"><strong>Experimental bridge</strong><span>Read an operator-registered peer, socket or device.</span><small class="path">WS /lab/stream</small></a>
           <a class="card" href="/api-words.html"><strong>Word stream</strong><span>JSON dictionary words and SHA-256.</span><small class="path">WS /words</small></a>
         </div>
       </section>
@@ -69,6 +72,7 @@
           <a class="card" href="/v1/image/heatmap"><strong>Bit heatmap API</strong><span>Byte bit counts on a nine-colour scale; optional image size.</span><small class="path">GET /v1/image/heatmap</small></a>
           <a class="card" href="/v1/qr/random"><strong>QR image API</strong><span>PNG code with a random hex sample.</span><small class="path">GET /v1/qr/random</small></a>
           <a class="card" href="/sound?duration_ms=2500&amp;style=bloom"><strong>Harmonic WAV API</strong><span>Download a generated 2.5-second WAV clip.</span><small class="path">GET /sound</small></a>
+          <a class="card" href="/lab/sources"><strong>Experimental source catalog</strong><span>Registered source names and byte limits; endpoint paths stay private.</span><small class="path">GET /lab/sources</small></a>
           <a class="card" href="/api-upload.html"><strong>File analysis API</strong><span>Upload using the interactive form; the underlying request is POST.</span><small class="path">POST /files</small></a>
           <a class="card" href="/paroleparoleparole?words=8"><strong>Words alias</strong><span>Compatibility route for the server-side word page.</span><small class="path">GET /paroleparoleparole</small></a>
         </div>

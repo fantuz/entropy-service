@@ -1,0 +1,167 @@
+"use strict";
+
+// Producers publish bounded binary samples; Stop/abort owns every timer, socket,
+// reader and media track. Experimental inputs are never sent to DRBG seeding.
+(() => {
+    const helpers=window.EntropyLabSamples;
+    const aborted=()=>new DOMException("Source stopped","AbortError");
+    function guard(signal,close) {if(signal.aborted){close();throw aborted();} signal.addEventListener("abort",close,{once:true});}
+    function periodic(signal,refresh,produce,onError) {
+        let timer;
+        const close=()=>clearTimeout(timer);
+        guard(signal,close);
+        const tick=async()=>{
+            const started=performance.now();
+            try {await produce();} catch(error) {if(!signal.aborted)onError(error);return;}
+            if(!signal.aborted)timer=setTimeout(tick,Math.max(0,refresh-(performance.now()-started)));
+        };
+        void tick();
+        return close;
+    }
+    async function httpPrefix(url,count,signal) {
+        const timeout=new AbortController();
+        const stop=()=>timeout.abort();
+        signal.addEventListener("abort",stop,{once:true});
+        const timer=setTimeout(stop,10000);
+        let reader;
+        try {
+            if(signal.aborted)throw aborted();
+            const response=await fetch(url,{signal:timeout.signal,credentials:"omit",redirect:"error",cache:"no-store"});
+            if(!response.ok)throw new Error(`HTTP source returned ${response.status}`);
+            if(!response.body)throw new Error("HTTP source has no readable response body");
+            reader=response.body.getReader();
+            const output=new Uint8Array(count);let used=0;
+            while(used<count){
+                const {done,value}=await reader.read();
+                if(done)break;
+                const take=Math.min(value.length,count-used);output.set(value.subarray(0,take),used);used+=take;
+            }
+            if(!used)throw new Error("HTTP source returned no bytes");
+            return {bytes:output.subarray(0,used),encoding:`HTTP body prefix · ${response.headers.get("Content-Type")||"unspecified type"}`};
+        } catch(failure) {
+            if(timeout.signal.aborted&&!signal.aborted)throw new Error("HTTP source timed out");
+            throw failure;
+        } finally {clearTimeout(timer);signal.removeEventListener("abort",stop);if(reader){await reader.cancel().catch(()=>{});reader.releaseLock();}}
+    }
+    async function start(options,{signal,emit,ready,end,error,video}) {
+        const {kind,size,refresh}=options;
+        if(["crypto","counter","constant","pattern"].includes(kind)) {
+            let sequence=0;ready();
+            return periodic(signal,refresh,()=>{
+                const bytes=helpers.generate(kind,size,{value:options.value,bytes:options.pattern,sequence});
+                sequence=(sequence+size)%(kind==="pattern"?options.pattern.length:256);
+                emit(bytes,kind==="crypto"?"Browser Web Crypto bytes":`Deterministic ${kind} bytes`);
+            },error);
+        }
+        if(kind==="file") {
+            if(!options.file?.size||options.file.size>32*1024*1024)throw new Error("Choose a nonempty local file up to 32 MiB");
+            let offset=0;ready();
+            return periodic(signal,refresh,async()=>{
+                const start=offset;
+                const bytes=new Uint8Array(await options.file.slice(start,Math.min(options.file.size,start+size)).arrayBuffer());
+                if(signal.aborted)return;
+                offset+=bytes.length;emit(bytes,`Local file bytes [${start}, ${offset}) · ${options.file.name}`);
+                if(offset>=options.file.size)end("File reached EOF");
+            },error);
+        }
+        if(kind==="http") {
+            const url=helpers.endpoint(options.url,"http");ready();
+            return periodic(signal,refresh,async()=>{const sample=await httpPrefix(url,size,signal);if(!signal.aborted)emit(sample.bytes,sample.encoding);},error);
+        }
+        if(kind==="websocket") {
+            const url=helpers.endpoint(options.url,"websocket");
+            const socket=new WebSocket(url);socket.binaryType="arraybuffer";
+            const timer=setTimeout(()=>{socket.close();if(!signal.aborted)error(new Error("WebSocket connection timed out"));},10000);
+            const close=()=>{clearTimeout(timer);socket.close();};guard(signal,close);
+            socket.onopen=()=>{clearTimeout(timer);if(!signal.aborted)ready();};
+            socket.onmessage=event=>{
+                if(signal.aborted)return;
+                if(!(event.data instanceof ArrayBuffer)||!event.data.byteLength||event.data.byteLength>helpers.MAX_BYTES){
+                    close();error(new Error("Source must send nonempty binary messages up to 1 MiB"));return;
+                }
+                emit(new Uint8Array(event.data),"Binary WebSocket message");
+            };
+            socket.onerror=()=>{if(!signal.aborted)error(new Error("WebSocket failed: check address, Origin policy, TLS and bridge availability"));};
+            socket.onclose=event=>{
+                clearTimeout(timer);
+                if(signal.aborted)return;
+                if(event.code===1000)end(event.reason||"WebSocket source closed");
+                else error(new Error(event.reason||`WebSocket closed (${event.code})`));
+            };
+            return close;
+        }
+        if(kind==="camera") {
+            if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera access needs a supported browser and HTTPS or localhost");
+            const [width,height]=options.resolution.split("x").map(Number);
+            const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:width},height:{ideal:height}},audio:false});
+            let cancelTimer=()=>{};
+            const close=()=>{cancelTimer();stream.getTracks().forEach(track=>track.stop());if(video.srcObject===stream){video.pause();video.srcObject=null;video.hidden=true;}};
+            guard(signal,close);
+            try {
+                video.srcObject=stream;video.hidden=false;await video.play();
+                if(signal.aborted)throw aborted();
+                const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+                const context=canvas.getContext("2d",{willReadFrequently:true});
+                const channels=options.format==="rgba"?4:3;
+                const settings=stream.getVideoTracks()[0].getSettings();ready();
+                cancelTimer=periodic(signal,refresh,()=>{
+                    if(video.readyState<2)return;
+                    context.drawImage(video,0,0,width,height);
+                    const rgba=context.getImageData(0,0,width,height).data;
+                    const bytes=new Uint8Array(Math.min(size,width*height*channels));
+                    if(channels===4)bytes.set(rgba.subarray(0,bytes.length));
+                    else for(let i=0;i<bytes.length;i++)bytes[i]=rgba[Math.floor(i/3)*4+i%3];
+                    emit(bytes,`${channels===4?"RGBA8":"RGB8"} ${width}×${height} row-major prefix · camera ${settings.width||"?"}×${settings.height||"?"} @ ${settings.frameRate||"?"} fps`);
+                },error);
+                return close;
+            }catch(failure){close();throw failure;}
+        }
+        if(kind==="microphone") {
+            const Audio=window.AudioContext||window.webkitAudioContext;
+            if(!navigator.mediaDevices?.getUserMedia||!Audio)throw new Error("Microphone access needs Web Audio and HTTPS or localhost");
+            const context=new Audio();
+            let stream,cancelTimer=()=>{};
+            const close=()=>{cancelTimer();stream?.getTracks().forEach(track=>track.stop());void context.close().catch(()=>{});};
+            guard(signal,close);
+            try{
+                await context.resume();
+                stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
+                if(signal.aborted){close();throw aborted();}
+                const source=context.createMediaStreamSource(stream),analyser=context.createAnalyser(),mute=context.createGain();
+                analyser.fftSize=Math.max(32,2**Math.floor(Math.log2(Math.min(32768,Math.max(32,size/2)))));
+                mute.gain.value=0;source.connect(analyser);analyser.connect(mute);mute.connect(context.destination);
+                const samples=new Float32Array(analyser.fftSize);ready();
+                cancelTimer=periodic(signal,refresh,()=>{
+                    analyser.getFloatTimeDomainData(samples);
+                    const length=Math.min(size,samples.length*2),bytes=new Uint8Array(Math.ceil(length/2)*2),view=new DataView(bytes.buffer);
+                    for(let i=0;i<bytes.length/2;i++){
+                        const sample=Math.max(-1,Math.min(1,samples[i]));
+                        view.setInt16(i*2,Math.round(sample*(sample<0?32768:32767)),true);
+                    }
+                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · latest audio window (may overlap)`);
+                },error);
+                return close;
+            }catch(failure){close();throw failure;}
+        }
+        if(kind==="serial") {
+            if(!navigator.serial?.requestPort)throw new Error("Web Serial is unavailable in this browser; use a registered socket adapter");
+            const port=await navigator.serial.requestPort();
+            if(signal.aborted)throw aborted();
+            await port.open({baudRate:options.baud});
+            let reader;
+            const close=()=>{void reader?.cancel().catch(()=>{});};
+            guard(signal,()=>{close();if(!reader)void port.close().catch(()=>{});});
+            reader=port.readable.getReader();ready();
+            void(async()=>{
+                try{
+                    while(!signal.aborted){const {done,value}=await reader.read();if(done)break;if(value?.length)emit(value.slice(0,size),`Serial read prefix · ${options.baud} baud`);}
+                    if(!signal.aborted)end("Serial source closed");
+                }catch(failure){if(!signal.aborted)error(failure);}
+                finally{reader.releaseLock();await port.close().catch(()=>{});}
+            })();
+            return close;
+        }
+        throw new Error("Unknown source type");
+    }
+    window.EntropyLabAdapters=Object.freeze({start});
+})();

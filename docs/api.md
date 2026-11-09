@@ -118,6 +118,8 @@ The embedded homepage at `/` is a **curated, three-column navigation page**. It 
 | `/api-colors.html` | Hash-only colour display without transmitting the entire sample. |
 | `/api-words.html` | Live dictionary words and SHA-256 digest. |
 | `/api-sound.html` | Centered controls to generate and play harmonic WAV files. |
+| `/api-sources.html` | Experimental browser generators, file/media/serial sources, meters, comparisons and downloads. |
+| `/api-socket.html` | Self/peer HTTP/WS connections and operator-registered source bridges. |
 | `/api-upload.html` | Server upload/SHA-256 plus a shared local-window lab: histogram, Yin/Yang, bit rates, byte trace, PSD, file playback and waterfall. |
 | `/api-stream.html` | Live binary `/stream` analysis: shared window, histogram, Shannon entropy, Yin/Yang, optional bit rates, byte trace, PSD and historical colour waterfall. |
 
@@ -166,5 +168,14 @@ Older README examples mentioned paths that are **not registered aliases**:
 ## Optional profiling endpoints
 
 With `-debug=true`, a separate listener on **127.0.0.1:6060** exposes `/debug/pprof/`, `/debug/pprof/profile`, `/debug/pprof/heap`, `/debug/pprof/cmdline`, `/debug/pprof/symbol` and `/debug/pprof/trace`. The index also serves named runtime profiles, including `/debug/pprof/allocs`, `/debug/pprof/block`, `/debug/pprof/goroutine`, `/debug/pprof/mutex` and `/debug/pprof/threadcreate`. Block/mutex samples require their corresponding runtime sampling to be enabled. These routes are not on the public API listeners.
+
+## Experimental source bridge
+
+`GET /lab/sources` returns registered IDs, display names, kinds, limits and
+requester access status. It omits private endpoints. `WS /lab/stream` accepts
+`source=ID`, `bytes=1..1048576` (also capped by source/server limits), and
+`refresh=20..60000` milliseconds. It sends binary source samples, with deadlines
+and separate admission budgets. Bridges are loopback-only by default and
+configured with `-lab-sources`; see [the source/socket lab guide](source-labs.md).
 
 [Back to README](../README.md) · [Technical reference index](README.md)
