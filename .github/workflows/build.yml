@@ -67,6 +67,8 @@ jobs:
         run: node scripts/test-status-kpis.mjs
       - name: Test status refresh scheduling
         run: node scripts/test-status-refresh.mjs
+      - name: Test shared analysis mathematics and worker
+        run: node scripts/test-analysis-math.mjs
       - name: Test stream Shannon entropy alerts
         run: node scripts/test-stream-entropy-alert.mjs
       - name: Test browser layout and digest formatting

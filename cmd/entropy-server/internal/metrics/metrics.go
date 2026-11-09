@@ -12,7 +12,37 @@ var (
 	rngBytesTestB     atomic.Uint64
 	httpRequests      atomic.Uint64
 	wsPayloads        atomic.Uint64
+	httpBodyBytes     atomic.Uint64
+	wsPayloadBytes    atomic.Uint64
+	wsSessions        atomic.Uint64
+	tcpConnections    atomic.Uint64
 )
+
+// ServingTotals is a process-lifetime snapshot. Requests include WS handshakes;
+// sessions count successful upgrades, and payload bytes exclude protocol framing.
+type ServingTotals struct {
+	HTTPBodyBytes  uint64
+	WSPayloadBytes uint64
+	TCPConnections uint64
+	HTTPRequests   uint64
+	WSSessions     uint64
+	WSMessages     uint64
+	GeneratedBytes uint64
+}
+
+func AddHTTPBodyBytes(n uint64)  { httpBodyBytes.Add(n) }
+func AddWSPayloadBytes(n uint64) { wsPayloadBytes.Add(n) }
+func AddWSSession()              { wsSessions.Add(1) }
+func AddTCPConnection()          { tcpConnections.Add(1) }
+
+func ServingSnapshot() ServingTotals {
+	return ServingTotals{
+		HTTPBodyBytes: httpBodyBytes.Load(), WSPayloadBytes: wsPayloadBytes.Load(),
+		TCPConnections: tcpConnections.Load(), HTTPRequests: httpRequests.Load(),
+		WSSessions: wsSessions.Load(), WSMessages: wsPayloads.Load(),
+		GeneratedBytes: rngBytesGenerated.Load(),
+	}
+}
 
 func AddBufferedBytes(n uint64) {
 	rngBytesBuffered.Add(n)

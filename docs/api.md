@@ -119,11 +119,11 @@ The embedded homepage at `/` is a **curated, three-column navigation page**. It 
 | `/api-words.html` | Live dictionary words and SHA-256 digest. |
 | `/api-sound.html` | Centered controls to generate and play harmonic WAV files. |
 | `/api-upload.html` | File analysis, histogram, readable Yin/Yang legend, mosaic, waveform and FFT. |
-| `/api-stream.html` | Live binary `/stream` analysis: histogram, Shannon entropy, mosaic, bit balance, waveform and FFT. |
+| `/api-stream.html` | Live binary `/stream` analysis: shared window, histogram, Shannon entropy, Yin/Yang, optional bit rates, byte trace, PSD and historical colour waterfall. |
 
 The duplicate `/bytes.html`, `/colors.html`, `/words.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. The HTTP and WebSocket API route names themselves are unchanged.
 
-The live stream-analysis page accepts integer `bytes` (1–33554432) and `refresh` (1–60000 milliseconds), requests raw binary WebSocket frames and analyses at most the first **64 KiB of an accepted frame**, at a maximum display-analysis rate of five frames per second. FFT uses the first 2048 bytes when available. These limits affect browser work only, not the server's delivered payload. Graphs are illustrative, not statistical certificates.
+The live stream-analysis page accepts integer `bytes` (1–33554432, default 65536) and `refresh` (1–60000 milliseconds, default 500), requesting raw binary WebSocket frames. Separate browser controls select a frame offset and analysis cap (4 KiB–1 MiB, default 64 KiB) at 1/2/5/10 updates per second (default five). FFT supports Auto and 512/2048/8192/32768/65536 points without zero padding, using the same window-energy-normalized, one-sided PSD calculation as file previews. Pause freezes plots while reception continues; hidden tabs skip analysis. These controls bound browser analysis, not the complete delivered payload or network traffic. See [browser controls and mathematical definitions](browser-ui.md#stream-analysis-shared-window-and-controls).
 
 Byte, colour, word and stream pages show a small **AWAITING FIRST SAMPLE** notice instead of a large connection-status panel. It disappears once the first valid sample is displayed; connection failures/disconnects remain visible. SHA-256 values use the shared bright-green terminal style, and Base64 previews are centered; long encodings may wrap visually at the container width without altering their text. Browser worker/paint backpressure prevents large or frequent samples from overloading the visual display.
 

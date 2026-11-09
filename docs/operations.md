@@ -18,6 +18,40 @@ Invalid sample parameters return 400. A request whose reservation exceeds the en
 
 HTTP responses with status **400 or higher** are logged to stderr with method, path, status, duration and remote address. Query strings and request bodies are omitted. After a successful WS upgrade, later stream errors are connection events rather than new HTTP response statuses. Under systemd, console logs are available through `journalctl`.
 
+## Shutdown executive summary
+
+On SIGINT or SIGTERM, the server stops its public listeners and joins HTTP and
+hijacked WebSocket handlers under the shared five-second deadline. It then logs
+three process-lifetime summary lines before `shutdown complete`, for example:
+
+```text
+shutdown summary uptime=1m0s drain=complete served_MB=5.000 HTTP_body_MB=2.000 WS_payload_MB=3.000
+shutdown connections TCP_accepted=4 HTTP_requests=7 WS_sessions=2 WS_messages=8 (HTTP requests include upgrades)
+shutdown DRBG_generated_MB=9.000 (includes internal seed work; served bytes exclude transport framing and are not peer acknowledgements)
+```
+
+- **MB** is decimal (1,000,000 bytes). `served_MB` adds HTTP response-body
+  writes and successfully completed WS application payloads. HTTP includes
+  public static files, health/metrics, errors and generated outputs, excluding
+  HEAD bodies. WS includes binary, compact, JSON/hash and word payloads, with
+  their encoding/digest overhead; it excludes failed/incomplete messages.
+- **TCP_accepted** counts accepted public HTTP/HTTPS connections, including
+  failed TLS/HTTP sessions and sockets later upgraded to WS. It counts a
+  keep-alive socket once; **HTTP_requests** counts its requests individually,
+  including WS handshake attempts. **WS_sessions** counts successful upgrades;
+  **WS_messages** counts successfully written application messages.
+- Body/payload counters exclude HTTP headers, WS framing/control traffic,
+  TLS/TCP overhead and debug-server traffic. Writes reflect server-side
+  acceptance, not proof that a peer consumed the data.
+- **DRBG_generated_MB** is separate: generation includes internal seed
+  derivation and data whose response/message might not finish. It is not a
+  served-byte measure.
+
+If a server fails to drain within the deadline, the log uses
+`drain=incomplete_snapshot`; remaining handlers might update counters after the
+snapshot. SIGKILL, process crashes and fatal startup exits cannot produce a
+normal shutdown summary. Counters reset when the process starts.
+
 ## Recent improvements: October–November 2026
 
 | Area | Implemented change and practical effect |

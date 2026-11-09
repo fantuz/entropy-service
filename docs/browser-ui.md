@@ -66,19 +66,168 @@ certificate. The implementation does not introduce aliases such as
 
 [Mobile layout](images/gallery-mobile.png)
 
-## Stream-analysis counters
+## Stream analysis: shared window and controls
 
-`/api-stream.html` displays **two independent cumulative rows**:
+`/api-stream.html` keeps the histogram, byte trace, power spectrum, historical
+colour waterfall and symbolic Yin/Yang bit balance. Wide screens use two
+columns; at 860 CSS pixels and below the cards form one column in reading
+order. Plots retain a 240–260 CSS-pixel height (250 on mobile) and use the
+screen pixel ratio, capped at three, rather than stretching an 800-pixel bitmap.
 
-- **Received**: every valid binary message delivered to the browser and its full
-  byte size, including frames skipped by the browser-side analysis sampler.
-- **Analysed**: only frames whose bounded samples were processed and rendered,
-  and the number of bytes actually analysed from each frame.
+[![Desktop stream lab](images/stream-lab-desktop.png)](images/stream-lab-desktop.png)
 
-The latter counters intentionally lag under load. The analysis uses at most the
-first 64 KiB per accepted frame, and display updates are throttled to five per
-second. Receiver counters are not equivalent to byte generation or network
-throughput benchmarks. The Yin/Yang legend is centered under the chart.
+[Mobile stream lab](images/stream-lab-mobile.png)
+
+### Capture and analysis
+
+The connection controls request **frame bytes** (default 65,536; maximum
+32 MiB) and **server refresh** (default 500 ms). Reconnect applies those network
+settings. Separate shared controls select a **start byte within each frame**
+and a cap of **4, 16, 64, 256 KiB or 1 MiB**, default 64 KiB. A short remaining
+window uses the available bytes; an offset outside the frame is reported
+rather than silently clamped. All statistics use exactly that selected window.
+The half-open `[start, end)` range appears above the charts.
+
+Display analysis can run at 1, 2, 5 or 10 frames/second (default 5), subject to
+the incoming frame rate and browser capacity. A worker computes statistics and
+FFT; there is at most one running job, one replaceable queued job and one
+pending display result. Large incoming messages are sliced to at most 1 MiB
+before analysis; the full network message still reaches the browser. Hidden
+tabs skip new analysis. This bounds computation and retained analysis state,
+not incoming WebSocket traffic or total browser RSS.
+
+**Pause plots** freezes the selected sample and waterfall while reception and
+received counters continue. Trace and plot controls remain usable; FFT changes
+recalculate the frozen sample. Changing the capture offset/cap requires
+resuming. Resize, colour changes, frozen recalculation and power-average
+changes never add duplicate frames to the waterfall or analysed counters.
+
+The two cumulative counter rows have distinct meanings:
+
+- **Received** counts every valid binary message and its full byte size,
+  including frames skipped by the display sampler or while paused/hidden.
+- **Analysed** counts unique sampled frames whose worker job completed and the
+  selected bytes actually processed. An already-running job can complete
+  after pause or a settings change, even if its obsolete result is discarded.
+  Frozen-frame recalculations are excluded.
+
+Neither row is a server-generation counter or a network throughput benchmark.
+The latest-frame caption includes capture time and worker computation time;
+that timing excludes transport, queueing and canvas rendering.
+
+### Histogram, trace and bit balance
+
+The histogram retains **all 256 byte values**. Choose counts or percent;
+fixed detail (0–1%), fixed full range (0–100%), or labelled auto scale. The
+dashed uniform reference is `100/256 = 0.390625%` (`N/256` counts). Yellow caps
+identify clipped bars on detail scale. For example, a repeating 0…255 counter
+has a flat histogram and Shannon estimate of eight, despite being predictable;
+the trace and spectrum expose its structure.
+
+The trace uses a fixed **0…255 byte-value** scale and **absolute byte offsets**,
+with a 127.5 centre reference. Pan through the shared window; show 128, 512,
+1,024, 8,192 or all selected bytes. Line, steps and dots are available for
+individual samples. When several bytes occupy a display column, an exact
+min/max envelope replaces the drawing style so isolated spikes survive
+zoom-out. Hover/touch or use the keyboard-accessible inspect slider for decimal,
+hex and binary readouts. While paused, click A and B to measure signed byte
+offset and value differences. These are byte values, not voltage or time.
+
+Yin/Yang retains its two-colour zero/one proportions with a compact legend.
+Expand **Eight bit-position rates** for ones percentages at bits 7 (MSB) through
+0 (LSB), each with a fixed 0–100% meter and 50% reference. These use the entire
+shared window, independently of trace zoom and FFT size.
+
+### Shared FFT mathematics
+
+Stream and uploaded-file previews load the same `analysis-math.js` FFT and
+`analysis-plots.js` spectrum renderer. Stream FFT choices are **512, 2,048,
+8,192, 32,768 and 65,536 points**; Auto chooses the largest power of two fitting
+the selected bytes, up to 8,192, with a minimum of 32. Explicit larger sizes
+require enough selected bytes and never silently zero-pad. The upload API is
+unchanged: its at-most-2,048-byte preview sets the file FFT's input limit.
+
+Choose Hann (default) or rectangular weighting and optional mean removal
+(default on). For N input bytes, mapped to full-scale amplitude:
+
+```text
+x[n] = (byte[n] − c) / 127.5
+c = FFT-input mean when removing mean, otherwise 127.5
+w[n] = 0.5 × (1 − cos(2πn/(N−1))) for Hann, or 1 for rectangular
+X[k] = FFT(x[n] × w[n])
+PSD[k] = |X[k]|² / Σ w[n]²
+PSD[k] *= 2 for 0 < k < N/2 only
+f[k] = k/N cycles/byte; Δf = 1/N
+PSD_dB[k] = 10 log10(PSD[k])
+```
+
+The one-sided spectrum contains **N/2 + 1 bins**, including DC (0) and Nyquist
+(0.5 cycles/byte). Summing `PSD × Δf` gives the window-weighted mean-square
+normalized amplitude. Removing the unweighted input mean does not guarantee
+zero DC after Hann weighting. Frequencies are **cycles/byte**, not Hz: a network
+refresh interval is not the sample clock of the byte sequence. dB is relative
+to `1 FS²/(cycles/byte)`; narrowband density peaks can exceed 0 dB. This is a
+periodogram, not a calibrated instrument or a cryptographic health test.
+
+Average **linear power** over 1, 4 or 16 distinct selected frames before taking
+the logarithm. The count warms up and resets when selection or FFT settings
+change; changing averaging depth restarts it too. Frozen-frame recalculation
+shows a single-frame preview without repeatedly adding the same sample.
+
+The default vertical range stays at **−60…+50 dB** between frames. Advanced
+controls set fixed floor/ceiling and zoom within 0…0.5 cycles/byte; invalid
+ranges retain the last valid scale with an explanation. Spectrum downsampling
+uses the peak per display column to preserve narrow lines; the plotted line
+is consequently a peak envelope at coarse zoom, not a bin average. Changing
+viewport width can change that envelope, while numerical PSD stays unchanged.
+
+### Historical colour waterfall
+
+Each displayed sample contributes one timestamped row; the newest is at the
+top. Retain **up to 240 rows**, each copying at most 1,024 raw bytes from the
+start of the shared window (245,760 raw history bytes maximum). One, two or
+three age labels refer to monotonic capture timestamps, so pauses and skipped
+frames create real age gaps. Row spacing is uniform per selected frame, not a
+uniform time axis. The caption shows row count and captured time span.
+
+Choose **RGB** (three successive bytes per cell), **grayscale** (one byte,
+0 black / 255 white), or **bit plane** (choose bit 7…0, 0 black / 1 white).
+Switching colour mode or bytes/row (128, 256, 512 or 1,024) redraws retained raw
+history. Missing bytes and incomplete RGB triplets are blank. On narrow plots,
+cells can share display pixels; reduce bytes/row to inspect individual cells.
+Clear history explicitly, or change the shared capture selection to start anew.
+
+### Regression checks
+
+The dependency-free Node suite runs in build/release CI:
+
+```sh
+node scripts/test-analysis-math.mjs
+```
+
+It compares the FFT with an independent direct DFT, checks Parseval, DC and
+Nyquist normalization, known periodic inputs through 65,536 points, all eight
+bit positions, min/max spike preservation, linear power averaging, history
+bounds and the actual worker protocol.
+
+For real Chromium checks, install Python Playwright and a Chromium executable,
+build the server, then run:
+
+```sh
+make build-server
+python3 -m pip install playwright
+python3 scripts/test_stream_browser.py --chromium /usr/bin/chromium \
+  --artifacts /tmp/entropy-stream-browser
+```
+
+The optional script starts and shuts down its own loopback server using
+`/dev/urandom`, exercises live reception/pause, frozen reanalysis, trace A/B,
+power averages, all waterfall modes, large/short FFTs, offset handling,
+320/390/768/1440-pixel layouts, a deterministic counter fixture, file upload,
+exact copyable Base64 and query validation. It saves screenshots, JSON results
+and shutdown logs under the supplied artifacts directory. It does not modify
+an existing server. Browser timings depend on host/browser and exclude a claim
+that every device can sustain the maximum settings.
 
 ### Shannon entropy sample alert
 
@@ -109,7 +258,8 @@ unaffected.
 
 `/api-bytes.html` uses the common Matrix theme for its hexadecimal, Base64
 and SHA-256 fields rather than an old inline stylesheet. Base64 remains
-centered and wraps as needed without changing the underlying sample.
+in a centered, width-limited box with justified wrapped lines and a centered
+last line. CSS changes no characters, spaces or padding in the copyable sample.
 
 `/api-colors.html` displays the 64-character SHA-256 digest on **two
 32-character lines** (16 whole byte pairs per line), preventing uneven

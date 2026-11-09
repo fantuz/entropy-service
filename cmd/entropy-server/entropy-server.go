@@ -426,7 +426,10 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 
 			return
 		}
+
 		defer conn.Close()
+
+		metrics.AddWSSession()
 
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
@@ -450,7 +453,7 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 				}
 
 				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-				if err := conn.WriteJSON(frame); err != nil {
+				if err := writeObservedJSON(conn, frame); err != nil {
 					return
 				}
 
@@ -633,7 +636,10 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webS
 
 			return
 		}
+
 		defer conn.Close()
+
+		metrics.AddWSSession()
 
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
@@ -806,7 +812,10 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes
 
 			return
 		}
+
 		defer conn.Close()
+
+		metrics.AddWSSession()
 
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
@@ -836,6 +845,7 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes
 					return
 				}
 
+				metrics.AddWSPayloadBytes(uint64(len(buf)))
 				metrics.AddWSPayloads(1)
 			}
 		}
@@ -950,6 +960,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*managed
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		Handler:      handler,
+		ConnContext:  observeConnection,
 		/*
 			ConnContext: func(cctx context.Context, c net.Conn) context.Context {
 				// seed, _ := master.Derive(32)
@@ -1000,6 +1011,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		Handler:      handler,
+		ConnContext:  observeConnection,
 		TLSConfig:    tlsConfig,
 		/*
 			ConnContext: func(cctx context.Context, c net.Conn) context.Context {
@@ -1038,6 +1050,8 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 }
 
 func main() {
+	started := time.Now()
+
 	// Root context canceled on signal
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
@@ -1280,6 +1294,8 @@ func main() {
 	// Stop listeners together and join all handlers, including WebSockets.
 	var shutdown sync.WaitGroup
 
+	shutdownErrors := make(chan error, 3)
+
 	for _, srv := range []*managedServer{httpSrv, httpsSrv, debugSrv} {
 		if srv == nil {
 			continue
@@ -1287,6 +1303,8 @@ func main() {
 
 		shutdown.Go(func() {
 			if err := srv.Shutdown(shutdownCtx); err != nil {
+				shutdownErrors <- err
+
 				log.Printf("shutdown %s: %v", srv.Addr, err)
 			}
 		})
@@ -1294,6 +1312,7 @@ func main() {
 
 	shutdown.Wait()
 
+	logServingSummary(log.Default(), time.Since(started), len(shutdownErrors) == 0, metrics.ServingSnapshot())
 	log.Println("shutdown complete")
 }
 

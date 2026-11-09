@@ -80,42 +80,16 @@
         renderFFT(bytes);
     }
 
+    let latestSpectrum = null;
     function renderFFT(bytes) {
-        const [element, plot] = canvas("fft");
-        const size = 2048;
-        const label = document.getElementById("fftvalue");
-        if (bytes.length < size) {
-            label.textContent = "requires 2048 analyzed bytes";
-            return;
-        }
-        const real = Float64Array.from(bytes.subarray(0, size), value => value - 128);
-        const imaginary = new Float64Array(size);
-        let reverse = 0;
-        for (let i = 1; i < size; i++) {
-            let bit = size >> 1;
-            while (reverse & bit) { reverse ^= bit; bit >>= 1; }
-            reverse ^= bit;
-            if (i < reverse) [real[i], real[reverse]] = [real[reverse], real[i]];
-        }
-        for (let span = 2; span <= size; span *= 2) {
-            for (let offset = 0; offset < size; offset += span) {
-                for (let k = 0; k < span / 2; k++) {
-                    const angle = -2 * Math.PI * k / span;
-                    const a = offset + k, b = a + span / 2;
-                    const r = real[b] * Math.cos(angle) - imaginary[b] * Math.sin(angle);
-                    const im = real[b] * Math.sin(angle) + imaginary[b] * Math.cos(angle);
-                    real[b] = real[a] - r; imaginary[b] = imaginary[a] - im;
-                    real[a] += r; imaginary[a] += im;
-                }
-            }
-        }
-        plot.fillStyle = "purple";
-        for (let i = 0; i < size / 2; i++) {
-            const height = Math.min(element.height, 20 * Math.log10(Math.hypot(real[i], imaginary[i]) + 1));
-            plot.fillRect(i * element.width / (size / 2), element.height - height, element.width / (size / 2), height);
-        }
-        label.textContent = "first 2048 analyzed bytes";
+        latestSpectrum = window.EntropyAnalysis.spectrum(bytes, {size: "auto", window: "hann", removeMean: true});
+        window.EntropyPlots.spectrum(document.getElementById("fft"), latestSpectrum);
+        document.getElementById("fftvalue").textContent = latestSpectrum ?
+            `${latestSpectrum.size} points · Hann · mean removed · Δf ${latestSpectrum.binWidth.toPrecision(4)} cycles/byte` :
+            "requires at least 32 preview bytes";
     }
+    new ResizeObserver(() => window.EntropyPlots.spectrum(document.getElementById("fft"), latestSpectrum))
+        .observe(document.getElementById("fft"));
 
     form.addEventListener("submit", async event => {
         event.preventDefault();
@@ -134,6 +108,7 @@
         document.getElementById("sample-info").textContent = "";
         document.getElementById("file-sha256").textContent = "";
         document.getElementById("fftvalue").textContent = "pending";
+        latestSpectrum = null;
         for (const id of ["histogram", "pie", "mosaic", "wave", "fft"]) canvas(id);
         try {
             // Send the File directly: no full-file ArrayBuffer or multipart copy.
