@@ -14,7 +14,8 @@ import (
 type statusWriter struct {
 	http.ResponseWriter
 
-	status int
+	status  int
+	written uint64
 }
 
 func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
@@ -50,7 +51,10 @@ func (w *statusWriter) Write(data []byte) (int, error) {
 		w.status = http.StatusOK
 	}
 
-	return w.ResponseWriter.Write(data)
+	n, err := w.ResponseWriter.Write(data)
+	w.written += uint64(n)
+
+	return n, err
 }
 
 func (w *statusWriter) Flush() {
@@ -78,6 +82,8 @@ func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 func (w *statusWriter) ReadFrom(source io.Reader) (int64, error) {
 	if reader, ok := w.ResponseWriter.(io.ReaderFrom); ok {
 		n, err := reader.ReadFrom(source)
+		w.written += uint64(n)
+
 		if n > 0 && w.status == 0 {
 			w.status = http.StatusOK
 		}
@@ -103,7 +109,13 @@ func observeRequests(next http.Handler, logger *log.Logger) http.Handler {
 		started := time.Now()
 
 		response := &statusWriter{ResponseWriter: w}
+
 		defer func() {
+			// net/http accepts HEAD writes but suppresses their body on the wire.
+			if r.Method != http.MethodHead {
+				metrics.AddHTTPBodyBytes(response.written)
+			}
+
 			if response.status >= http.StatusBadRequest {
 				logger.Printf("HTTP request failed method=%q path=%q status=%d duration_ms=%.3f remote=%q",
 					r.Method, r.URL.Path, response.status, time.Since(started).Seconds()*1000, r.RemoteAddr)

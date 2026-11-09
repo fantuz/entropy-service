@@ -65,15 +65,17 @@
 
     <section class="analysis-card" aria-labelledby="upload-fft-title">
       <h2 id="upload-fft-title" class="analysis-label">Frequency-domain preview
-        <span id="fftvalue" class="analysis-meta">· REQUIRES 2048 BYTES</span>
+        <span id="fftvalue" class="analysis-meta">· HANN / ONE-SIDED PSD</span>
       </h2>
-      <canvas id="fft" width="800" height="110" aria-label="FFT magnitude spectrum of first 2048 bytes"></canvas>
+      <canvas id="fft" width="800" height="110" aria-label="One-sided power spectral density in cycles per byte"></canvas>
     </section>
 
-    <p class="note">Statistics cover the analyzed upload prefix. Visual plots use only the
+    <p class="note">FFT uses the same window-energy normalization and labelled scale as live stream analysis. Statistics cover the analyzed upload prefix. Visual plots use only the
       preview bytes; uploads are transmitted to the server for analysis.</p>
     <p><a href="/">← Back to all endpoints</a></p>
   </main>
+  <script src="/analysis-math.js" defer></script>
+  <script src="/analysis-plots.js" defer></script>
   <script src="/file-upload.js" defer></script>
 </body>
 </html>

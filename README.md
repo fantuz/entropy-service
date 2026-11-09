@@ -245,6 +245,8 @@ The homepage at `/` is the interactive entry point. Common API routes include:
 | `POST /files` | JSON statistics about an uploaded binary file. |
 | `GET /ready` / `GET /metrics-2` | Readiness and Prometheus metrics. |
 
+The stream lab offers shared analysis windows up to 1 MiB, FFTs up to 65,536 points, labelled plots, paused byte inspection, optional bit-position rates and a historical colour waterfall, with desktop/mobile layouts. See [controls and mathematics](docs/browser-ui.md#stream-analysis-shared-window-and-controls). Normal shutdown prints a [served-traffic executive summary](docs/operations.md#shutdown-executive-summary).
+
 Interactive demonstrations live at `/api-bytes.html`, `/api-stream.html`, `/api-words.html`, `/api-colors.html`, `/api-sound.html`, and `/api-upload.html`. They are **browser pages**, not API version prefixes.
 
 **[Complete HTTP/WebSocket endpoint, parameter and format reference](docs/api.md)**

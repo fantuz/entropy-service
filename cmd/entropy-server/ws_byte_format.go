@@ -42,19 +42,9 @@ func writeByteFrame(conn *websocket.Conn, data []byte, format byteFrameFormat) e
 		kind = websocket.BinaryMessage
 	}
 
-	writer, err := conn.NextWriter(kind)
-	if err != nil {
-		return err
-	}
-
-	err = encodeByteFrame(writer, data, format)
-	closeErr := writer.Close()
-
-	if err != nil {
-		return err
-	}
-
-	return closeErr
+	return writeObservedPayload(conn, kind, func(w io.Writer) error {
+		return encodeByteFrame(w, data, format)
+	})
 }
 
 func encodeByteFrame(w io.Writer, data []byte, format byteFrameFormat) error {
