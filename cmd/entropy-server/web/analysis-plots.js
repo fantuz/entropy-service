@@ -58,11 +58,11 @@
         ctx.beginPath(); ctx.moveTo(left, p.y(total / 256 * factor)); ctx.lineTo(right, p.y(total / 256 * factor)); ctx.stroke(); ctx.setLineDash([]);
         return clipped;
     }
-    function trace(canvas, bytes, {start = 0, span = 1024, offset = 0, style = "line"} = {}) {
+    function trace(canvas, bytes, {start = 0, span = 1024, offset = 0, style = "line", source = "stream"} = {}) {
         start = Math.max(0, Math.min(start, bytes.length - 1));
         const end = Math.min(bytes.length, start + span), sample = bytes.subarray(start, end);
         const p = axes(canvas, {xmin: offset + start, xmax: offset + Math.max(start + 1, end - 1),
-            ymin: 0, ymax: 255, xlabel: "Byte offset in frame", ylabel: "Byte value"});
+            ymin: 0, ymax: 255, xlabel: `Byte offset in ${source === "file" ? "file" : "frame"}`, ylabel: "Byte value"});
         const {ctx, left, right} = p;
         ctx.strokeStyle = color.warn; ctx.setLineDash([3, 4]);
         ctx.beginPath(); ctx.moveTo(left, p.y(127.5)); ctx.lineTo(right, p.y(127.5)); ctx.stroke(); ctx.setLineDash([]);
@@ -132,7 +132,7 @@
             [0, secondary, chroma], [secondary, 0, chroma], [chroma, 0, secondary]][Math.floor(hue)];
         return channels.map(value => Math.round((value + base) * 255));
     });
-    function waterfall(canvas, rows, {mode = "rgb", bit = 7, rowBytes = "auto", historyRows = 16, offset = 0} = {}) {
+    function waterfall(canvas, rows, {mode = "rgb", bit = 7, rowBytes = "auto", historyRows = 16, offset = 0, source = "stream"} = {}) {
         if (!rows.length) { empty(canvas, "Awaiting history"); return; }
         const p = prepare(canvas);
         const bytesPerCell = mode === "rgb" ? 3 : 1;
@@ -142,10 +142,18 @@
         // Keep the full history in the caller; only the visible subset is enlarged.
         rows = rows.slice(0, historyRows);
         const latest = rows[0].time, oldest = rows[rows.length - 1].time;
-        axes(canvas, {xmin: offset, xmax: offset + rowBytes - 1, ymin: 0, ymax: Math.max(1, rows.length),
-            xlabel: "Byte offset in frame", ylabel: "History · newest at top", yformat: n => {
+        function rowLabel(row) {
+            if (source !== "file") return ((latest - row.time) / 1000).toFixed(1) + "s";
+            const value = row.offset;
+            if (value < 10000) return String(value);
+            const unit = value >= 1048576 ? 1048576 : 1024, suffix = unit === 1024 ? "Ki" : "Mi";
+            return `${value % unit ? "~" : ""}${(value / unit).toFixed(unit === 1024 ? 0 : 1)}${suffix}`;
+        }
+        const xoffset = source === "file" ? 0 : offset;
+        axes(canvas, {xmin: xoffset, xmax: xoffset + rowBytes - 1, ymin: 0, ymax: Math.max(1, rows.length),
+            xlabel: source === "file" ? "Byte offset within window" : "Byte offset in frame", ylabel: source === "file" ? "Window start (bytes)" : "History · newest at top", yformat: n => {
                 const row = rows[Math.min(rows.length - 1, Math.max(0, rows.length - 1 - Math.round(n)))];
-                return ((latest - row.time) / 1000).toFixed(1) + "s";
+                return rowLabel(row);
             }}, p);
         const columns = mode === "rgb" ? Math.ceil(rowBytes / 3) : rowBytes;
         scratch.width = columns; scratch.height = rows.length;
@@ -174,11 +182,11 @@
         // Age ticks correspond to actual rows, including gaps, rather than a nominal refresh clock.
         p.ctx.clearRect(0, p.top - 6, p.left - 3, p.bottom - p.top + 16);
         p.ctx.fillStyle = color.text; p.ctx.textAlign = "right";
-        p.ctx.fillText("0.0s", p.left - 6, p.top + 9);
-        if (rows.length > 1) p.ctx.fillText(((latest - oldest) / 1000).toFixed(1) + "s", p.left - 6, p.bottom);
+        p.ctx.fillText(rowLabel(rows[0]), p.left - 6, p.top + 9);
+        if (rows.length > 1) p.ctx.fillText(rowLabel(rows[rows.length - 1]), p.left - 6, p.bottom);
         if (rows.length > 3) {
             const middle = Math.floor(rows.length / 2);
-            p.ctx.fillText(((latest - rows[middle].time) / 1000).toFixed(1) + "s", p.left - 6,
+            p.ctx.fillText(rowLabel(rows[middle]), p.left - 6,
                 p.top + (middle + .5) / rows.length * visibleHeight + 4);
         }
         return {oldest, latest, shownRows: rows.length, rowBytes, columns,

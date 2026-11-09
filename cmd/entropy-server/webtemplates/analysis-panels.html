@@ -1,0 +1,84 @@
+    <div class="analysis-grid">
+      <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
+        <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>
+        <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span>bits/byte</span></p>
+        <label class="entropy-threshold-control" for="entropy-threshold">Red alert below
+          <input id="entropy-threshold" type="number" min="1" max="8" step="0.00001" value="7.99990" inputmode="decimal"> <span>bits/byte</span>
+        </label>
+        <p class="entropy-alert-message" id="entropy-alert-message" role="status" aria-live="polite">AWAITING FIRST ANALYSIS SAMPLE</p>
+        <p class="entropy-alert-hint">Finite-sample estimate. High thresholds can trigger on healthy samples.</p>
+        <p id="byte-statistics" class="analysis-meta">Mean / standard deviation / range: —</p>
+      </section>
+      <section class="analysis-card balance-card" aria-labelledby="balance-title">
+        <h2 class="analysis-label" id="balance-title">Bit balance · Yin/Yang</h2>
+        <div class="balance-layout"><canvas id="pie" width="180" height="180" role="img" aria-label="Zero and one bit proportions"></canvas>
+          <div class="balance-legend"><p class="zero-key" id="zero-count">Zeros: —</p><p class="one-key" id="one-count">Ones: —</p><p class="note">50% reference per position</p></div>
+        </div>
+        <details id="bit-rates"><summary>Eight bit-position rates</summary><div class="bit-rate-grid" id="bit-rate-grid"></div><p class="note">Fraction of ones, MSB (7) to LSB (0). Each uses the same selected bytes.</p></details>
+      </section>
+      <section class="analysis-card plot-card trace-card" aria-labelledby="trace-title">
+        <h2 class="analysis-label" id="trace-title">Byte trace</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Visible bytes <select id="trace-span"><option value="128">128</option><option value="512">512</option><option value="1024" selected>1,024</option><option value="8192">8,192</option><option value="all">Whole window</option></select></label>
+          <label>Draw <select id="trace-style"><option value="line">Line</option><option value="steps">Steps</option><option value="dots">Dots</option></select></label>
+          <label>Pan (window offset) <input id="trace-start" type="range" min="0" max="0" value="0" step="1"><output id="trace-start-value">0</output></label>
+        </div>
+        <div class="trace-wrap" id="trace-wrap"><canvas id="wave" class="diagnostic-plot" width="800" height="240" role="img" aria-describedby="trace-info" aria-label="Byte trace, values 0 to 255 against byte offset"></canvas><span class="trace-marker" id="marker-a" hidden>A</span><span class="trace-marker" id="marker-b" hidden>B</span></div>
+        <div class="plot-readouts">
+          <p class="analysis-meta" id="trace-info">Zoom out preserves min/max per display column.</p>
+          <label class="cursor-control">Inspect byte <input id="trace-cursor" type="range" min="0" max="0" value="0" step="1"></label>
+          <output id="trace-reading" class="analysis-meta">Byte: —</output>
+          <p class="note">Hover or use the slider. {{trace_hint}}</p>
+          <button id="clear-markers" type="button">Clear A/B</button><output id="marker-reading" class="analysis-meta"></output>
+        </div>
+      </section>
+      <section class="analysis-card plot-card histogram-card" aria-labelledby="histogram-title">
+        <h2 class="analysis-label" id="histogram-title">Byte histogram · all 256 values</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Units <select id="histogram-unit"><option value="percent">Percent</option><option value="count">Count</option></select></label>
+          <label>Scale <select id="histogram-scale"><option value="detail">Fixed · 0–1%</option><option value="full">Fixed · 0–100%</option><option value="auto">Auto · labelled</option></select></label>
+        </div>
+        <canvas id="histogram" class="diagnostic-plot" width="800" height="240" role="img" aria-label="Byte-frequency histogram with uniform reference"></canvas>
+        <div class="plot-readouts">
+          <p class="analysis-meta" id="histogram-info">Dashed line: uniform reference, 100/256 = 0.390625%.</p>
+          <p class="note">Yellow caps mark clipped bars; use full scale to see concentrated distributions. A flat histogram alone does not imply unpredictability.</p>
+        </div>
+      </section>
+      <section class="analysis-card plot-card spectrum-card" aria-labelledby="spectrum-title">
+        <h2 class="analysis-label" id="spectrum-title">Power spectrum</h2>
+        <div class="plot-controls">
+          <div class="analysis-controls compact-controls">
+            <label>FFT points <select id="fft-size"><option value="auto">Auto · up to 8,192</option><option value="512">512</option><option value="2048">2,048</option><option value="8192">8,192</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
+            <label>Window <select id="fft-window"><option value="hann">Hann</option><option value="rectangular">Rectangular</option></select></label>
+            <label>Average power <select id="fft-average"><option value="1">1 sample</option><option value="4">4 samples</option><option value="16">16 samples</option></select></label>
+            <label class="checkbox-label"><input id="fft-demean" type="checkbox" checked>Remove mean</label>
+          </div>
+          <details><summary>Frequency zoom &amp; fixed dB scale</summary><div class="analysis-controls compact-controls">
+            <label>Min (cycles/byte) <input id="fft-min" type="number" min="0" max="0.49999" step="0.001" value="0"></label>
+            <label>Max (cycles/byte) <input id="fft-max" type="number" min="0.00001" max="0.5" step="0.001" value="0.5"></label>
+            <label>Floor (dB) <input id="fft-floor" type="number" min="-160" max="40" value="-60"></label>
+            <label>Ceiling (dB) <input id="fft-ceiling" type="number" min="-150" max="100" value="50"></label>
+          </div><p id="fft-scale-error" class="form-error" role="status"></p></details>
+        </div>
+        <canvas id="fft" class="diagnostic-plot" width="800" height="240" role="img" aria-label="One-sided power spectral density in cycles per byte"></canvas>
+        <div class="plot-readouts">
+          <p id="fftvalue" class="analysis-meta">Awaiting FFT input.</p>
+          <p class="note">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.</p>
+        </div>
+      </section>
+      <section class="analysis-card plot-card waterfall-card" aria-labelledby="waterfall-title">
+        <h2 class="analysis-label" id="waterfall-title">{{waterfall_title}}</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Colour mode <select id="waterfall-mode"><option value="rgb">RGB</option><option value="vivid">Vivid hue</option><option value="gray">Grayscale</option><option value="bit">Bit plane</option></select></label>
+          <label>Bit plane <select id="waterfall-bit" aria-describedby="waterfall-help"><option value="7">7 · MSB</option><option value="6">6</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option><option value="0">0 · LSB</option></select></label>
+          <label>Bytes/row <select id="waterfall-bytes"><option value="auto" selected>Auto · large</option><option value="128">128</option><option value="256">256</option><option value="512">512</option><option value="1024">1,024</option></select></label>
+          <label>History rows <select id="waterfall-rows"><option value="16" selected>16 · large</option><option value="32">32 rows</option><option value="64">64 rows</option><option value="240">All (240 max)</option></select></label>
+          <button id="clear-history" type="button">Clear history</button>
+        </div>
+        <canvas id="mosaic" class="diagnostic-plot waterfall-plot" width="800" height="240" role="img" aria-label="Historical byte colours, newest sample at top"></canvas>
+        <div class="plot-readouts">
+          <p id="waterfall-info" class="analysis-meta">0 / 240 samples</p>
+          <p class="note" id="waterfall-help">Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.</p>
+        </div>
+      </section>
+    </div>

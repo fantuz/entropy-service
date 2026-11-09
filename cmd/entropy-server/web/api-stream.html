@@ -7,7 +7,7 @@
   <title>Entropy Service — Stream Analysis</title>
   <link rel="stylesheet" href="/theme.css">
 </head>
-<body class="page-analysis page-stream">
+<body class="page-analysis page-analysis-lab page-stream">
   <main class="panel analysis-panel">
     <h1>Live Stream Analysis</h1>
     <p>Explore binary samples from <code>/stream</code>. One selected window feeds every view.
@@ -34,7 +34,8 @@
       <p id="sample-info" class="analysis-meta" aria-live="off">Awaiting a sample for analysis.</p>
     </section>
 
-    <div class="stream-grid">
+    <!-- BEGIN SHARED ANALYSIS -->
+    <div class="analysis-grid">
       <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
         <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>
         <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span>bits/byte</span></p>
@@ -86,7 +87,7 @@
           <div class="analysis-controls compact-controls">
             <label>FFT points <select id="fft-size"><option value="auto">Auto · up to 8,192</option><option value="512">512</option><option value="2048">2,048</option><option value="8192">8,192</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
             <label>Window <select id="fft-window"><option value="hann">Hann</option><option value="rectangular">Rectangular</option></select></label>
-            <label>Average power <select id="fft-average"><option value="1">1 frame</option><option value="4">4 frames</option><option value="16">16 frames</option></select></label>
+            <label>Average power <select id="fft-average"><option value="1">1 sample</option><option value="4">4 samples</option><option value="16">16 samples</option></select></label>
             <label class="checkbox-label"><input id="fft-demean" type="checkbox" checked>Remove mean</label>
           </div>
           <details><summary>Frequency zoom &amp; fixed dB scale</summary><div class="analysis-controls compact-controls">
@@ -99,7 +100,7 @@
         <canvas id="fft" class="diagnostic-plot" width="800" height="240" role="img" aria-label="One-sided power spectral density in cycles per byte"></canvas>
         <div class="plot-readouts">
           <p id="fftvalue" class="analysis-meta">Awaiting FFT input.</p>
-          <p class="note">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between frames.</p>
+          <p class="note">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.</p>
         </div>
       </section>
       <section class="analysis-card plot-card waterfall-card" aria-labelledby="waterfall-title">
@@ -113,11 +114,12 @@
         </div>
         <canvas id="mosaic" class="diagnostic-plot waterfall-plot" width="800" height="240" role="img" aria-label="Historical byte colours, newest sample at top"></canvas>
         <div class="plot-readouts">
-          <p id="waterfall-info" class="analysis-meta">0 / 240 selected frames</p>
+          <p id="waterfall-info" class="analysis-meta">0 / 240 samples</p>
           <p class="note" id="waterfall-help">Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.</p>
         </div>
       </section>
     </div>
+    <!-- END SHARED ANALYSIS -->
     <details class="analysis-card analysis-help"><summary>How to read these plots</summary>
       <p>Histogram, entropy and bit rates cover the whole selected window, up to 1 MiB. Trace pan/zoom and FFT use subsets of that same window. Choose a larger frame or smaller start offset when a requested FFT does not fit; there is no zero padding.</p>
       <p>Byte trace is not a voltage measurement. FFT frequency is cycles per byte, not Hz: network refresh is not a sample clock. Bytes are mapped to −1…+1; removing the mean subtracts the FFT input mean. PSD is |FFT|² divided by window energy, doubling interior positive-frequency bins. Integrating PSD over bins gives window-weighted mean-square amplitude. dB is 10 log₁₀(PSD), relative to one full-scale squared per cycle/byte; positive dB peaks are possible.</p>
@@ -128,6 +130,7 @@
   <script src="/analysis-math.js" defer></script>
   <script src="/analysis-plots.js" defer></script>
   <script src="/stream-entropy-alert.js" defer></script>
+  <script src="/analysis-workspace.js" defer></script>
   <script src="/stream-analysis.js" defer></script>
 </body>
 </html>

@@ -7,12 +7,11 @@
   <title>Entropy Service — File Analysis</title>
   <link rel="stylesheet" href="/theme.css">
 </head>
-<body class="page-analysis page-upload">
+<body class="page-analysis page-analysis-lab page-upload">
   <main class="panel analysis-panel">
     <h1>File Analysis</h1>
-    <p>Upload a local file for server-side statistical analysis (maximum 32 MiB). The
-       results describe the uploaded bytes; visual plots sample a bounded prefix.</p>
-
+    <p>Upload a file for server analysis and full-file SHA-256 (maximum 32 MiB).
+      Inspect any part with the same plots and controls as the live stream lab.</p>
     <section class="analysis-card upload-input-card" aria-labelledby="upload-title">
       <h2 id="upload-title" class="analysis-label">Select &amp; analyze a file</h2>
       <form class="uploadForm" id="uploadForm">
@@ -24,58 +23,125 @@
         </div>
       </form>
       <p id="upload-status" role="status" aria-live="polite" data-state="ready">READY TO ANALYZE</p>
-    </section>
-
-    <section class="analysis-card upload-entropy-card" aria-labelledby="upload-entropy-title">
-      <h2 id="upload-entropy-title" class="analysis-label">Shannon entropy index</h2>
-      <p class="upload-entropy-reading"><output id="entropy" class="analysis-value">NO FILE LOADED</output></p>
-      <p class="note">Bits per byte in the uploaded sample. A statistical estimate, not a cryptographic health test.</p>
-    </section>
-
-    <section class="analysis-card" aria-labelledby="upload-file-title">
-      <h2 id="upload-file-title" class="analysis-label">Analyzed file</h2>
       <p id="file-entropy" class="analysis-meta">NO FILE LOADED</p>
-      <p id="sample-info" class="analysis-meta"></p>
-    </section>
-
-    <section class="analysis-card" aria-labelledby="upload-sha-title">
-      <h2 id="upload-sha-title" class="analysis-label">SHA-256 · full upload</h2>
+      <p id="server-analysis" class="analysis-meta">The server report covers its configured file prefix. Plots describe the selected window below.</p>
+      <details id="server-report"><summary>Server analysis report</summary><pre id="server-report-content"></pre></details>
+      <h3 class="analysis-label">SHA-256 · full upload</h3>
       <output id="file-sha256" class="upload-sha256 hash">—</output>
     </section>
-
-    <section class="analysis-card" aria-labelledby="upload-hist-title">
-      <h2 id="upload-hist-title" class="analysis-label">Byte histogram · 256 values</h2>
-      <canvas id="histogram" width="800" height="110" aria-label="Byte-frequency histogram"></canvas>
+    <section class="analysis-card shared-controls" aria-labelledby="selection-title">
+      <h2 class="analysis-label" id="selection-title">Shared analysis window</h2>
+      <fieldset id="file-controls" disabled>
+        <div class="analysis-controls">
+          <label>Window cap <select id="analysis-size"><option value="4096">4 KiB</option><option value="16384">16 KiB</option><option value="65536" selected>64 KiB</option><option value="262144">256 KiB</option><option value="1048576">1 MiB</option></select></label>
+          <label>Start byte in file <input id="analysis-offset" type="number" min="0" max="33554431" value="0" step="1" required></label>
+          <label>Playback limit <select id="display-fps"><option value="1">1 window/s</option><option value="2">2 windows/s</option><option value="5" selected>5 windows/s</option><option value="10">10 windows/s</option></select></label>
+          <button id="previous-window" type="button">Previous</button>
+          <button id="next-window" type="button">Next</button>
+          <button id="play-file" type="button" aria-pressed="false">Play windows</button>
+        </div>
+      </fieldset>
+      <p id="capture-state" class="note">Upload a file, then inspect a window or play successive windows. Playback stops at the end of the file.</p>
+      <p id="sample-info" class="analysis-meta" aria-live="off">Awaiting a file for analysis.</p>
+      <p class="note">All plots and Shannon/bit statistics use the same selected local bytes, up to 1 MiB at a time. Changing views does not upload the file again. The waterfall records inspected windows, with file offsets on its left axis.</p>
     </section>
-
-    <section class="analysis-card" aria-labelledby="upload-mosaic-title">
-      <h2 id="upload-mosaic-title" class="analysis-label">RGB mosaic · sampled bytes</h2>
-      <canvas id="mosaic" width="800" height="96" aria-label="Random RGB mosaic"></canvas>
-    </section>
-
-    <section class="analysis-card" aria-labelledby="upload-balance-title">
-      <h2 id="upload-balance-title" class="analysis-label">Bit balance · Yin/Yang</h2>
-      <canvas id="pie" width="340" height="210" aria-label="Zero and one bits with centered legend"></canvas>
-    </section>
-
-    <section class="analysis-card" aria-labelledby="upload-wave-title">
-      <h2 id="upload-wave-title" class="analysis-label">Input waveform · first preview bytes</h2>
-      <canvas id="wave" width="800" height="170" aria-label="Byte-value waveform"></canvas>
-    </section>
-
-    <section class="analysis-card" aria-labelledby="upload-fft-title">
-      <h2 id="upload-fft-title" class="analysis-label">Frequency-domain preview
-        <span id="fftvalue" class="analysis-meta">· HANN / ONE-SIDED PSD</span>
-      </h2>
-      <canvas id="fft" width="800" height="110" aria-label="One-sided power spectral density in cycles per byte"></canvas>
-    </section>
-
-    <p class="note">FFT uses the same window-energy normalization and labelled scale as live stream analysis. Statistics cover the analyzed upload prefix. Visual plots use only the
-      preview bytes; uploads are transmitted to the server for analysis.</p>
-    <p><a href="/">← Back to all endpoints</a></p>
+    <!-- BEGIN SHARED ANALYSIS -->
+    <div class="analysis-grid">
+      <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
+        <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>
+        <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span>bits/byte</span></p>
+        <label class="entropy-threshold-control" for="entropy-threshold">Red alert below
+          <input id="entropy-threshold" type="number" min="1" max="8" step="0.00001" value="7.99990" inputmode="decimal"> <span>bits/byte</span>
+        </label>
+        <p class="entropy-alert-message" id="entropy-alert-message" role="status" aria-live="polite">AWAITING FIRST ANALYSIS SAMPLE</p>
+        <p class="entropy-alert-hint">Finite-sample estimate. High thresholds can trigger on healthy samples.</p>
+        <p id="byte-statistics" class="analysis-meta">Mean / standard deviation / range: —</p>
+      </section>
+      <section class="analysis-card balance-card" aria-labelledby="balance-title">
+        <h2 class="analysis-label" id="balance-title">Bit balance · Yin/Yang</h2>
+        <div class="balance-layout"><canvas id="pie" width="180" height="180" role="img" aria-label="Zero and one bit proportions"></canvas>
+          <div class="balance-legend"><p class="zero-key" id="zero-count">Zeros: —</p><p class="one-key" id="one-count">Ones: —</p><p class="note">50% reference per position</p></div>
+        </div>
+        <details id="bit-rates"><summary>Eight bit-position rates</summary><div class="bit-rate-grid" id="bit-rate-grid"></div><p class="note">Fraction of ones, MSB (7) to LSB (0). Each uses the same selected bytes.</p></details>
+      </section>
+      <section class="analysis-card plot-card trace-card" aria-labelledby="trace-title">
+        <h2 class="analysis-label" id="trace-title">Byte trace</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Visible bytes <select id="trace-span"><option value="128">128</option><option value="512">512</option><option value="1024" selected>1,024</option><option value="8192">8,192</option><option value="all">Whole window</option></select></label>
+          <label>Draw <select id="trace-style"><option value="line">Line</option><option value="steps">Steps</option><option value="dots">Dots</option></select></label>
+          <label>Pan (window offset) <input id="trace-start" type="range" min="0" max="0" value="0" step="1"><output id="trace-start-value">0</output></label>
+        </div>
+        <div class="trace-wrap" id="trace-wrap"><canvas id="wave" class="diagnostic-plot" width="800" height="240" role="img" aria-describedby="trace-info" aria-label="Byte trace, values 0 to 255 against byte offset"></canvas><span class="trace-marker" id="marker-a" hidden>A</span><span class="trace-marker" id="marker-b" hidden>B</span></div>
+        <div class="plot-readouts">
+          <p class="analysis-meta" id="trace-info">Zoom out preserves min/max per display column.</p>
+          <label class="cursor-control">Inspect byte <input id="trace-cursor" type="range" min="0" max="0" value="0" step="1"></label>
+          <output id="trace-reading" class="analysis-meta">Byte: —</output>
+          <p class="note">Hover or use the slider. Click two bytes for A/B measurements while playback is paused.</p>
+          <button id="clear-markers" type="button">Clear A/B</button><output id="marker-reading" class="analysis-meta"></output>
+        </div>
+      </section>
+      <section class="analysis-card plot-card histogram-card" aria-labelledby="histogram-title">
+        <h2 class="analysis-label" id="histogram-title">Byte histogram · all 256 values</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Units <select id="histogram-unit"><option value="percent">Percent</option><option value="count">Count</option></select></label>
+          <label>Scale <select id="histogram-scale"><option value="detail">Fixed · 0–1%</option><option value="full">Fixed · 0–100%</option><option value="auto">Auto · labelled</option></select></label>
+        </div>
+        <canvas id="histogram" class="diagnostic-plot" width="800" height="240" role="img" aria-label="Byte-frequency histogram with uniform reference"></canvas>
+        <div class="plot-readouts">
+          <p class="analysis-meta" id="histogram-info">Dashed line: uniform reference, 100/256 = 0.390625%.</p>
+          <p class="note">Yellow caps mark clipped bars; use full scale to see concentrated distributions. A flat histogram alone does not imply unpredictability.</p>
+        </div>
+      </section>
+      <section class="analysis-card plot-card spectrum-card" aria-labelledby="spectrum-title">
+        <h2 class="analysis-label" id="spectrum-title">Power spectrum</h2>
+        <div class="plot-controls">
+          <div class="analysis-controls compact-controls">
+            <label>FFT points <select id="fft-size"><option value="auto">Auto · up to 8,192</option><option value="512">512</option><option value="2048">2,048</option><option value="8192">8,192</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
+            <label>Window <select id="fft-window"><option value="hann">Hann</option><option value="rectangular">Rectangular</option></select></label>
+            <label>Average power <select id="fft-average"><option value="1">1 sample</option><option value="4">4 samples</option><option value="16">16 samples</option></select></label>
+            <label class="checkbox-label"><input id="fft-demean" type="checkbox" checked>Remove mean</label>
+          </div>
+          <details><summary>Frequency zoom &amp; fixed dB scale</summary><div class="analysis-controls compact-controls">
+            <label>Min (cycles/byte) <input id="fft-min" type="number" min="0" max="0.49999" step="0.001" value="0"></label>
+            <label>Max (cycles/byte) <input id="fft-max" type="number" min="0.00001" max="0.5" step="0.001" value="0.5"></label>
+            <label>Floor (dB) <input id="fft-floor" type="number" min="-160" max="40" value="-60"></label>
+            <label>Ceiling (dB) <input id="fft-ceiling" type="number" min="-150" max="100" value="50"></label>
+          </div><p id="fft-scale-error" class="form-error" role="status"></p></details>
+        </div>
+        <canvas id="fft" class="diagnostic-plot" width="800" height="240" role="img" aria-label="One-sided power spectral density in cycles per byte"></canvas>
+        <div class="plot-readouts">
+          <p id="fftvalue" class="analysis-meta">Awaiting FFT input.</p>
+          <p class="note">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.</p>
+        </div>
+      </section>
+      <section class="analysis-card plot-card waterfall-card" aria-labelledby="waterfall-title">
+        <h2 class="analysis-label" id="waterfall-title">File waterfall · window history</h2>
+        <div class="analysis-controls compact-controls">
+          <label>Colour mode <select id="waterfall-mode"><option value="rgb">RGB</option><option value="vivid">Vivid hue</option><option value="gray">Grayscale</option><option value="bit">Bit plane</option></select></label>
+          <label>Bit plane <select id="waterfall-bit" aria-describedby="waterfall-help"><option value="7">7 · MSB</option><option value="6">6</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option><option value="0">0 · LSB</option></select></label>
+          <label>Bytes/row <select id="waterfall-bytes"><option value="auto" selected>Auto · large</option><option value="128">128</option><option value="256">256</option><option value="512">512</option><option value="1024">1,024</option></select></label>
+          <label>History rows <select id="waterfall-rows"><option value="16" selected>16 · large</option><option value="32">32 rows</option><option value="64">64 rows</option><option value="240">All (240 max)</option></select></label>
+          <button id="clear-history" type="button">Clear history</button>
+        </div>
+        <canvas id="mosaic" class="diagnostic-plot waterfall-plot" width="800" height="240" role="img" aria-label="Historical byte colours, newest sample at top"></canvas>
+        <div class="plot-readouts">
+          <p id="waterfall-info" class="analysis-meta">0 / 240 samples</p>
+          <p class="note" id="waterfall-help">Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.</p>
+        </div>
+      </section>
+    </div>
+    <!-- END SHARED ANALYSIS -->
+    <details class="analysis-card analysis-help"><summary>How to read these plots</summary>
+      <p>Histogram, entropy and bit rates cover the selected file window. Trace pan/zoom and FFT use subsets of that same window. File position is a byte offset, not a time or voltage. Frequency is cycles per byte, not Hz.</p>
+      <p>The same Hann/rectangular windows, one-sided power density, linear power averaging and fixed scales are used by the live stream lab. Playback advances one window at a time; averaging spans consecutive windows of equal size. A/B measurements work while playback is paused.</p>
+      <p>Waterfall columns are offsets within each window; its left axis identifies each row's starting file byte (Ki/Mi labels marked ~ are rounded). It records inspections rather than elapsed time. All plots are diagnostics, not cryptographic certification.</p>
+    </details>
+    <p><a href="/api-stream.html">Live stream lab</a> · <a href="/">All endpoints</a></p>
   </main>
   <script src="/analysis-math.js" defer></script>
   <script src="/analysis-plots.js" defer></script>
+  <script src="/stream-entropy-alert.js" defer></script>
+  <script src="/analysis-workspace.js" defer></script>
   <script src="/file-upload.js" defer></script>
 </body>
 </html>

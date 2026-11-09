@@ -63,6 +63,8 @@ jobs:
         run: node scripts/test-analysis-math.mjs
       - name: Test stream Shannon entropy alerts
         run: node scripts/test-stream-entropy-alert.mjs
+      - name: Check shared analysis markup
+        run: node scripts/render-analysis-pages.mjs --check
       - name: Test browser layout and digest formatting
         run: node scripts/test-web-layout.mjs
       - name: Test synchronized HTTP gallery

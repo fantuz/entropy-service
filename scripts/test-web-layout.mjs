@@ -60,13 +60,13 @@ assert.match(css, /\.page-home \.websocket-grid > \.card > \.path/);
 assert.match(css, /margin-top:\s*auto/);
 assert.match(css, /\.page-colors #hash[\s\S]*?white-space:\s*pre-line/);
 
-// Uploaded results retain all renderer DOM IDs and now follow input/entropy/
-// file/hash/charts in that order, with no legacy line-break spacer tags.
+// Upload metadata precedes the same shared analysis panels used by the stream.
+// IDs remain unique; the generated markup must not drift between the two labs.
 const upload = html("api-upload.html");
 assert.ok(!upload.includes("<style>"));
 assert.ok(!upload.includes("</br>"));
-const ordered = ["uploadForm", "upload-status", "entropy", "file-entropy",
-    "file-sha256", "histogram", "mosaic", "pie", "wave", "fft"];
+const ordered = ["uploadForm", "upload-status", "file-entropy", "file-sha256",
+    "analysis-size", "analysis-offset", "entropy", "pie", "wave", "histogram", "fft", "mosaic"];
 let previous = -1;
 for (const id of ordered) {
     const token = 'id="' + id + '"';
@@ -76,7 +76,12 @@ for (const id of ordered) {
     previous = position;
 }
 assert.match(upload, /class="analysis-card upload-input-card"/);
-assert.match(upload, /class="analysis-card upload-entropy-card"/);
+for (const page of [upload, html("api-stream.html")]) {
+    assert.match(page, /class="analysis-card entropy-alert-card"/);
+    assert.match(page, /page-analysis-lab/);
+    assert.match(page, /src="\/analysis-workspace.js"/);
+}
+assert.match(upload, /id="server-report-content"/);
 // Homepage API examples belong under the output explanation, before legacy links.
 // The curl/WebSocket example uses a real HTTP/1.1 Upgrade request rather than
 // treating a ws:// URL as a plain HTTP download. Curl exposes raw WS framing.

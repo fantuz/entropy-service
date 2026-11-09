@@ -113,8 +113,8 @@
     class WaterfallHistory {
         constructor(capacity = 240) { this.capacity = capacity; this.rows = []; }
         clear() { this.rows = []; }
-        add(bytes, time, frame) {
-            this.rows.unshift({bytes: bytes.slice(0, 1024), time, frame});
+        add(bytes, time, frame, offset = 0) {
+            this.rows.unshift({bytes: bytes.slice(0, 1024), time, frame, offset});
             if (this.rows.length > this.capacity) this.rows.length = this.capacity;
         }
     }
