@@ -20,7 +20,10 @@ import (
 
 var ErrTooLarge = errors.New("source sample exceeds requested byte limit")
 
-type HTTPStatusError struct{ Code int }
+type HTTPStatusError struct {
+	Code            int
+	RedirectBlocked bool
+}
 
 func (e *HTTPStatusError) Error() string { return fmt.Sprintf("upstream HTTP status %d", e.Code) }
 
@@ -32,7 +35,17 @@ type Stream struct {
 	maxBytes int
 	stop     func() bool
 	once     sync.Once
+	info     HTTPInfo
 }
+
+// HTTPInfo describes the last response without disclosing endpoint URLs.
+type HTTPInfo struct {
+	Status    int  `json:"status"`
+	Redirects int  `json:"redirects"`
+	Location  bool `json:"location_present"`
+}
+
+func (s *Stream) HTTPInfo() HTTPInfo { return s.info }
 
 func (s *Stream) Read(ctx context.Context, count int) ([]byte, error) {
 	if count < 1 || count > s.maxBytes {
@@ -42,7 +55,12 @@ func (s *Stream) Read(ctx context.Context, count int) ([]byte, error) {
 	bounded, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
-	return s.read(bounded, count)
+	data, err := s.read(bounded, count)
+	if err != nil && bounded.Err() != nil {
+		err = bounded.Err()
+	}
+
+	return data, err
 }
 
 func (s *Stream) Close() error {
@@ -84,8 +102,10 @@ func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refr
 	switch c.Kind {
 	case sourceHTTP, sourceEntropyHTTP, sourceWebpage:
 		stream.read = func(readCtx context.Context, n int) ([]byte, error) {
+			stream.info = HTTPInfo{}
 			endpoint := sourceURL(c, n, refresh)
 			client := r.client
+			redirects, blocked := 0, false
 
 			if c.Kind == sourceWebpage {
 				if len(c.URLs) > 0 {
@@ -100,11 +120,13 @@ func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refr
 				}
 
 				copyClient := *r.client
-				original, _ := url.Parse(endpoint)
 				copyClient.CheckRedirect = func(request *http.Request, via []*http.Request) error {
-					if len(via) >= 3 || !sameOrigin(request.URL, original) || request.URL.User != nil {
+					if len(via) >= 3 || !webRedirectAllowed(request.URL, via[len(via)-1].URL) || request.URL.User != nil {
+						blocked = true
 						return http.ErrUseLastResponse
 					}
+
+					redirects++
 
 					return nil
 				}
@@ -126,8 +148,10 @@ func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refr
 			}
 			defer response.Body.Close()
 
+			stream.info = HTTPInfo{Status: response.StatusCode, Redirects: redirects, Location: response.Header.Get("Location") != ""}
+
 			if response.StatusCode < 200 || response.StatusCode > 299 {
-				return nil, &HTTPStatusError{Code: response.StatusCode}
+				return nil, &HTTPStatusError{Code: response.StatusCode, RedirectBlocked: blocked || (isRedirect(response.StatusCode) && response.Header.Get("Location") != "")}
 			}
 
 			limit := int64(n) + 1
@@ -221,10 +245,7 @@ func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refr
 
 			buffer := make([]byte, n)
 
-			size, err := io.ReadFull(conn, buffer)
-			if errors.Is(err, io.ErrUnexpectedEOF) {
-				err = io.EOF
-			}
+			size, err := conn.Read(buffer)
 
 			return buffer[:size], err
 		}
@@ -273,6 +294,14 @@ func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refr
 	stream.mu.Unlock()
 
 	return stream, nil
+}
+
+func isRedirect(code int) bool {
+	return code == 301 || code == 302 || code == 303 || code == 307 || code == 308
+}
+
+func webRedirectAllowed(target, original *url.URL) bool {
+	return sameOrigin(target, original) || (original.Scheme == sourceHTTP && target.Scheme == sourceHTTPS && strings.EqualFold(target.Hostname(), original.Hostname()) && (original.Port() == "" || original.Port() == "80") && (target.Port() == "" || target.Port() == "443"))
 }
 
 func sourceURL(c Config, count, refresh int) string {

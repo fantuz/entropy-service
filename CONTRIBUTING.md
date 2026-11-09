@@ -110,3 +110,8 @@ The latter uses fake media and local fixtures; it does not activate real devices
 The optional `scripts/test_lab_cameras.py` uses FFmpeg and a supplied MediaMTX
 binary for authenticated RTSP and mocked ONVIF/HTTP browser integration.
 It also requires test-only Python packages `playwright` and `defusedxml`.
+
+`scripts/lab_socket_fixture.py` provides local deterministic TCP/UDP producers
+for the source-lab guide; the browser suite exercises short TCP reads, one-shot
+UDP delivery after readiness, WebSocket schema errors, HTTP 201/redirects and
+CORS/no-registry feedback.

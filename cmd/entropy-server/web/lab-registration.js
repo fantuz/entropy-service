@@ -4,25 +4,60 @@
 // registry; these controls do not add a remote filesystem or arbitrary-dial API.
 (() => {
     const kinds=["webpage","http","websocket","entropy-http","entropy-ws","rtsp","onvif","tcp","udp","unix","device"];
+    const pagePresets=Object.freeze([
+        {label:"Example.org · HTML",url:"https://example.org/",hint:"Ordinary HTML; use a webpage registration if CORS is blocked."},
+        {label:"RFC 4086 · randomness",url:"https://www.rfc-editor.org/rfc/rfc4086.txt",hint:"Long plain text; currently grants browser CORS. A registered source is available if site policy changes."},
+        {label:"Random Wikipedia page",url:"https://en.wikipedia.org/wiki/Special:Random",hint:"Uses redirects; site policies may require the registered-server route."},
+        {label:"HTTPBin · 4,096 binary bytes",url:"https://httpbin.org/bytes/4096",hint:"CORS-enabled binary example; often works in browser mode."},
+        {label:"HTTPBin · JSON",url:"https://httpbin.org/json",hint:"CORS-enabled structured JSON comparison data."},
+        {label:"Project README · plain text",url:"https://raw.githubusercontent.com/fantuz/entropy-service/main/README.md",hint:"Public source text; normally permits browser CORS."},
+        {label:"RFC 1149 · IP over avian carriers",url:"https://www.rfc-editor.org/rfc/rfc1149.txt",hint:"A second plain-text example; currently grants browser CORS."},
+    ]);
+    function schemaFor(kind){
+        if(!kinds.includes(kind))throw new Error("Unknown source kind");
+        const schemas={
+            webpage:{label:"Web-page HTTP(S) URL",example:"https://example.org/",schemes:["http:","https:"],help:"Reads a prefix; follows up to two same-origin redirects or same-host HTTP→HTTPS upgrades on default ports. Additional URLs form a random pool."},
+            http:{label:"Binary HTTP(S) URL",example:"https://httpbin.org/bytes/4096",schemes:["http:","https:"],help:"Strict binary source: the complete body must fit Sample bytes; redirects are rejected. Choose webpage for HTML/text prefixes."},
+            websocket:{label:"Complete binary WebSocket URL",example:"ws://127.0.0.1:8081/stream?bytes=4096&refresh=500",schemes:["ws:","wss:"],help:"Use ws://host:port/path or wss://host/path. The upstream must push binary messages without a subscription/request; each must fit Sample bytes. For entropy-server, entropy-ws automatically sets bytes/refresh."},
+            "entropy-http":{label:"Entropy-server base HTTP(S) URL",example:"http://127.0.0.1:8081",schemes:["http:","https:"],help:"Enter the base HTTP(S) address, without a path/query. The bridge adds /v1/data/random and sampling parameters."},
+            "entropy-ws":{label:"Entropy-server base HTTP(S) URL",example:"http://127.0.0.1:8081",schemes:["http:","https:"],help:"This peer type expects http:// or https://, even though it uses WebSocket. The bridge adds /stream and selected bytes/refresh; choose websocket for a full ws:// URL."},
+            rtsp:{label:"Camera RTSP URL",example:"rtsp://192.168.1.100:554/Streaming/Channels/102",schemes:["rtsp:"],help:"Use the camera's RTSP/TCP stream URL without userinfo. Enter camera credentials in the capture form; FFmpeg is required on the server."},
+            onvif:{label:"ONVIF Device service HTTP(S) URL",example:"http://192.168.1.100/onvif/device_service",schemes:["http:","https:"],help:"This is the Device service, not the RTSP feed. Media1 discovery obtains the feed; an empty profile token selects the first profile. Enter camera credentials at capture time."},
+            tcp:{label:"TCP producer host:port",example:"127.0.0.1:9001",help:"entropy-server connects as a TCP client and reads available raw bytes up to Sample bytes. The producer must listen and send data without waiting for a request; no HTTP/TLS/echo commands are sent."},
+            udp:{label:"Local UDP listen address:port",example:"127.0.0.1:9002",help:"entropy-server binds this local address. Another process sends nonempty datagrams to it after Start; this does not pull a remote UDP service. Sample bytes must fit each datagram."},
+            unix:{label:"Server-side Unix socket path",example:"/tmp/entropy-source.sock",help:"Connects to a local byte-producing stream socket. No commands are sent."},
+            device:{label:"Server-side device/file path",example:"/dev/urandom",help:"Reads a registered Linux byte device/file. This path belongs to entropy-server, not the browser computer."},
+        };
+        if(!schemas[kind])throw new Error("Unknown source kind");return schemas[kind];
+    }
+    function httpStatus(code,redirects=0){
+        const suffix=redirects===true?" · redirect followed":redirects?` · ${redirects} redirect(s) followed`:"";
+        if(code===201)return `HTTP 201 Created${suffix} · success, not a redirect; a Location header identifies a created resource.`;
+        return `HTTP ${code}${suffix}`;
+    }
     function build(value){
         const source={id:String(value.id||"").trim(),name:String(value.name||"").trim(),kind:value.kind,endpoint:String(value.endpoint||"").trim(),max_bytes:Number(value.max_bytes),timeout_ms:Number(value.timeout_ms)};
         if(!/^[a-z][a-z0-9_-]{0,31}$/.test(source.id))throw new Error("ID needs 1–32 lowercase letters/digits/_/-, starting with a letter");
-        if(new TextEncoder().encode(source.name).length>80||!kinds.includes(source.kind))throw new Error("Invalid kind or name (maximum 80 UTF-8 bytes)");
+        if(new TextEncoder().encode(source.name).length>80)throw new Error("Name exceeds 80 UTF-8 bytes");
+        const schema=schemaFor(source.kind),expected=`${schema.label}. Example: ${schema.example}`;
         if(!Number.isInteger(source.max_bytes)||source.max_bytes<1||source.max_bytes>1048576||!Number.isInteger(source.timeout_ms)||source.timeout_ms<100||source.timeout_ms>60000)throw new Error("Bytes: 1–1,048,576; timeout: 100–60,000 ms");
         function checkURL(raw,schemes){
-            let url;try{url=new URL(raw);}catch(_){throw new Error("Enter a complete source URL");}
-            if(!schemes.includes(url.protocol)||!url.hostname||url.username||url.password||url.hash||raw.length>2048)throw new Error("Wrong URL scheme, credentials or fragment; enter camera credentials at capture time");
+            let url;try{url=new URL(raw);}catch(_){throw new Error(`Enter a complete ${expected}`);}
+            if(!schemes.includes(url.protocol)||!url.hostname)throw new Error(`Expected ${expected}`);
+            if(url.username||url.password)throw new Error(["rtsp","onvif"].includes(source.kind)?"Remove camera credentials from the URL; enter them in the Network camera capture form.":`URL credentials are not supported for this source. Use ${schema.example} without userinfo.`);
+            if(url.hash)throw new Error(`Remove the URL fragment (#...). ${expected}`);
+            if(raw.length>2048)throw new Error("Source URL exceeds 2,048 characters");
             if(url.pathname==="/lab"||url.pathname.startsWith("/lab/"))throw new Error("Relay endpoints cannot be upstream sources");
             return url;
         }
         if(["unix","device"].includes(source.kind)){
-            if(!source.endpoint.startsWith("/")||source.endpoint.length>4096)throw new Error("Use an absolute server-side socket/device path");
+            if(!source.endpoint.startsWith("/")||source.endpoint.length>4096)throw new Error(`Use an absolute ${expected}`);
         }else if(["tcp","udp"].includes(source.kind)){
-            const url=checkURL("tcp://"+source.endpoint,["tcp:"]);
-            if(!url.port||url.pathname||url.search)throw new Error("Use host:port, e.g. 127.0.0.1:9001");
+            let url;try{url=new URL("tcp://"+source.endpoint);}catch(_){throw new Error(`Expected ${expected} (no ${source.kind}:// prefix).`);}
+            if(source.endpoint.includes("://")||!url.hostname||!url.port||url.pathname||url.search||url.hash||url.username||url.password||Number(url.port)<1)throw new Error(`Expected ${expected} (no ${source.kind}:// prefix).`);
         }else{
-            const url=checkURL(source.endpoint,source.kind==="rtsp"?["rtsp:"]:source.kind==="websocket"?["ws:","wss:"]:["http:","https:"]);
-            if(source.kind.startsWith("entropy-")&&((url.pathname&&url.pathname!=="/")||url.search))throw new Error("Peer registration requires a base HTTP(S) URL without path/query");
+            const url=checkURL(source.endpoint,schema.schemes);
+            if(source.kind.startsWith("entropy-")&&((url.pathname&&url.pathname!=="/")||url.search))throw new Error(`Peer registration requires a base HTTP(S) URL without path/query. Example: ${schema.example}`);
         }
         if(source.kind==="webpage"){
             const urls=Array.isArray(value.urls)?value.urls:String(value.urls||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
@@ -48,17 +83,19 @@
         if(new TextEncoder().encode(JSON.stringify({sources},null,2)).length>65536)throw new Error("Configuration exceeds the server's 64 KiB limit");
         return {sources};
     }
-    globalThis.EntropyLabRegistration=Object.freeze({build,configuration});
+    globalThis.EntropyLabRegistration=Object.freeze({build,configuration,schemaFor,pagePresets,httpStatus});
     if(typeof document==="undefined")return;
     const trigger=document.getElementById("lab-create-source");if(!trigger)return;
     const dialog=document.createElement("dialog");dialog.className="lab-registration";dialog.id="lab-registration";
-    dialog.innerHTML=`<form id="lab-registration-form"><h2 id="registration-title">Register a source</h2>
+    dialog.innerHTML=`<form id="lab-registration-form"><h2 id="registration-title">Prepare source registry</h2>
       <p class="note">Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server.</p>
       <div class="analysis-controls">
         <label>Source kind<select name="kind">${kinds.map(kind=>`<option>${kind}</option>`).join("")}</select></label>
         <label>ID<input name="id" required pattern="[a-z][a-z0-9_-]{0,31}" placeholder="lab-camera"></label>
         <label>Display name<input name="name" maxlength="80" placeholder="Optional friendly name"></label>
-        <label class="registration-wide">Endpoint<input name="endpoint" required placeholder="https://example.org/"></label>
+        <label class="registration-wide"><span id="registration-endpoint-label">Endpoint</span><input name="endpoint" required aria-describedby="registration-example registration-help" placeholder="https://example.org/"></label>
+        <div class="registration-wide"><p id="registration-example" class="note"></p><button type="button" id="registration-use-example">Use example</button></div>
+        <label class="registration-pages registration-wide" hidden>Web-page example<select id="registration-page-example"><option value="">Choose an example…</option>${pagePresets.map(p=>`<option value="${p.url}">${p.label}</option>`).join("")}</select></label>
         <label>Maximum sample bytes<input name="max_bytes" type="number" min="1" max="1048576" value="1048576" required></label>
         <label>Timeout (ms)<input name="timeout_ms" type="number" min="100" max="60000" value="10000" required></label>
         <label class="registration-camera" hidden>Decoded size<select name="resolution"><option>160x120</option><option selected>320x240</option><option>640x480</option></select></label>
@@ -73,23 +110,29 @@
     <label>Configuration JSON<textarea id="registration-json" rows="8" readonly spellcheck="false"></textarea></label>
     <div class="lab-actions"><button type="button" id="registration-download">Download lab-sources.json</button><button type="button" id="registration-copy">Copy JSON</button><button type="button" id="registration-reset">New configuration</button></div>
     <p class="note">Save this file on the entropy-server host, then restart with:</p><pre>./bin/entropy-server -lab-sources=lab-sources.json</pre>
-    <p class="note">Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.</p>`;
+    <p class="note" id="registration-camera-note" hidden>Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.</p>`;
     dialog.setAttribute("aria-labelledby","registration-title");document.body.append(dialog);
     const form=dialog.querySelector("form"),field=name=>form.elements.namedItem(name),status=text=>{dialog.querySelector("#registration-status").textContent=text;};
     let registry={sources:[]};
     function render(){dialog.querySelector("#registration-json").value=JSON.stringify(registry,null,2);dialog.querySelector("#registration-download").disabled=dialog.querySelector("#registration-copy").disabled=!registry.sources.length;}
     function fields(){
         const kind=field("kind").value,camera=["rtsp","onvif"].includes(kind);
-        for(const [selector,shown] of [[".registration-camera",camera],[".registration-onvif",kind==="onvif"],[".registration-pool",kind==="webpage"]])dialog.querySelectorAll(selector).forEach(node=>{node.hidden=!shown;node.querySelectorAll("input,select,textarea").forEach(control=>{control.disabled=!shown;});});
+        for(const [selector,shown] of [[".registration-camera",camera],[".registration-onvif",kind==="onvif"],[".registration-pool",kind==="webpage"],[".registration-pages",["webpage","http"].includes(kind)]])dialog.querySelectorAll(selector).forEach(node=>{node.hidden=!shown;node.querySelectorAll("input,select,textarea").forEach(control=>{control.disabled=!shown;});});
         const [width,height]=field("resolution").value.split("x").map(Number);field("max_bytes").disabled=camera;if(camera)field("max_bytes").value=width*height*3;
-        dialog.querySelector("#registration-help").textContent=kind==="webpage"?"Reads a body prefix and follows up to two redirects on the same origin. A pool chooses randomly between the endpoint and additional URLs.":kind==="rtsp"?"Use the RTSP URL supplied by your camera; username/password are entered at capture time.":kind==="onvif"?"Use e.g. http://camera/onvif/device_service. Media profiles and the RTSP URI are discovered using ONVIF Media1.":"Endpoint paths/devices belong to the server host. Keep bridges within your trusted lab.";
+        const schema=schemaFor(kind);field("endpoint").placeholder=schema.example;
+        dialog.querySelector("#registration-endpoint-label").textContent=schema.label;
+        dialog.querySelector("#registration-example").textContent=`Example: ${schema.example}`;
+        dialog.querySelector("#registration-help").textContent=schema.help;
+        dialog.querySelector("#registration-camera-note").hidden=!camera;
     }
+    dialog.querySelector("#registration-use-example").addEventListener("click",()=>{field("endpoint").value=schemaFor(field("kind").value).example;status("Example filled; adjust the host/port/path for your source.");});
+    dialog.querySelector("#registration-page-example").addEventListener("change",event=>{if(event.target.value){field("endpoint").value=event.target.value;status(pagePresets.find(p=>p.url===event.target.value).hint);}});
     trigger.addEventListener("click",()=>{fields();render();dialog.showModal();});dialog.querySelector("#registration-close").addEventListener("click",()=>dialog.close());form.addEventListener("change",fields);
     form.addEventListener("submit",event=>{event.preventDefault();try{
         if(!form.reportValidity())return;
         const values=Object.fromEntries(Array.from(form.elements).filter(control=>control.name).map(control=>[control.name,control.value]));[values.width,values.height]=field("resolution").value.split("x");
         const source=build(values);if(registry.sources.some(item=>item.id===source.id))throw new Error("ID already exists; choose another ID");if(registry.sources.length>=32)throw new Error("The registry is limited to 32 sources");
-        registry=configuration({sources:[...registry.sources,source]});render();status(`${source.id} added. Download/install the JSON and restart entropy-server to activate it.`);
+        registry=configuration({sources:[...registry.sources,source]});render();status(`${source.id} added to the draft; not active yet. Download/install the JSON and restart entropy-server with -lab-sources=lab-sources.json.`);
     }catch(error){status(error.message);}});
     dialog.querySelector("#registration-import").addEventListener("change",async event=>{try{const file=event.target.files[0];if(!file)return;if(file.size>65536)throw new Error("Registry exceeds 64 KiB");registry=configuration(JSON.parse(await file.text()));render();status(`Imported ${registry.sources.length} registrations locally.`);}catch(error){status(error.message);}});
     dialog.querySelector("#registration-reset").addEventListener("click",()=>{registry={sources:[]};render();status("New empty configuration.");});
