@@ -68,6 +68,92 @@ class FixtureTCP(socketserver.ThreadingTCPServer):
     allow_reuse_address=True
 
 
+def registration_checks(page, artifacts):
+    from playwright.sync_api import expect
+
+    page.set_viewport_size({"width":1440,"height":1000})
+    page.locator("#lab-create-source").click();dialog=page.locator("#lab-registration")
+    field=lambda name:dialog.locator(f'[name="{name}"]')
+    draft=lambda:json.loads(dialog.locator("#registration-json").input_value())["sources"]
+    field("id").fill("ws-draft");field("kind").select_option("websocket")
+    field("endpoint").fill("http://127.0.0.1:8081/stream");dialog.locator('#registration-submit').click()
+    expect(dialog.locator("#registration-status")).to_contain_text("ws://")
+    expect(field("endpoint")).to_have_attribute("aria-invalid","true")
+    expect(dialog.locator("#registration-error-endpoint")).to_be_visible()
+    assert "camera" not in dialog.locator("#registration-status").text_content().lower()
+    expect(dialog.locator("#registration-camera-note")).to_be_hidden()
+    dialog.locator("#registration-use-example").click()
+    expect(field("endpoint")).to_have_value("ws://127.0.0.1:8081/stream?bytes=4096&refresh=500")
+    dialog.locator('#registration-submit').click();expect(dialog.locator("#registration-status")).to_contain_text("not active yet")
+    expect(dialog.locator("#registration-draft-state")).to_contain_text("Unsaved changes")
+    dialog.get_by_role("button",name="Edit ws-draft",exact=True).click()
+    field("id").fill("ws-renamed");field("name").fill("My WebSocket");field("max_bytes").fill("16384")
+    dialog.locator('#registration-submit').click()
+    assert len(draft())==1 and draft()[0]["id"]=="ws-renamed" and draft()[0]["max_bytes"]==16384
+    field("id").fill("ws-renamed");dialog.locator("#registration-use-example").click();dialog.locator('#registration-submit').click()
+    expect(dialog.locator("#registration-error-id")).to_contain_text("already exists")
+    field("id").fill("page");dialog.locator('#registration-submit').click()
+    dialog.get_by_role("button",name="Remove page",exact=True).click();assert len(draft())==1
+    field("id").fill("peer");field("kind").select_option("entropy-ws");field("endpoint").fill("ws://127.0.0.1:8081/stream")
+    dialog.locator('#registration-submit').click();expect(dialog.locator("#registration-status")).to_contain_text("http://127.0.0.1:8081")
+    for kind,example in [("onvif","http://192.168.1.100/onvif/device_service"),("udp","127.0.0.1:9002")]:
+        field("kind").select_option(kind);expect(dialog.locator("#registration-example")).to_contain_text(example)
+    expect(dialog.locator("#registration-camera-note")).to_be_hidden()
+    dialog.locator("#registration-close").click()
+    # Unsaved registry/form edits survive a cancelled navigation.
+    dialogs=[]
+    def reject_navigation(event):dialogs.append(event.type);event.dismiss()
+    page.once("dialog",reject_navigation);page.locator(".lab-menu a").click()
+    assert dialogs==["beforeunload"] and page.url.endswith("api-socket.html")
+    page.once("dialog",lambda event:event.accept());page.locator(".lab-menu a").click()
+    page.wait_for_url("**/api-sources.html")
+    page.locator("#lab-create-source").click();assert draft()==[]
+
+    def delayed_import():
+        page.evaluate('''() => {
+            const input=document.getElementById('registration-import');
+            const data=JSON.stringify({sources:[{id:'obsolete',kind:'http',endpoint:'https://example.org/'}]});
+            const file=new File([data],'delayed.json',{type:'application/json'});
+            file.text=()=>new Promise(resolve=>window.finishRegistryImport=()=>resolve(data));
+            Object.defineProperty(input,'files',{configurable:true,value:[file]});
+            input.dispatchEvent(new Event('change',{bubbles:true}));delete input.files;
+        }''')
+
+    delayed_import();dialog.locator("#registration-reset").click();page.evaluate("finishRegistryImport()");wait_paint(page)
+    assert draft()==[]
+    expect(dialog.locator("#registration-status")).to_have_text("New empty configuration.")
+    delayed_import()
+    camera={"id":"camera","kind":"onvif","endpoint":"http://camera/onvif/device_service","width":160,"height":120,"timeout_ms":5000}
+    dialog.locator("#registration-import").set_input_files({"name":"camera.json","mimeType":"application/json","buffer":json.dumps({"sources":[camera]}).encode()})
+    expect(dialog.locator("#registration-status")).to_contain_text("Imported 1")
+    page.evaluate("finishRegistryImport()");wait_paint(page)
+    assert draft()[0]["id"]=="camera" and draft()[0]["max_bytes"]==57600
+    dialog.get_by_role("button",name="Edit camera",exact=True).click()
+    expect(field("timeout_ms")).to_have_value("5000")
+    field("name").fill("Network camera");dialog.locator('#registration-submit').click()
+    assert draft()[0]["timeout_ms"]==5000
+    with page.expect_download() as downloaded:dialog.locator("#registration-download").click()
+    assert json.loads(Path(downloaded.value.path()).read_text())["sources"]==draft()
+    expect(dialog.locator("#registration-draft-state")).to_contain_text("No pending changes")
+    # Invalid imports preserve the last good draft; the same file can be retried.
+    invalid={**camera,"max_bytes":4096}
+    for _ in range(2):
+        dialog.locator("#registration-import").set_input_files({"name":"bad.json","mimeType":"application/json","buffer":json.dumps({"sources":[invalid]}).encode()})
+        expect(dialog.locator("#registration-status")).to_contain_text("RGB frame size")
+        assert draft()[0]["name"]=="Network camera"
+    dialog.get_by_role("button",name="Edit camera",exact=True).click()
+    dialog.locator(".registration-body").evaluate("node=>node.scrollTop=0")
+    dialog.screenshot(path=str(artifacts/"registration-desktop.png"))
+    page.set_viewport_size({"width":390,"height":844})
+    dialog.locator(".registration-body").evaluate("node=>node.scrollTop=node.scrollHeight")
+    expect(dialog.locator("#registration-close")).to_be_in_viewport()
+    expect(dialog.locator("#registration-download")).to_be_in_viewport()
+    assert dialog.evaluate("node=>node.scrollWidth<=node.clientWidth+1")
+    dialog.locator(".registration-body").evaluate("node=>node.scrollTop=0")
+    dialog.screenshot(path=str(artifacts/"registration-feedback-mobile.png"))
+    dialog.locator("#registration-close").click()
+
+
 def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
     from playwright.sync_api import expect, sync_playwright
     with sync_playwright() as playwright:
@@ -107,6 +193,8 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
             page.locator("#lab-export").click()
         records=json.loads(Path(exported.value.path()).read_text())
         assert [record["statistics"]["entropy"] for record in records["records"]]==[8,0]
+        expect(page.locator("#lab-input-unit")).to_have_text("sample")
+        expect(page.locator("#lab-analysis-unit")).to_have_text("window")
         page.locator("#lab-kind").select_option("counter")
         page.locator("#lab-transform").select_option("lsb")
         page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
@@ -123,6 +211,13 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
         page.wait_for_timeout(250)
         assert number(page,"lab-input-frames")>frames and number(page,"lab-analysis-frames")==analyzed
         assert page.locator("#sample-info").inner_text()==frozen
+        page.locator("#lab-record").click()
+        with page.expect_download() as paused_export:page.locator("#lab-export").click()
+        paused_record=json.loads(Path(paused_export.value.path()).read_text())["records"][-1]
+        assert paused_record["frozen"] and paused_record["sampleAgeMs"]>=200
+        assert paused_record["capturedAt"]<paused_record["recordedAt"]==paused_record["timestamp"]
+        assert paused_record["meter"]["scope"]=="source-session" and paused_record["meter"]["measuredAt"]==paused_record["recordedAt"]
+        assert paused_record["meter"]["frames"]>paused_record["window"]["frame"]
         page.locator("#pause-plots").click()
         page.wait_for_function("Number(document.getElementById('lab-analysis-frames').textContent.replaceAll(',',''))>"+str(analyzed))
         page.locator("#lab-stop").click();expect(page.locator("#lab-start")).to_be_enabled()
@@ -132,6 +227,10 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
             page.set_viewport_size({"width":width,"height":844});wait_paint(page);assert_layout(page,1)
         page.set_viewport_size({"width":390,"height":844});wait_paint(page)
         page.screenshot(path=str(artifacts/"sources-mobile.png"),full_page=True)
+        caption=page.locator("#lab-measurements caption").bounding_box()
+        table=page.locator("#lab-measurements").bounding_box()
+        assert caption["width"]>=table["width"]-2 and caption["height"]<50,(caption,table)
+        page.locator("#lab-measurements").screenshot(path=str(artifacts/"measurements-mobile.png"))
         page.set_viewport_size({"width":1440,"height":1000})
         page.locator("#lab-kind").select_option("pattern")
         page.locator("#lab-pattern").fill("zz")
@@ -201,7 +300,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
         expect(page.locator("#lab-download")).to_be_enabled();page.locator("#lab-stop").click()
         expect(page.locator("#entropy")).to_have_text("8.00000")
         page.locator("#lab-record").click()
-        assert page.locator("#lab-measurements tbody tr").count()==3
+        assert page.locator("#lab-measurements tbody tr").count()==4
         assert_layout(page,2);page.screenshot(path=str(artifacts/"socket-desktop.png"),full_page=True)
         page.set_viewport_size({"width":390,"height":844});wait_paint(page);assert_layout(page,1)
         page.screenshot(path=str(artifacts/"socket-mobile.png"),full_page=True)
@@ -221,23 +320,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url):
             page.locator("#lab-registered").select_option(source);page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
             expect(page.locator("#lab-transport-info")).to_contain_text("201 Created" if source=="created" else "1 redirect")
             if source=="created":expect(page.locator("#lab-transport-info")).to_contain_text("not a redirect")
-        page.locator("#lab-create-source").click();dialog=page.locator("#lab-registration")
-        dialog.locator('[name="id"]').fill("ws-draft");dialog.locator('[name="kind"]').select_option("websocket")
-        dialog.locator('[name="endpoint"]').fill("http://127.0.0.1:8081/stream");dialog.locator('button[type="submit"]').click()
-        expect(dialog.locator("#registration-status")).to_contain_text("ws://")
-        assert "camera" not in dialog.locator("#registration-status").text_content().lower()
-        expect(dialog.locator("#registration-camera-note")).to_be_hidden()
-        dialog.locator("#registration-use-example").click();expect(dialog.locator('[name="endpoint"]')).to_have_value("ws://127.0.0.1:8081/stream?bytes=4096&refresh=500")
-        dialog.locator('button[type="submit"]').click();expect(dialog.locator("#registration-status")).to_contain_text("not active yet")
-        dialog.locator('[name="kind"]').select_option("entropy-ws");dialog.locator('[name="endpoint"]').fill("ws://127.0.0.1:8081/stream");dialog.locator('button[type="submit"]').click()
-        expect(dialog.locator("#registration-status")).to_contain_text("http://127.0.0.1:8081")
-        for kind,example in [("onvif","http://192.168.1.100/onvif/device_service"),("udp","127.0.0.1:9002")]:
-            dialog.locator('[name="kind"]').select_option(kind);expect(dialog.locator("#registration-example")).to_contain_text(example)
-        expect(dialog.locator("#registration-camera-note")).to_be_hidden()
-        page.set_viewport_size({"width":390,"height":844});dialog.evaluate("node=>node.scrollTop=0")
-        assert dialog.evaluate("node=>node.scrollWidth<=node.clientWidth+1")
-        dialog.screenshot(path=str(artifacts/"registration-feedback-mobile.png"))
-        dialog.locator("#registration-close").click()
+        registration_checks(page,artifacts)
         # No startup registry: direct CORS-enabled pages/redirects work; CORS denial is explained.
         page.goto(peer+"/api-socket.html")
         expect(page.locator("#lab-catalog-info")).to_contain_text("No registered sources are active")

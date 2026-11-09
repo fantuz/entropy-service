@@ -35,50 +35,81 @@
         if(code===201)return `HTTP 201 Created${suffix} · success, not a redirect; a Location header identifies a created resource.`;
         return `HTTP ${code}${suffix}`;
     }
-    function build(value){
-        const source={id:String(value.id||"").trim(),name:String(value.name||"").trim(),kind:value.kind,endpoint:String(value.endpoint||"").trim(),max_bytes:Number(value.max_bytes),timeout_ms:Number(value.timeout_ms)};
-        if(!/^[a-z][a-z0-9_-]{0,31}$/.test(source.id))throw new Error("ID needs 1–32 lowercase letters/digits/_/-, starting with a letter");
-        if(new TextEncoder().encode(source.name).length>80)throw new Error("Name exceeds 80 UTF-8 bytes");
+    const sourceFields=["id","name","kind","endpoint","max_bytes","timeout_ms","urls","width","height","profile_token"];
+    const utf8=value=>new TextEncoder().encode(value).length;
+    function invalid(field,message){const error=new Error(message);error.field=field;throw error;}
+    // Imported JSON is validated without form coercion or dropping fields. Keep
+    // defaults and byte limits in step with internal/lab.Config.validate.
+    function validate(value){
+        if(!value||Array.isArray(value)||typeof value!=="object"||Object.keys(value).some(key=>!sourceFields.includes(key)))invalid("","Unknown source field; credentials do not belong in configuration exports");
+        const source={};
+        for(const key of ["id","name","kind","endpoint","profile_token"]){
+            if(value[key]!=null&&typeof value[key]!=="string")invalid(key,`${key} must be a string`);
+            source[key]=value[key]??"";
+        }
+        for(const key of ["max_bytes","timeout_ms","width","height"]){
+            if(value[key]!=null&&!Number.isSafeInteger(value[key]))invalid(key,`${key} must be an integer`);
+            source[key]=value[key]??0;
+        }
+        if(!/^[a-z][a-z0-9_-]{0,31}$/.test(source.id))invalid("id","ID needs 1–32 lowercase letters/digits/_/-, starting with a letter");
+        if(!source.name)source.name=source.id;
+        if(utf8(source.name)>80)invalid("name","Name exceeds 80 UTF-8 bytes");
+        if(!kinds.includes(source.kind))invalid("kind","Unknown source kind");
         const schema=schemaFor(source.kind),expected=`${schema.label}. Example: ${schema.example}`;
-        if(!Number.isInteger(source.max_bytes)||source.max_bytes<1||source.max_bytes>1048576||!Number.isInteger(source.timeout_ms)||source.timeout_ms<100||source.timeout_ms>60000)throw new Error("Bytes: 1–1,048,576; timeout: 100–60,000 ms");
-        function checkURL(raw,schemes){
-            let url;try{url=new URL(raw);}catch(_){throw new Error(`Enter a complete ${expected}`);}
-            if(!schemes.includes(url.protocol)||!url.hostname)throw new Error(`Expected ${expected}`);
-            if(url.username||url.password)throw new Error(["rtsp","onvif"].includes(source.kind)?"Remove camera credentials from the URL; enter them in the Network camera capture form.":`URL credentials are not supported for this source. Use ${schema.example} without userinfo.`);
-            if(url.hash)throw new Error(`Remove the URL fragment (#...). ${expected}`);
-            if(raw.length>2048)throw new Error("Source URL exceeds 2,048 characters");
-            if(url.pathname==="/lab"||url.pathname.startsWith("/lab/"))throw new Error("Relay endpoints cannot be upstream sources");
+        const camera=["rtsp","onvif"].includes(source.kind);
+        if(camera){
+            if(!source.width&&!source.height){source.width=320;source.height=240;}
+            if(![[160,120],[320,240],[640,480]].some(([w,h])=>source.width===w&&source.height===h))invalid("resolution","Unsupported camera size");
+            if(!source.max_bytes)source.max_bytes=source.width*source.height*3;
+            if(source.max_bytes!==source.width*source.height*3)invalid("max_bytes","Camera max_bytes must equal the RGB frame size");
+        }else if(source.width||source.height||source.profile_token)invalid("kind","Camera fields require an RTSP or ONVIF source");
+        if(utf8(source.profile_token)>256||(source.profile_token&&source.kind!=="onvif"))invalid("profile_token","ONVIF profile token must be at most 256 UTF-8 bytes and requires an ONVIF source");
+        if(!source.max_bytes)source.max_bytes=1048576;
+        if(!source.timeout_ms)source.timeout_ms=camera?10000:5000;
+        if(source.max_bytes<1||source.max_bytes>1048576)invalid("max_bytes","Sample bytes must be 1–1,048,576");
+        if(source.timeout_ms<100||source.timeout_ms>60000)invalid("timeout_ms","Timeout must be 100–60,000 ms");
+        const urls=value.urls??[];
+        if(!Array.isArray(urls)||urls.some(url=>typeof url!=="string"))invalid("urls","URL pool must be an array of strings");
+        if(urls.length>16||(urls.length&&source.kind!=="webpage"))invalid("urls","Only webpage sources accept a pool of up to 16 URLs");
+        function checkURL(raw,schemes,field="endpoint"){
+            let url;try{url=new URL(raw);}catch(_){invalid(field,`Enter a complete ${expected}`);}
+            if(raw!==raw.trim()||/[\x00-\x20\x7f]/.test(raw)||!schemes.includes(url.protocol)||!url.hostname)invalid(field,`Expected ${expected}`);
+            if(url.username||url.password)invalid(field,camera?"Remove camera credentials from the URL; enter them in the Network camera capture form.":`URL credentials are not supported for this source. Use ${schema.example} without userinfo.`);
+            if(url.hash)invalid(field,`Remove the URL fragment (#...). ${expected}`);
+            if(utf8(raw)>2048)invalid(field,"Source URL exceeds 2,048 UTF-8 bytes");
+            // Go decodes and cleans paths before rejecting relay recursion.
+            let path;try{path=decodeURIComponent(url.pathname);}catch(_){invalid(field,"Invalid URL path encoding");}
+            const parts=[];for(const part of path.split("/")){if(part==="..")parts.pop();else if(part&&part!==".")parts.push(part);}
+            if(source.kind!=="rtsp"&&(parts[0]==="lab"))invalid(field,"Relay endpoints cannot be upstream sources");
             return url;
         }
         if(["unix","device"].includes(source.kind)){
-            if(!source.endpoint.startsWith("/")||source.endpoint.length>4096)throw new Error(`Use an absolute ${expected}`);
+            if(!source.endpoint.startsWith("/")||utf8(source.endpoint)>4096)invalid("endpoint",`Use an absolute path of at most 4,096 UTF-8 bytes. ${expected}`);
         }else if(["tcp","udp"].includes(source.kind)){
-            let url;try{url=new URL("tcp://"+source.endpoint);}catch(_){throw new Error(`Expected ${expected} (no ${source.kind}:// prefix).`);}
-            if(source.endpoint.includes("://")||!url.hostname||!url.port||url.pathname||url.search||url.hash||url.username||url.password||Number(url.port)<1)throw new Error(`Expected ${expected} (no ${source.kind}:// prefix).`);
+            let url;try{url=new URL("tcp://"+source.endpoint);}catch(_){invalid("endpoint",`Expected ${expected} (no ${source.kind}:// prefix).`);}
+            if(source.endpoint.includes("://")||!url.hostname||!url.port||url.pathname||url.search||url.hash||url.username||url.password||Number(url.port)<1)invalid("endpoint",`Expected ${expected} (no ${source.kind}:// prefix).`);
         }else{
             const url=checkURL(source.endpoint,schema.schemes);
-            if(source.kind.startsWith("entropy-")&&((url.pathname&&url.pathname!=="/")||url.search))throw new Error(`Peer registration requires a base HTTP(S) URL without path/query. Example: ${schema.example}`);
+            const rawPath=source.endpoint.match(/^[^:]+:\/\/[^/?#]*([^?#]*)/)?.[1]||"";
+            if(source.kind.startsWith("entropy-")&&((rawPath&&rawPath!=="/")||url.search))invalid("endpoint",`Peer registration requires a base HTTP(S) URL without path/query. Example: ${schema.example}`);
         }
-        if(source.kind==="webpage"){
-            const urls=Array.isArray(value.urls)?value.urls:String(value.urls||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-            if(urls.length>16)throw new Error("Use at most 16 additional page URLs");
-            urls.forEach(url=>checkURL(url,["http:","https:"]));if(urls.length)source.urls=urls;
-        }
-        if(["rtsp","onvif"].includes(source.kind)){
-            source.width=Number(value.width)||320;source.height=Number(value.height)||240;
-            if(![[160,120],[320,240],[640,480]].some(([w,h])=>source.width===w&&source.height===h))throw new Error("Unsupported camera size");
-            source.max_bytes=source.width*source.height*3;
-            if(source.kind==="onvif"&&value.profile_token){source.profile_token=String(value.profile_token).trim();if(source.profile_token.length>256)throw new Error("ONVIF profile token exceeds 256 characters");}
-        }
+        urls.forEach(url=>checkURL(url,["http:","https:"],"urls"));if(urls.length)source.urls=[...urls];
+        if(!camera){delete source.width;delete source.height;}
+        if(!source.profile_token)delete source.profile_token;
         return source;
     }
+    function build(value){
+        const source={id:String(value.id||"").trim(),name:String(value.name||"").trim(),kind:value.kind,endpoint:String(value.endpoint||"").trim(),max_bytes:Number(value.max_bytes??0),timeout_ms:Number(value.timeout_ms??0)};
+        if(source.kind==="webpage")source.urls=Array.isArray(value.urls)?value.urls:String(value.urls||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        if(["rtsp","onvif"].includes(source.kind)){
+            source.width=Number(value.width??0);source.height=Number(value.height??0);
+            if(source.kind==="onvif")source.profile_token=String(value.profile_token||"").trim();
+        }
+        return validate(source);
+    }
     function configuration(value){
-        const fields=["id","name","kind","endpoint","max_bytes","timeout_ms","urls","width","height","profile_token"];
         if(!value||Object.keys(value).some(key=>key!=="sources")||!Array.isArray(value.sources)||value.sources.length>32)throw new Error("Import a registry with at most 32 sources");
-        const sources=value.sources.map(source=>{
-            if(!source||Object.keys(source).some(key=>!fields.includes(key)))throw new Error("Unknown source field; credentials do not belong in configuration exports");
-            return build({...source,max_bytes:source.max_bytes??1048576,timeout_ms:source.timeout_ms??5000});
-        });
+        const sources=value.sources.map(validate);
         if(new Set(sources.map(source=>source.id)).size!==sources.length)throw new Error("Source IDs must be unique");
         if(new TextEncoder().encode(JSON.stringify({sources},null,2)).length>65536)throw new Error("Configuration exceeds the server's 64 KiB limit");
         return {sources};
@@ -87,8 +118,12 @@
     if(typeof document==="undefined")return;
     const trigger=document.getElementById("lab-create-source");if(!trigger)return;
     const dialog=document.createElement("dialog");dialog.className="lab-registration";dialog.id="lab-registration";
-    dialog.innerHTML=`<form id="lab-registration-form"><h2 id="registration-title">Prepare source registry</h2>
+    dialog.innerHTML=`<header class="registration-header"><div><h2 id="registration-title" class="analysis-label">Prepare source registry</h2><p id="registration-draft-state" class="note"></p></div><button type="button" id="registration-close">Close</button></header>
+    <div class="registration-body">
       <p class="note">Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server.</p>
+      <section aria-labelledby="registration-list-title"><h3 id="registration-list-title" class="analysis-label">Draft sources</h3><ul id="registration-list" class="registration-list"></ul></section>
+      <p id="registration-status" role="status" class="note"></p>
+      <form id="lab-registration-form">
       <div class="analysis-controls">
         <label>Source kind<select name="kind">${kinds.map(kind=>`<option>${kind}</option>`).join("")}</select></label>
         <label>ID<input name="id" required pattern="[a-z][a-z0-9_-]{0,31}" placeholder="lab-camera"></label>
@@ -97,46 +132,137 @@
         <div class="registration-wide"><p id="registration-example" class="note"></p><button type="button" id="registration-use-example">Use example</button></div>
         <label class="registration-pages registration-wide" hidden>Web-page example<select id="registration-page-example"><option value="">Choose an example…</option>${pagePresets.map(p=>`<option value="${p.url}">${p.label}</option>`).join("")}</select></label>
         <label>Maximum sample bytes<input name="max_bytes" type="number" min="1" max="1048576" value="1048576" required></label>
-        <label>Timeout (ms)<input name="timeout_ms" type="number" min="100" max="60000" value="10000" required></label>
+        <label>Timeout (ms)<input name="timeout_ms" type="number" min="100" max="60000" value="5000" required></label>
         <label class="registration-camera" hidden>Decoded size<select name="resolution"><option>160x120</option><option selected>320x240</option><option>640x480</option></select></label>
         <label class="registration-onvif" hidden>ONVIF profile token<input name="profile_token" maxlength="256" placeholder="Empty: first Media profile"></label>
         <label class="registration-pool registration-wide">Additional page URLs, one per line<textarea name="urls" rows="3" placeholder="Optional pool: one URL chosen per sample"></textarea></label>
       </div>
       <p id="registration-help" class="note"></p>
-      <div class="lab-actions"><button type="submit">Add registration</button><button type="button" id="registration-close">Close</button></div>
+      <div class="lab-actions"><button type="submit" id="registration-submit">Add registration</button><button type="button" id="registration-cancel-edit">Clear form</button></div>
     </form>
-    <p id="registration-status" role="status" class="note"></p>
     <label>Import existing registry (local file)<input type="file" id="registration-import" accept=".json,application/json"></label>
-    <label>Configuration JSON<textarea id="registration-json" rows="8" readonly spellcheck="false"></textarea></label>
-    <div class="lab-actions"><button type="button" id="registration-download">Download lab-sources.json</button><button type="button" id="registration-copy">Copy JSON</button><button type="button" id="registration-reset">New configuration</button></div>
+    <details><summary>Configuration JSON</summary><label>Local draft<textarea id="registration-json" rows="8" readonly spellcheck="false"></textarea></label></details>
     <p class="note">Save this file on the entropy-server host, then restart with:</p><pre>./bin/entropy-server -lab-sources=lab-sources.json</pre>
-    <p class="note" id="registration-camera-note" hidden>Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.</p>`;
+    <p class="note" id="registration-camera-note" hidden>Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.</p>
+    </div><footer class="registration-footer"><div class="lab-actions"><button type="button" id="registration-download">Download JSON</button><button type="button" id="registration-copy">Copy JSON</button><button type="button" id="registration-reset">New configuration</button></div></footer>`;
     dialog.setAttribute("aria-labelledby","registration-title");document.body.append(dialog);
     const form=dialog.querySelector("form"),field=name=>form.elements.namedItem(name),status=text=>{dialog.querySelector("#registration-status").textContent=text;};
-    let registry={sources:[]};
-    function render(){dialog.querySelector("#registration-json").value=JSON.stringify(registry,null,2);dialog.querySelector("#registration-download").disabled=dialog.querySelector("#registration-copy").disabled=!registry.sources.length;}
-    function fields(){
+    const json=()=>JSON.stringify(registry,null,2);
+    let registry={sources:[]},saved=json(),formDirty=false,editing=null,revision=0,leavingGuard=false;
+    let previousKind=field("kind").value,previousBytes=field("max_bytes").value;
+    const dirty=()=>formDirty||json()!==saved;
+    function beforeUnload(event){if(dirty()){event.preventDefault();event.returnValue="";}}
+    function draftState(){
+        const unsaved=dirty();
+        dialog.querySelector("#registration-draft-state").textContent=`${registry.sources.length} ${registry.sources.length===1?"registration":"registrations"} · ${unsaved?"Unsaved changes":"No pending changes"}`;
+        if(unsaved!==leavingGuard){window[unsaved?"addEventListener":"removeEventListener"]("beforeunload",beforeUnload);leavingGuard=unsaved;}
+    }
+    function clearErrors(){
+        form.querySelectorAll("[name]").forEach(control=>{control.removeAttribute("aria-invalid");control.setCustomValidity("");});
+        form.querySelectorAll(".field-error").forEach(node=>{node.hidden=true;node.textContent="";});
+    }
+    function showError(error){
+        status(error.message);
+        const control=error.field&&field(error.field);
+        if(control&&!control.disabled){
+            control.setAttribute("aria-invalid","true");
+            const feedback=form.querySelector(`#registration-error-${control.name}`);feedback.textContent=error.message;feedback.hidden=false;
+            control.focus();control.scrollIntoView({block:"center"});
+        }
+    }
+    form.querySelectorAll("[name]").forEach(control=>{
+        const feedback=document.createElement("span");feedback.id=`registration-error-${control.name}`;feedback.className="field-error";feedback.hidden=true;
+        control.closest("label").append(feedback);control.setAttribute("aria-describedby",`${control.getAttribute("aria-describedby")||""} ${feedback.id}`.trim());
+    });
+    function resetForm(){
+        form.reset();editing=null;formDirty=false;clearErrors();previousKind=field("kind").value;previousBytes=field("max_bytes").value;fields();
+        dialog.querySelector("#registration-submit").textContent="Add registration";dialog.querySelector("#registration-cancel-edit").textContent="Clear form";
+    }
+    function render(){
+        dialog.querySelector("#registration-json").value=json();
+        dialog.querySelector("#registration-download").disabled=dialog.querySelector("#registration-copy").disabled=!registry.sources.length;
+        const list=dialog.querySelector("#registration-list");list.replaceChildren();
+        if(!registry.sources.length){const item=document.createElement("li");item.className="note";item.textContent="No draft sources. Add one below or import a registry.";list.append(item);}
+        for(const source of registry.sources){
+            const item=document.createElement("li"),text=document.createElement("span"),actions=document.createElement("div");
+            text.textContent=`${source.name} · ${source.id} · ${source.kind}`;actions.className="registration-entry-actions";
+            for(const action of ["Edit","Remove"]){
+                const button=document.createElement("button");button.type="button";button.textContent=action;button.setAttribute("aria-label",`${action} ${source.id}`);
+                button.addEventListener("click",()=>{
+                    if(action==="Edit"){
+                        if(formDirty&&!window.confirm("Discard the unfinished form edits?"))return;
+                        revision++;resetForm();
+                        for(const key of ["id","name","kind","endpoint","max_bytes","timeout_ms","profile_token"])field(key).value=source[key]??"";
+                        if(source.width)field("resolution").value=`${source.width}x${source.height}`;
+                        field("urls").value=(source.urls||[]).join("\n");fields(true);editing=source.id;
+                        dialog.querySelector("#registration-submit").textContent="Save registration";dialog.querySelector("#registration-cancel-edit").textContent="Cancel edit";
+                        status(`Editing ${source.id}; Save registration applies your changes to the draft.`);field("id").focus();
+                    }else{
+                        revision++;registry={sources:registry.sources.filter(item=>item.id!==source.id)};
+                        if(editing===source.id)resetForm();render();status(`${source.id} removed from the draft.`);
+                    }
+                    draftState();
+                });actions.append(button);
+            }
+            item.append(text,actions);list.append(item);
+        }
+        draftState();
+    }
+    function fields(preserve=false){
         const kind=field("kind").value,camera=["rtsp","onvif"].includes(kind);
         for(const [selector,shown] of [[".registration-camera",camera],[".registration-onvif",kind==="onvif"],[".registration-pool",kind==="webpage"],[".registration-pages",["webpage","http"].includes(kind)]])dialog.querySelectorAll(selector).forEach(node=>{node.hidden=!shown;node.querySelectorAll("input,select,textarea").forEach(control=>{control.disabled=!shown;});});
+        const wasCamera=["rtsp","onvif"].includes(previousKind);
+        if(kind!==previousKind){
+            if(!wasCamera)previousBytes=field("max_bytes").value;
+            if(!preserve&&field("timeout_ms").value===(wasCamera?"10000":"5000"))field("timeout_ms").value=camera?"10000":"5000";
+            if(!preserve&&wasCamera&&!camera)field("max_bytes").value=previousBytes;
+        }
         const [width,height]=field("resolution").value.split("x").map(Number);field("max_bytes").disabled=camera;if(camera)field("max_bytes").value=width*height*3;
+        previousKind=kind;
         const schema=schemaFor(kind);field("endpoint").placeholder=schema.example;
         dialog.querySelector("#registration-endpoint-label").textContent=schema.label;
         dialog.querySelector("#registration-example").textContent=`Example: ${schema.example}`;
         dialog.querySelector("#registration-help").textContent=schema.help;
         dialog.querySelector("#registration-camera-note").hidden=!camera;
     }
-    dialog.querySelector("#registration-use-example").addEventListener("click",()=>{field("endpoint").value=schemaFor(field("kind").value).example;status("Example filled; adjust the host/port/path for your source.");});
+    function changed(){revision++;formDirty=true;clearErrors();draftState();}
+    dialog.querySelector("#registration-use-example").addEventListener("click",()=>{field("endpoint").value=schemaFor(field("kind").value).example;changed();status("Example filled; adjust the host/port/path for your source.");});
     dialog.querySelector("#registration-page-example").addEventListener("change",event=>{if(event.target.value){field("endpoint").value=event.target.value;status(pagePresets.find(p=>p.url===event.target.value).hint);}});
-    trigger.addEventListener("click",()=>{fields();render();dialog.showModal();});dialog.querySelector("#registration-close").addEventListener("click",()=>dialog.close());form.addEventListener("change",fields);
+    trigger.addEventListener("click",()=>{fields();render();dialog.showModal();});dialog.querySelector("#registration-close").addEventListener("click",()=>dialog.close());
+    form.addEventListener("input",changed);form.addEventListener("change",()=>{fields();changed();});
+    form.addEventListener("invalid",event=>showError({field:event.target.name,message:event.target.validationMessage}),true);
+    dialog.querySelector("#registration-cancel-edit").addEventListener("click",()=>{revision++;resetForm();draftState();status("Form edits discarded; draft registrations kept.");});
     form.addEventListener("submit",event=>{event.preventDefault();try{
+        clearErrors();
         if(!form.reportValidity())return;
-        const values=Object.fromEntries(Array.from(form.elements).filter(control=>control.name).map(control=>[control.name,control.value]));[values.width,values.height]=field("resolution").value.split("x");
-        const source=build(values);if(registry.sources.some(item=>item.id===source.id))throw new Error("ID already exists; choose another ID");if(registry.sources.length>=32)throw new Error("The registry is limited to 32 sources");
-        registry=configuration({sources:[...registry.sources,source]});render();status(`${source.id} added to the draft; not active yet. Download/install the JSON and restart entropy-server with -lab-sources=lab-sources.json.`);
-    }catch(error){status(error.message);}});
-    dialog.querySelector("#registration-import").addEventListener("change",async event=>{try{const file=event.target.files[0];if(!file)return;if(file.size>65536)throw new Error("Registry exceeds 64 KiB");registry=configuration(JSON.parse(await file.text()));render();status(`Imported ${registry.sources.length} registrations locally.`);}catch(error){status(error.message);}});
-    dialog.querySelector("#registration-reset").addEventListener("click",()=>{registry={sources:[]};render();status("New empty configuration.");});
-    dialog.querySelector("#registration-copy").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(JSON.stringify(registry,null,2));status("Configuration copied.");}catch(_){status("Clipboard unavailable; use Download or select the JSON text.");}});
-    dialog.querySelector("#registration-download").addEventListener("click",()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(registry,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="lab-sources.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+        const values=Object.fromEntries(Array.from(form.elements).filter(control=>control.name&&!control.disabled).map(control=>[control.name,control.value]));
+        if(["rtsp","onvif"].includes(values.kind)){[values.width,values.height]=field("resolution").value.split("x");values.max_bytes=Number(values.width)*Number(values.height)*3;}
+        const source=build(values);
+        if(registry.sources.some(item=>item.id===source.id&&item.id!==editing))invalid("id","ID already exists; choose another ID");
+        const sources=editing?registry.sources.map(item=>item.id===editing?source:item):[...registry.sources,source];
+        registry=configuration({sources});revision++;resetForm();render();status(`${source.id} saved in the draft; not active yet. Download/install the JSON and restart entropy-server with -lab-sources=lab-sources.json.`);
+    }catch(error){showError(error);}});
+    dialog.querySelector("#registration-import").addEventListener("change",async event=>{
+        const file=event.target.files[0];event.target.value="";if(!file)return;
+        const token=++revision;
+        if(dirty()&&!window.confirm("Replace the unsaved draft and unfinished form with this registry?"))return;
+        status("Reading local registry…");
+        try{
+            if(file.size>65536)throw new Error("Registry exceeds 64 KiB");
+            const text=await file.text();if(token!==revision)return;
+            const imported=configuration(JSON.parse(text));registry=imported;resetForm();saved=json();render();status(`Imported ${registry.sources.length} registrations locally.`);
+        }catch(error){if(token===revision)status(error.message);}
+    });
+    dialog.querySelector("#registration-reset").addEventListener("click",()=>{
+        if(dirty()&&!window.confirm("Discard the unsaved draft and start a new configuration?"))return;
+        revision++;registry={sources:[]};resetForm();saved=json();render();status("New empty configuration.");
+    });
+    dialog.querySelector("#registration-copy").addEventListener("click",async()=>{
+        const text=json(),token=revision;try{await navigator.clipboard.writeText(text);if(token!==revision)return;saved=text;draftState();status("Configuration copied; install it on the server to activate sources.");}catch(_){if(token===revision)status("Clipboard unavailable; use Download or select the JSON text.");}
+    });
+    dialog.querySelector("#registration-download").addEventListener("click",()=>{
+        const text=json(),url=URL.createObjectURL(new Blob([text],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="lab-sources.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        saved=text;draftState();status("Download requested; install the JSON on the server to activate sources.");
+    });
     render();fields();
 })();

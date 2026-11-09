@@ -1,0 +1,278 @@
+[
+  {
+    "name": "http defaults",
+    "valid": true,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/"
+    },
+    "normalized": {
+      "name": "page",
+      "max_bytes": 1048576,
+      "timeout_ms": 5000,
+      "width": 0,
+      "height": 0
+    }
+  },
+  {
+    "name": "camera defaults",
+    "valid": true,
+    "source": {
+      "id": "camera",
+      "kind": "onvif",
+      "endpoint": "http://camera/onvif/device_service"
+    },
+    "normalized": {
+      "name": "camera",
+      "max_bytes": 230400,
+      "timeout_ms": 10000,
+      "width": 320,
+      "height": 240
+    }
+  },
+  {
+    "name": "camera zero defaults",
+    "valid": true,
+    "source": {
+      "id": "camera",
+      "kind": "onvif",
+      "endpoint": "http://camera/onvif/device_service",
+      "max_bytes": 0,
+      "timeout_ms": 0,
+      "width": 0,
+      "height": 0
+    },
+    "normalized": {
+      "name": "camera",
+      "max_bytes": 230400,
+      "timeout_ms": 10000,
+      "width": 320,
+      "height": 240
+    }
+  },
+  {
+    "name": "camera small frame",
+    "valid": true,
+    "source": {
+      "id": "camera",
+      "kind": "onvif",
+      "endpoint": "http://camera/onvif/device_service",
+      "width": 160,
+      "height": 120,
+      "timeout_ms": 5000
+    },
+    "normalized": {
+      "name": "camera",
+      "max_bytes": 57600,
+      "timeout_ms": 5000,
+      "width": 160,
+      "height": 120
+    }
+  },
+  {
+    "name": "camera mismatched max_bytes",
+    "valid": false,
+    "source": {
+      "id": "camera",
+      "kind": "onvif",
+      "endpoint": "http://camera/onvif/device_service",
+      "max_bytes": 4096
+    }
+  },
+  {
+    "name": "camera partial dimensions",
+    "valid": false,
+    "source": {
+      "id": "camera",
+      "kind": "onvif",
+      "endpoint": "http://camera/onvif/device_service",
+      "width": 160
+    }
+  },
+  {
+    "name": "http camera fields",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "width": 320,
+      "height": 240
+    }
+  },
+  {
+    "name": "rtsp onvif token",
+    "valid": false,
+    "source": {
+      "id": "camera",
+      "kind": "rtsp",
+      "endpoint": "rtsp://camera/feed",
+      "profile_token": "first"
+    }
+  },
+  {
+    "name": "http URL pool",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "urls": [
+        "https://example.net/"
+      ]
+    }
+  },
+  {
+    "name": "webpage URL pool",
+    "valid": true,
+    "source": {
+      "id": "page",
+      "kind": "webpage",
+      "endpoint": "https://example.org/",
+      "name": "Web pages",
+      "urls": [
+        "https://example.net/"
+      ]
+    },
+    "normalized": {
+      "name": "Web pages",
+      "max_bytes": 1048576,
+      "timeout_ms": 5000,
+      "width": 0,
+      "height": 0
+    }
+  },
+  {
+    "name": "string max_bytes",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "max_bytes": "4096"
+    }
+  },
+  {
+    "name": "fractional max_bytes",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "max_bytes": 4096.5
+    }
+  },
+  {
+    "name": "wrong URL pool type",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "webpage",
+      "endpoint": "https://example.org/",
+      "urls": "https://example.net/"
+    }
+  },
+  {
+    "name": "unknown field",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "password": "fixture-only"
+    }
+  },
+  {
+    "name": "UTF-8 profile token limit",
+    "valid": false,
+    "source": {
+      "id": "camera",
+      "kind": "onvif",
+      "endpoint": "http://camera/onvif/device_service",
+      "profile_token": "漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢"
+    }
+  },
+  {
+    "name": "UTF-8 URL limit",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢"
+    }
+  },
+  {
+    "name": "UTF-8 name limit",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "name": "漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢"
+    }
+  },
+  {
+    "name": "byte-limited name",
+    "valid": true,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/",
+      "name": "漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢"
+    },
+    "normalized": {
+      "name": "漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢",
+      "max_bytes": 1048576,
+      "timeout_ms": 5000,
+      "width": 0,
+      "height": 0
+    }
+  },
+  {
+    "name": "encoded relay",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org/%6cab/stream"
+    }
+  },
+  {
+    "name": "repeated slash relay",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "http",
+      "endpoint": "https://example.org//lab/stream"
+    }
+  },
+  {
+    "name": "URL pool whitespace",
+    "valid": false,
+    "source": {
+      "id": "page",
+      "kind": "webpage",
+      "endpoint": "https://example.org/",
+      "urls": [
+        " https://example.net/"
+      ]
+    }
+  },
+  {
+    "name": "IPv6 socket",
+    "valid": true,
+    "source": {
+      "id": "tcp",
+      "kind": "tcp",
+      "endpoint": "[::1]:9000"
+    },
+    "normalized": {
+      "name": "tcp",
+      "max_bytes": 1048576,
+      "timeout_ms": 5000,
+      "width": 0,
+      "height": 0
+    }
+  }
+]
