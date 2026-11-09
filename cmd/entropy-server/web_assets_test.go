@@ -18,7 +18,7 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 
 	for _, path := range []string{
 		"/", "/theme.css", "/entropy-display.js",
-		"/entropy-display-worker.js", "/worker.js", "/analysis-math.js", "/analysis-plots.js", "/analysis-workspace.js", "/lab-samples.js", "/lab-adapters.js", "/source-lab.js", "/stream-analysis.js", "/stream-entropy-alert.js", "/file-upload.js", "/status-dashboard.js", "/status-kpis.js", "/gallery.js",
+		"/entropy-display-worker.js", "/worker.js", "/analysis-math.js", "/analysis-plots.js", "/analysis-workspace.js", "/lab-samples.js", "/lab-adapters.js", "/lab-registration.js", "/source-lab.js", "/stream-analysis.js", "/stream-entropy-alert.js", "/file-upload.js", "/status-dashboard.js", "/status-kpis.js", "/gallery.js",
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
 		"/api-sound.html", "/api-sources.html", "/api-socket.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
 	} {

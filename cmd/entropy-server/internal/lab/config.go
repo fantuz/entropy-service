@@ -29,6 +29,9 @@ const (
 	sourceUDP         = "udp"
 	sourceUnix        = "unix"
 	sourceDevice      = "device"
+	sourceWebpage     = "webpage"
+	sourceRTSP        = "rtsp"
+	sourceONVIF       = "onvif"
 )
 
 const MaxBytes = 1 << 20
@@ -36,12 +39,16 @@ const MaxBytes = 1 << 20
 var validID = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 
 type Config struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Kind      string `json:"kind"`
-	Endpoint  string `json:"endpoint"`
-	MaxBytes  int    `json:"max_bytes"`
-	TimeoutMs int    `json:"timeout_ms"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Kind         string   `json:"kind"`
+	Endpoint     string   `json:"endpoint"`
+	MaxBytes     int      `json:"max_bytes"`
+	TimeoutMs    int      `json:"timeout_ms"`
+	URLs         []string `json:"urls,omitempty"`
+	Width        int      `json:"width,omitempty"`
+	Height       int      `json:"height,omitempty"`
+	ProfileToken string   `json:"profile_token,omitempty"`
 }
 
 type Descriptor struct {
@@ -50,12 +57,15 @@ type Descriptor struct {
 	Kind      string `json:"kind"`
 	MaxBytes  int    `json:"max_bytes"`
 	TimeoutMs int    `json:"timeout_ms"`
+	Width     int    `json:"width,omitempty"`
+	Height    int    `json:"height,omitempty"`
 }
 
 type Registry struct {
 	sources   map[string]Config
 	client    *http.Client
 	transport *http.Transport
+	cameras   chan struct{}
 }
 
 func Load(path string) (*Registry, error) {
@@ -95,7 +105,7 @@ func New(configs []Config) (*Registry, error) {
 		return nil, errors.New("at most 32 lab sources may be registered")
 	}
 
-	registry := &Registry{sources: make(map[string]Config)}
+	registry := &Registry{sources: make(map[string]Config), cameras: make(chan struct{}, 2)}
 
 	for _, config := range configs {
 		if err := config.validate(); err != nil {
@@ -136,6 +146,38 @@ func (c *Config) validate() error {
 		return errors.New("name exceeds 80 bytes")
 	}
 
+	if c.Kind == sourceRTSP || c.Kind == sourceONVIF {
+		if c.Width == 0 && c.Height == 0 {
+			c.Width, c.Height = 320, 240
+		}
+
+		if (c.Width != 160 || c.Height != 120) && (c.Width != 320 || c.Height != 240) && (c.Width != 640 || c.Height != 480) {
+			return errors.New("camera size must be 160x120, 320x240 or 640x480")
+		}
+
+		if c.MaxBytes == 0 {
+			c.MaxBytes = c.Width * c.Height * 3
+		}
+
+		if c.MaxBytes != c.Width*c.Height*3 {
+			return errors.New("camera max_bytes must equal RGB frame size")
+		}
+
+		if c.TimeoutMs == 0 {
+			c.TimeoutMs = 10000
+		}
+	} else if c.Width != 0 || c.Height != 0 || c.ProfileToken != "" {
+		return errors.New("camera fields require an rtsp or onvif source")
+	}
+
+	if len(c.ProfileToken) > 256 || (c.ProfileToken != "" && c.Kind != sourceONVIF) {
+		return errors.New("invalid ONVIF profile token")
+	}
+
+	if len(c.URLs) > 16 || (len(c.URLs) != 0 && c.Kind != sourceWebpage) {
+		return errors.New("only webpage sources accept a pool of up to 16 URLs")
+	}
+
 	if c.MaxBytes == 0 {
 		c.MaxBytes = MaxBytes
 	}
@@ -149,7 +191,7 @@ func (c *Config) validate() error {
 	}
 
 	switch c.Kind {
-	case sourceHTTP, sourceWS, sourceEntropyHTTP, sourceEntropyWS:
+	case sourceHTTP, sourceWS, sourceEntropyHTTP, sourceEntropyWS, sourceWebpage, sourceONVIF:
 		u, err := url.Parse(c.Endpoint)
 		if err != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || len(c.Endpoint) > 2048 {
 			return errors.New("invalid source URL; userinfo and fragments are not allowed")
@@ -172,6 +214,17 @@ func (c *Config) validate() error {
 		if strings.HasPrefix(c.Kind, "entropy-") && (u.Path != "" && u.Path != "/" || u.RawQuery != "") {
 			return errors.New("entropy-server endpoint must be a base HTTP(S) URL without path or query")
 		}
+
+		for _, endpoint := range c.URLs {
+			candidate := Config{ID: c.ID, Kind: sourceHTTP, Endpoint: endpoint}
+			if err := candidate.validate(); err != nil {
+				return errors.New("invalid webpage pool URL")
+			}
+		}
+	case sourceRTSP:
+		if _, err := cameraURL(c.Endpoint); err != nil {
+			return err
+		}
 	case sourceTCP, sourceUDP:
 		host, port, err := net.SplitHostPort(c.Endpoint)
 		if err != nil || host == "" {
@@ -187,7 +240,7 @@ func (c *Config) validate() error {
 			return errors.New("socket/device endpoint must be an absolute path")
 		}
 	default:
-		return errors.New("kind must be http, websocket, entropy-http, entropy-ws, tcp, udp, unix or device")
+		return errors.New("unsupported source kind")
 	}
 
 	return nil
@@ -210,6 +263,22 @@ func (r *Registry) Lookup(id string) (Descriptor, bool) {
 }
 
 func describe(c Config) Descriptor {
-	return Descriptor{ID: c.ID, Name: c.Name, Kind: c.Kind, MaxBytes: c.MaxBytes, TimeoutMs: c.TimeoutMs}
+	return Descriptor{ID: c.ID, Name: c.Name, Kind: c.Kind, MaxBytes: c.MaxBytes, TimeoutMs: c.TimeoutMs, Width: c.Width, Height: c.Height}
 }
 func (r *Registry) Close() { r.transport.CloseIdleConnections() }
+
+func sameOrigin(a, b *url.URL) bool {
+	port := func(u *url.URL) string {
+		if u.Port() != "" {
+			return u.Port()
+		}
+
+		if u.Scheme == "https" {
+			return "443"
+		}
+
+		return "80"
+	}
+
+	return a.Scheme == b.Scheme && strings.EqualFold(a.Hostname(), b.Hostname()) && port(a) == port(b)
+}

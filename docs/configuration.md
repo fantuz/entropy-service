@@ -261,4 +261,10 @@ See [experimental source/socket labs](source-labs.md) and the
 [registry example](../resources/lab-sources.example.json) for peer/self links,
 protocols, deadlines and exposure rules.
 
+The registry also supports `webpage` body prefixes/URL pools and `rtsp`/`onvif`
+cameras. Cameras optionally set `width`, `height` and `profile_token` and need
+FFmpeg on the server's PATH. Credentials are entered per capture rather than
+saved in the registry. The lab's assisted configurator prepares the JSON for
+operator installation/restart; it does not change running configuration.
+
 [Back to README](../README.md) · [Technical reference index](README.md)

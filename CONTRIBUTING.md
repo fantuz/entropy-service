@@ -104,5 +104,8 @@ markup in `cmd/entropy-server/webtemplates/analysis-panels.html`, then run
 real Chromium checks of both labs.
 
 Experimental-source checks: `node scripts/test-lab-samples.mjs` and
+`node scripts/test-lab-registration.mjs`, plus
 `python3 scripts/test_sources_browser.py --artifacts /tmp/entropy-source-lab`.
 The latter uses fake media and local fixtures; it does not activate real devices.
+The optional `scripts/test_lab_cameras.py` uses FFmpeg and a supplied MediaMTX
+binary for authenticated RTSP and mocked ONVIF/HTTP browser integration.

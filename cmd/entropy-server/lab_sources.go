@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -69,7 +71,7 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 		}
 
 		for name := range query {
-			if name != "source" && name != "bytes" && name != labRefreshQuery {
+			if name != "source" && name != "bytes" && name != labRefreshQuery && name != "preview" {
 				http.Error(w, "unknown source query parameter", http.StatusBadRequest)
 				return
 			}
@@ -84,6 +86,22 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 		if !found {
 			http.Error(w, "unknown registered source", http.StatusBadRequest)
 			return
+		}
+
+		camera := source.Width > 0
+		preview := false
+
+		if values, present := query["preview"]; present {
+			if !camera || len(values) != 1 || (values[0] != "0" && values[0] != "1") {
+				http.Error(w, "preview requires a camera and must be 0 or 1", http.StatusBadRequest)
+				return
+			}
+
+			preview = values[0] == "1"
+			if preview && source.Width*source.Height*3 > maxBytes {
+				http.Error(w, "preview frame exceeds server byte limit", http.StatusBadRequest)
+				return
+			}
 		}
 
 		count, err := extractByteCount(r, min(65536, maxBytes, source.MaxBytes), min(maxBytes, source.MaxBytes))
@@ -107,7 +125,12 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 			}
 		}
 
-		release, admitted := budget.admit(w, r, wsReservation(count, 2)+(128<<10))
+		reservation := wsReservation(count, 2) + (128 << 10)
+		if camera {
+			reservation = wsReservation(source.Width*source.Height*3, 2) + (16 << 20)
+		}
+
+		release, admitted := budget.admit(w, r, reservation)
 		if !admitted {
 			return
 		}
@@ -121,12 +144,40 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 
 		metrics.AddWSSession()
 
+		credentials := lab.Credentials{}
+
+		if camera {
+			stop := context.AfterFunc(r.Context(), func() { _ = conn.Close() })
+
+			conn.SetReadLimit(8192)
+			_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			kind, payload, readErr := conn.ReadMessage()
+
+			stop()
+
+			decoder := json.NewDecoder(bytes.NewReader(payload))
+			decoder.DisallowUnknownFields()
+
+			if readErr != nil || kind != websocket.TextMessage || len(bytes.TrimSpace(payload)) == 0 || bytes.TrimSpace(payload)[0] != '{' || decoder.Decode(&credentials) != nil || decoder.Decode(new(any)) != io.EOF || len(credentials.Username) > 256 || len(credentials.Password) > 1024 {
+				labClose(conn, websocket.ClosePolicyViolation, "Camera requires one credentials object")
+				return
+			}
+
+			_ = conn.SetReadDeadline(time.Time{})
+		}
+
 		ctx, cleanup := websocketContext(r.Context(), conn)
 		defer cleanup()
 
-		upstream, err := registry.Open(ctx, source.ID, count, refresh)
+		upstream, err := registry.OpenAuthenticated(ctx, source.ID, count, refresh, credentials)
 		if err != nil {
-			labClose(conn, websocket.CloseTryAgainLater, "Registered source unavailable")
+			reason := "Registered source unavailable"
+			if camera {
+				reason = "Camera unavailable; check registration, credentials and FFmpeg"
+			}
+
+			labClose(conn, websocket.CloseTryAgainLater, reason)
+
 			return
 		}
 		defer upstream.Close()
@@ -139,7 +190,12 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				data, readErr := upstream.Read(ctx, count)
+				readCount := count
+				if preview {
+					readCount = source.Width * source.Height * 3
+				}
+
+				data, readErr := upstream.Read(ctx, readCount)
 				if len(data) > 0 {
 					_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 					if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
@@ -157,7 +213,18 @@ func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes 
 					case errors.Is(readErr, lab.ErrTooLarge):
 						labClose(conn, websocket.CloseMessageTooBig, "Source exceeds requested byte limit")
 					default:
-						labClose(conn, websocket.CloseInternalServerErr, "Source read failed or timed out")
+						reason := "Source read failed or timed out"
+
+						var statusError *lab.HTTPStatusError
+						if errors.As(readErr, &statusError) {
+							reason = "HTTP source returned status " + strconv.Itoa(statusError.Code)
+						}
+
+						if camera {
+							reason = "Camera failed; check credentials, stream and FFmpeg"
+						}
+
+						labClose(conn, websocket.CloseInternalServerErr, reason)
 					}
 
 					if !errors.Is(readErr, io.EOF) && ctx.Err() == nil {

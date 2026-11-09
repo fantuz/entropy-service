@@ -178,4 +178,12 @@ requester access status. It omits private endpoints. `WS /lab/stream` accepts
 and separate admission budgets. Bridges are loopback-only by default and
 configured with `-lab-sources`; see [the source/socket lab guide](source-labs.md).
 
+Camera sources (`rtsp`/`onvif`) also accept `preview=0|1` and require an initial
+text WS frame `{"username":"...","password":"..."}` within ten seconds.
+Credentials are session-only and never query parameters. With preview enabled,
+frames contain complete RGB8 images at the catalog's width/height; the browser
+meters/analyses the chosen prefix. `webpage` registrations return bounded HTTP
+body prefixes and can randomly select from an operator-configured URL pool.
+Both lab pages include an assisted JSON registry configurator.
+
 [Back to README](../README.md) · [Technical reference index](README.md)
