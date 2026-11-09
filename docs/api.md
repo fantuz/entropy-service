@@ -118,8 +118,14 @@ The embedded homepage at `/` is a **curated, three-column navigation page**. It 
 | `/api-colors.html` | Hash-only colour display without transmitting the entire sample. |
 | `/api-words.html` | Live dictionary words and SHA-256 digest. |
 | `/api-sound.html` | Centered controls to generate and play harmonic WAV files. |
-| `/api-upload.html` | File analysis, histogram, readable Yin/Yang legend, mosaic, waveform and FFT. |
+| `/api-upload.html` | Server upload/SHA-256 plus a shared local-window lab: histogram, Yin/Yang, bit rates, byte trace, PSD, file playback and waterfall. |
 | `/api-stream.html` | Live binary `/stream` analysis: shared window, histogram, Shannon entropy, Yin/Yang, optional bit rates, byte trace, PSD and historical colour waterfall. |
+
+The upload page posts the selected file once. Its interactive plots then read local
+slices up to 1 MiB, independently of the server's analysed prefix and 2 KiB JSON
+preview. The full-file SHA-256 and original server report remain available;
+seeking/playback and view changes do not repeat the upload. See the
+[file-workspace guide](browser-ui.md#shared-file-analysis-workspace).
 
 The duplicate `/bytes.html`, `/colors.html`, `/words.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. The HTTP and WebSocket API route names themselves are unchanged.
 

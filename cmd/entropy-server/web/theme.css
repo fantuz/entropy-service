@@ -514,13 +514,7 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
   gap: .6rem;
 }
 .page-upload #upload-status { display: block; max-width: 44rem; margin: 1rem auto .5rem; }
-.page-upload .upload-entropy-reading {
-  margin: .75rem auto;
-  color: var(--green-bright);
-  font-size: clamp(1.2rem, 2.9vw, 1.9rem);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
+
 .page-upload #file-entropy { overflow-wrap: anywhere; color: var(--green-bright); }
 .page-upload .upload-sha256 {
   display: block;
@@ -580,36 +574,36 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
   overflow-wrap: anywhere;
 }
 
-/* Stream lab: two columns on desktop, readable fixed-height plots on phones. */
-.page-stream { padding: 1rem .65rem; }
-.page-stream .analysis-panel { width: min(100%, 92rem); max-width: 92rem; padding: clamp(.8rem, 2vw, 1.6rem); }
-.page-stream .stream-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: stretch; }
-.page-stream .stream-grid > .analysis-card { margin: 0; min-width: 0; }
-.page-stream .analysis-card { padding: .9rem; }
-.page-stream .analysis-controls { gap: .7rem; }
-.page-stream .analysis-controls label { min-width: 0; font-size: .8rem; }
-.page-stream .analysis-controls select { max-width: 100%; }
-.page-stream .compact-controls { justify-content: flex-start; margin: .8rem 0; gap: .7rem; }
-.page-stream .analysis-controls input[type="number"] { width: 9rem; max-width: 100%; }
-.page-stream .checkbox-label { display: flex; align-items: center; align-self: center; }
-.page-stream input[type="checkbox"] { width: auto; accent-color: var(--green); }
-.page-stream input[type="range"] { width: 100%; min-width: 6rem; accent-color: var(--green); }
-.page-stream details { text-align: left; }
-.page-stream summary { color: var(--cyan); cursor: pointer; }
-.page-stream .note { font-size: .8rem; text-align: left; }
-.page-stream .analysis-meta { font-size: .79rem; text-align: left; }
-.page-stream .diagnostic-plot, .page-upload #fft { width: 100%; height: 240px; }
+/* Shared stream/file lab: two columns on desktop, readable fixed-height plots on phones. */
+.page-analysis-lab { padding: 1rem .65rem; }
+.page-analysis-lab .analysis-panel { width: min(100%, 92rem); max-width: 92rem; padding: clamp(.8rem, 2vw, 1.6rem); }
+.page-analysis-lab .analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: stretch; }
+.page-analysis-lab .analysis-grid > .analysis-card { margin: 0; min-width: 0; }
+.page-analysis-lab .analysis-card { padding: .9rem; }
+.page-analysis-lab .analysis-controls { gap: .7rem; }
+.page-analysis-lab .analysis-controls label { min-width: 0; font-size: .8rem; }
+.page-analysis-lab .analysis-controls select { max-width: 100%; }
+.page-analysis-lab .compact-controls { justify-content: flex-start; margin: .8rem 0; gap: .7rem; }
+.page-analysis-lab .analysis-controls input[type="number"] { width: 9rem; max-width: 100%; }
+.page-analysis-lab .checkbox-label { display: flex; align-items: center; align-self: center; }
+.page-analysis-lab input[type="checkbox"] { width: auto; accent-color: var(--green); }
+.page-analysis-lab input[type="range"] { width: 100%; min-width: 6rem; accent-color: var(--green); }
+.page-analysis-lab details { text-align: left; }
+.page-analysis-lab summary { color: var(--cyan); cursor: pointer; }
+.page-analysis-lab .note { font-size: .8rem; text-align: left; }
+.page-analysis-lab .analysis-meta { font-size: .79rem; text-align: left; }
+.page-analysis-lab .diagnostic-plot { width: 100%; height: 240px; }
 /* Subgrid keeps paired headings, toolbars, plots and card borders aligned. */
-.page-stream .plot-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: .3rem; }
-.page-stream .plot-card > .analysis-label { margin: .35rem 0; }
-.page-stream .plot-card > .analysis-controls,
-.page-stream .plot-controls .analysis-controls { margin: .4rem 0; }
-.page-stream .plot-card .diagnostic-plot { margin: 0; }
-.page-stream .plot-controls, .page-stream .plot-readouts { min-width: 0; }
-.page-stream .plot-readouts > .analysis-meta:first-child { margin-top: .7rem; }
-.page-stream #sample-info { min-height: 3.2em; }
-.page-stream .balance-layout { display: flex; align-items: center; justify-content: center; gap: 1rem; }
-.page-stream .analysis-panel #pie { width: 148px; height: 148px; flex: 0 0 148px; margin: 0; }
+.page-analysis-lab .plot-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: .3rem; }
+.page-analysis-lab .plot-card > .analysis-label { margin: .35rem 0; }
+.page-analysis-lab .plot-card > .analysis-controls,
+.page-analysis-lab .plot-controls .analysis-controls { margin: .4rem 0; }
+.page-analysis-lab .plot-card .diagnostic-plot { margin: 0; }
+.page-analysis-lab .plot-controls, .page-analysis-lab .plot-readouts { min-width: 0; }
+.page-analysis-lab .plot-readouts > .analysis-meta:first-child { margin-top: .7rem; }
+.page-analysis-lab #sample-info { min-height: 3.2em; }
+.page-analysis-lab .balance-layout { display: flex; align-items: center; justify-content: center; gap: 1rem; }
+.page-analysis-lab .analysis-panel #pie { width: 148px; height: 148px; flex: 0 0 148px; margin: 0; }
 .balance-legend { min-width: 0; text-align: left; font-size: .84rem; }
 .zero-key::before, .one-key::before { content: ""; display: inline-block; width: .7rem; height: .7rem; margin-right: .5rem; border: 1px solid var(--cyan); background: #145b41; }
 .one-key::before { background: #a7ffcd; }
@@ -620,26 +614,31 @@ body.page-colors { display: grid; place-items: center; min-block-size: 100svh; p
 .bit-meter::after { content: ""; position: absolute; left: 50%; top: .15rem; bottom: .15rem; width: 1px; background: var(--warn); }
 .trace-wrap { position: relative; }
 .trace-marker { position: absolute; top: 23px; bottom: 43px; width: 1px; background: var(--warn); color: var(--warn); font-size: .8rem; pointer-events: none; }
-.page-stream #wave { cursor: crosshair; }
+.page-analysis-lab #wave { cursor: crosshair; }
 .cursor-control { display: flex; gap: .8rem; align-items: center; font-size: .8rem; }
-.page-stream #marker-reading { display: block; min-height: 2.8em; }
-.page-stream .form-error { color: var(--warn); }
-.page-stream .analysis-help { margin-top: 1rem; }
+.page-analysis-lab #marker-reading { display: block; min-height: 2.8em; }
+.page-analysis-lab .form-error { color: var(--warn); }
+.page-analysis-lab .analysis-help { margin-top: 1rem; }
 @media (max-width: 860px) {
-  .page-stream .stream-grid { grid-template-columns: minmax(0, 1fr); }
-  .page-stream .plot-card { display: block; grid-row: auto; }
-  .page-stream .analysis-controls { justify-content: flex-start; }
-  .page-stream .balance-layout { justify-content: flex-start; }
-  .page-stream .diagnostic-plot { height: 250px; }
+  .page-analysis-lab .analysis-grid { grid-template-columns: minmax(0, 1fr); }
+  .page-analysis-lab .plot-card { display: block; grid-row: auto; }
+  .page-analysis-lab .analysis-controls { justify-content: flex-start; }
+  .page-analysis-lab .balance-layout { justify-content: flex-start; }
+  .page-analysis-lab .diagnostic-plot { height: 250px; }
 }
 @media (max-width: 420px) {
-  .page-stream .analysis-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .page-stream .analysis-controls input, .page-stream .analysis-controls select { width: 100%; min-width: 0; }
-  .page-stream .analysis-controls button { align-self: end; }
-  .page-stream .analysis-panel #pie { width: 110px; height: 110px; flex-basis: 110px; }
-  .page-stream .balance-layout { gap: .65rem; }
-  .page-stream .balance-legend { font-size: .75rem; }
-  .page-stream .entropy-threshold-control { flex-wrap: wrap; }
+  .page-analysis-lab .analysis-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-analysis-lab .analysis-controls input, .page-analysis-lab .analysis-controls select { width: 100%; min-width: 0; }
+  .page-analysis-lab .analysis-controls button { align-self: end; }
+  .page-analysis-lab .analysis-panel #pie { width: 110px; height: 110px; flex-basis: 110px; }
+  .page-analysis-lab .balance-layout { gap: .65rem; }
+  .page-analysis-lab .balance-legend { font-size: .75rem; }
+  .page-analysis-lab .entropy-threshold-control { flex-wrap: wrap; }
 }
 
-.page-stream #bit-rates[data-state="waiting"] meter { opacity: .25; }
+.page-analysis-lab #bit-rates[data-state="waiting"] meter { opacity: .25; }
+
+.page-upload #file-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
+.page-upload #file-controls:disabled { opacity: .55; }
+
+.page-upload #server-report-content { max-height: 20rem; text-align: left; }

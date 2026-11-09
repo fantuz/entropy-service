@@ -93,3 +93,12 @@ Keep benchmark commands, exact payloads, CPU, Go version, backend, seed source, 
 Update the homepage and [API reference](docs/api.md) when adding or renaming endpoints. Preserve canonical `api-*.html` demonstration paths unless a compatibility change is intentional. Avoid showing internal workers and CSS as navigation items. Keep accessibility, bounded preview data, and the shared monospace theme in mind.
 
 The project uses the [MIT License](LICENSE); contributions are submitted under that license.
+
+### Shared analysis panels
+
+Stream and upload controls use `cmd/entropy-server/web/analysis-workspace.js`. Edit the common card
+markup in `cmd/entropy-server/webtemplates/analysis-panels.html`, then run
+`node scripts/render-analysis-pages.mjs`. The generated HTML is committed;
+`node scripts/render-analysis-pages.mjs --check` runs in CI. See
+[the browser guide](docs/browser-ui.md#shared-file-analysis-workspace) for optional
+real Chromium checks of both labs.

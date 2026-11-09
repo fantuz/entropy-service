@@ -140,12 +140,13 @@ shared window, independently of trace zoom and FFT size.
 
 ### Shared FFT mathematics
 
-Stream and uploaded-file previews load the same `analysis-math.js` FFT and
-`analysis-plots.js` spectrum renderer. Stream FFT choices are **512, 2,048,
+Stream and uploaded-file windows use the same `analysis-workspace.js` controls,
+`analysis-math.js` calculations and `analysis-plots.js` renderers. Both offer **512, 2,048,
 8,192, 32,768 and 65,536 points**; Auto chooses the largest power of two fitting
 the selected bytes, up to 8,192, with a minimum of 32. Explicit larger sizes
-require enough selected bytes and never silently zero-pad. The upload API is
-unchanged: its at-most-2,048-byte preview sets the file FFT's input limit.
+require enough selected bytes and never silently zero-pad. File plots read
+bounded slices of the selected local file, so the unchanged API's 2,048-byte
+preview does not limit the interactive file FFT.
 
 Choose Hann (default) or rectangular weighting and optional mean removal
 (default on). For N input bytes, mapped to full-scale amplitude:
@@ -285,11 +286,69 @@ last line. CSS changes no characters, spaces or padding in the copyable sample.
 30+30+2 wrapping at typical browser widths. This is presentation only; the
 hash used to generate the background colour is unchanged.
 
-`/api-upload.html` now follows the stream-analysis card layout. File
-selection and upload controls appear first, then Shannon entropy, file
-metadata, full-upload SHA-256, the histogram, RGB mosaic, Yin/Yang bit
-balance, waveform and FFT preview. Existing upload and cancel handling,
-underlying `/files` API and result semantics are unchanged.
+## Shared file-analysis workspace
+
+`/api-upload.html` uses the same aligned desktop/mobile grid, labelled plots,
+FFT/trace/histogram controls, Shannon threshold, Yin/Yang, optional bit-position
+rates and colour choices as `/api-stream.html`. The threshold is the same
+browser preference on both pages.
+
+Select a nonempty file up to **32 MiB**, then **Upload and analyze**. The server
+still receives the raw file once through `POST /files`, computes SHA-256 over
+the whole upload, and analyses the prefix set by `-fingerprint` (default 2 MiB).
+The **Server analysis report** expander preserves its JSON response, including
+histogram, entropy, bit counts and the original up-to-2-KiB preview. Files are
+not saved on the server.
+
+The main plots describe a **separately selected local window**, not that server
+prefix or its small preview. Pick any starting file byte and a cap of 4/16/64/
+256 KiB or 1 MiB. All displayed statistics use exactly those bytes; trace and
+FFT use subsets of the same window. A short final window uses only remaining
+bytes. The main Shannon value can therefore differ from the server report;
+both scopes are labelled, and SHA-256 always identifies the entire upload.
+
+**Previous/Next** moves by one selected window. **Play windows** advances through
+the file at up to 1/2/5/10 windows per second and stops at EOF. A final-window
+Play action starts from byte zero. Pause or a hidden tab stops playback; a
+paused file supports the same A/B inspection as a frozen stream. Playback,
+seeking and plot-control changes never upload the file again. Power averaging
+spans successive inspected windows of equal size, resetting on a direct seek,
+window-cap change or FFT configuration change. A recalculated frozen window
+is not counted as a new history entry.
+
+The file waterfall records inspected windows, newest first. Its columns are
+relative byte offsets within each window; left-axis labels identify each
+row's starting file byte, not capture age. `Ki`/`Mi` abbreviations are binary
+units, with `~` marking rounded labels. The current window's exact half-open
+byte range appears above the plots. Large-cell defaults, RGB/vivid/grayscale/
+bit-plane modes, the 240-row history limit and visible-row choices are shared.
+
+Only bounded `File.slice` reads are materialized: one running read and one
+replaceable pending seek, each at most 1 MiB, followed by the bounded worker
+queue. Stale read/analysis results are discarded after rapid seeks or file
+replacement. Empty/oversized selections, cancellation and HTTP failures show
+an explicit status; a failed or canceled upload cannot retain the previous
+file's hash or plots.
+
+[Desktop file workspace](images/upload-lab-desktop.png) ·
+[Mobile file workspace](images/upload-lab-mobile.png)
+
+The common cards live in `cmd/entropy-server/webtemplates/analysis-panels.html`.
+After editing them, regenerate the committed static pages:
+
+```sh
+node scripts/render-analysis-pages.mjs
+node scripts/render-analysis-pages.mjs --check
+```
+
+CI rejects markup drift between the two pages. Normal Go builds embed the
+already-generated HTML and need no new runtime or build dependency. The browser
+regression script also covers full-file SHA versus window scope, large FFTs,
+file playback/EOF, seek and replacement races, bounded reads, cancellation,
+HTTP failure and recovery, and desktop/mobile alignment.
+
+For a possible next experiment, see the [source-lab proposal](source-lab-proposal.md)
+covering WebSockets, HTTP, Web Crypto, camera/audio and device adapters.
 
 The four `WS /...` route labels in the homepage's WebSocket cards are pinned
 to the card bottoms so they align even when text wraps at different zoom

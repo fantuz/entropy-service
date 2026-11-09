@@ -13,6 +13,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Configuration](configuration.md) | Server and client flags, timing semantics, source selection and client analysis settings. |
 | [Client experiments](client-experiments.md) | Configurable Shannon assessment, timed/headless runs, JSONL schema and reproducible experiments. |
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
+| [Source-lab proposal](source-lab-proposal.md) | Proposed browser/device adapters and scope; no new source endpoints are implemented. |
 | [API reference](api.md) | HTTP/WebSocket routes, parameters, formats, browser pages, upload protocol and health checks. |
 | [Operations](operations.md) | Memory and concurrency budgets, readiness, shutdown behavior, profiling and diagnostics. |
 | [Benchmarks](benchmarks.md) | Measured encoding cost and HTTP throughput, original `wrk` output and reproducibility guidance. |

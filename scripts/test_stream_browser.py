@@ -5,7 +5,9 @@ Uses a temporary local entropy-server, never an existing server or research data
 Requires Python Playwright and Chromium, in addition to the built server binary.
 """
 import argparse
+import base64
 import json
+import hashlib
 from pathlib import Path
 import re
 import signal
@@ -33,12 +35,12 @@ def wait_paint(page):
 def assert_layout(page, columns):
     result = page.evaluate("""() => ({
       overflow: document.documentElement.scrollWidth > innerWidth,
-      columns: getComputedStyle(document.querySelector('.stream-grid')).gridTemplateColumns.split(' ').length,
+      columns: getComputedStyle(document.querySelector('.analysis-grid')).gridTemplateColumns.split(' ').length,
       plots: [...document.querySelectorAll('.diagnostic-plot')].map(c => ({
         id:c.id, width:c.clientWidth, height:c.clientHeight, backing:c.width,
         label:c.getAttribute('aria-label'), top:c.getBoundingClientRect().top, bottom:c.getBoundingClientRect().bottom
       })),
-      cards:[...document.querySelectorAll('.stream-grid > .analysis-card')].map(c => ({
+      cards:[...document.querySelectorAll('.analysis-grid > .analysis-card')].map(c => ({
         top:c.getBoundingClientRect().top,bottom:c.getBoundingClientRect().bottom,
         left:c.getBoundingClientRect().left,right:c.getBoundingClientRect().right,
         padding:getComputedStyle(c).padding
@@ -96,7 +98,178 @@ def assert_waterfall_pixels(page):
     return result
 
 
-def run_browser(base, artifacts, chromium):
+
+def check_upload_workspace(page, base, artifacts):
+    from playwright.sync_api import expect
+
+    posts = []
+    def track(request):
+        if request.url == base + "/files" and request.method == "POST":
+            posts.append(request.url)
+    page.on("request", track)
+    # Observe bounded reads and inject latency to exercise real seek/file races.
+    page.add_init_script("""(() => {
+      const original=Blob.prototype.slice;
+      window.fileReadStats={slices:[],active:0,maxActive:0,delay:0};
+      Blob.prototype.slice=function(start,end,...args) {
+        const result=original.call(this,start,end,...args);
+        if (!(this instanceof File)) return result;
+        const read=result.arrayBuffer.bind(result), stats=window.fileReadStats;
+        stats.slices.push({start,end,size:result.size});
+        result.arrayBuffer=async () => {
+          stats.active++; stats.maxActive=Math.max(stats.maxActive,stats.active);
+          try {
+            if(stats.delay) await new Promise(resolve=>setTimeout(resolve,stats.delay));
+            return await read();
+          } finally {stats.active--;}
+        };
+        return result;
+      };
+    })();""")
+    page.set_viewport_size({"width":1440,"height":1050})
+    page.goto(base + "/api-upload.html")
+    expect(page.locator("#analysis-size")).to_be_disabled()
+    data = bytes(range(256)) * 4096 + bytes(8192)
+    def upload(name, payload):
+        page.locator("#fileInput").set_input_files({"name":name,"mimeType":"application/octet-stream","buffer":payload})
+        page.locator("#submit-upload").click()
+    upload("counter-with-zero-tail.bin", data)
+    expect(page.locator("#upload-status")).to_have_text("Analysis complete")
+    expect(page.locator("#entropy")).to_have_text("8.00000")
+    expect(page.locator("#file-sha256")).to_have_text(hashlib.sha256(data).hexdigest())
+    page.locator("#server-report summary").click()
+    report = json.loads(page.locator("#server-report-content").inner_text())
+    assert report["total_bytes"] == report["analyzed_bytes"] == len(data)
+    assert report["entropy"] < 8 and report["histogram"][0] == 12288
+    assert len(base64.b64decode(report["preview"])) == 2048
+    page.locator("#server-report summary").click()
+    page.locator("#analysis-size").select_option("1048576")
+    page.locator("#fft-size").select_option("65536")
+    expect(page.locator("#sample-info")).to_contain_text("[0, 1,048,576)")
+    expect(page.locator("#fftvalue")).to_contain_text("65,536 points")
+    page.locator("#bit-rates").evaluate("element=>element.open=true")
+    for bit in range(8):
+        expect(page.locator(f"#rate-{bit}")).to_have_text("50.000%")
+    page.locator("#trace-span").select_option("128")
+    page.locator("#wave").click(position={"x":80,"y":60})
+    page.locator("#wave").click(position={"x":180,"y":60})
+    expect(page.locator("#marker-reading")).to_contain_text("Δ offset")
+    page.locator("#waterfall-bit").select_option("0")
+    expect(page.locator("#waterfall-mode")).to_have_value("bit")
+    for mode in ["gray","vivid","rgb"]:
+        page.locator("#waterfall-mode").select_option(mode)
+    page.locator("#fft-window").select_option("rectangular")
+    expect(page.locator("#fftvalue")).to_contain_text("rectangular")
+    page.locator("#fft-window").select_option("hann")
+    # Playback is local and averages successive windows, rather than repeating a preview.
+    page.locator("#analysis-size").select_option("4096")
+    page.locator("#fft-size").select_option("auto")
+    expect(page.locator("#fftvalue")).to_contain_text("4,096 points")
+    page.evaluate("fileReadStats.delay=100")
+    page.locator("#next-window").click()
+    page.locator("#fft-window").select_option("rectangular")
+    expect(page.locator("#sample-info")).to_contain_text("[4,096, 8,192)")
+    expect(page.locator("#fftvalue")).to_contain_text("rectangular")
+    page.evaluate("fileReadStats.delay=0")
+    page.locator("#previous-window").click()
+    expect(page.locator("#sample-info")).to_contain_text("[0, 4,096)")
+    page.locator("#fft-window").select_option("hann")
+    page.locator("#fft-average").select_option("4")
+    page.locator("#play-file").click()
+    expect(page.locator("#fftvalue")).to_contain_text("4 window(s)")
+    page.locator("#play-file").click()
+    wait_paint(page)
+    frozen = page.locator("#sample-info").inner_text()
+    page.wait_for_timeout(350)
+    assert page.locator("#sample-info").inner_text() == frozen
+    assert len(posts) == 1, "Plot controls/playback must not upload again"
+    desktop = assert_layout(page, 2)
+    page.screenshot(path=str(artifacts / "upload-desktop.png"),full_page=True)
+    for width in [320,390,768]:
+        page.set_viewport_size({"width":width,"height":844})
+        wait_paint(page)
+        assert_layout(page, 1)
+    page.set_viewport_size({"width":390,"height":844})
+    wait_paint(page)
+    page.screenshot(path=str(artifacts / "upload-mobile.png"),full_page=True)
+    page.set_viewport_size({"width":1440,"height":1050})
+    # The final windows are zeros, not the API's counter-prefix preview.
+    set_value(page,"analysis-offset",1048576)
+    expect(page.locator("#entropy")).to_have_text("0.00000")
+    expect(page.locator("#one-count")).to_contain_text("0 (0.000%)")
+    expect(page.locator("#sample-info")).to_contain_text("[1,048,576, 1,052,672)")
+    page.locator("#play-file").click()
+    expect(page.locator("#sample-info")).to_contain_text("[1,052,672, 1,056,768)")
+    expect(page.locator("#play-file")).to_have_attribute("aria-pressed","false")
+    expect(page.locator("#upload-status")).to_have_text("Analysis complete")
+    expect(page.locator("#next-window")).to_be_disabled()
+    page.locator("#previous-window").click()
+    expect(page.locator("#sample-info")).to_contain_text("[1,048,576, 1,052,672)")
+    # Only the latest seek survives a slow local read, and reads never overlap.
+    before = page.evaluate("fileReadStats.slices.length")
+    page.evaluate("fileReadStats.delay=200")
+    for offset in [131072,262144,393216]:
+        set_value(page,"analysis-offset",offset)
+    expect(page.locator("#sample-info")).to_contain_text("[393,216, 397,312)")
+    slices = page.evaluate("fileReadStats.slices")[before:]
+    assert [s["start"] for s in slices] == [131072,393216], slices
+    set_value(page,"analysis-offset",655360)
+    upload("ones.bin", bytes([255])*4096)
+    expect(page.locator("#upload-status")).to_have_text("Analysis complete")
+    expect(page.locator("#file-sha256")).to_have_text(hashlib.sha256(bytes([255])*4096).hexdigest())
+    expect(page.locator("#one-count")).to_contain_text("32,768 (100.000%)")
+    expect(page.locator("#trace-reading")).to_contain_text("255 · 0xff")
+    reads = page.evaluate("fileReadStats")
+    assert reads["maxActive"] == 1 and max(s["size"] for s in reads["slices"]) <= 1048576, reads
+    page.evaluate("fileReadStats.delay=0")
+    # A one-byte file still has meaningful statistics and a correctly unavailable FFT.
+    upload("single-byte.bin", bytes([128]))
+    expect(page.locator("#upload-status")).to_have_text("Analysis complete")
+    expect(page.locator("#fftvalue")).to_contain_text("at least 32 bytes")
+    expect(page.locator("#entropy")).to_have_text("0.00000")
+    expect(page.locator("#previous-window")).to_be_disabled()
+    expect(page.locator("#next-window")).to_be_disabled()
+    page.locator("#play-file").click()
+    expect(page.locator("#sample-info")).to_contain_text("FILE WINDOW #2")
+    expect(page.locator("#play-file")).to_have_attribute("aria-pressed","false")
+    assert len(posts) == 3
+    # Client limits, aborts and server errors leave no stale hash/plots behind.
+    for size in [0,32*1024*1024+1]:
+        page.locator("#fileInput").evaluate("""(input,size)=>{
+          const transfer=new DataTransfer();
+          transfer.items.add(new File([new Uint8Array(size)],'invalid.bin'));
+          input.files=transfer.files;
+        }""",size)
+        page.locator("#submit-upload").click()
+        expect(page.locator("#upload-status")).to_contain_text("at most 32 MiB")
+        assert len(posts) == 3
+    pending = []
+    page.route("**/files",lambda route:pending.append(route))
+    upload("cancel.bin",bytes(4096))
+    expect(page.locator("#cancel-upload")).to_be_enabled()
+    page.locator("#cancel-upload").click()
+    expect(page.locator("#upload-status")).to_have_text("Upload canceled")
+    expect(page.locator("#file-sha256")).to_have_text("—")
+    expect(page.locator("#entropy")).to_have_text("—")
+    expect(page.locator("#analysis-size")).to_be_disabled()
+    for route in pending:
+        route.abort()
+    page.unroute("**/files")
+    page.route("**/files",lambda route:route.fulfill(status=503,body="fixture busy"))
+    upload("busy.bin",bytes(4096))
+    expect(page.locator("#upload-status")).to_contain_text("HTTP 503")
+    expect(page.locator("#file-sha256")).to_have_text("—")
+    expect(page.locator("#analysis-size")).to_be_disabled()
+    page.unroute("**/files")
+    upload("recovered.bin",bytes(range(256))*16)
+    expect(page.locator("#upload-status")).to_have_text("Analysis complete")
+    expect(page.locator("#entropy")).to_have_text("8.00000")
+    page.remove_listener("request",track)
+    return {"desktop":desktop,"maximum_read_bytes":max(s["size"] for s in reads["slices"]),
+        "maximum_concurrent_reads":reads["maxActive"],"checks":"full SHA, separate server/window scopes, large FFT, EOF/pause/playback/averaging, local-only views, seek/file replacement races, size limits, abort/error/recovery, desktop/mobile"}
+
+
+def run_browser(base, artifacts, chromium, upload_only=False):
     from playwright.sync_api import expect, sync_playwright
 
     with sync_playwright() as playwright:
@@ -106,6 +279,11 @@ def run_browser(base, artifacts, chromium):
         page = context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
+        if upload_only:
+            results = check_upload_workspace(page, base, artifacts)
+            assert not errors, errors
+            browser.close()
+            return {"upload":results,"browser_errors":errors}
         page.goto(base + "/api-stream.html?bytes=1048576&refresh=50")
         page.wait_for_function("document.getElementById('analysed-frames').textContent !== '0'")
         page.locator("#analysis-size").select_option("1048576")
@@ -226,13 +404,7 @@ def run_browser(base, artifacts, chromium):
         for bit in range(8):
             expect(fixture.locator(f"#rate-{bit}")).to_have_text("50.000%")
         fixture.close()
-        page.goto(base + "/api-upload.html")
-        page.locator("#fileInput").set_input_files({"name": "counter.bin", "mimeType": "application/octet-stream", "buffer": bytes(range(256)) * 16})
-        page.locator("#submit-upload").click()
-        expect(page.locator("#upload-status")).to_have_text("Analysis complete")
-        expect(page.locator("#fftvalue")).to_contain_text("2048 points · Hann · mean removed")
-        expect(page.locator("#entropy")).to_have_text("8.00000 / 8 bits per byte")
-        page.screenshot(path=str(artifacts / "upload-mobile.png"), full_page=True)
+        upload_results = check_upload_workspace(page, base, artifacts)
         page.goto(base + "/api-bytes.html?bytes=256&refresh=100")
         page.wait_for_function("document.getElementById('base64').textContent.length > 4")
         base64 = page.locator("#base64").evaluate("element => ({value:element.textContent,align:getComputedStyle(element).textAlign,decoded:atob(element.textContent).length})")
@@ -248,7 +420,7 @@ def run_browser(base, artifacts, chromium):
         expect(page.locator("#stream-notice")).to_have_attribute("data-state", "error")
         assert not errors, errors
         browser.close()
-        return {"desktop": desktop, "bounded_history": bounded, "waterfall_pixels": waterfall_pixels, "browser_errors": errors,
+        return {"desktop": desktop, "bounded_history": bounded, "waterfall_pixels": waterfall_pixels, "upload": upload_results, "browser_errors": errors,
             "checks": "native bit dropdown, aligned card borders and plot rows, enlarged/adaptive waterfall cells, raw/palette pixel fidelity, pause/reception, frozen reanalysis, trace A/B, power average, all colour modes, large/short FFT, offsets, 320/390/768/1440px, shared upload FFT, exact Base64, invalid query"}
 
 
@@ -257,6 +429,7 @@ def main():
     parser.add_argument("--server-binary", type=Path, default=Path("bin/entropy-server"))
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--chromium", default="/usr/bin/chromium")
+    parser.add_argument("--upload-only", action="store_true", help="Run the file workspace checks only")
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
     with socket.socket() as listener:
@@ -278,7 +451,7 @@ def main():
                     time.sleep(.05)
             else:
                 raise RuntimeError("Test server did not become live")
-            results = run_browser(base, args.artifacts, args.chromium)
+            results = run_browser(base, args.artifacts, args.chromium, args.upload_only)
         finally:
             if process.poll() is None:
                 process.send_signal(signal.SIGTERM)
