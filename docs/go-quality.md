@@ -93,6 +93,28 @@ result. Do not average those printed percentages. An ordinary
 `go test -cover ./...` report instead measures each package using its own
 test binary and can miss indirect coverage from another package's tests.
 
+### Reading `[no test files]`
+
+Ordinary `go test ./...` output reports test execution, not a coverage
+percentage. `[no test files]` means that package has no tests of its own;
+integration tests in a caller can still exercise it. Use the combined CI
+`go-coverage` artifact to locate unexecuted functions. Running from the
+repository root includes both commands and shared packages; running from
+`cmd/entropy-client` or `cmd/entropy-server` covers only that subtree.
+
+The packages highlighted by this label have different situations:
+
+| Package | Interpretation and useful follow-up |
+| --- | --- |
+| Client `internal/metrics` | HTTP and WebSocket integration tests verify actual byte/message accounting, including rejected bodies/messages and control traffic, through its public counter accessors. |
+| Server `internal/metrics` | Public HTTP/WS counters and serving snapshots are exercised by handler and lifecycle tests. Unused buffer/test counters remain maintenance candidates. |
+| Client `internal/pipe` | Its old `WriteStdout` helper has no callers; active raw exports use `internal/output`. Tests of the export path protect shipped behavior. |
+| Client `internal/protocol` | Contains an unused response structure with no executable statements, so there is no statement coverage percentage to improve. |
+
+The unused client `metrics.CountWrite` wrapper likewise has no current caller.
+These helpers/types can be reviewed for removal separately; adding tests solely
+to remove a status label would not improve coverage of active behavior.
+
 The baseline on `main` commit `4c94a08`, measured on 2026-11-08 with
 Go 1.26.10, Linux amd64 and `GOMAXPROCS=4`, was:
 
