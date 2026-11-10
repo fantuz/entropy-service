@@ -93,6 +93,8 @@ Startup and `generate-cert` report the loaded certificate's expiry time and
 warn when it has 24 hours or less remaining. A running HTTPS server logs a
 warning at that boundary and again at expiry, without changing its identity.
 These notices do not renew files or update client trust automatically.
+For Prometheus expiry alerts and a separate verified HTTPS probe, see
+[operational monitoring](monitoring.md).
 
 Newly generated certificates include a nonempty subject/issuer name for TLS
 client compatibility; SANs remain the authority for hostname verification.

@@ -19,6 +19,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
 | [Experimental source/socket labs](source-labs.md) | Generate, meter and compare sources; browser media and registered peer/device/socket connections. |
 | [API reference](api.md) | HTTP/WebSocket routes, parameters, formats, browser pages, upload protocol and health checks. |
+| [Operational monitoring](monitoring.md) | Loaded TLS expiry, Prometheus alerts and external HTTPS probes. |
 | [Operations](operations.md) | Memory and concurrency budgets, readiness, shutdown behavior, profiling and diagnostics. |
 | [Benchmarks](benchmarks.md) | Measured encoding cost and HTTP throughput, original `wrk` output and reproducibility guidance. |
 | [Root reseeding review](root-reseeding.md) | Seed input-size hardening, failure semantics, state-transition diagram and tests. |

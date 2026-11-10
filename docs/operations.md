@@ -67,6 +67,9 @@ health checks, metrics scrapes, upgrades and static files, excluding the debug
 listener. Admission gauges describe reserved estimates and slots; their HELP
 text distinguishes them from RSS and physical entropy.
 
+For loaded-certificate metrics, tested alert rules and an external HTTPS
+readiness probe, see [operational monitoring](monitoring.md).
+
 ## Resource limits
 
 The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket handlers and the client. Uploads have a separate fixed 32 MiB ceiling. Encoding can make the transmitted message larger than the underlying sample.

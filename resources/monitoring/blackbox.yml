@@ -1,0 +1,13 @@
+modules:
+  entropy_https:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      valid_status_codes: [200]
+      fail_if_not_ssl: true
+      follow_redirects: false
+      tls_config:
+        min_version: TLS13
+        ca_file: /etc/blackbox_exporter/entropy-service-ca.pem
