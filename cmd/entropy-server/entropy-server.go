@@ -972,6 +972,7 @@ func startHTTP(ctx context.Context, addr string, handler http.Handler) (*managed
 	}
 
 	managed := newManagedServer(ctx, srv)
+	managed.listenAddr = ln.Addr().String()
 
 	// Serve loop
 	go func() {
@@ -1029,6 +1030,7 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 	*/
 
 	managed := newManagedServer(ctx, srv)
+	managed.listenAddr = ln.Addr().String()
 
 	// Serve loop
 	go func() {
@@ -1042,6 +1044,8 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 }
 
 func main() {
+	log.SetPrefix("entropy-server ")
+
 	started := time.Now()
 
 	// Root context canceled on signal
@@ -1053,6 +1057,7 @@ func main() {
 	defer stop()
 
 	cfg := config.ParseConfig()
+	startup := serverInvocation(os.Stderr, cfg)
 
 	labRegistry, err := lab.Load(cfg.LabSources)
 	if err != nil {
@@ -1060,7 +1065,7 @@ func main() {
 	}
 	defer labRegistry.Close()
 
-	log.Printf("Experimental lab: %d registered sources, loopback_only=%t, max_connections=%d", len(labRegistry.List()), !cfg.LabAllowRemote, cfg.LabMaxConnections)
+	startup.Check("Lab registry", "OK", fmt.Sprintf("%d registered sources (experimental bridges)", len(labRegistry.List())))
 
 	algorithm, err := drbg.ParseAlgorithm(cfg.DRBG)
 	if err != nil {
@@ -1073,33 +1078,6 @@ func main() {
 
 	maxReseedAge := time.Duration(cfg.MaxReseedAgeMs) * time.Millisecond
 
-	fmt.Println("\n-------------------------------------------------")
-	fmt.Println(Cyan + "       Entropy Server Pre-Flight Checks" + Reset)
-	fmt.Println("-------------------------------------------------")
-	fmt.Println("HTTP cookie support          :", cfg.WantsCookie)
-	fmt.Println("HTTP port                    :", cfg.HTTPAddr)
-	fmt.Println("HTTPS port                   :", cfg.HTTPSAddr)
-	fmt.Println("CertFile TLS                 :", cfg.CertFile)
-	fmt.Println("KeyFile TLS                  :", cfg.KeyFile)
-	fmt.Println("EnableHTTPS flag             :", cfg.EnableHTTPS)
-	fmt.Println("-------------------------------------------------")
-	fmt.Println("Reseed size                  :", cfg.ReseedSize)
-	fmt.Println("ReseedMs interval            :", cfg.ReseedMs)
-	fmt.Println("Max request size KB          :", cfg.MaxBytes/1024)
-	fmt.Println("DRBG stream backend          :", algorithm)
-	fmt.Println("Readiness max seed age (ms)  :", cfg.MaxReseedAgeMs)
-	fmt.Println("Legacy entropy buffer        : ignored (-buffer-entropy)")
-	fmt.Println("Legacy QRNG buffer           : ignored (-buffer-qrng)")
-	fmt.Println("-------------------------------------------------")
-	fmt.Println("Max number of Bytes          :", cfg.MaxBytes)
-	fmt.Println("Maximum number of Words      :", cfg.MaxWords)
-	fmt.Println("-------------------------------------------------")
-	fmt.Printf("Page refresh (ms)            : %d\n", cfg.PageRefreshMs)
-	fmt.Println("RefreshMs (ms)               :", cfg.RefreshRateMs)
-	fmt.Println("RefreshColorMs (ms)          :", cfg.RefreshColorMs)
-	fmt.Println("-------------------------------------------------")
-	fmt.Println()
-
 	// Validate HTTPS before opening a device or reading hardware seed material.
 	var tlsCfg *tls.Config
 	if cfg.EnableHTTPS {
@@ -1108,6 +1086,8 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+
+	reportTLS(startup, tlsCfg, time.Now())
 
 	// Select and open exactly one source. Report the opened reader's identity,
 	// not merely the path requested before potential fallback.
@@ -1119,15 +1099,7 @@ func main() {
 
 	var seedReader io.Reader = qrngdev
 
-	if actualSource == DefaultCSPRNG || actualSource == sourceGoCryptoRand {
-		log.Printf("Entropy mode: operating-system CSPRNG (%s)", actualSource)
-	} else {
-		log.Printf("Entropy mode: configured character device (%s); quality not independently verified", actualSource)
-	}
-
-	log.Printf("Entropy source: %s", actualSource)
-
-	fmt.Println("\t1) open entropy seed source")
+	reportSource(startup, cfg.DevicePath, actualSource)
 
 	if cfg.MixCPU {
 		seedReader = rdrand.NewCPUMixer(seedReader, func(err error) {
@@ -1148,14 +1120,12 @@ func main() {
 		log.Print("Seed source: configured entropy source with optional RDRAND mixing")
 	}
 
-	fmt.Println("	2) read root DRBG seed")
-
 	seed := make([]byte, 64)
 	if _, err := io.ReadFull(seedReader, seed); err != nil {
 		log.Fatalf("read root seed: %v", err)
 	}
 
-	fmt.Println("	3) initialize root DRBG")
+	startup.Check("Root seed read", "OK", "64 bytes; seed contents never logged")
 
 	root, err := drbg.NewDRBGWithAlgorithm(seed, algorithm)
 	clear(seed)
@@ -1167,15 +1137,13 @@ func main() {
 	defer root.Close()
 
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
-	fmt.Println("	4) set DRBG metadata (optional)")
 	root.SetMetadata(appVersion, actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
+	startup.Check("Root DRBG", "OK", "initialized; metadata set")
+
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
-	log.Printf("WebSocket limits: %d connections, %d MiB estimated working memory, %d-byte inbound messages", cfg.WSMaxConnections, cfg.WSMemoryMiB, wsInboundLimit)
 	httpBudget := newHTTPRequestBudget(cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB*(1<<20))
 	activityMonitor := startActivityPeakMonitor(ctx, wsBudget, httpBudget)
-
-	log.Printf("HTTP generation limits: %d requests, %d MiB estimated working memory", cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB)
 
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
@@ -1231,8 +1199,6 @@ func main() {
 	// start HTTP & HTTPS servers on the same mux
 	// os.Getenv("TLS") == "1"
 
-	fmt.Printf("	5) start HTTP server(s)\n")
-
 	var (
 		httpSrv  *managedServer
 		httpsSrv *managedServer
@@ -1245,7 +1211,7 @@ func main() {
 	if httpErr != nil {
 		log.Fatal(httpErr)
 	} else {
-		log.Println(Green+"HTTP server running on", cfg.HTTPAddr+Reset)
+		startup.Check("HTTP listener", "OK", httpSrv.listenAddr)
 	}
 
 	if cfg.EnableHTTPS {
@@ -1253,7 +1219,7 @@ func main() {
 		if httpsErr != nil {
 			log.Fatal(httpsErr)
 		} else {
-			log.Println(Green+"HTTPS server running on", cfg.HTTPSAddr+Reset)
+			startup.Check("HTTPS listener", "OK", httpsSrv.listenAddr)
 		}
 	}
 
@@ -1266,29 +1232,26 @@ func main() {
 		muxdebug.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		muxdebug.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-		debugSrv = newManagedServer(ctx, &http.Server{
-			Addr: "127.0.0.1:6060", Handler: muxdebug, ReadHeaderTimeout: 5 * time.Second,
-		})
+		debugSrv, err = startDebugHTTP(ctx, "127.0.0.1:6060", muxdebug)
+		if err != nil {
+			log.Fatalf("startup debug listener: %v", err)
+		}
 
-		go func() {
-			if err := debugSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Printf("debug serve error: %v", err)
-			}
-		}()
-
-		log.Println("Debug server running on 127.0.0.1:6060/debug/pprof")
+		startup.Check("Debug listener", "OK", debugSrv.listenAddr+"/debug/pprof/")
 	}
 
 	// Run permanent reseed loop
-	fmt.Printf("	6) start reseed loop every %d ms\n", cfg.ReseedMs)
 
 	go reseedLoop(ctx, seedReader, cfg.ReseedMs, cfg.ReseedSize, &root)
 
-	log.Println(Cyan + "Entropy Server startup sequence completed successfully\n" + Reset)
+	startup.Check("Reseed loop", "OK", fmt.Sprintf("scheduled every %s", time.Duration(cfg.ReseedMs)*time.Millisecond))
+	startup.Value("Health endpoints", "/live (process) /ready (seed freshness)")
+	fmt.Fprintln(os.Stderr)
+	log.Printf("ready: startup completed in %s", time.Since(started).Round(time.Millisecond))
 
 	<-ctx.Done()
 
-	log.Println(Red + "shutdown signal received" + Reset)
+	log.Println("shutdown: signal received; draining listeners and active requests")
 
 	// shutdownCtx, cancel := context.WithCancel(context.Background())
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

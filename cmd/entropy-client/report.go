@@ -108,19 +108,15 @@ func (r *runReport) start(cfg *config.Config, endpoint string) error {
 		return nil
 	}
 
-	// User information, fragments and arbitrary query values may contain secrets.
-	u, err := url.Parse(endpoint)
+	endpoint, err := sanitizedEndpoint(endpoint)
 	if err != nil {
 		return fmt.Errorf("report endpoint: %w", err)
 	}
 
-	u.User, u.RawQuery, u.Fragment = nil, "", ""
-	u.ForceQuery = false
-
 	return r.write(startRecord{
 		reportHeader: newReportHeader("run_start"),
 		Settings: reportSettings{
-			Mode: cfg.Mode, Endpoint: u.String(), PayloadBytes: cfg.Slice,
+			Mode: cfg.Mode, Endpoint: endpoint, PayloadBytes: cfg.Slice,
 			Refresh: cfg.Refresh.String(), AnalysisBytes: cfg.AnalysisBytes,
 			AnalysisInterval: cfg.AnalysisInterval.String(), DisplayInterval: cfg.DisplayInterval.String(),
 			ShannonThreshold: cfg.ShannonThreshold, Duration: cfg.Duration.String(),
@@ -222,4 +218,17 @@ func (r *runReport) summary(m *monitorState, began time.Time, reason string, fai
 		ElapsedMS: elapsed.Seconds() * 1000, TotalElapsedMS: time.Since(began).Seconds() * 1000,
 		ReceivedMiBPerSec: rate, ShannonAssessment: diag.ShannonAssessment(&m.latest, m.cfg.ShannonThreshold),
 	})
+}
+
+// Never disclose credentials, arbitrary query values or fragments in reports.
+func sanitizedEndpoint(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	u.User, u.RawQuery, u.Fragment = nil, "", ""
+	u.ForceQuery = false
+
+	return u.String(), nil
 }

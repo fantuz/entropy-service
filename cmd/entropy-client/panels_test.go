@@ -71,7 +71,7 @@ func TestPreflightBothTransportsAndUnstyledOutput(t *testing.T) {
 			}
 
 			text := string(output)
-			for _, want := range []string{"Pre-flight diagnostics", "Waterfall / mapping  : true rgb", "Terminal colors      : never", "Fetched Size         : 256", "Pre-flight analysed  : 64 / 256 bytes", "Link                 : data received", "Shannon assessment : WARN"} {
+			for _, want := range []string{"Pre-flight diagnostics", "true / rgb", "never", "256 / 256 requested bytes", "64 / 256 bytes", "data received from the selected endpoint", "Shannon assessment : WARN"} {
 				if !strings.Contains(text, want) {
 					t.Errorf("preflight missing %q: %q", want, text)
 				}

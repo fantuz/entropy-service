@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
@@ -75,7 +76,14 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 			err = errors.Join(err, closeErr)
 		}
 
-		return errors.Join(err, report.summary(&m, began, reason, err != nil))
+		err = errors.Join(err, report.summary(&m, began, reason, err != nil))
+
+		if !cfg.Headless {
+			log.Printf("stopped: reason=%s failed=%t received_frames=%d received_bytes=%d analysed_samples=%d",
+				reason, err != nil, m.frames, m.stats.TotalBytes, m.samples)
+		}
+
+		return err
 	}
 	if cfg.WriteOut {
 		m.writeout, err = openDevice()
