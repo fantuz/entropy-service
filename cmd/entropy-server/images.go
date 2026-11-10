@@ -85,7 +85,7 @@ func generatedImageHandler(d *drbg.DRBG, budget *httpRequestBudget, heatmap bool
 
 		img, err := renderSampleImage(d, size, heatmap)
 		if err != nil {
-			http.Error(w, "image generation failed", http.StatusInternalServerError)
+			writeGenerationError(w, err, "image generation failed")
 
 			return
 		}

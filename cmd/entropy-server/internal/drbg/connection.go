@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 )
 
 // ConnectionReader owns a private stream, created lazily on its first read.
@@ -21,7 +22,8 @@ func NewConnectionReader(parent *DRBG) *ConnectionReader {
 }
 
 // Read refreshes the private stream before using a new parent reseed epoch or
-// exceeding its per-key byte budget. Only refreshes take the parent's mutex.
+// exceeding its per-key byte budget. Only refreshes take the parent's cipher
+// mutex; every read shares the serving root's freshness-policy gate.
 // Derived seeds are parent DRBG output, not additional device entropy reads.
 func (c *ConnectionReader) Read(p []byte) (int, error) {
 	c.mu.Lock()
@@ -49,7 +51,7 @@ func (c *ConnectionReader) Read(p []byte) (int, error) {
 		}
 
 		if c.child == nil {
-			child, newErr := NewDRBGWithAlgorithm(seed[:], c.parent.algorithm)
+			child, newErr := newDRBGWithRoot(seed[:], c.parent.algorithm, c.parent.servingRoot())
 			clear(seed[:])
 
 			if newErr != nil {
@@ -74,8 +76,19 @@ func (c *ConnectionReader) Read(p []byte) (int, error) {
 
 // connectionSeed keeps the derived seed and its epoch in the same snapshot.
 func (d *DRBG) connectionSeed() ([64]byte, uint64, error) {
+	if root := d.freshnessRoot; root != nil {
+		root.policyMu.RLock()
+		defer root.policyMu.RUnlock()
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
+	if root := d.freshnessRoot; root != nil {
+		if err := root.generationErrorLocked(time.Now()); err != nil {
+			return [64]byte{}, 0, err
+		}
+	}
 
 	var seed [64]byte
 

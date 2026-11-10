@@ -15,6 +15,10 @@
 > [November 10 source-backed follow-up](review-followup-2026-11-10.md) for the
 > four findings revisited in the external PDF and remaining priorities.
 
+> The later [reseed failure policy](reseed-failure-policy.md) also addresses
+> fail-closed serving for stale/failed seeds, including private children and
+> active streams. Source-level cancellation and assurance questions remain.
+
 ## Executive summary
 
 The architecture has a coherent division between seed acquisition, one

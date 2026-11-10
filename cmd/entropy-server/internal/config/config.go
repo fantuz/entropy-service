@@ -55,6 +55,7 @@ type Config struct {
 	LogLevel          string // Legacy field: unused.
 	DevicePath        string
 	DRBG              string
+	OnReseedFailure   drbg.ReseedFailurePolicy
 	EnableHTTPS       bool
 	RequireDevice     bool
 	MixRDRAND         bool
@@ -101,6 +102,12 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.MaxWords, "words", 20, "Default number of items presented by \"words\" endpoint (positive)")
 	flags.IntVar(&cfg.ReseedMs, "reseed-ms", defaultReseedMs, "Root reseed interval in milliseconds (1-60000)")
 	flags.IntVar(&cfg.MaxReseedAgeMs, maxReseedAgeFlag, 0, "Maximum seed age in milliseconds (0 = max(1000, four reseed intervals))")
+	flags.Func("on-reseed-failure", "Reseed failure policy: stop (default) pauses generation on failure/stale seed; continue explicitly permits old-state output", func(value string) error {
+		cfg.OnReseedFailure = drbg.ReseedFailurePolicy(value)
+		return drbg.ValidateReseedFailurePolicy(cfg.OnReseedFailure)
+	})
+
+	cfg.OnReseedFailure = drbg.ReseedStop
 	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Deprecated; ignored (no separate entropy buffer)")
 	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Bytes supplied to each root reseed (32-1048576)")
 	flags.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Deprecated; ignored (reseeding reads the configured source directly)")
@@ -210,6 +217,10 @@ func (cfg *Config) Validate() error {
 	}
 
 	if _, err := drbg.ParseAlgorithm(cfg.DRBG); err != nil {
+		return err
+	}
+
+	if err := drbg.ValidateReseedFailurePolicy(cfg.OnReseedFailure); err != nil {
 		return err
 	}
 

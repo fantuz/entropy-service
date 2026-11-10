@@ -33,7 +33,7 @@ Security fixes are maintained on a best-effort basis for the current `main` bran
 - The configured hardware device or operating-system CSPRNG supplies **seed material**. The selectable ChaCha20/AES-256-CTR implementation generates the bulk output; it does not continuously deliver hardware entropy for every byte.
 - This is a project-specific DRBG/reseed construction, **not NIST CTR_DRBG**. Treat it as unsuitable for deployments requiring externally audited or certified cryptographic generators without further review.
 - Startup opens and checks the selected character device. With `-require-device=true`, a nonempty specified path must open successfully and no fallback occurs. Without it, startup can fall back to `/dev/urandom` and then Go `crypto/rand.Reader` if needed. The source metadata reports the actual selected reader. This does **not** validate hardware entropy quality or change the runtime reseed failure policy.
-- A reseed failure is reported via readiness and metrics, but **does not automatically halt output** from existing generator state. Monitor `/ready` and establish an operational policy for stale seeds.
+- Serving-root generation now defaults to **fail closed**: `-on-reseed-failure=stop` refuses further output on a recorded reseed failure or excessive seed age, including existing child streams. Successful reseeding restores admission. Explicit `continue` permits existing-state output while readiness remains degraded. Delivered/in-flight bytes cannot be recalled, and source-level read cancellation remains separate; see [failure policy and boundaries](docs/reseed-failure-policy.md).
 - The built-in statistical dashboards are diagnostics, not evidence of cryptographic assurance.
 
 ## Network and application exposure

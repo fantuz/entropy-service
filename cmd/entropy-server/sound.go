@@ -99,7 +99,7 @@ func randomSoundHandler(source io.Reader) http.HandlerFunc {
 			var entropy [64]byte
 			if _, err = io.ReadFull(source, entropy[:]); err != nil {
 				log.Printf("sound parameter read: %v", err)
-				http.Error(w, "entropy source unavailable", http.StatusInternalServerError)
+				writeGenerationError(w, err, "entropy source unavailable")
 
 				return
 			}

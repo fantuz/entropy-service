@@ -332,7 +332,7 @@ func qrHandler(d *drbg.DRBG) http.HandlerFunc {
 		// 1. get entropy
 		buf := make([]byte, 64)
 		if _, err := io.ReadFull(d, buf); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeGenerationError(w, err, err.Error())
 
 			return
 		}
@@ -435,7 +435,7 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
 
-		ctx, cancel := websocketContext(r.Context(), conn)
+		ctx, cancel := generationWebSocketContext(r.Context(), conn, d)
 		defer cancel()
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -449,6 +449,7 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 				frame, err := newWordFrame(source, quantity)
 				if err != nil {
 					log.Printf("ws word generation failed: %v", err)
+					closeUnavailableGeneration(conn, err)
 
 					return
 				}
@@ -504,7 +505,7 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 
 		frame, err := newWordFrame(source, prefs.Words)
 		if err != nil {
-			http.Error(w, "word generation failed", http.StatusInternalServerError)
+			writeGenerationError(w, err, "word generation failed")
 
 			return
 		}
@@ -562,7 +563,7 @@ func randomBytesHandler(d *drbg.DRBG, maxBytes, maxWords int, hasCookie bool, bu
 		// Create a per-request DRBG using the parent's selected backend.
 		child, err := drbg.NewConnectionDRBG(d)
 		if err != nil {
-			http.Error(w, "DRBG child creation failed", http.StatusInternalServerError)
+			writeGenerationError(w, err, "DRBG child creation failed")
 
 			return
 		}
@@ -636,7 +637,7 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webS
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
 
-		ctx, cancel := websocketContext(r.Context(), conn)
+		ctx, cancel := generationWebSocketContext(r.Context(), conn, d)
 		defer cancel()
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -651,6 +652,7 @@ func wsBytesHandler(d *drbg.DRBG, defaultRefresh int, maxBytes int, budget *webS
 			case <-ticker.C:
 				if _, err := io.ReadFull(source, buf); err != nil {
 					log.Printf("ws entropy read failed: %v", err)
+					closeUnavailableGeneration(conn, err)
 
 					return
 				}
@@ -812,7 +814,7 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes
 		source := drbg.NewConnectionReader(d)
 		defer source.Close()
 
-		ctx, cancel := websocketContext(r.Context(), conn)
+		ctx, cancel := generationWebSocketContext(r.Context(), conn, d)
 		defer cancel()
 
 		ticker := time.NewTicker(time.Duration(refresh) * time.Millisecond)
@@ -827,6 +829,7 @@ func wsBinaryHandler(d *drbg.DRBG, defaultRefresh int, defaultQuantity, maxBytes
 			case <-ticker.C:
 				if _, err := io.ReadFull(source, buf); err != nil {
 					log.Printf("ws entropy read failed: %v", err)
+					closeUnavailableGeneration(conn, err)
 
 					return
 				}
@@ -1143,6 +1146,10 @@ func main() {
 	// Set Metadata, for example PCI card "QRNG-idQuantique-QuantisPCI".
 	root.SetMetadata(appVersion, actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
+	if err := root.ConfigureReseedPolicy(cfg.OnReseedFailure, maxReseedAge); err != nil {
+		log.Fatalf("configure generation freshness policy: %v", err)
+	}
+
 	startup.Check("Root DRBG", "OK", "initialized; metadata set")
 
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
@@ -1171,30 +1178,11 @@ func main() {
 	mux.Handle("/metrics-1", legacyMetrics)
 	mux.Handle("/metrics-2", legacyMetrics)
 
-	mux.HandleFunc("/stream", wsBinaryHandler(&root, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
-	mux.HandleFunc("/colors", wsBytesHandler(&root, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
-	mux.HandleFunc("/bytes", wsBytesHandler(&root, cfg.RefreshRateMs, cfg.MaxBytes, wsBudget))
+	registerGenerationRoutes(mux, &root, cfg, wsBudget, httpBudget)
 	labBudget := newWebSocketBudget(cfg.LabMaxConnections, cfg.LabMemoryMiB*(1<<20))
 	mux.HandleFunc("/lab/sources", labCatalogHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote))
 	mux.HandleFunc("/lab/stream", labStreamHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote))
 	mux.HandleFunc("/files", uploadHandler(cfg.BytesFingerprint, httpBudget))
-
-	mux.HandleFunc("/words", wsWordsHandler(&root, cfg.MaxWords, cfg.RefreshColorMs, wsBudget))
-
-	// mux.HandleFunc("/v1/data/random", randomBytesHandler(&root, cfg.MaxBytes, cfg.WantsCookie))
-	mux.HandleFunc("/v1/data/random", randomBytesHandler(&root, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie, httpBudget))
-	mux.HandleFunc("/v1/data/test", randomHandler(&root, cfg.MaxBytes, httpBudget))
-	// Image handlers validate size and reserve proportional working memory.
-	mux.HandleFunc("/v1/image/random", randomImageHandler(&root, httpBudget))
-	mux.HandleFunc("/v1/image/heatmap", entropyHeatmapHandler(&root, httpBudget))
-	// mux.HandleFunc("/v1/meta/random", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
-	mux.HandleFunc("/v1/meta/random", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
-	mux.HandleFunc("/v1/qr/random", httpBudget.wrap(qrHandler(&root), 4<<20))
-	// Up to five seconds of samples plus WAV output; keep the sound slot limit.
-	mux.HandleFunc("/sound", httpBudget.wrap(randomSoundHandler(&root), 8<<20))
-
-	// mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.WantsCookie))
-	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(&root, cfg.MaxWords, cfg.PageRefreshMs, cfg.MaxBytes, cfg.WantsCookie, httpBudget))
 
 	// placeholder for public/private key generation
 	// mux.HandleFunc("/v1/cert/random", healthHandler(drbg))

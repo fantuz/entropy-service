@@ -79,6 +79,14 @@ For compact messages, read the first 32 bytes as the digest and the remainder as
 
 Examples: `ws://127.0.0.1:8080/bytes?bytes=65536&refresh=100&format=compact` and `ws://127.0.0.1:8080/colors?bytes=2048&refresh=1000&format=hash`.
 
+Serving-root HTTP and WebSocket generation uses the [reseed freshness
+policy](reseed-failure-policy.md). By default, failed or stale seed state
+returns 503 before a new response/upgrade, interrupts further reads in an
+active binary transfer, and closes open entropy WebSockets with code 1013.
+Diagnostics and upload analysis remain available. Successful reseeding permits
+new requests/connections; clients must reject incomplete HTTP samples and
+reconnect closed sockets.
+
 ## File analysis
 
 ```sh

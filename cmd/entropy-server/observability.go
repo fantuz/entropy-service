@@ -23,21 +23,24 @@ const (
 )
 
 type HealthInfo struct {
-	Status               string    `json:"status"`
-	Ready                bool      `json:"ready"`
-	Version              string    `json:"rng_version"`
-	Source               string    `json:"rng_source"`
-	DRBG                 string    `json:"rng_drbg"`
-	ReseedAgeMs          int64     `json:"reseed_age_ms"`
-	ReseedIntervalMs     int64     `json:"reseed_interval_ms"`
-	ReseedSizeBits       int       `json:"reseed_size_bits"`
-	MaxReseedAgeMs       int64     `json:"max_reseed_age_ms"`
-	LastReseedAt         time.Time `json:"last_reseed_at"`
-	ReseedFailuresTotal  uint64    `json:"reseed_failures_total"`
-	LastReseedError      string    `json:"last_reseed_error,omitempty"`
-	EntropyBufferEnabled bool      `json:"entropy_buffer_enabled"`
-	EntropyBufferedBytes int       `json:"entropy_buffered_kb"`
-	EntropyBufferedPCT   int       `json:"entropy_buffered_pct"`
+	Status               string                   `json:"status"`
+	Ready                bool                     `json:"ready"`
+	SeedState            string                   `json:"seed_state"`
+	ReseedFailurePolicy  drbg.ReseedFailurePolicy `json:"on_reseed_failure"`
+	GenerationAllowed    bool                     `json:"generation_allowed"`
+	Version              string                   `json:"rng_version"`
+	Source               string                   `json:"rng_source"`
+	DRBG                 string                   `json:"rng_drbg"`
+	ReseedAgeMs          int64                    `json:"reseed_age_ms"`
+	ReseedIntervalMs     int64                    `json:"reseed_interval_ms"`
+	ReseedSizeBits       int                      `json:"reseed_size_bits"`
+	MaxReseedAgeMs       int64                    `json:"max_reseed_age_ms"`
+	LastReseedAt         time.Time                `json:"last_reseed_at"`
+	ReseedFailuresTotal  uint64                   `json:"reseed_failures_total"`
+	LastReseedError      string                   `json:"last_reseed_error,omitempty"`
+	EntropyBufferEnabled bool                     `json:"entropy_buffer_enabled"`
+	EntropyBufferedBytes int                      `json:"entropy_buffered_kb"`
+	EntropyBufferedPCT   int                      `json:"entropy_buffered_pct"`
 }
 
 // Count once at the HTTP boundary and log failed responses to the standard
@@ -47,7 +50,7 @@ func countRequests(next http.Handler) http.Handler {
 }
 
 func reseedReady(meta drbg.Metadata, maxAge time.Duration) bool {
-	return meta.LastReseedError == "" && meta.ReseedAge <= maxAge
+	return meta.SeedState(maxAge) == drbg.SeedFresh
 }
 
 // Liveness does not depend on the configured seed source being available.
@@ -69,6 +72,7 @@ func healthHandler(d *drbg.DRBG, maxAge time.Duration) http.HandlerFunc {
 
 		health := HealthInfo{
 			Status: status, Ready: ready,
+			SeedState: meta.SeedState(maxAge), ReseedFailurePolicy: meta.ReseedFailurePolicy, GenerationAllowed: meta.GenerationAllowed,
 			Version: meta.Version, Source: meta.Source, DRBG: meta.DRBG,
 			ReseedAgeMs:      meta.ReseedAge.Milliseconds(),
 			ReseedIntervalMs: meta.ReseedIntervalMs, ReseedSizeBits: meta.ReseedSizeBits,
@@ -122,6 +126,15 @@ func metricsExposition(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudg
 			ready = 1
 		}
 
+		allowed, failClosed := 0, 0
+		if meta.GenerationAllowed {
+			allowed = 1
+		}
+
+		if meta.ReseedFailurePolicy == drbg.ReseedStop {
+			failClosed = 1
+		}
+
 		generated, payloads := metrics.BytesGenerated(), metrics.NumWSPayloads()
 
 		var activity activityPeakValues
@@ -140,9 +153,12 @@ func metricsExposition(d *drbg.DRBG, maxAge time.Duration, budget *webSocketBudg
 			{metricLegacyRootReseeds, "Deprecated serving-root successful-reseed view; overlaps rng_reseeds_total and must not be summed with it", counterType, meta.ReseedsTotal},
 			{"rng_reseed_failures_total", "Failed or skipped reseeds for this root generator", counterType, meta.ReseedFailuresTotal},
 			{metricSeedAge, "Seconds since this root generator was seeded", gaugeType, meta.ReseedAge.Seconds()},
+			{"rng_max_reseed_age_seconds", "Configured maximum seed age for readiness and stop-policy generation gating", gaugeType, maxAge.Seconds()},
 			{metricLegacyAge, "Deprecated millisecond view of rng_reseed_age_seconds; do not sum these metrics", gaugeType, meta.ReseedAge.Milliseconds()},
 			{"rng_reseed_last_success_timestamp_seconds", "Unix timestamp of the last successful seed for this root generator", gaugeType, meta.LastReseedAt.Unix()},
 			{"rng_ready", "One when this root generator has fresh seed state and no unresolved reseed failure", gaugeType, ready},
+			{"rng_generation_allowed", "One when serving-root output is allowed by the configured reseed policy; not a readiness or entropy-quality claim", gaugeType, allowed},
+			{"rng_reseed_fail_closed", "One when the serving root is configured to stop generation on reseed failure or excessive seed age", gaugeType, failClosed},
 			{"http_requests_total", "Process-lifetime public HTTP/HTTPS requests, including errors, upgrades, probes, scrapes and static files; excludes debug listener", counterType, metrics.NumHTTPRequests()},
 			{"rng_generation_peak_bytes_per_second", "Highest observed interval-average DRBG generation bytes per second since server process start; not hardware entropy rate", gaugeType, activity.GeneratedBytesPerSecond},
 			{"wss_payloads_peak_per_second", "Highest observed interval-average outbound WebSocket application messages per second since process start; WS and WSS combined", gaugeType, activity.WSFramesPerSecond},

@@ -17,9 +17,10 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 | `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |
 | `-reseed-ms` | `15000` | Root reseed interval: 1–60000 ms. |
 | `-buffer-reseed` | `256` | Bytes per root reseed: 32–1048576. |
-| `-max-reseed-age` | `0` (effective 60000 ms) | Readiness age limit in ms; zero selects `max(1000, 4 × reseed-ms)`. |
+| `-max-reseed-age` | `0` (effective 60000 ms) | Freshness-age limit in ms for readiness and stop-mode generation; zero selects `max(1000, 4 × reseed-ms)`. |
+| `-on-reseed-failure` | `stop` | `stop` pauses generation on a recorded reseed failure or stale seed; `continue` explicitly permits existing-state output. Both report degraded readiness. |
 
-The architecture-based backend policy uses the binary's Go target architecture (`GOARCH`): `arm`, `arm64` and `riscv64` select ChaCha20; other builds select AES-256-CTR. This does **not** inspect AES acceleration at runtime: some non-ARM platforms without hardware AES may perform worse or have different side-channel characteristics. Operators may override with `-drbg=chacha20` or `-drbg=aes-256-ctr` after evaluating their CPU. Neither algorithm is claimed to be a NIST-certified DRBG. The 15-second reseed interval is a **service policy**, not a proven post-compromise recovery bound. The 60-second readiness-age threshold is monitoring only; an unhealthy `/ready` does not automatically stop output.
+The architecture-based backend policy uses the binary's Go target architecture (`GOARCH`): `arm`, `arm64` and `riscv64` select ChaCha20; other builds select AES-256-CTR. This does **not** inspect AES acceleration at runtime: some non-ARM platforms without hardware AES may perform worse or have different side-channel characteristics. Operators may override with `-drbg=chacha20` or `-drbg=aes-256-ctr` after evaluating their CPU. Neither algorithm is claimed to be a NIST-certified DRBG. The 15-second reseed interval and 60-second freshness-age threshold are **service policies**, not proven post-compromise recovery bounds. With the new default `stop` policy, failed or stale seed state denies generation as well as degrading readiness. See [rationale, recovery and migration](reseed-failure-policy.md); explicitly select `continue` to retain the old generation policy.
 
 ### Listeners and TLS
 

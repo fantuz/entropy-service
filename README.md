@@ -264,7 +264,7 @@ AES-256-CTR (default on non-ARM/non-RISC-V) and ChaCha20 (default on ARM/RISC-V)
 
 The suite can support laboratory work, application prototyping and integration experiments. It is not an HSM, key-management system, OpenSSL provider or certified entropy source. Remote randomness also introduces trust in the server and transport; keep private keys and sensitive seed material out of public diagnostic pages and logs.
 
-Source failures are visible through readiness and reseed metrics. A failed reseed does **not** automatically stop existing DRBG output. Use `/ready` in routing/monitoring if your application requires a recent successful seed, and assess whether a stricter failure policy is needed.
+Source failures are visible through readiness and reseed metrics. By default, `-on-reseed-failure=stop` pauses serving-root generation immediately on a recorded reseed failure or when the seed exceeds `-max-reseed-age`. New requests return 503 and existing streams stop; `/live` and diagnostics remain available. A successful reseed restores admission. Explicit `-on-reseed-failure=continue` retains the earlier behavior while readiness still degrades. See [policy, reasoning, client behavior and upgrade guidance](docs/reseed-failure-policy.md).
 
 ## API reference
 
@@ -355,7 +355,7 @@ Available features are documented above. The following are follow-up work or ide
 
 - Expand browser regression coverage (especially real network disconnections and mobile rendering).
 - Verify release-derived metadata and package/service smoke checks on every release.
-- Clarify source-failure policy and cancellation of blocking hardware reads.
+- Add source-specific cancellation of blocking hardware reads; the freshness gate already stops stale serving independently of a blocked read.
 - Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
 - Improve deployment hardening: service identity/device permissions, authentication/access control, explicit optional origin allowlists for cross-host browser clients, and hardware-specific startup checks.
 - Evaluate integrations separately: FUSE/CUSE byte devices and an OpenSSL provider need distinct designs. FUSE alone does not implement `openssl rand -engine entropyctl`. HSM/blockchain integrations, GPU generation and production/demo build profiles are not implemented.
