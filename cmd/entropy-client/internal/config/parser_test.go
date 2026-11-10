@@ -44,6 +44,13 @@ func TestClientParserHelpAndRejectedArguments(t *testing.T) {
 		}
 	}
 
+	privateArg := "https://example.invalid/?token=" + t.Name()
+
+	var diagnostic bytes.Buffer
+	if _, err := parseConfig([]string{privateArg}, &diagnostic); err == nil || strings.Contains(diagnostic.String(), t.Name()) {
+		t.Fatal("positional argument error should not print URL secrets")
+	}
+
 	for _, arg := range []string{"-help", "--help", "-h"} {
 		var output bytes.Buffer
 		if _, err := parseConfig([]string{arg}, &output); !errors.Is(err, flag.ErrHelp) {

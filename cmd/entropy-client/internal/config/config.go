@@ -124,7 +124,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	}
 
 	if flags.NArg() != 0 {
-		err := fmt.Errorf("unexpected positional arguments %q; use -flag=false or -flag=true for boolean values", flags.Args())
+		err := errors.New("unexpected positional arguments; use -flag=false or -flag=true for boolean values")
 		fmt.Fprintln(output, err)
 
 		return nil, err
