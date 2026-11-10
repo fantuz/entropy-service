@@ -81,7 +81,8 @@ ExecStart=/usr/bin/entropy-server -http=127.0.0.1:8080 -https=127.0.0.1:8443 -en
 
 `StateDirectory` supplies writable persistent storage with the correct
 ownership for the packaged `DynamicUser` sandbox. The certificate survives
-restarts. Review the effective unit before explicitly restarting it. For
+restarts. Direct file edits require `sudo systemctl daemon-reload` before
+restarting the service. Review the effective unit before explicitly restarting it. For
 root-owned CA-managed private keys, use systemd `LoadCredential` and `%d`
 credential paths or another explicit access policy; do not make keys
 world-readable to accommodate a dynamic UID. See [packaged deployment](packaged-service.md).
