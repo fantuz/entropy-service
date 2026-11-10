@@ -190,13 +190,36 @@ with the profile, per-function summary and annotated HTML. The reports need
 no third-party coverage account or token. No arbitrary minimum percentage
 is imposed: review which meaningful paths a change exercises.
 
+## Failure-path and fuzz validation
+
+Client arguments now use an isolated `flag.FlagSet`. Repeated parses retain
+independent defaults, help is explicit, and unexpected positional arguments
+(including `-headless false`) are rejected before output destinations open.
+Use `-headless=false` for an explicit boolean value.
+
+`python3 scripts/test_startup_failures.py` tests the actual executables after
+`make build`: help/argument failures, occupied HTTP/HTTPS ports, missing and
+mismatched certificates, unreadable keys for unprivileged users, TLS failure
+before entropy access, verified HTTPS/HTTP sampling and SIGTERM cleanup.
+Temporary identities are generated at runtime and never committed. These
+checks complement handler tests and the actual systemd package lifecycle test.
+
+`bash scripts/test-fuzz.sh` runs four native Go fuzz targets for ten seconds
+each with at most two workers: isolated CLI arguments, actual WebSocket frame
+size/type handling, bounded generation queries and upload prefix analysis.
+Inputs are capped to keep allocations, network fixtures and work bounded.
+Upload assertions compare full-body SHA-256 and independently counted prefix
+histograms; frame assertions reject text and incorrect fixed lengths.
+For a focused local run, use `FUZZTIME=2s bash scripts/test-fuzz.sh`.
+Build and release validation run the complete fixed-budget checks in CI.
+Fuzz discoveries that fail are written to Go's `testdata/fuzz` corpus; retain
+and review them with the fix, rather than merely reducing the fuzz budget.
+
 ## Remaining test and maintenance priorities
 
 | Priority | Follow-up | Why |
 | --- | --- | --- |
-| High | Give client argument parsing an isolated `flag.FlagSet`; test defaults, help, malformed/positional arguments and repeated parsing. | Most client config-validation logic is covered, but the CLI parser itself is not directly exercised. |
-| High | Add subprocess startup tests for the actual server/client executables, including occupied ports and HTTP-only/HTTPS modes. | Handler tests and helper tests do not fully execute `main` or every startup/exit path. |
-| Medium | Add native Go fuzz targets for bounded query/frame/upload parsing, retaining discovered regression cases. | Existing boundary cases do not explore arbitrary malformed inputs. |
+| Medium | Extend the bounded fuzz corpus when failures are found, including additional media/source-registration parsers. | Four native targets now exercise client arguments, entropy frames, generation queries and upload analysis; preserve any discovered failures as regressions. |
 | Medium | Exercise real browser disconnect/reconnect and mobile layouts with browser automation. | Node regression scripts cover calculations/scheduling/layout contracts, not every interactive network/UI path. |
 | Deployment | Test real QRNG startup/failure, blocking driver reads and supported non-amd64 systems. | OS-backed local tests and cross-compilation do not validate physical hardware or driver behavior. |
 | Maintenance | Remove unused prototypes/helpers and stale comments in small reviewed changes; prefer initialisms in new code. | Tests of unused code can inflate coverage while leaving shipped behavior untouched. |
