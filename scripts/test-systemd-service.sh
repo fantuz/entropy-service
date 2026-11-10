@@ -49,9 +49,13 @@ trap cleanup EXIT
 fail() { echo "$*" >&2; exit 1; }
 wait_ready() {
   for _ in {1..100}; do
-    if curl -fsS --max-time 1 "$@" >/dev/null 2>&1; then return; fi
+    if curl -fsS --max-time 1 "$@" >/dev/null 2>"$work/last-curl-error"; then return; fi
     sleep 0.1
   done
+  cat "$work/last-curl-error" >&2
+  ss -ltnp '( sport = :8080 or sport = :8443 )' >&2
+  stat -Lc '%A %U:%G %n' "$state" "$state/current-cert.pem" "$state/current-key.pem" >&2 || true
+  ls -ld /var/lib/entropy-service /var/lib/private/entropy-service >&2 || true
   fail 'Service did not become ready.'
 }
 write_override() {
