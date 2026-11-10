@@ -1,6 +1,10 @@
 package diag
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"os"
+)
 
 type EntropyGraph struct {
 	values []float64
@@ -23,40 +27,42 @@ func (g *EntropyGraph) Add(v float64) {
 }
 
 func (g *EntropyGraph) Render() {
-	// fmt.Print("\033[H\033[2J") // clear screen
-	// fmt.Print("\a")
-	fmt.Println("\nShannon entropy history (bits/byte, 0..8)")
-	fmt.Println("----------------")
+	g.RenderTo(os.Stdout)
+}
+
+func (g *EntropyGraph) RenderTo(out io.Writer) {
+	fmt.Fprintln(out, "\nShannon entropy history (bits/byte, 0..8)")
+	fmt.Fprintln(out, "----------------")
 
 	for _, v := range g.values {
 		level := int((v / 8.0) * 8)
 
 		switch level {
 		case 0, 1:
-			fmt.Print("▁")
+			fmt.Fprint(out, "▁")
 
 		case 2:
-			fmt.Print("▂")
+			fmt.Fprint(out, "▂")
 
 		case 3:
-			fmt.Print("▃")
+			fmt.Fprint(out, "▃")
 
 		case 4:
-			fmt.Print("▄")
+			fmt.Fprint(out, "▄")
 
 		case 5:
-			fmt.Print("▅")
+			fmt.Fprint(out, "▅")
 
 		case 6:
-			fmt.Print("▆")
+			fmt.Fprint(out, "▆")
 
 		case 7:
-			fmt.Print("▇")
+			fmt.Fprint(out, "▇")
 
 		default:
-			fmt.Print("█")
+			fmt.Fprint(out, "█")
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(out)
 }

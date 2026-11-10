@@ -174,6 +174,11 @@ For example, this requests 64 KiB with a 100 ms refresh setting, overriding the 
 | `-graph` | `false` | Shannon-entropy history of analysed samples. |
 | `-preview` | `false` | Up to 64 bytes, in hex, from the last selected frame. |
 | `-histogram` | `false` | Byte-distribution bars from the analysed sample's existing counts. |
+| `-waterfall` | `false` | Recent analysed sample prefixes as colored cells or a monochrome ramp. |
+| `-waterfall-mode` | `byte` | `byte` (byte-value hues), `rgb` (consecutive RGB triplets) or `gray` (byte brightness). |
+| `-waterfall-columns` | `32` | Cells per retained row, 8–128; each cell uses two terminal columns. |
+| `-waterfall-rows` | `8` | Maximum retained samples, 1–32; rendered newest first. |
+| `-color` | `auto` | `auto`, `always`, `never`, `256` or `truecolor`; details below. |
 | `-debug` | `false` | Receive/fetch, analysis and runtime timings, to three decimal places in ms. |
 
 By default, the client receives and counts every frame but analyses **at most the first 1 MiB of a selected frame, once every 250 ms**. The first frame is analysed immediately; later samples require both a new frame and an elapsed analysis interval. Slow sources therefore produce fewer samples. The terminal redraws once per second using the latest available result.
@@ -197,6 +202,83 @@ To analyse **every byte of every frame**, set both analysis options to zero:
 ```
 
 Add `-matrix` if transition-matrix analysis is also wanted. Setting only `-analysis-bytes=0` still selects frames at the configured interval; setting only `-analysis-interval=0` still respects the prefix cap. Full analysis can reduce throughput. The bounded receive queue applies backpressure when processing cannot keep up; increasing display frequency does not accelerate reception.
+
+### Terminal waterfall and colors
+
+```sh
+# Vivid byte-value hues, with automatic terminal color detection.
+./bin/entropy-client -mode=stream -slice=65536 -refresh=100ms -waterfall
+
+# Interpret consecutive triples as RGB; request 24-bit terminal colors.
+./bin/entropy-client -mode=pull -waterfall -waterfall-mode=rgb -color=truecolor
+
+# Byte brightness with a 256-color palette, or an uncolored text ramp.
+./bin/entropy-client -waterfall -waterfall-mode=gray -color=256
+./bin/entropy-client -waterfall -color=never
+```
+
+Each waterfall row represents **one selected analysis sample**, labelled with
+its received-frame number. Gaps in frame numbers are normal when analysis
+sampling skips frames. The newest sample is at the top; columns always start
+at byte offset zero. The offset heading gives the visible cell range, not a
+claim that a short sample filled every cell.
+
+| Mapping | Bytes per cell | Interpretation |
+| --- | ---: | --- |
+| `byte` | 1 | A fixed six-sector hue cycle over byte values 0–255; hue is a byte-value encoding. |
+| `rgb` | 3 | Consecutive bytes are red, green and blue. An incomplete final triplet is left blank. |
+| `gray` | 1 | A byte's value is brightness, from black at 0 to white at 255. |
+
+Color palettes quantize these mappings to the selected depth. Without color,
+`byte` uses raw-byte brightness (labelled `gray fallback`), `gray` uses the
+same brightness ramp, and `rgb` uses luminance. Cells use the ASCII ramp
+` .:-=+*#%@`; unused cells stay blank. This display is a visualization of
+sample bytes, not a statistical assessment or proof of entropy quality.
+
+The client copies at most `waterfall-columns × bytes-per-cell` bytes from
+each **analysed prefix**, further limited by the sample's actual length.
+History retains at most `waterfall-rows` samples: at the maximum settings,
+12,288 copied payload bytes in RGB mode, plus bounded row metadata. It
+neither retains transport buffers nor changes analysis, reception, reports'
+statistics or `-writeout` data. Empty or unselected frames add no row.
+`-headless` allocates no waterfall history and renders nothing, even if
+`-waterfall` or forced color is requested.
+
+On Linux, stdout's terminal dimensions are read again on each redraw.
+The waterfall narrows to fit the frame label and two-column cells and shows
+only the newest rows that fit below the diagnostics and other enabled
+panels. One screen row is reserved for the cursor. It is omitted if there
+is insufficient room for its headings and a data row. Resizing changes the
+visible area without discarding the bounded history, so older rows and
+their wider prefixes can reappear after enlarging the terminal. Large
+optional panels such as `-matrix` can themselves exceed the screen; they
+leave no space for the waterfall on a small terminal.
+
+| Color choice | Behavior |
+| --- | --- |
+| `auto` | No color for redirected stdout, nonempty `NO_COLOR`, or empty/`dumb` `TERM`. Otherwise uses truecolor for `COLORTERM=truecolor`/`24bit` or `TERM=*-direct`, 256 colors for `TERM` containing `256color`, and basic ANSI colors otherwise. |
+| `always` | Force color, including with redirected stdout or `NO_COLOR`; use the detected depth or basic ANSI colors as fallback. |
+| `never` | No color escapes. A supported interactive terminal still uses cursor controls to redraw. |
+| `256` | Force the 256-color palette, overriding detection and `NO_COLOR`. |
+| `truecolor` | Force 24-bit RGB, overriding detection and `NO_COLOR`. |
+
+Redirected output never uses cursor controls, including with forced colors.
+`TERM=dumb` or empty `TERM` also suppresses cursor controls. Linux is the
+packaged platform; on other systems automatic output is unstyled and
+dimensions are unknown, so explicit color and configured row/column limits
+are used. Colors affect diagnostics and preflight as well as the waterfall.
+For JSONL stdout, use `-headless -report=-`; it stays unstyled regardless of
+these display flags.
+
+![Byte-hue waterfall in an 80-column, 32-row terminal](images/client-waterfall.png)
+
+The preview was rendered from the actual client in an 80×32 Linux PTY,
+using a local deterministic HTTP byte-cycle fixture, `-waterfall
+-waterfall-mode=byte -waterfall-columns=32 -waterfall-rows=8
+-color=truecolor -slice=4096 -refresh=50ms -analysis-interval=100ms
+-display-interval=100ms`. It demonstrates the display, not a random-source
+measurement; the fixture's ordered byte cycle is predictable despite its
+Shannon estimate of 8. The server APIs and stream framing are unchanged.
 
 ### Reading the monitor
 

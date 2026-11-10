@@ -2,12 +2,18 @@ package diag
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 )
 
 // PrintHistogramCounts reuses the analysed histogram without retaining or
 // scanning the frame again. Each of the 32 buckets covers eight byte values.
 func PrintHistogramCounts(hist [256]int) {
+	PrintHistogramCountsTo(os.Stdout, hist)
+}
+
+func PrintHistogramCountsTo(out io.Writer, hist [256]int) {
 	var bins [32]int
 	for value, count := range hist {
 		bins[value/8] += count
@@ -18,10 +24,10 @@ func PrintHistogramCounts(hist [256]int) {
 		peak = max(peak, count)
 	}
 
-	fmt.Println("\nAnalysed byte distribution (32 bins)")
+	fmt.Fprintln(out, "\nAnalysed byte distribution (32 bins)")
 
 	for i, count := range bins {
-		fmt.Printf("%02x-%02x | %s\n", i*8, i*8+7, strings.Repeat("█", count*50/peak))
+		fmt.Fprintf(out, "%02x-%02x | %s\n", i*8, i*8+7, strings.Repeat("█", count*50/peak))
 	}
 }
 

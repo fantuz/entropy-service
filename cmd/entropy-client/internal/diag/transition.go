@@ -1,6 +1,10 @@
 package diag
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"os"
+)
 
 // perfect RNG -> 1 / 64 ≈ 0.015625
 
@@ -36,6 +40,10 @@ func (tm *TransitionMatrix) Probability(i, j int) float64 {
 }
 
 func (tm *TransitionMatrix) PrintHeatmap() {
+	tm.PrintHeatmapTo(os.Stdout)
+}
+
+func (tm *TransitionMatrix) PrintHeatmapTo(out io.Writer) {
 	peak := 0
 
 	for i := range 64 {
@@ -50,34 +58,33 @@ func (tm *TransitionMatrix) PrintHeatmap() {
 		peak = 1
 	}
 
-	fmt.Println("\nTransition Matrix (64x64)")
-	fmt.Println("--------------------------")
+	fmt.Fprintln(out, "\nTransition Matrix (64x64)")
+	fmt.Fprintln(out, "--------------------------")
 
 	for i := range 32 {
-		fmt.Print("                 ")
+		fmt.Fprint(out, "                 ")
 
 		for j := range 64 {
 			v := float64(tm.Matrix[i][j]) / float64(peak)
 
 			switch {
 			case v > 0.75:
-				fmt.Print("█")
+				fmt.Fprint(out, "█")
 
 			case v > 0.5:
-				fmt.Print("▓")
+				fmt.Fprint(out, "▓")
 
 			case v > 0.25:
-				fmt.Print("▒")
+				fmt.Fprint(out, "▒")
 
 			case v > 0.1:
-				fmt.Print("░")
+				fmt.Fprint(out, "░")
 
 			default:
-				fmt.Print(" ")
+				fmt.Fprint(out, " ")
 			}
 		}
 
-		fmt.Println()
-		// fmt.Println("          ")
+		fmt.Fprintln(out)
 	}
 }

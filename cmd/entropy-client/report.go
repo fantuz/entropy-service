@@ -86,6 +86,11 @@ type reportSettings struct {
 	Headless         bool    `json:"headless"`
 	Matrix           bool    `json:"matrix"`
 	WriteOut         bool    `json:"writeout"`
+	Waterfall        bool    `json:"waterfall"`
+	WaterfallMode    string  `json:"waterfall_mode"`
+	WaterfallColumns int     `json:"waterfall_columns"`
+	WaterfallRows    int     `json:"waterfall_rows"`
+	Color            string  `json:"color"`
 }
 
 type startRecord struct {
@@ -119,6 +124,8 @@ func (r *runReport) start(cfg *config.Config, endpoint string) error {
 			AnalysisInterval: cfg.AnalysisInterval.String(), DisplayInterval: cfg.DisplayInterval.String(),
 			ShannonThreshold: cfg.ShannonThreshold, Duration: cfg.Duration.String(),
 			Headless: cfg.Headless, Matrix: cfg.ShowMatrix, WriteOut: cfg.WriteOut,
+			Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
+			WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
 		},
 		GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
 	})

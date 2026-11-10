@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/terminal"
 )
 
 type Config struct {
@@ -32,6 +33,11 @@ type Config struct {
 	ShowMatrix       bool
 	ShowDashboard    bool
 	ShowHistogram    bool
+	ShowWaterfall    bool
+	WaterfallMode    string
+	WaterfallColumns int
+	WaterfallRows    int
+	Color            string
 	Slice            int64
 	AnalysisBytes    int
 	AnalysisInterval time.Duration
@@ -54,6 +60,11 @@ func ParseConfig() *Config {
 	flag.BoolVar(&cfg.ShowGraph, "graph", false, "print distribution graph")
 	flag.BoolVar(&cfg.ShowDashboard, "dashboard", false, "print dashboard summaries")
 	flag.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
+	flag.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
+	flag.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
+	flag.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 32, "waterfall cells per row (8..128; two terminal columns per cell)")
+	flag.IntVar(&cfg.WaterfallRows, "waterfall-rows", 8, "retained waterfall samples (1..32; newest first)")
+	flag.StringVar(&cfg.Color, "color", "auto", "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
 
 	flag.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
 	flag.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
@@ -86,6 +97,22 @@ func ParseConfig() *Config {
 }
 
 func (cfg *Config) ValidateAnalysis() error {
+	if !terminal.ValidColor(cfg.Color) {
+		return errors.New("color must be auto, always, never, 256 or truecolor")
+	}
+
+	if cfg.WaterfallMode != "" && cfg.WaterfallMode != diag.WaterfallByte && cfg.WaterfallMode != diag.WaterfallRGB && cfg.WaterfallMode != diag.WaterfallGray {
+		return errors.New("waterfall-mode must be byte, rgb or gray")
+	}
+
+	if (cfg.ShowWaterfall || cfg.WaterfallColumns != 0) && (cfg.WaterfallColumns < 8 || cfg.WaterfallColumns > 128) {
+		return errors.New("waterfall-columns must be between 8 and 128")
+	}
+
+	if (cfg.ShowWaterfall || cfg.WaterfallRows != 0) && (cfg.WaterfallRows < 1 || cfg.WaterfallRows > 32) {
+		return errors.New("waterfall-rows must be between 1 and 32")
+	}
+
 	if math.IsNaN(cfg.ShannonThreshold) || math.IsInf(cfg.ShannonThreshold, 0) || cfg.ShannonThreshold < 0 || cfg.ShannonThreshold > 8 {
 		return errors.New("shannon-threshold must be a finite value between 0 and 8 bits/byte")
 	}

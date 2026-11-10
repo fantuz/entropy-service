@@ -371,6 +371,8 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	defer func() { os.Stdout = original }()
 
 	cfg := experimentConfig(modePull, serveExperiment(t, modePull), "-")
+	cfg.ShowWaterfall, cfg.ShowPreview, cfg.ShowGraph, cfg.ShowDashboard = true, true, true, true
+	cfg.WaterfallMode, cfg.WaterfallColumns, cfg.WaterfallRows, cfg.Color = "rgb", 128, 32, "truecolor"
 
 	cfg.Duration = 40 * time.Millisecond
 	if err := runConfigured(t.Context(), cfg); err != nil {
@@ -380,5 +382,10 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	records := readReport(t, path)
 	if decodeRecord[reportHeader](t, records[0]).Type != "run_start" || decodeRecord[reportHeader](t, records[len(records)-1]).Type != "run_summary" {
 		t.Fatal("headless stdout is not a complete report")
+	}
+
+	settings := decodeRecord[startRecord](t, records[0]).Settings
+	if !settings.Waterfall || settings.WaterfallMode != "rgb" || settings.WaterfallColumns != 128 || settings.WaterfallRows != 32 || settings.Color != "truecolor" {
+		t.Fatalf("display settings missing from metadata: %+v", settings)
 	}
 }

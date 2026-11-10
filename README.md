@@ -56,6 +56,9 @@ wc -c sample.bin
 # Alternatively, one WebSocket connection delivering 64 KiB per message.
 ./bin/entropy-client -mode=stream -wsurl=ws://127.0.0.1:8080/stream -slice=65536 -refresh=100ms
 
+# Optional terminal waterfall of recent analysed sample prefixes.
+./bin/entropy-client -mode=stream -waterfall -waterfall-mode=byte -color=auto
+
 # A repeatable 60-second measurement with a custom Shannon threshold and JSONL.
 ./bin/entropy-client -mode=stream -slice=1048576 -refresh=50ms \
   -headless -duration=60s -shannon-threshold=7.99 -report=run-60s.jsonl
@@ -66,6 +69,13 @@ The monitor retains the raw Shannon estimate in bits/byte and shows one
 weighted score or a cryptographic certification. See [timed client experiments
 and JSONL reports](docs/client-experiments.md) for interpretation, comparisons
 and longer runs. Report files must be new; choose a different name for each run.
+
+The optional [client waterfall](docs/configuration.md#terminal-waterfall-and-colors)
+maps bytes to hues, RGB triplets or grayscale, with bounded history and
+terminal sizing. `-color=auto` detects Linux terminal capabilities and leaves
+redirected stdout unstyled; explicit color modes are available.
+
+![Entropy client with byte-hue waterfall](docs/images/client-waterfall.png)
 
 ### WebSocket examples with curl
 
