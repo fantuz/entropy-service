@@ -91,6 +91,8 @@ jobs:
           python3 scripts/test_client_20fps.py
       - name: Smoke-test packaged service configuration
         run: sh scripts/test-package-service.sh
+      - name: Smoke-test client binary exports and retries
+        run: python3 scripts/test_client_output.py
       - name: Run linters
         uses: golangci/golangci-lint-action@v9.3.0
         with:
@@ -101,6 +103,8 @@ jobs:
         with:
           version: v2.17.0
           args: release --snapshot --skip=publish --clean
+      - name: Test real packaged systemd HTTP and HTTPS lifecycle
+        run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh dist/*_amd64.deb
 
   release:
     name: Publish only after full tag validation

@@ -290,27 +290,10 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 	diag.ClientRateMeter.Reset()
 	atomic.StoreUint64(&diag.BytesFetched, 0)
 
-	var frames <-chan client.StreamFrame
+	frames := make(chan client.StreamFrame, 1)
 
 	failures := make(chan error, 1)
-
-	if cfg.Mode == modeStream {
-		var err error
-
-		frames, err = client.StreamEntropy(ctx, wsURL)
-		if err != nil {
-			if contextEnded(ctx) {
-				return stopReason(parent), nil
-			}
-
-			return reasonTransportError, fmt.Errorf("open entropy stream: %w", err)
-		}
-	} else {
-		out := make(chan client.StreamFrame, 1)
-		frames = out
-
-		go pullFrames(ctx, cfg, httpURL, out, failures)
-	}
+	go receiveFrames(ctx, cfg, httpURL, wsURL, frames, failures)
 
 	defer func() {
 		cancel()
@@ -429,9 +412,7 @@ func contextEnded(ctx context.Context) bool {
 	return ok && !time.Now().Before(deadline)
 }
 
-func pullFrames(ctx context.Context, cfg *config.Config, endpoint string, out chan<- client.StreamFrame, failures chan<- error) {
-	defer close(out)
-
+func pullFramesUntilError(ctx context.Context, cfg *config.Config, endpoint string, out chan<- client.StreamFrame) error {
 	ticker := time.NewTicker(cfg.Refresh)
 	defer ticker.Stop()
 
@@ -440,7 +421,7 @@ func pullFrames(ctx context.Context, cfg *config.Config, endpoint string, out ch
 
 		select {
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		case <-ticker.C:
 		}
 
@@ -452,17 +433,13 @@ func pullFrames(ctx context.Context, cfg *config.Config, endpoint string, out ch
 		cancel()
 
 		if err != nil {
-			if ctx.Err() == nil {
-				failures <- fmt.Errorf("fetch entropy: %w", err)
-			}
-
-			return
+			return fmt.Errorf("fetch entropy: %w", err)
 		}
 
 		select {
 		case out <- client.StreamFrame{Data: data, ReceiveWait: wait, CycleRuntime: time.Since(cycleStarted)}:
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		}
 	}
 }

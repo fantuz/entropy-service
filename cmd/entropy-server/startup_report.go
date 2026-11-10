@@ -80,10 +80,12 @@ func reportTLS(r *console.Report, cfg *tls.Config, now time.Time) {
 
 	state := "OK"
 	if now.Before(cert.NotBefore) || !now.Before(cert.NotAfter) {
-		state = "WARN"
+		state = reportWarning
 	}
 
 	r.Check("Certificate dates", state, fmt.Sprintf("%s to %s (UTC; trust/hostname not checked)", cert.NotBefore.UTC().Format(time.DateOnly), cert.NotAfter.UTC().Format(time.DateOnly)))
+	expiryState, message := certificateExpiry(cert, now)
+	r.Check("Certificate expiry", expiryState, message)
 }
 
 func reportSource(r *console.Report, requested, actual string) {

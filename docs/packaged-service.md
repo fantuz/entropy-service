@@ -147,6 +147,14 @@ deliberately if future application changes need persistent writable state.
 
 ## Review and validation
 
+Build and release CI additionally install the actual amd64 DEB in a disposable
+Ubuntu systemd VM. `scripts/test-systemd-service.sh` verifies installation
+without activation, unprivileged HTTP serving, upgrade without restart, HTTPS
+provisioning in `DynamicUser` state, identity retention across restarts, staged
+renewal, expired-pair refusal and rollback with normal client trust validation.
+It requires root, systemd PID 1 and explicit `ENTROPY_SYSTEMD_TEST=1`; it refuses
+pre-existing service/state paths and must never be run on an operator's host.
+
 ```sh
 sh scripts/test-package-service.sh
 systemctl cat entropy-server

@@ -64,6 +64,10 @@ func dialWebSocket(ctx context.Context, endpoint string) (*websocket.Conn, error
 		if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
 			return nil, context.DeadlineExceeded
 		}
+
+		if response != nil {
+			return nil, &HTTPStatusError{Code: response.StatusCode, RetryAfter: retryAfter(response.Header.Get("Retry-After"), time.Now())}
+		}
 	}
 
 	return conn, err
