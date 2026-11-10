@@ -43,7 +43,7 @@ use a validated solution rather than interpreting this document as assurance.
 | Asset / principal | Security interest | Relevant trust assumption |
 | --- | --- | --- |
 | Hardware entropy device and its kernel driver | Seed quality, availability, integrity | Device, firmware, driver and host are trusted and assessed separately. |
-| OS CSPRNG (`/dev/urandom` or `crypto/rand.Reader`) | Startup/reseed confidentiality and strength | Host kernel and operating system are uncompromised. |
+| OS CSPRNG (`/dev/urandom` or nonblocking Linux `getrandom`) | Startup/reseed confidentiality and strength | Host kernel and operating system are uncompromised. |
 | CPU RDSEED/RDRAND mixing | Supplemental seed material | CPU instructions are optional, not the sole trusted source. |
 | Root DRBG key, nonce and cipher position | Unpredictability of later derivations | Process memory and OS isolation are trusted. |
 | Request/connection child generators | Computational stream separation | Derived seeds and internal state remain private. |
@@ -112,20 +112,19 @@ unless the operator installs an external proxy. HTTP and HTTPS expose the
 
 ### 4.1 Startup
 
-The standalone binary's configured path defaults to `/dev/qrandom0` (the packaged unit explicitly selects `/dev/urandom`). Startup calls
-`ResolveEntropyDevice`, validates that the selected path is a character
-device, opens it and requires a complete 64-byte read before initializing the
-root generator.
+The standalone binary's configured path defaults to `/dev/qrandom0` (the packaged unit explicitly selects `/dev/urandom`). Startup opens with `O_NONBLOCK`, validates the opened character device and
+its deadline support, and requires a complete 64-byte read within
+`-source-timeout` before initializing the root generator.
 
 | Condition | With `-require-device=false` (default) | With `-require-device=true` |
 | --- | --- | --- |
 | Configured path missing / not a char device | Resolve to `/dev/urandom`; startup may proceed. | Startup fails. |
-| Chosen device fails to open **after** validation | `NewEntropySource` may fall back to Go `crypto/rand.Reader`. | Startup fails. |
+| Device open/validation/deadline support fails | Try `/dev/urandom`, then nonblocking Linux `getrandom`. | Startup fails. |
 | Complete initial seed cannot be read | Startup fails; no root output is served. | Startup fails. |
 | Path supplied as empty string | Fallback to the OS CSPRNG may be used. | Configuration is rejected: strict mode requires a nonempty device path. |
 | Source returns 64 bytes, but predictable or defective | Seed is accepted. | Seed is accepted. |
 
-`/dev/urandom` and Go's `crypto/rand.Reader` are **cryptographic OS sources**,
+`/dev/urandom` and Linux `getrandom` are **cryptographic OS sources**,
 not intentionally weak generators. Any legacy fallback description using the word "weak" is misleading. The resolved path in metadata is not
 cryptographic proof of physical-source quality or provenance. Fallback may select an OS CSPRNG, but source metadata reports the actual
 opened reader rather than just the originally requested device.
@@ -151,11 +150,11 @@ open `/dev/urandom`, replace the source, or switch the root to a new device.
    reseed epoch. Long-lived child readers check that epoch before subsequent
    reads and refresh their streams. In-flight reads complete within their
    current generator state.
-5. A source read that blocks indefinitely may never return an error. The
-   readiness age grows stale and the default policy refuses further output
-   independently of that read. `io.ReadFull` on an arbitrary device reader is
-   **not interrupted by context cancellation**. Shutdown does not prove that
-   this worker terminated cleanly.
+5. Each complete startup/reseed read has a configurable deadline, and
+   cancellation interrupts supported pollable source reads. The reseed worker
+   is joined before root cleanup. Unsupported devices are rejected; a broken
+   driver that ignores `O_NONBLOCK` remains an OS/driver boundary, requiring
+   hardware verification. See [source I/O](source-io.md).
 6. Each stream has a configured operational per-key output ceiling
    (`1 << 38` bytes, or 256 GiB). If sufficient state refresh cannot
    occur, generation may eventually fail rather than reuse the same key.
@@ -319,7 +318,7 @@ exposes the relevant capability. No exploit or penetration test is claimed.
 | T02 | Packaged daemon compromise / privilege escape | **High** | Restricted systemd user, capabilities and filesystem/device access | Verify sandbox effectiveness on the target distribution and review optional device overrides. |
 | T03 | Public demo TLS key deployed as real server identity | **High** | Documentation warning | Unique private key, trusted certificate, rotation and restricted permissions. |
 | T04 | Faulty/malicious entropy device emits predictable seed | **High** for security-sensitive output | Complete source read, optional mixing | Hardware/driver evaluation and source health tests; no automatic entropy claims. |
-| T05 | Device disappears or blocks after startup | **Medium–High** availability/freshness | Failure counters, `/ready`, per-key ceiling | Cancellable/time-bounded source abstraction and configurable fail-closed mode. |
+| T05 | Device disappears or blocks after startup | **Medium–High** availability/freshness | Failure counters, `/ready`, per-key ceiling | Validate nonblocking/deadline behavior on the real driver; startup/reseed deadlines and fail-closed generation are implemented. |
 | T06 | Attacker reads process memory or crash dumps | **High** | OS process boundaries | Restrict privileges, diagnostics, dumps; review key lifecycle. |
 | T07 | One client attempts to predict another stream | **Medium** assurance question | Separate derived streams, stream ciphers | External cryptographic review, explicit domain separation and threat-model tests. |
 | T08 | Untrusted clients exhaust CPU, memory or bandwidth | **High** when exposed | Admission reservations and message limits | Rate limits and observed RSS/heap/load tests; distinguish rejection vs capacity. |

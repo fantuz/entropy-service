@@ -141,12 +141,13 @@ The package still does not restart or enable services during installation.
 
 ## Remaining boundaries and verification
 
-The gate does not interrupt an arbitrary kernel/device `Read`, cancel an
-initial seed read before a root exists, reopen a failed device, or make that
-worker join reliably at shutdown. Adding a timeout by abandoning a goroutine
-would leave the original read alive, potentially leak workers, and allow
-concurrent reads of one source. A source-specific cancellable I/O design is
-separate work. The age gate prevents stale serving without claiming that fix.
+Startup/reseed input now has a complete-read deadline and the reseed worker
+is joined on shutdown. Devices must provide nonblocking, pollable reads;
+unsupported drivers are rejected during source selection. The server does not
+reopen a failed device or silently switch a running source. A misbehaving kernel
+driver that ignores nonblocking I/O cannot be made cancellable by Go; real
+hardware verification is still required. See [source I/O and migration](source-io.md).
+
 Likewise, a defective source that returns enough predictable bytes still
 looks fresh; online hardware health and min-entropy assessment remain separate.
 

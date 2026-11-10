@@ -1142,6 +1142,16 @@ func main() {
 		log.Print("Seed source: configured entropy source with optional RDRAND mixing")
 	}
 
+	deadlineSource, ok := qrngdev.(seedDeadlineSource)
+	if !ok {
+		log.Fatal("entropy source does not support bounded reads")
+	}
+
+	boundedSeed := &seedInput{source: deadlineSource, reader: seedReader, timeout: cfg.SourceTimeout}
+	startup.Check("Source read deadline", "OK", fmt.Sprintf("%s per complete seed; nonblocking source", cfg.SourceTimeout))
+
+	seedReader = boundedSeed.Reader(ctx)
+
 	seed := make([]byte, 64)
 	if _, err := io.ReadFull(seedReader, seed); err != nil {
 		log.Fatalf("read root seed: %v", err)
@@ -1251,7 +1261,14 @@ func main() {
 
 	// Run permanent reseed loop
 
-	go reseedLoop(ctx, seedReader, cfg.ReseedMs, cfg.ReseedSize, &root)
+	reseedDone := make(chan struct{})
+	go func() {
+		defer close(reseedDone)
+
+		reseedLoop(ctx, seedReader, cfg.ReseedMs, cfg.ReseedSize, &root)
+	}()
+
+	defer func() { stop(); <-reseedDone }()
 
 	startup.Check("Reseed loop", "OK", fmt.Sprintf("scheduled every %s", time.Duration(cfg.ReseedMs)*time.Millisecond))
 	startup.Value("Health endpoints", "/live (process) /ready (seed freshness)")

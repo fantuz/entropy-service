@@ -40,10 +40,10 @@ func TestSelectEntropySourceStrictAndFallback(t *testing.T) {
 		{name: "strict empty device", require: true, wantError: true},
 		{name: "optional named device", path: configured, wantOrigin: configured, wantCalls: []string{configured}},
 		{name: "fallback to urandom", path: configured, fail: map[string]bool{configured: true}, wantOrigin: DefaultCSPRNG, wantCalls: []string{configured, DefaultCSPRNG}},
-		{name: "fallback to crypto rand", path: configured, fail: map[string]bool{configured: true, DefaultCSPRNG: true}, wantOrigin: sourceGoCryptoRand, wantCalls: []string{configured, DefaultCSPRNG}},
+		{name: "fallback to crypto rand", path: configured, fail: map[string]bool{configured: true, DefaultCSPRNG: true}, wantOrigin: sourceOSFallback, wantCalls: []string{configured, DefaultCSPRNG}},
 		{name: "explicit urandom", path: DefaultCSPRNG, wantOrigin: DefaultCSPRNG, wantCalls: []string{DefaultCSPRNG}},
 		{name: "empty optional chooses urandom", wantOrigin: DefaultCSPRNG, wantCalls: []string{DefaultCSPRNG}},
-		{name: "urandom open failure", path: DefaultCSPRNG, fail: map[string]bool{DefaultCSPRNG: true}, wantOrigin: sourceGoCryptoRand, wantCalls: []string{DefaultCSPRNG}},
+		{name: "urandom open failure", path: DefaultCSPRNG, fail: map[string]bool{DefaultCSPRNG: true}, wantOrigin: sourceOSFallback, wantCalls: []string{DefaultCSPRNG}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string

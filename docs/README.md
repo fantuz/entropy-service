@@ -30,3 +30,5 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Go quality review](go-quality.md) | Go conventions, module/toolchain policy, measured coverage, remaining tests and README badge meanings. |
 
 The reference pages retain the detailed descriptions formerly contained in the README; measurements and API conventions are not rewritten as new guarantees.
+
+[Entropy source I/O deadlines and driver migration](source-io.md).
