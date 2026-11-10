@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/client"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/device"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/terminal"
 )
@@ -30,6 +28,9 @@ type monitorState struct {
 	okSamples     uint64
 	warnSamples   uint64
 	deviceErrors  uint64
+	deviceBytes   uint64
+	deviceFrames  uint64
+	writeout      writeoutSink
 	sampleBytes   int
 	preview       string
 	started       time.Time
@@ -42,6 +43,54 @@ type monitorState struct {
 	graph         *diag.EntropyGraph
 	dashboard     *diag.Dashboard
 	waterfall     *diag.Waterfall
+}
+
+type writeoutSink interface {
+	WriteContext(ctx context.Context, data []byte) (int, error)
+	Close() error
+}
+
+func (m *monitorState) closeWriteout() error {
+	if m.writeout == nil {
+		return nil
+	}
+
+	sink := m.writeout
+
+	m.writeout = nil
+	if err := sink.Close(); err != nil {
+		m.deviceErrors++
+		return fmt.Errorf("writeout: %w", err)
+	}
+
+	return nil
+}
+
+func (m *monitorState) writeFrame(ctx context.Context, data []byte) error {
+	if m.writeout == nil || len(data) == 0 {
+		return nil
+	}
+
+	n, err := m.writeout.WriteContext(ctx, data)
+	if n < 0 || n > len(data) {
+		n, err = 0, errors.New("invalid device write byte count")
+	}
+
+	m.deviceBytes += uint64(n)
+	if err == nil && n == len(data) {
+		m.deviceFrames++
+		return nil
+	}
+
+	if err == nil {
+		err = io.ErrShortWrite
+	}
+
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		m.deviceErrors++
+	}
+
+	return fmt.Errorf("writeout: %w", err)
 }
 
 func analysePayload(data []byte, cfg *config.Config) diag.Diagnostics {
@@ -125,6 +174,10 @@ func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
 	fmt.Fprintf(&summary, "Analysed total     : %.3f MiB\n", float64(m.analysedBytes)/(1<<20))
 	fmt.Fprintf(&summary, "Sample age         : %.3f ms\n", time.Since(m.sampleAt).Seconds()*1000)
 	fmt.Fprintln(&summary, "Statistics cover the last analysed sample.")
+
+	if m.cfg.WriteOut {
+		fmt.Fprintf(&summary, "Device mixed       : %d frames, %.3f MiB (%d errors)\n", m.deviceFrames, float64(m.deviceBytes)/(1<<20), m.deviceErrors)
+	}
 
 	if m.cfg.ShowMatrix {
 		m.latest.TMatrix.PrintHeatmapTo(&summary)
@@ -263,21 +316,22 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 				return stopReason(parent), nil
 			}
 
-			if cfg.WriteOut && len(frame.Data) > 0 {
-				if err := device.Write("/dev/urandom", frame.Data); err != nil {
-					m.deviceErrors++
-
-					log.Println("device write error:", err)
-				}
-			}
-
 			analysed := m.observe(frame, time.Now())
+			writeErr := m.writeFrame(ctx, frame.Data)
 			frame.Release()
 
 			if analysed {
 				if err := report.sample(m); err != nil {
-					return reasonReportError, err
+					return reasonReportError, errors.Join(err, writeErr)
 				}
+			}
+
+			if writeErr != nil {
+				if contextEnded(ctx) && (errors.Is(writeErr, context.Canceled) || errors.Is(writeErr, context.DeadlineExceeded)) {
+					return stopReason(parent), nil
+				}
+
+				return reasonWriteoutError, writeErr
 			}
 		}
 	}

@@ -96,7 +96,7 @@ func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl
 	fmt.Println("Program mode         :", cfg.Mode)
 
 	if cfg.WriteOut {
-		fmt.Println("Write-out to /dev    : " + profile.Paint(Green, "enabled"))
+		fmt.Println("Write-out to /dev    : " + profile.Paint(Green, "enabled (mix only, no entropy credit)"))
 	} else {
 		fmt.Println("Write-out to /dev    : " + profile.Paint(Red, "disabled"))
 	}

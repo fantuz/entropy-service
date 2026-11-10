@@ -144,7 +144,7 @@ Client timing options accept **Go durations**, such as `50ms` or `1s`. Byte coun
 | `-mode` | `pull` | HTTP `pull` or WebSocket `stream`. |
 | `-slice` | `2097152` | Bytes per response/message: 1 byte to 32 MiB. |
 | `-refresh` | `1s` | HTTP request interval or requested server WS interval; minimum 1 ms. |
-| `-writeout` | `false` | Experimental Linux write of every received frame to `/dev/urandom`; does not credit the [kernel's entropy count](https://man7.org/linux/man-pages/man4/random.4.html). |
+| `-writeout` | `false` | Linux-only, uncredited pool mixing via `/dev/urandom`. Normally unnecessary; device errors fail the run. See [value, safeguards and limits](client-writeout.md). |
 
 Transport URLs are listed separately to keep the table readable:
 

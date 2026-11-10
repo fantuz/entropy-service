@@ -139,6 +139,8 @@ type reportCounts struct {
 	ShannonOK       uint64 `json:"shannon_ok_samples"`
 	ShannonWarn     uint64 `json:"shannon_warn_samples"`
 	DeviceErrors    uint64 `json:"device_write_errors"`
+	DeviceBytes     uint64 `json:"device_written_bytes"`
+	DeviceFrames    uint64 `json:"device_written_frames"`
 }
 
 func (m *monitorState) counts() reportCounts {
@@ -146,6 +148,7 @@ func (m *monitorState) counts() reportCounts {
 		ReceivedFrames: m.frames, ReceivedBytes: m.stats.TotalBytes,
 		AnalysedSamples: m.samples, AnalysedBytes: m.analysedBytes,
 		ShannonOK: m.okSamples, ShannonWarn: m.warnSamples, DeviceErrors: m.deviceErrors,
+		DeviceBytes: m.deviceBytes, DeviceFrames: m.deviceFrames,
 	}
 }
 
