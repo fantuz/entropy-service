@@ -119,6 +119,35 @@ correctness or the absence of races outside the exercised cases. The
 pure-Go tests check portable fallback code on the host architecture; they
 do not replace execution on ARM hardware.
 
+### Follow-up coverage, 2026-11-10
+
+The UI/coverage follow-up, measured with Go 1.26.10 on Linux amd64 against
+the client-waterfall baseline (`c72da4b`), exercises 2,533 of the same 3,072
+instrumented statements, up from 2,362. Both measurements use the combined
+`make coverage` profile, including indirect calls from command tests.
+
+| Area | Before | After |
+| --- | ---: | ---: |
+| Whole Go module | 76.9% | 82.5% |
+| Client command | 71.4% | 86.9% |
+| Client diagnostics | 60.2% | 87.5% |
+| Server command | 76.8% | 79.7% |
+
+The added tests check verified TLS 1.3 and HTTP startup, functional responses,
+shutdown and occupied/invalid listen addresses; actual periodic activity
+counter collection; preflight over both transports; optional monitor panels
+using the selected analysis prefix; bounded diagnostic history, sparkline
+levels, histogram boundaries and transition probabilities. Unused helpers
+and forced low-level failures were not added merely to raise the percentage.
+
+Go coverage does not include browser JavaScript. `node scripts/test-theme.mjs`
+separately checks preference detection, persistence, blocked storage,
+cross-tab events and shared page/help contracts. The real Chromium suite
+`python3 scripts/test_theme_browser.py` exercises 48 page/theme/viewport
+combinations plus navigation persistence, cached-page help reset and frozen
+plot repainting. See [the browser guide](browser-ui.md#shared-light-and-dark-appearance)
+for commands and prerequisites.
+
 The quality update addresses these concrete gaps:
 
 - TLS certificate loading returns wrapped errors to the caller. HTTPS

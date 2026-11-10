@@ -4,6 +4,51 @@ The embedded homepage is available at `/` on the configured HTTP or HTTPS addres
 It displays interactive demonstrations and links to the original HTTP/WebSocket APIs.
 There is no separate `/web` HTTP prefix; the assets are embedded in `entropy-server`.
 
+## Shared light and dark appearance
+
+Every showcase, lab, status page and HTTP word response uses the same embedded
+stylesheet and small appearance controller. The standard light view and dark
+view share typography, spacing, controls, borders and status colors. There
+are no external fonts, UI libraries or additional analysis features.
+
+The **Dark mode** button in the top toolbar switches appearance. The initial
+choice follows the operating system; a manual choice is saved for this browser
+and server origin and applied before the stylesheet paints. It survives
+navigation and reloads and synchronizes between tabs. If browser storage is
+disabled, the switch still works for the current page. OS changes are followed
+until a manual choice is made.
+
+Plot labels, guides and bit-balance colors follow the theme, including frozen
+samples. Raw RGB, grayscale, bit views, histogram values and statistical
+results stay unchanged. The Colours demo keeps its sampled color inside the
+digest swatch, with contrasting digest text; page controls retain the selected
+appearance. Bytes and Words no longer recolor the page background.
+
+Source Lab and Socket Lab keep their experimental status in their descriptions.
+Both use the same three initially closed help sections: Connect entropy-server
+instances, HTTP body fetch, and Source notes. The first two link to the Socket
+Lab for those operations; copying guidance does not add unsupported source
+adapters to the Source Lab. Help resets closed on page entry and cached-page
+restoration. Shared markup lives in `webtemplates/lab-help.html`; regenerate
+it with `node scripts/render-analysis-pages.mjs`.
+
+Checks:
+
+```sh
+node scripts/test-theme.mjs
+node scripts/test-web-layout.mjs
+node scripts/render-analysis-pages.mjs --check
+make build-server
+# Requires Python Playwright and its Chromium browser.
+python3 scripts/test_theme_browser.py --artifacts /tmp/entropy-theme-browser
+```
+
+The Chromium suite checks all 12 views in both themes at 1440×1000 and 390×844
+(48 combinations), disclosure interaction/reload/restoration, saved settings,
+cross-tab updates, blocked storage, and frozen canvas repainting. Screenshots
+and machine-readable results are written to the artifact directory. Set
+`PLAYWRIGHT_BROWSERS_PATH` when using a non-default browser installation.
+
 ## Endpoint gallery
 
 Open `/api-gallery.html` for a framed view of these existing HTTP responses:
@@ -276,7 +321,7 @@ unaffected.
 
 ## Byte, colour and upload presentation
 
-`/api-bytes.html` uses the common Matrix theme for its hexadecimal, Base64
+`/api-bytes.html` uses the common light/dark theme for its hexadecimal, Base64
 and SHA-256 fields rather than an old inline stylesheet. Base64 remains
 in a centered, width-limited box with justified wrapped lines and a centered
 last line. CSS changes no characters, spaces or padding in the copyable sample.

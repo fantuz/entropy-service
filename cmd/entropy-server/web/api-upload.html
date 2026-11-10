@@ -3,11 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light dark">
   <title>Entropy Service — File Analysis</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-analysis page-analysis-lab page-upload">
+  <nav class="site-toolbar" aria-label="Site and appearance">
+    <a href="/">Entropy Service</a>
+    <button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button>
+  </nav>
   <main class="panel analysis-panel">
     <h1>File Analysis</h1>
     <p>Upload a file for server analysis and full-file SHA-256 (maximum 32 MiB).

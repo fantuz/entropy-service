@@ -92,6 +92,12 @@ func TestWordPageCountAndCookie(t *testing.T) {
 				t.Fatalf("status=%d body=%s", w.Code, w.Body)
 			}
 
+			if !strings.Contains(w.Body.String(), `src="/theme.js"`) ||
+				!strings.Contains(w.Body.String(), `href="/theme.css"`) ||
+				!strings.Contains(w.Body.String(), "data-theme-toggle") || strings.Contains(w.Body.String(), "<style>") {
+				t.Fatal("HTTP word responses must share the web appearance and toggle")
+			}
+
 			words := wordPattern.FindStringSubmatch(w.Body.String())
 
 			hash := hashPattern.FindStringSubmatch(w.Body.String())

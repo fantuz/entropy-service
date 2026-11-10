@@ -1,7 +1,15 @@
 "use strict";
 
 (() => {
-    const color = {grid: "#24513c", text: "#a6c7b9", green: "#42f5a2", cyan: "#7ee6cf", pale: "#a7ffcd", warn: "#ffd27e"};
+    let color;
+    function updatePalette() {
+        const style = getComputedStyle(document.documentElement);
+        const value = name => style.getPropertyValue(name).trim();
+        color = {grid: value("--border"), text: value("--muted"), green: value("--green"),
+            cyan: value("--cyan"), warn: value("--warn"), zero: value("--plot-zero"), one: value("--plot-one")};
+    }
+    updatePalette();
+    window.addEventListener("entropythemechange", updatePalette);
     function prepare(canvas) {
         const rect = canvas.getBoundingClientRect();
         const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
@@ -119,7 +127,7 @@
         if (!total) return;
         const x = width / 2, y = height / 2, radius = Math.min(width, height) / 2 - 8;
         const cut = 2 * Math.PI * zeros / total;
-        for (const [start, end, fill] of [[0, cut, "#145b41"], [cut, 2 * Math.PI, "#a7ffcd"]]) {
+        for (const [start, end, fill] of [[0, cut, color.zero], [cut, 2 * Math.PI, color.one]]) {
             ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, radius, start, end); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
         }
     }

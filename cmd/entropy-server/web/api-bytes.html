@@ -3,11 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light dark">
   <title>Entropy Service — Random Bytes</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-bytes" data-entropy-view="bytes">
+  <nav class="site-toolbar" aria-label="Site and appearance">
+    <a href="/">Entropy Service</a>
+    <button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button>
+  </nav>
   <main class="panel">
     <p id="stream-notice" class="stream-notice" role="status" aria-live="polite"
        data-state="waiting">AWAITING FIRST SAMPLE</p>

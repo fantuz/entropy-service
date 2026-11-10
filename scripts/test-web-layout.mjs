@@ -14,7 +14,7 @@ function simulateFrame(view, frame) {
         currentScript: {src: "http://localhost/entropy-display.js"},
         getElementById(id) {
             if (!elements.has(id)) {
-                elements.set(id, {textContent: "", hidden: false, dataset: {}});
+                elements.set(id, {textContent: "", hidden: false, dataset: {}, style: {}});
             }
             return elements.get(id);
         },
@@ -37,7 +37,8 @@ function simulateFrame(view, frame) {
     });
     assert.equal(workers.length, 1);
     workers[0].onmessage({data: {type: "frame", ...frame}});
-    return {value: id => document.getElementById(id).textContent, style: document.body.style, worker: workers[0]};
+    return {value: id => document.getElementById(id).textContent, style: document.body.style,
+        swatch: document.getElementById("hash").style, worker: workers[0]};
 }
 
 const hash = "0123456789abcdef".repeat(4);
@@ -46,10 +47,15 @@ const colors = simulateFrame("colors", frame);
 assert.equal(colors.value("hash"), hash.slice(0, 32) + "\n" + hash.slice(32));
 assert.equal(colors.value("hash").split("\n").length, 2);
 assert.ok(colors.value("hash").split("\n").every(part => part.length === 32));
+assert.equal(colors.swatch.backgroundColor, "rgb(0.5,17.5,34.5)");
+assert.equal(colors.swatch.color, "#fff");
+assert.equal(colors.style.backgroundColor, undefined, "page chrome follows the selected theme");
+assert.equal(simulateFrame("colors", {...frame, hash: "f".repeat(64)}).swatch.color, "#000", "bright sample swatches need dark digest text");
 const bytes = simulateFrame("bytes", frame);
 assert.equal(bytes.value("hash"), hash);
 assert.equal(bytes.value("base64"), "ESI=");
 assert.equal(bytes.value("hex"), "11 22");
+assert.equal(bytes.style.backgroundColor, undefined);
 
 // The old inline CSS hid the shared Base64 layout; the new page must use only
 // the common stylesheet. The WebSocket path labels must be flex-pinned.

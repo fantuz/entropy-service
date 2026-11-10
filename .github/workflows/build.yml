@@ -79,6 +79,8 @@ jobs:
         run: node scripts/render-analysis-pages.mjs --check
       - name: Test browser layout and digest formatting
         run: node scripts/test-web-layout.mjs
+      - name: Test shared appearance and lab help
+        run: node scripts/test-theme.mjs
       - name: Test synchronized HTTP gallery
         run: node scripts/test_gallery.mjs
       - name: Test statistical capture and report contracts

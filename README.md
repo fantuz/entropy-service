@@ -341,11 +341,25 @@ Available features are documented above. The following are follow-up work or ide
 
 ### Current browser interface (November 2026)
 
-The following screenshots capture the Matrix-inspired homepage and stream-analysis layout from the November 2026 UI revision. They are representative examples rather than a guarantee of pixel-identical appearance on later releases.
+The same compact interface is available in light and dark. Use **Dark mode**
+in the toolbar; the choice is remembered across pages. Plot labels follow the
+theme while sample colors and statistics keep their meaning.
+
+| Standard / light | Dark |
+| --- | --- |
+| ![Light interface](docs/images/interface-light.png) | ![Dark interface](docs/images/interface-dark.png) |
+
+<details>
+<summary>Earlier November 2026 interface</summary>
+
+These screenshots show the earlier Matrix-inspired appearance; routes and
+analysis controls remain available in the shared light/dark interface.
 
 [![Homepage — curated API and demonstration navigation](docs/images/homepage-preview.webp)](docs/images/homepage.webp)
 
 [![Stream analysis — histogram, bit balance, waveform and FFT](docs/images/stream-analysis-preview.webp)](docs/images/stream-analysis.webp)
+
+</details>
 
 
 The project began as a demonstration around an older Quantis PCI QRNG, with driver adaptation for newer Linux kernels. Hardware-driver maintenance is separate from this Go suite. The service can also run with the OS CSPRNG and no external card.

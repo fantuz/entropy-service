@@ -467,32 +467,23 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes int, hasCookie bool, budget *httpRequestBudget) http.HandlerFunc {
 	page := template.Must(template.New("page").Parse(`
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="refresh" content="{{.Refresh}}">
-<style>
-body {
-	background-color: black;
-	color: #00ff88;
-	font-family: monospace;
-	text-align: center;
-	padding-top: 10%;
-}
-.words {
-	font-size: 2em;
-	letter-spacing: 2px;
-}
-.hash {
-	margin-top: 30px;
-	font-size: 0.8em;
-	color: #444;
-}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Entropy Service — Random Words</title>
+<script src="/theme.js"></script>
+<link rel="stylesheet" href="/theme.css">
 </head>
-<body>
+<body class="page-word-response">
+<nav class="site-toolbar" aria-label="Site and appearance"><a href="/">Entropy Service</a><button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button></nav>
+<main class="panel">
+<h1>Random Words</h1>
 <div class="words">{{.Words}}</div>
 <div class="hash">{{.Hash}}</div>
+</main>
 </body>
 </html>
 `))
