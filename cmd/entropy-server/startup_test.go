@@ -55,6 +55,7 @@ func TestHTTPAndHTTPSStartupServeAndShutdown(t *testing.T) {
 			}
 
 			t.Cleanup(func() { _ = server.Close() })
+
 			if server.listenAddr != address {
 				t.Fatalf("reported listener %q differs from bound address %q", server.listenAddr, address)
 			}

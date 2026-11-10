@@ -31,6 +31,9 @@ type monitorState struct {
 	deviceBytes   uint64
 	deviceFrames  uint64
 	writeout      writeoutSink
+	outputBytes   uint64
+	outputFrames  uint64
+	outputErrors  uint64
 	sampleBytes   int
 	preview       string
 	started       time.Time
@@ -59,7 +62,7 @@ func (m *monitorState) closeWriteout() error {
 
 	m.writeout = nil
 	if err := sink.Close(); err != nil {
-		m.deviceErrors++
+		m.countOutputError()
 		return fmt.Errorf("writeout: %w", err)
 	}
 
@@ -71,14 +74,35 @@ func (m *monitorState) writeFrame(ctx context.Context, data []byte) error {
 		return nil
 	}
 
-	n, err := m.writeout.WriteContext(ctx, data)
-	if n < 0 || n > len(data) {
-		n, err = 0, errors.New("invalid device write byte count")
+	frameBytes := len(data)
+
+	if m.cfg.OutputBytes > 0 {
+		if m.outputBytes >= uint64(m.cfg.OutputBytes) {
+			return nil
+		}
+
+		remaining := uint64(m.cfg.OutputBytes) - m.outputBytes
+		data = data[:min(uint64(len(data)), remaining)]
 	}
 
-	m.deviceBytes += uint64(n)
+	n, err := m.writeout.WriteContext(ctx, data)
+	if n < 0 || n > len(data) {
+		n, err = 0, errors.New("invalid output write byte count")
+	}
+
+	m.outputBytes += uint64(n)
+	if m.cfg.WriteOut || m.cfg.OutputDevice != "" {
+		m.deviceBytes += uint64(n)
+	}
+
 	if err == nil && n == len(data) {
-		m.deviceFrames++
+		if n == frameBytes {
+			m.outputFrames++
+			if m.cfg.WriteOut || m.cfg.OutputDevice != "" {
+				m.deviceFrames++
+			}
+		}
+
 		return nil
 	}
 
@@ -87,10 +111,17 @@ func (m *monitorState) writeFrame(ctx context.Context, data []byte) error {
 	}
 
 	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-		m.deviceErrors++
+		m.countOutputError()
 	}
 
 	return fmt.Errorf("writeout: %w", err)
+}
+
+func (m *monitorState) countOutputError() {
+	m.outputErrors++
+	if m.cfg.WriteOut || m.cfg.OutputDevice != "" {
+		m.deviceErrors++
+	}
 }
 
 func analysePayload(data []byte, cfg *config.Config) diag.Diagnostics {
@@ -182,6 +213,8 @@ func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
 
 	if m.cfg.WriteOut {
 		fmt.Fprintf(&summary, "Device mixed       : %d frames, %.3f MiB (%d errors)\n", m.deviceFrames, float64(m.deviceBytes)/(1<<20), m.deviceErrors)
+	} else if m.cfg.OutputEnabled() {
+		fmt.Fprintf(&summary, "Output written     : %d bytes, %d full frames (%d errors)\n", m.outputBytes, m.outputFrames, m.outputErrors)
 	}
 
 	if m.cfg.ShowMatrix {
@@ -371,6 +404,10 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 				}
 
 				return reasonWriteoutError, writeErr
+			}
+
+			if cfg.OutputBytes > 0 && m.outputBytes >= uint64(cfg.OutputBytes) {
+				return reasonOutputLimit, nil
 			}
 		}
 	}

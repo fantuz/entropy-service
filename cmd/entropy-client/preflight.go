@@ -28,6 +28,9 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Value("Measurement duration", fmt.Sprintf("%s (0 = until interrupted; excludes preflight)", cfg.Duration))
 	r.Value("JSONL report", cfg.ReportPath)
 	r.Value("Write-out /dev/urandom", fmt.Sprintf("%t (mix only; no entropy credit)", cfg.WriteOut))
+	r.Value("Raw output", cfg.OutputKind())
+	r.Value("Output file / device", cfg.OutputPath+cfg.OutputDevice)
+	r.Value("Output byte limit", fmt.Sprintf("%d (0 = until duration/interruption)", cfg.OutputBytes))
 	r.Section("Display")
 	r.Value("Terminal", fmt.Sprintf("%d columns x %d rows; interactive=%t", profile.Columns, profile.Rows, profile.Interactive))
 	r.Value("Layout / color", fmt.Sprintf("%s / %s", cfg.Layout, cfg.Color))
@@ -39,6 +42,7 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Value("Waterfall bounds", fmt.Sprintf("%d columns x %d rows (0 = auto)", cfg.WaterfallColumns, cfg.WaterfallRows))
 	r.Section("Pre-flight diagnostics")
 	r.Check("Configuration", "OK", "flags, sampling and display limits validated")
+
 	if len(data) > 0 {
 		r.Check("Selected transport", "OK", "data received from the selected endpoint")
 	} else {

@@ -179,12 +179,20 @@ random device (including partial frames) and `device_written_frames` counts
 complete writes. Device errors now fail the run; normal cancellation can
 leave a partially written frame. See [write-out semantics and limited value](client-writeout.md).
 
+[Raw exports](client-output.md) also support files, stdout/SSH pipes and explicit
+Linux devices. `settings.output_kind` and `settings.output_limit_bytes` record
+the export policy without disclosing destination paths. All destinations use
+`output_written_bytes`, `output_written_frames` and `output_write_errors`;
+legacy `device_*` counters apply only to device destinations. A byte-limited
+final prefix counts as bytes but not as an entire exported frame. Reception
+and analysis retain their independent counts.
+
 Summary fields also include:
 
 | Field | Meaning |
 | --- | --- |
-| `termination` | `duration`, `interrupted`, `startup_error`, `transport_error`, `writeout_error`, or `report_error`. |
-| `failed` | Whether the run encountered a fatal startup, transport or report error before summary writing. |
+| `termination` | `duration`, `interrupted`, `output_limit`, `startup_error`, `transport_error`, `writeout_error`, or `report_error`. |
+| `failed` | Whether the run encountered a fatal startup, transport, output or report error before summary writing. |
 | `measurement_began` | False when preflight failed or was interrupted. |
 | `elapsed_ms` | Measurement wall time through connection cleanup; zero if measurement did not begin. |
 | `total_elapsed_ms` | Run wall time, including preflight, up to summary writing. |

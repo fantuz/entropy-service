@@ -61,3 +61,24 @@ func TestLinuxMixOnlyOptIn(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestExplicitDeviceDestinationPolicy(t *testing.T) {
+	for _, path := range []string{"/dev/zero", "/dev/full", "/dev/mem", filepath.Join(t.TempDir(), "missing")} {
+		if w, err := OpenDestination(path); err == nil || w != nil {
+			t.Fatalf("accepted unsupported device %s", path)
+		}
+	}
+
+	w, err := OpenDestination("/dev/null")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n, err := w.WriteContext(t.Context(), []byte{0, 1, 2, 3}); n != 4 || err != nil {
+		t.Fatalf("null export: %d %v", n, err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

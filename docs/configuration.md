@@ -145,6 +145,9 @@ Client timing options accept **Go durations**, such as `50ms` or `1s`. Byte coun
 | `-slice` | `2097152` | Bytes per response/message: 1 byte to 32 MiB. |
 | `-refresh` | `1s` | HTTP request interval or requested server WS interval; minimum 1 ms. |
 | `-writeout` | `false` | Linux-only, uncredited pool mixing via `/dev/urandom`. Normally unnecessary; device errors fail the run. See [value, safeguards and limits](client-writeout.md). |
+| `-output` | empty | Raw bytes to a new private file, or `-` for stdout with `-headless` on Linux. Stdout cannot also carry JSONL. See [exports and SSH examples](client-output.md). |
+| `-output-device` | empty | Explicit Linux `/dev/random`, `/dev/urandom` or `/dev/null`; validated device identity, no entropy credit. Choose one destination across this flag, `-output` and `-writeout`. |
+| `-output-bytes` | `0` | Stop after this many bytes have been exported; zero runs until duration/interruption. Requires an enabled destination. A byte limit can clip the final frame. |
 
 Transport URLs are listed separately to keep the table readable:
 

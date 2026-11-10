@@ -1,4 +1,4 @@
-// Package device mixes bytes into Linux's random input pool without crediting entropy.
+// Package device writes to validated Linux random and null devices without entropy credit.
 package device
 
 import (
@@ -10,7 +10,7 @@ import (
 
 const writeChunk = 32 * 1024
 
-// Writer owns one validated /dev/urandom descriptor. Use it from one goroutine;
+// Writer owns one validated device descriptor. Use it from one goroutine;
 // Close must follow WriteContext, rather than racing an in-flight write.
 type Writer struct {
 	file io.WriteCloser
@@ -21,7 +21,7 @@ type Writer struct {
 // for a kernel system call. No entropy-crediting ioctl is used.
 func (w *Writer) WriteContext(ctx context.Context, data []byte) (int, error) {
 	if w == nil || w.file == nil {
-		return 0, fmt.Errorf("write /dev/urandom: %w", os.ErrClosed)
+		return 0, fmt.Errorf("write output device: %w", os.ErrClosed)
 	}
 
 	written := 0
@@ -35,16 +35,16 @@ func (w *Writer) WriteContext(ctx context.Context, data []byte) (int, error) {
 
 		n, err := w.file.Write(chunk)
 		if n < 0 || n > len(chunk) {
-			return written, fmt.Errorf("write /dev/urandom: invalid byte count %d", n)
+			return written, fmt.Errorf("write output device: invalid byte count %d", n)
 		}
 
 		written += n
 		if err != nil {
-			return written, fmt.Errorf("write /dev/urandom: %w", err)
+			return written, fmt.Errorf("write output device: %w", err)
 		}
 
 		if n != len(chunk) {
-			return written, fmt.Errorf("write /dev/urandom: %w", io.ErrShortWrite)
+			return written, fmt.Errorf("write output device: %w", io.ErrShortWrite)
 		}
 
 		data = data[n:]
@@ -62,7 +62,7 @@ func (w *Writer) Close() error {
 
 	w.file = nil
 	if err := file.Close(); err != nil {
-		return fmt.Errorf("close /dev/urandom: %w", err)
+		return fmt.Errorf("close output device: %w", err)
 	}
 
 	return nil

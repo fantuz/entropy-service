@@ -89,6 +89,8 @@ jobs:
         run: |
           make build-client
           python3 scripts/test_client_terminal.py
+      - name: Smoke-test client binary exports and pipe cancellation
+        run: python3 scripts/test_client_output.py
       - name: Race-test all Go packages
         run: make test-race
       - name: Smoke-test packaged service configuration

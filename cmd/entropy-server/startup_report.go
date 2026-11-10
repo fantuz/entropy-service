@@ -58,12 +58,12 @@ func reportTLS(r *console.Report, cfg *tls.Config, now time.Time) {
 		return
 	}
 
-	r.Check("TLS key pair", "OK", "loaded; TLS 1.3 minimum")
-
 	if len(cfg.Certificates) == 0 || len(cfg.Certificates[0].Certificate) == 0 {
 		r.Check("Certificate dates", "WARN", "no loaded leaf certificate")
 		return
 	}
+
+	r.Check("TLS key pair", "OK", "loaded; TLS 1.3 minimum")
 
 	cert, err := x509.ParseCertificate(cfg.Certificates[0].Certificate[0])
 	if err != nil {
