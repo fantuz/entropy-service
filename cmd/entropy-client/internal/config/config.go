@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"time"
@@ -57,57 +58,79 @@ type Config struct {
 const MaxRetryDelay = 30 * time.Second
 
 func ParseConfig() *Config {
+	cfg, err := parseConfig(os.Args[1:], os.Stderr)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
+		}
+
+		os.Exit(2)
+	}
+
+	return cfg
+}
+
+func parseConfig(args []string, output io.Writer) (*Config, error) {
 	cfg := &Config{}
+	flags := flag.NewFlagSet("entropy-client", flag.ContinueOnError)
+	flags.SetOutput(output)
 
-	flag.Int64Var(&cfg.Slice, "slice", 2097152, "raw bytes per response/message (1..33554432)")
-	flag.BoolVar(&cfg.WriteOut, "writeout", false, "Linux only: mix received bytes into /dev/urandom without entropy credit; fail on device errors (normally unnecessary)")
-	flag.StringVar(&cfg.OutputPath, "output", "", "export raw received bytes to a new 0600 file; - uses stdout with -headless (e.g. an SSH pipe)")
-	flag.StringVar(&cfg.OutputDevice, "output-device", "", "Linux only: export to a validated /dev/random, /dev/urandom or /dev/null device; no entropy credit")
-	flag.Int64Var(&cfg.OutputBytes, "output-bytes", 0, "stop after exporting this many bytes (0 = until duration/interruption); requires an output destination or -writeout")
-	flag.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
+	flags.Int64Var(&cfg.Slice, "slice", 2097152, "raw bytes per response/message (1..33554432)")
+	flags.BoolVar(&cfg.WriteOut, "writeout", false, "Linux only: mix received bytes into /dev/urandom without entropy credit; fail on device errors (normally unnecessary)")
+	flags.StringVar(&cfg.OutputPath, "output", "", "export raw received bytes to a new 0600 file; - uses stdout with -headless (e.g. an SSH pipe)")
+	flags.StringVar(&cfg.OutputDevice, "output-device", "", "Linux only: export to a validated /dev/random, /dev/urandom or /dev/null device; no entropy credit")
+	flags.Int64Var(&cfg.OutputBytes, "output-bytes", 0, "stop after exporting this many bytes (0 = until duration/interruption); requires an output destination or -writeout")
+	flags.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
 
-	flag.BoolVar(&cfg.ShowPreview, "preview", false, "print hex preview of first 64 bytes")
-	flag.BoolVar(&cfg.ShowMatrix, "matrix", false, "print 64x64 matrix")
-	flag.BoolVar(&cfg.ShowGraph, "graph", false, "print distribution graph")
-	flag.BoolVar(&cfg.ShowDashboard, "dashboard", false, "print dashboard summaries")
-	flag.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
-	flag.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
-	flag.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
-	flag.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..256; two terminal columns per cell)")
-	flag.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..64; newest first)")
-	flag.StringVar(&cfg.Color, "color", "auto", "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
-	flag.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full; auto uses panels on large interactive terminals")
+	flags.BoolVar(&cfg.ShowPreview, "preview", false, "print hex preview of first 64 bytes")
+	flags.BoolVar(&cfg.ShowMatrix, "matrix", false, "print 64x64 matrix")
+	flags.BoolVar(&cfg.ShowGraph, "graph", false, "print distribution graph")
+	flags.BoolVar(&cfg.ShowDashboard, "dashboard", false, "print dashboard summaries")
+	flags.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
+	flags.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
+	flags.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
+	flags.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..256; two terminal columns per cell)")
+	flags.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..64; newest first)")
+	flags.StringVar(&cfg.Color, "color", "auto", "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
+	flags.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full; auto uses panels on large interactive terminals")
 
-	flag.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
-	flag.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
-	flag.DurationVar(&cfg.AnalysisInterval, "analysis-interval", 250*time.Millisecond, "minimum interval between analysed frames; 0 analyses every frame")
-	flag.DurationVar(&cfg.DisplayInterval, "display-interval", time.Second, "terminal redraw interval, independent of reception (interactive maximum 20 FPS)")
-	flag.Float64Var(&cfg.ShannonThreshold, "shannon-threshold", diag.DefaultShannonThreshold, "minimum empirical Shannon entropy for OK, in bits/byte (0..8)")
-	flag.DurationVar(&cfg.Duration, "duration", 0, "measurement duration, excluding interactive preflight (0 = until interrupted)")
-	flag.StringVar(&cfg.ReportPath, "report", "", "write JSONL to a new file; - writes to stdout with -headless")
-	flag.BoolVar(&cfg.Headless, "headless", false, "disable terminal output and interactive preflight")
-	flag.StringVar(&cfg.Mode, "mode", "pull", "Preferred mode: pull|stream (HTTP vs websocket)")
-	flag.IntVar(&cfg.Retries, "retries", 0, "Maximum total transport retries per measured run (0..100; default 0 fails immediately)")
-	flag.DurationVar(&cfg.RetryDelay, "retry-delay", time.Second, "Initial retry delay (1ms..30s); exponential backoff capped at 30s, with jitter")
+	flags.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
+	flags.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
+	flags.DurationVar(&cfg.AnalysisInterval, "analysis-interval", 250*time.Millisecond, "minimum interval between analysed frames; 0 analyses every frame")
+	flags.DurationVar(&cfg.DisplayInterval, "display-interval", time.Second, "terminal redraw interval, independent of reception (interactive maximum 20 FPS)")
+	flags.Float64Var(&cfg.ShannonThreshold, "shannon-threshold", diag.DefaultShannonThreshold, "minimum empirical Shannon entropy for OK, in bits/byte (0..8)")
+	flags.DurationVar(&cfg.Duration, "duration", 0, "measurement duration, excluding interactive preflight (0 = until interrupted)")
+	flags.StringVar(&cfg.ReportPath, "report", "", "write JSONL to a new file; - writes to stdout with -headless")
+	flags.BoolVar(&cfg.Headless, "headless", false, "disable terminal output and interactive preflight")
+	flags.StringVar(&cfg.Mode, "mode", "pull", "Preferred mode: pull|stream (HTTP vs websocket)")
+	flags.IntVar(&cfg.Retries, "retries", 0, "Maximum total transport retries per measured run (0..100; default 0 fails immediately)")
+	flags.DurationVar(&cfg.RetryDelay, "retry-delay", time.Second, "Initial retry delay (1ms..30s); exponential backoff capped at 30s, with jitter")
 
-	flag.StringVar(&cfg.HTTPUrl, "url", "http://127.0.0.1:8080/v1/data/random", "HTTP entropy endpoint (supports existing query parameters)")
-	flag.StringVar(&cfg.WSUrl, "wsurl", "ws://127.0.0.1:8080/stream", "WS entropy endpoint (supports existing query parameters)")
+	flags.StringVar(&cfg.HTTPUrl, "url", "http://127.0.0.1:8080/v1/data/random", "HTTP entropy endpoint (supports existing query parameters)")
+	flags.StringVar(&cfg.WSUrl, "wsurl", "ws://127.0.0.1:8080/stream", "WS entropy endpoint (supports existing query parameters)")
 
 	/*
-		flag.IntVar(&cfg.MaxWords, "words", 20, "Default number of words presented by /words endpoint (maximum 20)")
+		flags.IntVar(&cfg.MaxWords, "words", 20, "Default number of words presented by /words endpoint (maximum 20)")
 		fps := strconv.FormatInt(refresh.Milliseconds(), 10)
 	*/
 
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Entropy Client\n\n")
-		fmt.Fprintf(os.Stderr, "Usage:\n  %s [options]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Options:\n")
-		flag.PrintDefaults()
+	flags.Usage = func() {
+		fmt.Fprint(output, "Entropy Client\n\nUsage:\n  entropy-client [options]\n\nOptions:\n")
+		flags.PrintDefaults()
 	}
 
-	flag.Parse()
+	if err := flags.Parse(args); err != nil {
+		return nil, err
+	}
 
-	return cfg
+	if flags.NArg() != 0 {
+		err := errors.New("unexpected positional arguments; use -flag=false or -flag=true for boolean values")
+		fmt.Fprintln(output, err)
+
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 func (cfg *Config) ValidateAnalysis() error {

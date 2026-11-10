@@ -1,30 +1,26 @@
 package config
 
 import (
-	"flag"
-	"os"
+	"io"
 	"testing"
 	"time"
 )
 
 func TestDisplayFlags(t *testing.T) {
-	originalFlags, originalArgs := flag.CommandLine, os.Args
-
-	t.Cleanup(func() { flag.CommandLine, os.Args = originalFlags, originalArgs })
-
 	for _, args := range [][]string{
-		{"entropy-client"},
-		{"entropy-client", "-waterfall", "-waterfall-mode=rgb", "-waterfall-columns=128", "-waterfall-rows=32", "-color=256"},
+		{},
+		{"-waterfall", "-waterfall-mode=rgb", "-waterfall-columns=128", "-waterfall-rows=32", "-color=256"},
 	} {
-		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-		os.Args = args
-		cfg := ParseConfig()
+		cfg, err := parseConfig(args, io.Discard)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if err := cfg.ValidateAnalysis(); err != nil {
 			t.Fatal(err)
 		}
 
-		if len(args) == 1 {
+		if len(args) == 0 {
 			if cfg.ShowWaterfall || cfg.WaterfallMode != "byte" || cfg.WaterfallColumns != 0 || cfg.WaterfallRows != 0 || cfg.Color != "auto" || cfg.Layout != "auto" {
 				t.Fatalf("incorrect display defaults: %+v", cfg)
 			}
