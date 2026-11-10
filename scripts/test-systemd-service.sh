@@ -151,6 +151,9 @@ systemd-run --quiet --wait --collect --unit="entropy-cert-fixture-$$" \
 expired=$(identity "$state/expired-cert.pem")
 write_override expired
 if systemctl restart entropy-server; then fail 'Expired certificate was accepted at startup.'; fi
+# Reset while the failed/restarting unit is still loaded, then cancel its restart.
+# After stop + daemon-reload, systemd may have already garbage-collected the unit.
+systemctl reset-failed entropy-server
 systemctl stop entropy-server
 [[ -z $(ss -H -ltn '( sport = :8080 or sport = :8443 )') ]] || fail 'TLS provisioning failure left a listener active.'
 [[ $(identity "$state/expired-cert.pem") == "$expired" ]] || fail 'Expired identity was silently replaced.'
@@ -160,7 +163,6 @@ grep -q 'not currently valid' "$work/journal.log" || fail 'Expected expiry diagn
 # Roll back to the retained, still-valid pair and prove trust works again.
 cp "$work/previous-override.conf" "$override"
 systemctl daemon-reload
-systemctl reset-failed entropy-server
 systemctl start entropy-server
 wait_ready --cacert "$work/previous-public-cert.pem" https://127.0.0.1:8443/ready
 [[ $(identity "$state/current-cert.pem") == "$first" ]] || fail 'Rollback changed the retained identity.'
