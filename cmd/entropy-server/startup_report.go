@@ -29,6 +29,7 @@ func serverInvocation(out io.Writer, cfg *config.Config) *console.Report {
 	r.Value("Require device", cfg.RequireDevice)
 	r.Value("DRBG backend", cfg.DRBG)
 	r.Value("CPU / RDRAND mixing", fmt.Sprintf("%t / %t (CPU takes precedence)", cfg.MixCPU, cfg.MixRDRAND))
+	r.Value("Source read timeout", cfg.SourceTimeout)
 	r.Value("Reseed size", fmt.Sprintf("%d bytes", cfg.ReseedSize))
 	r.Value("Reseed interval", time.Duration(cfg.ReseedMs)*time.Millisecond)
 	r.Value("Maximum seed age", time.Duration(cfg.MaxReseedAgeMs)*time.Millisecond)
@@ -99,7 +100,7 @@ func reportSource(r *console.Report, requested, actual string) {
 		r.Check("Source selection", "WARN", "configured device unavailable; using operating-system CSPRNG fallback")
 	}
 
-	if actual == DefaultCSPRNG || actual == sourceGoCryptoRand {
+	if actual == DefaultCSPRNG || actual == sourceOSFallback {
 		r.Value("Source type", "operating-system CSPRNG")
 	} else {
 		r.Value("Source type", "character device; quality not independently verified")

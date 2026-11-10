@@ -40,6 +40,7 @@ type Config struct {
 	ReseedMs          int
 	MaxReseedAgeMs    int
 	ReseedSize        int
+	SourceTimeout     time.Duration
 	MaxBytes          int
 	QRNGBuffer        int
 	SeedBuffer        int
@@ -94,6 +95,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.HTTPSAddr, "https", ":8443", "HTTPS listen address")
 	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "TLS certificate chain PEM file (provision your own; see generate-cert -help)")
 	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "TLS private key PEM file matching cert-file; keep owner-only")
+	flags.DurationVar(&cfg.SourceTimeout, "source-timeout", 3*time.Second, "Deadline for each complete startup/reseed read (1ms..5m); hardware must support nonblocking read deadlines")
 	flags.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
 	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; barzakh-521-experimental requires -tags=experimental_barzakh")
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
@@ -128,7 +130,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		fmt.Fprintln(output, "Entropy Server")
 		fmt.Fprintln(output, "Usage: entropy-server [options]")
 		fmt.Fprintln(output, "Provision a unique self-signed TLS identity: entropy-server generate-cert -help")
-		fmt.Fprintln(output, "Timing values are plain integer milliseconds, e.g. 1000 (no unit suffix).")
+		fmt.Fprintln(output, "Millisecond flags use plain integers; source-timeout uses a Go duration, e.g. 3s.")
 		fmt.Fprintln(output, "WebSocket budgets are shared by HTTP/HTTPS and reserved until disconnect.")
 		fmt.Fprintln(output, "Inbound WebSocket messages are limited to 1 KiB.")
 		fmt.Fprintln(output, "/bytes and /colors accept format=json (default), compact, or hash.")
@@ -141,6 +143,13 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 	if flags.NArg() != 0 {
 		err := fmt.Errorf("unexpected positional arguments %q; use -flag=false or -flag=true for boolean values", flags.Args())
+		fmt.Fprintln(output, err)
+
+		return nil, err
+	}
+
+	if cfg.SourceTimeout == 0 {
+		err := errors.New("source-timeout must be between 1ms and 5m")
 		fmt.Fprintln(output, err)
 
 		return nil, err
@@ -186,6 +195,14 @@ func (cfg *Config) Validate() error {
 
 	if err := cfg.validateTiming(); err != nil {
 		return err
+	}
+
+	if cfg.SourceTimeout == 0 {
+		cfg.SourceTimeout = 3 * time.Second
+	}
+
+	if cfg.SourceTimeout < time.Millisecond || cfg.SourceTimeout > 5*time.Minute {
+		return errors.New("source-timeout must be between 1ms and 5m")
 	}
 
 	if cfg.ReseedSize < minReseedBytes || cfg.ReseedSize > maxReseedBytes {

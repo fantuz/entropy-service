@@ -1,38 +1,11 @@
 package main
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"os"
 )
-
-const sourceGoCryptoRand = "crypto/rand"
-
-// openCharacterEntropySource checks the actual opened file, not a prior Stat
-// of its pathname. This avoids accepting a replaced regular file or reporting
-// a device that was never successfully opened.
-func openCharacterEntropySource(path string) (io.ReadCloser, error) {
-	source, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	info, err := source.Stat()
-	if err != nil {
-		_ = source.Close()
-		return nil, fmt.Errorf("inspect opened source %q: %w", path, err)
-	}
-
-	if info.Mode()&os.ModeCharDevice == 0 {
-		_ = source.Close()
-		return nil, fmt.Errorf("%q is not a character device", path)
-	}
-
-	return source, nil
-}
 
 // openEntropySource returns the selected reader and its *actual* origin.
 // -require-device requires the explicitly named source to open successfully;
@@ -72,12 +45,14 @@ func selectEntropySource(
 			return fallback, DefaultCSPRNG, nil
 		}
 
-		log.Printf("OS CSPRNG device %q unavailable (%v); using Go crypto/rand", DefaultCSPRNG, fallbackErr)
+		log.Printf("OS CSPRNG device %q unavailable (%v); trying %s", DefaultCSPRNG, fallbackErr, sourceOSFallback)
 	} else {
-		log.Printf("OS CSPRNG device %q unavailable (%v); using Go crypto/rand", DefaultCSPRNG, err)
+		log.Printf("OS CSPRNG device %q unavailable (%v); trying %s", DefaultCSPRNG, err, sourceOSFallback)
 	}
 
-	// This is the Go runtime's cryptographic OS source, not a weak PRNG.
+	// Use the OS cryptographic source without an unbounded initialization wait.
 	// No silent fallback is possible once strict mode has been selected.
-	return io.NopCloser(rand.Reader), sourceGoCryptoRand, nil
+	fallback, err := openOSSeedSource()
+
+	return fallback, sourceOSFallback, err
 }

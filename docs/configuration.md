@@ -72,13 +72,24 @@ device must be opened successfully; **no startup fallback** is permitted.
 `-device=/dev/urandom -require-device=true` deliberately requires that OS
 character device, not a physical QRNG. To require a specific hardware device,
 name its path explicitly. With strict mode off, failure to open/validate the
-requested device selects `/dev/urandom`; if that also fails, the Go OS-backed
-`crypto/rand.Reader` is used. `X-RNG-Source` and `/ready`
+requested device selects `/dev/urandom`; if that also fails, Linux `getrandom(GRND_NONBLOCK)` is used. If the OS random source is not
+initialized, that read fails rather than waiting indefinitely. `X-RNG-Source` and `/ready`
 report the **actual selected reader**, not the originally requested path.
 Optional CPU mixing supplements seed bytes but does not replace this
 reported base source. This is **startup-only** fallback: an error from the
 already opened source during a later reseed does not switch readers.
 Source selection establishes neither entropy quality nor physical provenance.
+
+`-source-timeout=3s` bounds each **complete** startup/reseed read (allowed
+1ms–5m), including short reads and optional CPU mixing. Linux opens devices
+with `O_NONBLOCK` and requires working Go read-deadline/poll support. Unsupported
+drivers are rejected: strict hardware mode fails; optional startup selection
+can use the logged OS fallback. The verified Linux urandom device (major 1,
+minor 9) is a special case because its reads do not wait for entropy; OS reads
+are chunked with deadline/cancellation checks. No timeout spawns a replacement
+reader. Runtime timeouts use the existing reseed-failure policy and can recover
+on a later successful read of the same source. See [driver limitations and
+migration](source-io.md).
 
 `-cpu-mix` prefers RDSEED, falls back to RDRAND, and takes precedence over `-rdrand-mix`. Mixing applies to **startup and reseed input**, not every output byte. Hardware attempts are bounded; if CPU randomness is unavailable, `-cpu-mix` retains the configured source bytes and logs the first failure. It does not turn the CPU instructions into a replacement for the configured source.
 
