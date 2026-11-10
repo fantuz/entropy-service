@@ -32,6 +32,12 @@ The architecture-based backend policy uses the binary's Go target architecture (
 | `-key-file` | `key.pem` | TLS private key path. |
 | `-debug` | `false` | Debug output and loopback pprof on port 6060. |
 
+No certificate or private key is bundled. Use `entropy-server generate-cert`
+for explicit, unique self-signed local identities, or provision a CA-issued
+chain and matching private key. See [TLS provisioning](tls-certificates.md)
+for SANs, expiry, safe reuse at startup and migration from the retired public key.
+Normal server startup never generates or replaces an identity.
+
 An explicit `-tags=experimental_barzakh` build additionally accepts
 `-drbg=barzakh-521-experimental` for local research. The variable-time Go
 implementation is excluded from normal releases and unsuitable for secrets.

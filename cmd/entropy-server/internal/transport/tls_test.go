@@ -22,6 +22,12 @@ import (
 func testCertificate(t *testing.T) (string, string, *x509.CertPool) {
 	t.Helper()
 
+	return testCertificatePolicy(t, time.Now().Add(-time.Hour), time.Now().Add(time.Hour), x509.ExtKeyUsageServerAuth)
+}
+
+func testCertificatePolicy(t *testing.T, notBefore, notAfter time.Time, usage x509.ExtKeyUsage) (string, string, *x509.CertPool) {
+	t.Helper()
+
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -29,9 +35,9 @@ func testCertificate(t *testing.T) (string, string, *x509.CertPool) {
 
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		NotBefore:    time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
+		NotBefore:    notBefore, NotAfter: notAfter,
 		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)},
-		KeyUsage:    x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{usage},
 	}
 
 	der, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)

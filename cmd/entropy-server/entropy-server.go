@@ -1044,6 +1044,10 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "generate-cert" {
+		os.Exit(runCertificateCommand(os.Args[2:], os.Stderr))
+	}
+
 	log.SetPrefix("entropy-server ")
 
 	started := time.Now()

@@ -143,8 +143,8 @@ failure policies are separate from any future fail-closed mode.
 1. A failed or incomplete seed read never updates the key, nonce, epoch,
    timestamp or successful-reseed counter.
 2. An invalid seed size is rejected **without** claiming a successful reseed.
-   The legacy code needs explicit zero/negative input validation; this is
-   addressed separately from this documentation/benchmark branch.
+   Configuration and the reseed loop now reject zero/negative or undersized
+   input; dedicated reseed tests cover the failure paths.
 3. The reseed digest matches `SHA512(Kold || Si)` exactly.
 4. A successful reseed atomically replaces the cipher state under the DRBG
    mutex; a child sees an epoch paired with one derived seed.

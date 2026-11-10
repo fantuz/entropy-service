@@ -53,22 +53,34 @@ are unsigned, validated user input and provide no authentication or resource
 limit exemption. Plain-HTTP deployments can use explicit query parameters.
 See [cookie policy, migration and examples](docs/configuration.md#preference-cookies).
 
-## Important: public demonstration TLS private key
+## TLS identities and the retired public demonstration key
 
-The source repository contains `cmd/entropy-server/cert.pem` and **`cmd/entropy-server/key.pem`**. The private key is **publicly distributed** and must be treated as a *development fixture only*. **Never use it to protect a production endpoint.** Generate your own certificate and private key, restrict file permissions, and supply their paths via `-cert-file` and `-key-file`. Do not assume the bundled key is a secret simply because it has a `.pem` extension.
+No TLS certificate or private key is bundled. Earlier revisions contained
+`cmd/entropy-server/cert.pem` and `cmd/entropy-server/key.pem`; that private key
+is permanently public, including in Git history and old source archives.
+The TLS loader now rejects its public-key fingerprint, even if the same key
+is wrapped in a different certificate. Removal does not rotate an existing
+deployment: operators must replace that identity, update client trust/pins,
+and restart their deployment. This repository cannot establish which external
+deployments still use it. No repository history rewrite is required.
 
-Example of a short-lived, local **development-only** certificate:
+`entropy-server generate-cert` explicitly generates a unique ECDSA P-256
+self-signed server identity from Go's OS-backed `crypto/rand`, independently
+of this service's custom DRBG or configured entropy source. It includes
+DNS/IP SANs, defaults to seven days and creates both files with mode 0600.
+It never overwrites existing files. `-if-missing` only reuses a complete,
+currently valid pair covering the requested names with an owner-only key;
+partial, expired, symlinked or mismatched pairs fail. Use operator-controlled
+parent directories and monitor expiry; a crash during two-file creation
+can leave a partial pair requiring explicit recovery.
 
-```sh
-openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days 7 \
-  -keyout /tmp/entropy-dev-key.pem -out /tmp/entropy-dev-cert.pem \
-  -subj '/CN=localhost'
-chmod 600 /tmp/entropy-dev-key.pem
-./bin/entropy-server -device=/dev/urandom \
-  -cert-file=/tmp/entropy-dev-cert.pem -key-file=/tmp/entropy-dev-key.pem
-```
-
-For production, use your organization's certificate lifecycle and replace self-signed testing certificates with appropriately trusted certificates. Do not commit replacement private keys to Git.
+See [local generation and startup provisioning](docs/tls-certificates.md).
+Self-signed certificates need explicit client trust; use your organization's
+CA/ACME lifecycle for public deployments. Normal HTTPS startup requires the
+configured pair and never silently generates, replaces or disables TLS.
+Do not commit replacement keys. CI rejects tracked PEM/key/PKCS#12 files and
+private-key PEM headers in other tracked regular files. This small guard
+does not replace a general-purpose secret scanner or deployment audit.
 
 ## Packaged service hardening and migration
 
