@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"sync"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/wordlist"
 )
 
 const (
@@ -36,10 +38,7 @@ type webSocketUsage struct {
 }
 
 func newWebSocketBudget(maxConnections int, maxMemory int64) *webSocketBudget {
-	longestWord := 0
-	for _, word := range dicewareWords {
-		longestWord = max(longestWord, len(word))
-	}
+	longestWord := wordlist.MaxWordBytes()
 
 	return &webSocketBudget{
 		maxConnections: maxConnections, maxMemory: maxMemory,

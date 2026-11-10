@@ -10,7 +10,7 @@ The normal request method below is GET, except where another method is specified
 | --- | --- | --- |
 | `/v1/data/random` | Raw binary; private request generator. | `bytes=N`<br>Default: 2 MiB; capped by `-max-bytes`. |
 | `/v1/data/test` | Raw binary; shared serving root. | `bytes=N`<br>Default: 1024 bytes; no statistical tests are run. |
-| `/v1/meta/random` | HTML words and SHA-256. | `words=N`<br>Default/limit: `-words`; page interval: `-refresh`. |
+| `/v1/meta/random` | HTML words and SHA-256. | `words=N`, `lang=CODE` (default `en`)<br>Default/limit: `-words`; page interval: `-refresh`. |
 | `/paroleparoleparole` | Alias of the HTTP word page. | Same as `/v1/meta/random`. |
 | `/v1/image/random` | Random RGB PNG. | Optional `size=64..1024` pixels per side; default 1024 × 1024. |
 | `/v1/image/heatmap` | Byte-popcount PNG, nine-colour scale. | Optional `size=64..1024` pixels per side; default 1024 × 1024. |
@@ -20,7 +20,7 @@ The normal request method below is GET, except where another method is specified
 
 Sound defaults to 2500 ms and `bloom`, with 48 kHz, 16-bit mono output. It uses 64 random bytes to select synthesis parameters; the PCM samples are harmonic synthesis, not raw random bytes. Heatmaps illustrate byte patterns rather than certifying entropy quality. QR dimensions and encoded sample length are not configurable.
 
-Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. The dictionary currently comes from `github.com/8ff/diceware` and is loaded once.
+Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. Ten pinned language dictionaries are embedded and loaded once; `lang` defaults to English. See [word languages and selection-space differences](word-languages.md).
 
 Both image routes accept one integer `size` between 64 and 1024, inclusive;
 invalid, duplicate or malformed image queries return 400 before generation
@@ -61,9 +61,9 @@ authentication token, and are ignored when the option is disabled. See
 | `/stream` | Raw binary sample; no digest prefix. | `bytes=2048`<br>`refresh=1500` |
 | `/bytes` | Sample and SHA-256, in the selected format. | `bytes=2048`<br>`refresh=5000`<br>`format=json` |
 | `/colors` | Same protocol as `/bytes`. | `bytes=2048`<br>`refresh=1500`<br>`format=json` |
-| `/words` | JSON fields: `words`, `hash`. | `words=20`<br>`refresh=1500` |
+| `/words` | JSON fields: `words`, `hash`, `language`, `wordlist`. | `words=20`<br>`refresh=1500`<br>`lang=en` |
 
-For `/words`, the word default and limit follow `-words`. The response contains a space-separated word string and its SHA-256 hex digest.
+For `/words`, the word default and limit follow `-words`. The response contains a space-separated word string, its SHA-256 over exact UTF-8 bytes, the canonical language and the pinned wordlist identifier. Supported language codes and list metadata are available at `/wordlists.json`; sizes differ by language. Missing `lang` means English; empty, unsupported or repeated values return 400. See [all ten languages, provenance and examples](word-languages.md).
 
 The table shows factory defaults; server flags can change the intervals. Request `refresh` values are integer milliseconds from 1 to 60000. `/words` rejects invalid or duplicate values; `/stream`, `/bytes` and `/colors` currently fall back to the configured interval for an invalid `refresh` value. The first message is sent on the first timer tick, not immediately on connection.
 
@@ -138,7 +138,7 @@ preview. The full-file SHA-256 and original server report remain available;
 seeking/playback and view changes do not repeat the upload. See the
 [file-workspace guide](browser-ui.md#shared-file-analysis-workspace).
 
-The duplicate `/bytes.html`, `/colors.html`, `/words.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. The HTTP and WebSocket API route names themselves are unchanged.
+The duplicate `/bytes.html`, `/colors.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. `/words.html` now provides a compatibility redirect to `/api-words.html`, preserving query values. The HTTP and WebSocket API route names themselves are unchanged.
 
 The live stream-analysis page accepts integer `bytes` (1–33554432, default 65536) and `refresh` (1–60000 milliseconds, default 500), requesting raw binary WebSocket frames. Separate browser controls select a frame offset and analysis cap (4 KiB–1 MiB, default 64 KiB) at 1/2/5/10/20 updates per second (default five). FFT supports Auto and 512/2048/8192/32768/65536 points without zero padding, using the same window-energy-normalized, one-sided PSD calculation as file previews. Pause freezes plots while reception continues; hidden tabs skip analysis. These controls bound browser analysis, not the complete delivered payload or network traffic. See [browser controls and mathematical definitions](browser-ui.md#stream-analysis-shared-window-and-controls).
 

@@ -1,0 +1,3 @@
+
+# Published dictionary data: keep source changes visible in review.
+cmd/entropy-server/internal/wordlist/data/*.txt linguist-vendored

@@ -280,6 +280,8 @@ The homepage at `/` is the interactive entry point. Common API routes include:
 
 The stream and upload labs share analysis windows up to 1 MiB, FFTs up to 65,536 points, labelled plots, paused byte inspection, optional bit-position rates and a historical colour waterfall, with desktop/mobile layouts. The [file workspace](docs/browser-ui.md#shared-file-analysis-workspace) adds bounded local seeking/playback while preserving server upload analysis and full-file SHA-256. See [controls and mathematics](docs/browser-ui.md#stream-analysis-shared-window-and-controls). Normal shutdown prints a [served-traffic executive summary](docs/operations.md#shutdown-executive-summary).
 
+Random-word endpoints support ten languages through `lang=CODE`; English remains the default. The browser offers a language selector. See [dictionary sources, selection space and examples](docs/word-languages.md).
+
 Interactive demonstrations live at `/api-bytes.html`, `/api-stream.html`, `/api-words.html`, `/api-colors.html`, `/api-sound.html`, `/api-upload.html`, `/api-sources.html` and `/api-socket.html`. They are **browser pages**, not API version prefixes.
 
 **[Complete HTTP/WebSocket endpoint, parameter and format reference](docs/api.md)**
@@ -356,7 +358,7 @@ Available features are documented above. The following are follow-up work or ide
 - Expand browser regression coverage (especially real network disconnections and mobile rendering).
 - Verify release-derived metadata and package/service smoke checks on every release.
 - Add source-specific cancellation of blocking hardware reads; the freshness gate already stops stale serving independently of a blocked read.
-- Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. An independent dictionary would remove the remaining Diceware dependency.
+- Continue word-endpoint profiling and assess buffer reuse only where allocation measurements justify it. Word dictionaries are now embedded with pinned provenance; see [word languages](docs/word-languages.md).
 - Improve deployment hardening: service identity/device permissions, authentication/access control, explicit optional origin allowlists for cross-host browser clients, and hardware-specific startup checks.
 - Evaluate integrations separately: FUSE/CUSE byte devices and an OpenSSL provider need distinct designs. FUSE alone does not implement `openssl rand -engine entropyctl`. HSM/blockchain integrations, GPU generation and production/demo build profiles are not implemented.
 
@@ -404,7 +406,7 @@ These historical screenshots illustrate removed page URLs and earlier layouts; f
 
 <img width="640" height="360" alt="Byte preview interface" src="https://github.com/user-attachments/assets/8d2d4846-5d3b-42e7-bad9-1081aa830177" />
 
-**Historical words page** — pictured URL `/words.html` (removed); current browser page: [`/api-words.html`](cmd/entropy-server/web/api-words.html), using WebSocket `/words`.
+**Historical words page** — pictured URL `/words.html` (now a compatibility redirect); current browser page: [`/api-words.html`](cmd/entropy-server/web/api-words.html), using WebSocket `/words`.
 
 <img width="640" height="360" alt="Word generation interface" src="https://github.com/user-attachments/assets/b65895bc-2da6-4a3b-9d31-ec3431c08988" />
 

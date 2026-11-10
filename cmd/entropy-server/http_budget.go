@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"sync"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/wordlist"
 )
 
 const httpRequestMemory int64 = 64 << 10
@@ -23,10 +25,7 @@ type httpBudgetUsage struct {
 }
 
 func newHTTPRequestBudget(maxRequests int, maxMemory int64) *httpRequestBudget {
-	longestWord := 0
-	for _, word := range dicewareWords {
-		longestWord = max(longestWord, len(word))
-	}
+	longestWord := wordlist.MaxWordBytes()
 
 	return &httpRequestBudget{
 		maxRequests: maxRequests, maxMemory: maxMemory,

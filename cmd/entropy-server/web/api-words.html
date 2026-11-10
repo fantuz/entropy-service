@@ -16,6 +16,13 @@
   </nav>
 
 <div class="panel">
+    <form id="word-language-form" class="word-language-controls">
+        <label for="word-language">Word language</label>
+        <select id="word-language" name="lang" disabled><option value="en">Loading languages…</option></select>
+        <button type="submit" id="word-language-apply" disabled>Apply</button>
+    </form>
+    <p id="wordlist-info" class="wordlist-info"></p>
+    <p class="wordlist-info"><a href="/wordlist-notices.txt">Wordlist sources and licenses</a></p>
     <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
     <div class="section">
         <h3>Words</h3>
@@ -28,64 +35,7 @@
 </div>
 
 <script src="/display-clock.js"></script>
-<script>
-"use strict";
-const params = new URLSearchParams(location.search);
-const query = params.toString();
-const status = document.getElementById("stream-notice");
-const words = document.getElementById("words-content");
-const hash = document.getElementById("hash");
-const ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") +
-    location.host + "/words" + (query ? "?" + query : "")
-);
-let failed = false;
-const displayClock = window.EntropyDisplayClock.create(paintLatest);
-
-function setStatus(state, message) {
-    status.hidden = false;
-    status.dataset.state = state;
-    status.textContent = message;
-}
-
-function paintLatest(data) {
-    const phrase = document.createDocumentFragment();
-    data.words.split(" ").forEach((word, i) => {
-        if (i > 0) phrase.append(" ");
-        const item = document.createElement("span");
-        item.textContent = word;
-        phrase.append(item);
-    });
-    words.replaceChildren(phrase);
-    hash.textContent = data.hash;
-    status.hidden = true;
-}
-
-ws.onopen = () => setStatus("waiting", "Awaiting first sample");
-ws.onerror = () => {
-    failed = true;
-    setStatus("error", "Connection failed");
-};
-ws.onclose = () => {
-    if (!failed) setStatus("disconnected", "Stream closed — reload to retry");
-};
-ws.onmessage = event => {
-    try {
-        const data = JSON.parse(event.data);
-        if (typeof data.words !== "string" || typeof data.hash !== "string" ||
-            !/^[0-9a-f]{64}$/.test(data.hash)) {
-            throw new Error("Invalid words response");
-        }
-        displayClock.submit(data);
-    } catch (error) {
-        failed = true;
-        setStatus("error", error.message);
-        displayClock.cancel();
-        ws.close(1002, "invalid words response");
-    }
-};
-window.addEventListener("pagehide", () => { displayClock.cancel(); ws.close(); });
-</script>
+<script src="/words-page.js"></script>
 
 </body>
 </html>
