@@ -1,5 +1,10 @@
 # Root reseeding — implementation review and input-validation fix
 
+> This document records the earlier input-validation change. The later
+> [reseed failure policy](reseed-failure-policy.md) now defaults serving to
+> fail closed, including private children and already-open streams. Historical
+> descriptions of continued output below apply to explicit `continue` mode.
+
 > **Scope:** review of the existing custom `SHA512(oldKey || seed)`
 > transition, and a narrow correctness fix for invalid reseed sizes.
 > **Not** a NIST DRBG certification, proof of compromise recovery,

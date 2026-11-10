@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/config"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 	"github.com/fantuz/entropy-service/internal/console"
 )
 
@@ -30,7 +31,13 @@ func serverInvocation(out io.Writer, cfg *config.Config) *console.Report {
 	r.Value("CPU / RDRAND mixing", fmt.Sprintf("%t / %t (CPU takes precedence)", cfg.MixCPU, cfg.MixRDRAND))
 	r.Value("Reseed size", fmt.Sprintf("%d bytes", cfg.ReseedSize))
 	r.Value("Reseed interval", time.Duration(cfg.ReseedMs)*time.Millisecond)
-	r.Value("Readiness seed age", time.Duration(cfg.MaxReseedAgeMs)*time.Millisecond)
+	r.Value("Maximum seed age", time.Duration(cfg.MaxReseedAgeMs)*time.Millisecond)
+	r.Value("Reseed failure policy", cfg.OnReseedFailure)
+
+	if cfg.OnReseedFailure == drbg.ReseedContinue {
+		r.Check("Seed freshness", "WARN", "continue permits output with failed or stale reseeds; readiness still degrades")
+	}
+
 	r.Value("Legacy buffers", "-buffer-entropy / -buffer-qrng ignored")
 	r.Section("Request & memory limits")
 	r.Value("Maximum sample", fmt.Sprintf("%d bytes (%.2f MiB)", cfg.MaxBytes, float64(cfg.MaxBytes)/(1<<20)))

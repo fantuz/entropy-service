@@ -143,27 +143,30 @@ open `/dev/urandom`, replace the source, or switch the root to a new device.
    The root key and reseed timestamp remain unchanged.
 2. `/ready` becomes HTTP 503 while there is an unresolved reseed error, or
    once the elapsed age exceeds `-max-reseed-age`; `/live` stays HTTP 200.
-3. Existing root and child generators **can continue outputting their
-   deterministic streams**. There is no automatic fail-closed generation
-   policy when readiness becomes degraded.
+3. By default, `-on-reseed-failure=stop` also refuses serving-root and child
+   generation. New requests/upgrades receive 503; active binary transfers
+   stop at a subsequent read, and entropy WebSockets close with code 1013.
+   Explicit `continue` permits existing-state output with degraded readiness.
 4. A later successful reseed clears the last error and advances the root's
    reseed epoch. Long-lived child readers check that epoch before subsequent
    reads and refresh their streams. In-flight reads complete within their
    current generator state.
 5. A source read that blocks indefinitely may never return an error. The
-   readiness age can grow stale, but `io.ReadFull` on an arbitrary device
-   reader is **not interrupted by context cancellation**. Shutdown does not
-   prove that this worker terminated cleanly.
+   readiness age grows stale and the default policy refuses further output
+   independently of that read. `io.ReadFull` on an arbitrary device reader is
+   **not interrupted by context cancellation**. Shutdown does not prove that
+   this worker terminated cleanly.
 6. Each stream has a configured operational per-key output ceiling
    (`1 << 38` bytes, or 256 GiB). If sufficient state refresh cannot
    occur, generation may eventually fail rather than reuse the same key.
 
 A failure to reseed is **not equivalent** to immediately predictable output.
 Conversely, continued output is **not** a guarantee of current physical
-entropy or post-compromise recovery. Deployment operators must decide whether
-to reject traffic when `/ready` is degraded. For strict policies, enforce
-readiness at the reverse proxy/client boundary or add a deliberate fail-closed
-server option (not currently implemented).
+entropy or post-compromise recovery. The server now enforces the freshness
+contract by default, including private children and already-open streams.
+Operators can explicitly select the former availability-first behavior with
+`continue`. Already admitted reads and buffered/delivered data cannot be
+recalled. See [policy rationale, exact boundaries and migration](reseed-failure-policy.md).
 
 ### 4.3 What the hardware source is *not* validated for
 

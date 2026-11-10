@@ -22,7 +22,19 @@ type Reader interface {
 
 // DRBG represents a deterministic random byte generator with observability metadata.
 type DRBG struct {
-	mu sync.Mutex
+	mu sync.RWMutex
+
+	// policyMu keeps private bulk reads independent of the root cipher mutex.
+	// Writes to closed, Reseeded, lastReseedError and policy fields require
+	// BOTH locks, in policyMu -> mu order. Readers may hold either lock.
+	// Never hold a policy read lock during source I/O or network writes.
+	policyMu sync.RWMutex
+
+	// Immutable child-to-serving-root link; all descendants use the same gate.
+	freshnessRoot     *DRBG
+	failurePolicy     ReseedFailurePolicy
+	maxReseedAge      time.Duration
+	generationChanged chan struct{}
 
 	// Crypto state
 	key             [32]byte
@@ -65,6 +77,8 @@ type Metadata struct {
 	ReseedsTotal         uint64
 	ReseedFailuresTotal  uint64
 	LastReseedError      string
+	ReseedFailurePolicy  ReseedFailurePolicy
+	GenerationAllowed    bool
 }
 
 // HealthInfo contains all info needed to generate JSON.
@@ -111,6 +125,10 @@ func NewDRBG(seed []byte) (DRBG, error) {
 // NewDRBGWithAlgorithm preserves the existing SHA-512 seed construction.
 // AES-CTR here is a stream backend, not a NIST CTR_DRBG implementation.
 func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
+	return newDRBGWithRoot(seed, algorithm, nil)
+}
+
+func newDRBGWithRoot(seed []byte, algorithm Algorithm, root *DRBG) (DRBG, error) {
 	if _, err := ParseAlgorithm(string(algorithm)); err != nil {
 		return DRBG{}, err
 	}
@@ -147,13 +165,15 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 	}
 
 	return DRBG{
-		key:       key,
-		nonce:     nonce,
-		cipher:    c,
-		algorithm: algorithm,
-		counted:   true,
-		algo:      algorithm.String(),
-		Reseeded:  time.Now(),
+		key:           key,
+		nonce:         nonce,
+		cipher:        c,
+		algorithm:     algorithm,
+		counted:       true,
+		algo:          algorithm.String(),
+		Reseeded:      time.Now(),
+		failurePolicy: ReseedContinue,
+		freshnessRoot: root,
 	}, nil
 }
 
@@ -172,7 +192,7 @@ func NewConnectionDRBG(d *DRBG) (DRBG, error) {
 		return DRBG{}, err
 	}
 
-	return NewDRBGWithAlgorithm(seed[:], d.algorithm)
+	return newDRBGWithRoot(seed[:], d.algorithm, d.servingRoot())
 }
 
 // Algorithm is immutable after construction, including across reseeds.
@@ -184,6 +204,9 @@ func (d *DRBG) Algorithm() Algorithm {
 // combined heap buffer. The resulting bytes and old visible state are cleared
 // after installing the new cipher; the caller still owns seed.
 func (d *DRBG) Reseed(seed []byte) error {
+	d.policyMu.Lock()
+	defer d.policyMu.Unlock()
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -235,6 +258,7 @@ func (d *DRBG) Reseed(seed []byte) error {
 	d.reseeds++
 	d.lastReseedError = ""
 	d.reseedEpoch.Add(1)
+	d.notifyGenerationLocked()
 
 	return nil
 }
@@ -246,6 +270,9 @@ func (d *DRBG) Reseed(seed []byte) error {
 // DRBG after its first use. Opaque cipher implementation state and copies
 // made by the Go runtime cannot be guaranteed erased.
 func (d *DRBG) Close() error {
+	d.policyMu.Lock()
+	defer d.policyMu.Unlock()
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -258,6 +285,7 @@ func (d *DRBG) Close() error {
 	clearStreamState(d.cipher)
 	d.cipher = nil
 	d.closed = true
+	d.notifyGenerationLocked()
 
 	if d.counted {
 		d.counted = false
@@ -272,16 +300,27 @@ func (d *DRBG) Close() error {
 func (d *DRBG) Read(p []byte) (int, error) {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
+	if root := d.freshnessRoot; root != nil {
+		root.policyMu.RLock()
+		defer root.policyMu.RUnlock()
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
+	if root := d.freshnessRoot; root != nil {
+		if err := root.generationErrorLocked(time.Now()); err != nil {
+			return 0, err
+		}
+	}
 
 	return d.readLocked(p)
 }
 
 // readLocked requires d.mu; seed derivation also snapshots the reseed epoch.
 func (d *DRBG) readLocked(p []byte) (int, error) {
-	if d.closed {
-		return 0, io.ErrClosedPipe
+	if err := d.generationErrorLocked(time.Now()); err != nil {
+		return 0, err
 	}
 
 	if uint64(len(p)) > maxBytesPerKey-d.generated {
@@ -316,8 +355,8 @@ func (d *DRBG) readLocked(p []byte) (int, error) {
 func (d *DRBG) ReseedAge() time.Duration {
 	// d.Mu.Lock()
 	// defer d.Mu.Unlock()
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
 	return time.Since(d.Reseeded)
 }
@@ -329,11 +368,15 @@ func (d *DRBG) RecordReseedFailure(err error) {
 		return
 	}
 
+	d.policyMu.Lock()
+	defer d.policyMu.Unlock()
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	d.reseedFailures++
 	d.lastReseedError = err.Error()
+	d.notifyGenerationLocked()
 }
 
 // WriteHeaders reports a synchronized metadata snapshot. The old software
@@ -364,14 +407,16 @@ func (d *DRBG) SetMetadata(version, source, _ string, interval time.Duration, si
 
 // GetMetadata returns one synchronized snapshot; removed buffer fields stay zero.
 func (d *DRBG) GetMetadata() Metadata {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	now := time.Now()
 
 	return Metadata{
 		Version:             d.version,
 		Source:              d.source,
 		DRBG:                d.algo,
-		ReseedAge:           time.Since(d.Reseeded),
+		ReseedAge:           now.Sub(d.Reseeded),
 		LastReseedAt:        d.Reseeded.UTC(),
 		ReseedIntervalMs:    d.reseedInterval.Milliseconds(),
 		ReseedSizeBits:      d.reseedSizeBits,
@@ -379,6 +424,8 @@ func (d *DRBG) GetMetadata() Metadata {
 		ReseedsTotal:        d.reseeds,
 		ReseedFailuresTotal: d.reseedFailures,
 		LastReseedError:     d.lastReseedError,
+		ReseedFailurePolicy: d.failurePolicy,
+		GenerationAllowed:   d.generationErrorLocked(now) == nil,
 	}
 }
 

@@ -21,6 +21,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Operations](operations.md) | Memory and concurrency budgets, readiness, shutdown behavior, profiling and diagnostics. |
 | [Benchmarks](benchmarks.md) | Measured encoding cost and HTTP throughput, original `wrk` output and reproducibility guidance. |
 | [Root reseeding review](root-reseeding.md) | Seed input-size hardening, failure semantics, state-transition diagram and tests. |
+| [Reseed failure policy](reseed-failure-policy.md) | Default fail-closed serving, explicit continue mode, recovery, reasoning, migration and blocked-read boundaries. |
 | [Statistical tests](statistical-tests.md) | `rngtest`, Dieharder and their limitations. |
 | [Randomness screening](randomness-screening.md) | PractRand/NIST/TestU01 results for three backends, runtime budgets and an optional manual workflow. |
 | [Security policy](../SECURITY.md) | Source/DRBG trust boundaries, exposure, disclosure and TLS keys. |

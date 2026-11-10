@@ -5,7 +5,19 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
+
+type entropyStreamWriter struct {
+	target  http.ResponseWriter
+	started bool
+}
+
+func (w *entropyStreamWriter) Write(p []byte) (int, error) {
+	w.started = true
+	return w.target.Write(p)
+}
 
 // requestEntropyReader checks cancellation between the bounded io.CopyN reads.
 // It cannot interrupt an individual blocked Read or a blocked socket Write;
@@ -25,7 +37,8 @@ func (r requestEntropyReader) Read(p []byte) (int, error) {
 
 // streamEntropyResponse generates exactly count bytes on success, without
 // allocating a response-sized buffer. A failed stream may already have sent
-// headers/body; callers must log errors rather than invoke http.Error.
+// headers/body; callers must log errors rather than invoke http.Error. A seed
+// policy denial before the first write is translated to 503 here.
 func streamEntropyResponse(w http.ResponseWriter, r *http.Request, source io.Reader, count int) error {
 	if count <= 0 {
 		return errors.New("entropy response size must be positive")
@@ -36,7 +49,12 @@ func streamEntropyResponse(w http.ResponseWriter, r *http.Request, source io.Rea
 	}
 
 	w.Header().Set("Content-Length", strconv.Itoa(count))
-	_, err := io.CopyN(w, requestEntropyReader{check: r.Context().Err, source: source}, int64(count))
+	output := &entropyStreamWriter{target: w}
+
+	_, err := io.CopyN(output, requestEntropyReader{check: r.Context().Err, source: source}, int64(count))
+	if errors.Is(err, drbg.ErrSeedUnavailable) && !output.started {
+		writeGenerationUnavailable(w)
+	}
 
 	return err
 }

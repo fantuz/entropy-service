@@ -1,5 +1,15 @@
 # Stability, operations and resource limits
 
+## Reseed outages and upgrades
+
+The server now defaults to `-on-reseed-failure=stop`. A failed refresh or seed
+age beyond `-max-reseed-age` denies new generation with 503, interrupts
+ongoing binary reads and closes entropy WebSockets with 1013. `/live` and
+diagnostics remain available; a successful reseed restores admission. Use
+explicit `continue` only when retaining output from old state is acceptable.
+This is an upgrade behavior change. See [policy, migration, in-flight data
+boundaries and blocked-read limitations](reseed-failure-policy.md).
+
 ## Startup reports and logs
 
 Both utilities group their invocation settings, units and startup checks in a

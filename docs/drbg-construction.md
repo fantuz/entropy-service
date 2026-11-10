@@ -131,12 +131,13 @@ flowchart TD
     Q --> T
 ```
 
-**Important:** `/ready` and `/live` have different semantics. A reseed error
-or stale last-successful-reseed timestamp can make `/ready` return 503 while
-`/live` remains 200 and the root/child streams **continue emitting
-deterministic bytes**. A blocked hardware read may not be cancellable by the
-Go context; this code currently has no source-level read timeout. These
-failure policies are separate from any future fail-closed mode.
+**Serving policy:** `/ready` becomes 503 on a reseed error or stale seed while
+`/live` remains 200. The default `-on-reseed-failure=stop` also refuses further
+serving-root and child reads; explicit `continue` permits existing-state output.
+The gate changes admission, not the cipher or SHA-512 transition above. A
+successful reseed restores admission; already delivered/in-flight bytes cannot
+be recalled. A blocked hardware read still lacks a source-level timeout, but
+seed-age expiry stops stale serving independently. See [policy and reasoning](reseed-failure-policy.md).
 
 ## Invariants worth testing
 

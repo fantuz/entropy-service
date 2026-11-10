@@ -1,5 +1,9 @@
 # Follow-up to the November 9 external review
 
+> Later implementation: the [reseed freshness policy](reseed-failure-policy.md)
+> addresses the previously missing fail-closed generation behavior. The table
+> below preserves the assessment made during the TLS provisioning change.
+
 Compared the supplied Claude PDF with source at `66ce1ce` (PR #51), then
 implemented the TLS changes described below. The PDF explicitly could not
 read the source tree or linked documentation: its recommendations are review
