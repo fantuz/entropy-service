@@ -51,7 +51,16 @@
                     /^[a-fA-F0-9]{64}$/.test(frame.hash) ?
                     frame.hash.slice(0, 32) + "\n" + frame.hash.slice(32) : frame.hash;
                 const color = [0, 2, 4].map(offset => parseInt(frame.hash.slice(offset, offset + 2), 16) / 2);
-                document.body.style.backgroundColor = `rgb(${color.join(",")})`;
+                if (view === "colors") {
+                    const swatch = document.getElementById("hash");
+                    swatch.style.backgroundColor = `rgb(${color.join(",")})`;
+                    const linear = color.map(channel => {
+                        const value = channel / 255;
+                        return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+                    });
+                    const luminance = .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
+                    swatch.style.color = luminance > .179 ? "#000" : "#fff";
+                }
                 if (view === "bytes") {
                     document.getElementById("hex").textContent = frame.hex;
                     document.getElementById("base64").textContent = frame.base64;

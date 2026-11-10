@@ -1,13 +1,60 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 )
+
+func TestActivityMonitorCollectsRealCountersAndTicks(t *testing.T) {
+	ws := newWebSocketBudget(1, 1<<20)
+	httpBudget := newHTTPRequestBudget(1, 1<<20)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	monitor := startActivityPeakMonitor(ctx, ws, httpBudget)
+	monitor.mu.RLock()
+	initial := monitor.last
+	monitor.mu.RUnlock()
+
+	metrics.AddBytesGenerated(1024)
+	metrics.AddWSPayloads(2)
+	metrics.AddHTTPRequests(3)
+
+	deadline := time.NewTimer(3 * time.Second)
+	defer deadline.Stop()
+
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("activity sampler did not collect a live interval")
+		case <-tick.C:
+			monitor.mu.RLock()
+			advanced := monitor.last.After(initial)
+			monitor.mu.RUnlock()
+
+			if !advanced {
+				continue
+			}
+
+			peak := monitor.snapshot()
+			if peak.GeneratedBytesPerSecond <= 0 || peak.WSFramesPerSecond <= 0 || peak.HTTPRequestsPerSecond <= 0 {
+				t.Fatalf("live counters were not reflected in peaks: %+v", peak)
+			}
+
+			return
+		}
+	}
+}
 
 func TestActivityPeakMonitorIntervalRatesAndReset(t *testing.T) {
 	var monitor activityPeakMonitor

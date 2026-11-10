@@ -1,5 +1,10 @@
 "use strict";
 
+// Help starts closed on navigation and when the browser restores a cached page.
+window.addEventListener("pageshow", () => {
+    for (const details of document.querySelectorAll(".lab-help details")) details.open = false;
+});
+
 (() => {
     const $=id=>document.getElementById(id), helpers=window.EntropyLabSamples;
     const guidance=window.EntropyLabRegistration;

@@ -1,135 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>Entropy Stream Service - Random Words</title>
-<style>
-body {
-    background: black;
-    color: #00ff88;
-    font-family: monospace;
-    text-align: center;
-    padding-top: 5%;
-    padding-bottom: 5%;
-    #margin: 5%;
-    position:relative;
-    margin: auto;
-    font-family: "JetBrains Mono", monospace;
-    #letter-spacing: 0.04em;
-    #font-family: monospace;
-    #display: flex;
-    #justify-content: center;
-    align-items: center;
-    #height: 100vh;
-    #word-wrap: break-word;
-    overflow: hidden;
-    max-width: 100%;
-    transition: background 0.5s ease-in-out;
-}
 
-.section {
-    margin-bottom: 25px;
-}
-
-.panel {
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(12px);
-    padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    max-width: 80%;
-    position:relative;
-    margin: auto;
-    word-wrap: break-word;
-}
-
-.data {
-    opacity: 1;
-    color: #00ffcc;
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-
-.data.out {
-    opacity: 0;
-}
-
-.words {
-    opacity: 1;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    font-size: 2em;
-    transition: opacity 0.5s ease-in-out;
-}
-
-.words.out {
-    opacity: 0;
-}
-
-.hash {
-    opacity: 1;
-    margin-top: 20px;
-    margin-bottom: 20px;
-    margin-bottom: 20px;
-    font-size: 1em;
-    color: #444;
-}
-
-.hash.out {
-    opacity: 0;
-}
-
-h3 {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
-    opacity: 0.6;
-}
-
-/* Phone/tablet layout; keep complete words and allow browser zoom. */
-@media (max-width: 1024px) {
-    body {
-        box-sizing: border-box;
-        overflow: auto;
-        min-height: 100vh;
-        min-height: 100svh;
-        padding: max(12px, env(safe-area-inset-top))
-                 max(12px, env(safe-area-inset-right))
-                 max(12px, env(safe-area-inset-bottom))
-                 max(12px, env(safe-area-inset-left));
-    }
-    .panel {
-        box-sizing: border-box;
-        width: 100%;
-        max-width: 100%;
-        padding: clamp(16px, 3vw, 28px);
-    }
-    .section { min-width: 0; margin-bottom: 0; }
-    .section + .section { margin-top: 24px; }
-    .words { font-size: clamp(1rem, 4vw, 1.5rem); line-height: 1.5; }
-    .words span { display: inline-block; }
-    #hash { overflow-wrap: anywhere; font-size: 0.875rem; }
-}
-
-@media (max-width: 1024px) and (orientation: landscape) {
-    .panel {
-        display: grid;
-        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-        align-items: center;
-        gap: 24px;
-    }
-    .section + .section { margin-top: 0; }
-    .words { font-size: clamp(1rem, 2.4vw, 1.5rem); }
-}
-
-@media (max-width: 600px) and (orientation: portrait) {
-    .words span { display: block; }
-}
-</style>
-<link rel="stylesheet" href="/theme.css">
+<script src="/theme.js"></script>
+  <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-words">
+  <nav class="site-toolbar" aria-label="Site and appearance">
+    <a href="/">Entropy Service</a>
+    <button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button>
+  </nav>
 
 <div class="panel">
     <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
@@ -179,8 +63,6 @@ function paintLatest() {
     words.replaceChildren(phrase);
     hash.textContent = data.hash;
     status.hidden = true;
-    const rgb = [0, 2, 4].map(offset => parseInt(data.hash.slice(offset, offset + 2), 16) / 2);
-    document.body.style.backgroundColor = `rgb(${rgb.join(",")})`;
 }
 
 ws.onopen = () => setStatus("waiting", "Awaiting first sample");

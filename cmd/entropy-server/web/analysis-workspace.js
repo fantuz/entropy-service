@@ -171,6 +171,7 @@
         });
         const observer = new ResizeObserver(redraw);
         observer.observe(document.querySelector(".analysis-panel"));
+        window.addEventListener("entropythemechange", redraw);
         worker.onerror = () => { busy = false; onError("ANALYSIS WORKER FAILED"); };
         worker.onmessage = ({data}) => {
             busy = false;
@@ -197,7 +198,7 @@
             setFrozen(value) { paused = value; invalidate(); clearMarkers(); redraw(); },
             get frozen() { return paused; },
             get sample() { return last; },
-            destroy() { worker.terminate(); observer.disconnect(); }
+            destroy() { worker.terminate(); observer.disconnect(); window.removeEventListener("entropythemechange", redraw); }
         };
         redraw();
         return api;

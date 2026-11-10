@@ -3,14 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <title>Entropy Service — Experimental Source Lab</title>
+  <meta name="color-scheme" content="light dark">
+  <title>Entropy Service — Source Lab</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-analysis page-analysis-lab page-lab" data-lab="sources">
+  <nav class="site-toolbar" aria-label="Site and appearance">
+    <a href="/">Entropy Service</a>
+    <button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button>
+  </nav>
   <main class="panel analysis-panel">
-    <h1>Experimental Source Lab</h1>
-    <p>Generate, inspect and compare browser sources. Start grants access only to the source you select; Stop releases it.</p>
+    <h1>Source Lab</h1>
+    <p>Experimental tools: generate, inspect and compare browser sources. Start grants access only to the source you select; Stop releases it.</p>
     <nav class="lab-menu" aria-label="Lab tools"><button type="button" id="lab-create-source">Register a source…</button><a href="/api-socket.html">Socket lab</a></nav>
     <section class="analysis-card" aria-labelledby="lab-source-title">
       <h2 class="analysis-label" id="lab-source-title">Source &amp; sampling</h2>
@@ -36,7 +41,26 @@
       <p id="lab-source-info" class="analysis-meta">No source active.</p>
       <p id="lab-transport-info" class="note" role="status" aria-live="polite"></p>
       <p id="lab-catalog-info" class="note"></p>
-      <details><summary>Source notes</summary><p class="note">Camera/microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the file lab for detailed local-file seeking.</p><p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. XOR needs two equal-length samples; LSB expands each low bit to a full byte. All transformations are labelled. Plots describe the representation and do not certify cryptographic entropy.</p></details>
+      <!-- BEGIN SHARED LAB HELP -->
+      <div class="lab-help" aria-label="Source help">
+        <details><summary>Connect entropy-server instances</summary>
+          <p class="note">Use the <a href="/api-socket.html">Socket lab</a> for peer and self-links. For a server-side A → B link, register B in A's JSON source file, start A with <code>-lab-sources=lab.json</code>, then choose Registered server source. Set the base URL to A itself for a server-side self-link.</p>
+          <pre>{"sources":[{"id":"peer","kind":"entropy-ws","endpoint":"http://127.0.0.1:8081"}]}</pre>
+          <p class="note">The operator controls registrations and bridge access. Loopback clients are allowed by default; remote access needs <code>-lab-allow-remote</code> and deployment access controls. A peer connection consumes its output without feeding it back into DRBG seeding.</p>
+        </details>
+        <details><summary>HTTP body fetch</summary>
+          <p class="note">The <a href="/api-socket.html">Socket lab</a> can fetch a prefix of response-body bytes (HTML, text or binary), not a rendered page. Browser mode follows ordinary redirects but needs the target to allow CORS. Most ordinary sites will block it.</p>
+          <p class="note">For those sites, prepare a <code>webpage</code> registration using Register a source, load it with <code>-lab-sources</code>, then choose Registered server source in the Socket lab. Registrations support bounded prefixes, same-origin redirects, same-host HTTP→HTTPS upgrades and a pool of URLs sampled at random. HTTP 201 Created is a successful response, not a redirect; a Location header there identifies the created resource.</p>
+          <p class="note">Structured web content is useful comparison data, not a cryptographic random source.</p>
+        </details>
+        <details><summary>Source notes</summary>
+          <p class="note">Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the <a href="/api-upload.html">File lab</a> for detailed local-file seeking.</p>
+          <p class="note">Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.</p>
+          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages are analysed whole, up to 1 MiB; sample size controls request/read sizes for the other adapters.</p>
+          <p class="note">XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.</p>
+        </details>
+      </div>
+      <!-- END SHARED LAB HELP -->
     </section>
     <div class="analysis-stats" aria-label="Sample meters" aria-live="off">
       <div class="analysis-stat-row"><span class="analysis-stat-title">Input samples</span><span><output id="lab-input-bytes">0</output> bytes · <output id="lab-input-frames">0</output> <span id="lab-input-unit">samples</span></span></div>

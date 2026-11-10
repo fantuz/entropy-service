@@ -103,6 +103,13 @@ markup in `cmd/entropy-server/webtemplates/analysis-panels.html`, then run
 [the browser guide](docs/browser-ui.md#shared-file-analysis-workspace) for optional
 real Chromium checks of both labs.
 
+Appearance lives in `cmd/entropy-server/web/theme.css` and `theme.js`.
+Use shared variables for UI and plot colors; keep sample RGB/grayscale values
+independent of the theme. Lab help comes from `webtemplates/lab-help.html`
+and the same render/check command. Run `node scripts/test-theme.mjs` and
+`python3 scripts/test_theme_browser.py` after appearance or help changes;
+the browser suite needs Python Playwright and Chromium.
+
 Experimental-source checks: `node scripts/test-lab-samples.mjs` and
 `node scripts/test-lab-registration.mjs`, plus
 `python3 scripts/test_sources_browser.py --artifacts /tmp/entropy-source-lab`.
