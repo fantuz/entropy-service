@@ -2,6 +2,8 @@ package diag
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 )
 
@@ -85,37 +87,41 @@ func renderSeries(series []float64, lo float64, hi float64) string {
 }
 
 func (d *Dashboard) Render() {
+	d.RenderTo(os.Stdout)
+}
+
+func (d *Dashboard) RenderTo(out io.Writer) {
 	total := ClientRateMeter.Total()
 	rate := ClientRateMeter.RateMiB()
 
-	fmt.Println("\nSampled statistics history")
-	fmt.Println("----------------------------")
-	fmt.Printf("Total received     : %d MiB\n", total/1024/1024)
-	fmt.Printf("Transfer Rate      : %.3f MiB/s\n", rate)
+	fmt.Fprintln(out, "\nSampled statistics history")
+	fmt.Fprintln(out, "----------------------------")
+	fmt.Fprintf(out, "Total received     : %d MiB\n", total/1024/1024)
+	fmt.Fprintf(out, "Transfer Rate      : %.3f MiB/s\n", rate)
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"Analysed Rate      : %.3f MiB/s\n",
 		d.rate.RateMiB(),
 	)
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"Shannon entropy      %s\n",
 		renderSeries(d.entropy, 7.995, 8.0),
 	)
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"Chi-square           %s\n",
 		renderSeries(d.chiP, 0.0, 1.0),
 	)
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"Monobit              %s\n",
 		renderSeries(d.monoP, 0.0, 1.0),
 	)
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"Serial correlation   %s\n",
 		renderSeries(d.serial, -0.02, 0.02), // 0.1
 	)
-	fmt.Println("----------------------------")
+	fmt.Fprintln(out, "----------------------------")
 }

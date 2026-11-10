@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/terminal"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/tests"
 )
 
@@ -36,11 +39,11 @@ const (
 	modeStream = "stream"
 )
 
-func drawUI(result *diag.Diagnostics, threshold float64) {
-	fmt.Print("\033[H\033[2J")
-	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
-	fmt.Println()
-	tests.PrintDiagnostics(os.Stdout, result, threshold)
+func drawUI(out io.Writer, result *diag.Diagnostics, threshold float64, profile terminal.Profile) {
+	fmt.Fprint(out, profile.Clear())
+	fmt.Fprintln(out, profile.Paint(Gray, "EntropyCTL Monitor"))
+	fmt.Fprintln(out)
+	tests.PrintDiagnosticsWithColor(out, result, threshold, profile.Color != terminal.Monochrome)
 }
 
 func main() {
@@ -61,12 +64,12 @@ func run(ctx context.Context) error {
 
 // Interactive preflight is separate from the measured experiment.
 func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl string) error {
+	profile := terminal.Detect(cfg.Color)
 	fpsdigit := 1000 / float64(cfg.Refresh.Milliseconds())
 
 	expectedbr := float64(cfg.Slice) * fpsdigit / (1 << 20)
 
-	fmt.Print("\033[H\033[2J")
-	fmt.Print("\a")
+	fmt.Print(profile.Clear())
 
 	sampleCtx, cancelSample := context.WithTimeout(ctx, 3*time.Second)
 	testdata, err := sampleEntropy(sampleCtx, cfg.Mode, refhttpurl, refwsurl, cfg.Slice)
@@ -80,22 +83,22 @@ func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl
 	result := analysePayload(testdata, cfg)
 
 	fmt.Println()
-	fmt.Println(Gray + "EntropyCTL Monitor" + Reset)
+	fmt.Println(profile.Paint(Gray, "EntropyCTL Monitor"))
 	fmt.Println()
 	fmt.Println("*--------------------------------------------*")
 	fmt.Println("|  Pre-flight diagnostics on entropy source  |")
 	fmt.Println("*--------------------------------------------*")
 	fmt.Printf("Framerate            : %.2f FPS (1 frame every %dms)\n", float64(fpsdigit), int(cfg.Refresh.Milliseconds()))
 	fmt.Println("Refresh (ms)         :", cfg.Refresh)
-	fmt.Println("HTTP URL             : " + Cyan + refhttpurl + Reset)
-	fmt.Println("WS URL               : " + Cyan + refwsurl + Reset)
+	fmt.Println("HTTP URL             : " + profile.Paint(Cyan, refhttpurl))
+	fmt.Println("WS URL               : " + profile.Paint(Cyan, refwsurl))
 	fmt.Println("----------------------------------------------")
 	fmt.Println("Program mode         :", cfg.Mode)
 
 	if cfg.WriteOut {
-		fmt.Println("Write-out to /dev    : " + Green + "enabled" + Reset)
+		fmt.Println("Write-out to /dev    : " + profile.Paint(Green, "enabled"))
 	} else {
-		fmt.Println("Write-out to /dev    : " + Red + "disabled" + Reset)
+		fmt.Println("Write-out to /dev    : " + profile.Paint(Red, "disabled"))
 	}
 
 	fmt.Println("Debug                :", cfg.ShowDebug)
@@ -104,18 +107,20 @@ func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl
 	fmt.Println("Show 64x64 Matrix    :", cfg.ShowMatrix)
 	fmt.Println("Show Graph           :", cfg.ShowGraph)
 	fmt.Println("Data Preview         :", cfg.ShowPreview)
+	fmt.Println("Waterfall / mapping  :", cfg.ShowWaterfall, cfg.WaterfallMode)
+	fmt.Println("Terminal colors      :", cfg.Color)
 	fmt.Println("----------------------------------------------")
 
 	if int(cfg.Slice) == len(testdata) {
-		fmt.Printf("Expected Slice       : "+Green+"%d"+Reset+"\n", cfg.Slice)
-		fmt.Printf("Fetched Size         : "+Green+"%d"+Reset+"\n", len(testdata))
+		fmt.Println("Expected Slice       :", profile.Paint(Green, strconv.FormatInt(cfg.Slice, 10)))
+		fmt.Println("Fetched Size         :", profile.Paint(Green, strconv.Itoa(len(testdata))))
 	} else {
-		fmt.Printf("Expected Slice       : "+Red+"%d"+Reset+"\n", cfg.Slice)
-		fmt.Printf("Fetched Size         : "+Red+"%d"+Reset+"\n", len(testdata))
+		fmt.Println("Expected Slice       :", profile.Paint(Red, strconv.FormatInt(cfg.Slice, 10)))
+		fmt.Println("Fetched Size         :", profile.Paint(Red, strconv.Itoa(len(testdata))))
 	}
 
 	fmt.Println("----------------------------------------------")
-	fmt.Printf("Requested rate       : "+Green+"%.3f MiB/s"+Reset+" (payload target)\n", expectedbr)
+	fmt.Printf("Requested rate       : %s (payload target)\n", profile.Paint(Green, fmt.Sprintf("%.3f MiB/s", expectedbr)))
 	fmt.Printf("Analysis prefix cap  : %d bytes (0 = full frame)\n", cfg.AnalysisBytes)
 	fmt.Printf("Analysis interval    : %s (0 = every frame)\n", cfg.AnalysisInterval)
 	fmt.Printf("Display interval     : %s\n", cfg.DisplayInterval)
@@ -129,7 +134,7 @@ func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl
 
 	fmt.Println("----------------------------------------------")
 
-	tests.PrintDiagnostics(os.Stdout, &result, cfg.ShannonThreshold)
+	tests.PrintDiagnosticsWithColor(os.Stdout, &result, cfg.ShannonThreshold, profile.Color != terminal.Monochrome)
 
 	if !waitContext(ctx, 3*time.Second) {
 		return ctx.Err()

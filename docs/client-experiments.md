@@ -135,6 +135,12 @@ treating a run as complete.
 | `sample` | One record per analysed frame/prefix, with raw statistics, its threshold assessment, timings and cumulative counters. Unselected frames produce no sample record. |
 | `run_summary` | Final counters, timing, throughput, completion reason and last sample's assessment. This is not a cumulative statistical test. |
 
+The additive display settings `waterfall`, `waterfall_mode`,
+`waterfall_columns`, `waterfall_rows` and `color` record the requested flags,
+including in headless runs. They do not indicate that a display was
+allocated or that a particular terminal capability was detected. Raw
+waterfall bytes are never included in reports.
+
 `settings.endpoint` retains scheme, host and path but omits URL user
 information, **all query parameters** and fragments. Effective payload and
 refresh are recorded separately. Raw entropy, hex previews, histograms and
@@ -259,7 +265,19 @@ infinity), equality, empty input, predictable high-Shannon data, a single
 terminal assessment, both transports, timed cancellation of pending HTTP and
 WS handshakes, indefinite-mode interruption, JSONL order and accounting,
 startup/transport failures, URL redaction, stdout purity, overwrite
-protection and report failure concurrent with cancellation. Run
+protection and report failure concurrent with cancellation. Display tests
+cover copied bounded waterfall history, actual WebSocket buffer recycling,
+analysis-prefix and sampling limits, RGB triplets and incomplete cells,
+hue/grayscale mappings and palette fallbacks, Linux PTY detection and
+resizing, `NO_COLOR`/redirected output, 80×24 and 60×24 geometry, and
+headless JSONL with forced color and display flags enabled. Run
 `go test -race ./cmd/entropy-client/...` for lifecycle/concurrency checks.
+
+For the built CLI, run `make build-client && python3 scripts/test_client_terminal.py`
+on Linux. This uses a local deterministic HTTP fixture to check all five
+color choices on redirected stdout, headless JSONL, and automatic truecolor
+in 80×24 and 60×24 PTYs. It requires only Python's standard library. Add
+`--capture=/tmp/client-waterfall.ansi` to capture the actual 80×32 display
+used for the preview; it contains synthetic fixture bytes only.
 
 [Client configuration](configuration.md#client) · [Technical reference](README.md)
