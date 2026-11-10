@@ -115,7 +115,7 @@ assert.equal(scheduledDelay(), 2000, "HTML default produces a two-second period"
 
 delayWords = false;
 const interval = elements.get("gallery-interval");
-for (const seconds of [0.5, 1, 1.5, 2, 2.5, 120]) {
+for (const seconds of [0.05, 0.1, 0.15, 0.5, 0.75, 1, 1.5, 2, 2.5, 120]) {
     interval.value = String(seconds);
     interval.handlers.change();
     assert.equal(scheduledDelay(), seconds * 1000);
@@ -136,16 +136,16 @@ assert.equal(paths.length, duringSlowBatch, "Half-second refreshes do not overla
 now += 750;
 wordsResolver();
 await slow;
-assert.equal(scheduledDelay(), 300, "Overdue cycles retain the existing post-batch breathing room");
+assert.equal(scheduledDelay(), 0, "Overdue batches start again only after finishing, without an extra slow-rate floor");
 delayWords = false;
 
-for (const value of ["", "0", "0.49", "0.75", "120.5", "-1", "NaN", "Infinity"]) {
+for (const value of ["", "0", "0.04", "0.075", "120.5", "-1", "NaN", "Infinity"]) {
     interval.value = value;
     interval.handlers.change();
     const before = paths.length;
     await elements.get("gallery-refresh").handlers.click();
     assert.equal(paths.length, before, `Invalid interval ${value} does not fetch`);
-    assert.match(elements.get("gallery-status").textContent, /0.5–120/);
+    assert.match(elements.get("gallery-status").textContent, /0.05–120/);
 }
 interval.value = "0.5";
 interval.handlers.change();
@@ -172,4 +172,4 @@ await takeScheduled(0)();
 assert.equal(scheduledDelay(), 500, "Visible galleries resume the selected half-second cadence");
 events["window:pagehide"]();
 assert.ok(revoked.includes(previousQR), "Object URLs are released on unload");
-console.log("PASS: two-second default, half-second cadence, validation, slow batches, visibility, partial failures, cleanup");
+console.log("PASS: two-second default, 20-FPS option, validation, slow batches, visibility, partial failures, cleanup");

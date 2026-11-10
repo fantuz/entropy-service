@@ -262,7 +262,7 @@ At 120×30 or larger, automatic layout uses adjacent panels and fits the
 waterfall to the remaining screen. `-layout=compact` retains stacked output.
 Zero dimensions request fitting; explicit positive dimensions override it.
 Full view also shows the existing sampled histories and histogram without
-requiring their flags. Interactive auto/full redraws are limited to 10 Hz.
+requiring their flags. Interactive terminal redraws are limited to 20 Hz (50 ms), including compact layouts.
 See [the adaptive terminal guide](client-terminal.md) for viewport/history
 bounds, clipping behavior, fullscreen examples and SSH considerations.
 

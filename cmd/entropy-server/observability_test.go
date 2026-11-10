@@ -145,12 +145,22 @@ func parseMetricSamples(t *testing.T, body string) (map[string]float64, map[stri
 		}
 
 		if strings.HasPrefix(line, "# HELP ") {
+			if help[fields[2]] {
+				t.Fatalf("duplicate metric HELP: %q", line)
+			}
+
 			help[fields[2]] = true
+
 			continue
 		}
 
 		if strings.HasPrefix(line, "# TYPE ") {
+			if _, exists := kinds[fields[2]]; exists {
+				t.Fatalf("duplicate metric TYPE: %q", line)
+			}
+
 			kinds[fields[2]] = fields[3]
+
 			continue
 		}
 

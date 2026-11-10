@@ -26,6 +26,37 @@ fragments are omitted from human and JSONL reports; control characters in
 reported paths are escaped. Statistical diagnostics screen the sample and do
 not certify its source or unpredictability.
 
+## Prometheus scrape configuration
+
+Use `/metrics` as the single Prometheus scrape path for each server process.
+Choose one HTTP or HTTPS listener per process, since both expose the same counters:
+
+```yaml
+scrape_configs:
+  - job_name: entropy-service
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["127.0.0.1:8080"]
+```
+
+The canonical endpoint emits each metric family once, with seconds and bytes
+as base units. `/metrics-1` and `/metrics-2` retain compatibility values, including
+the old `wss_payloads`, whole-MiB generated count, millisecond seed age, root-only
+reseed view and disabled buffers. Do not add aliases or their unit-converted
+values together. Configuring multiple metrics paths for one process can duplicate
+series across scrape jobs; the server cannot deduplicate a Prometheus configuration.
+The legacy `wss_payloads` and `wss_payloads_total` names can also collide when a
+parser normalizes counter family names. These compatibility aliases are absent
+from `/metrics`; use that endpoint for Prometheus.
+
+`rng_bytes_generated_total` includes internal DRBG seed derivation, whereas
+`wss_payloads_total` counts completed outbound WS/WSS application messages,
+including lab events. They measure different work. `http_requests_total` includes
+health checks, metrics scrapes, upgrades and static files, excluding the debug
+listener. Admission gauges describe reserved estimates and slots; their HELP
+text distinguishes them from RSS and physical entropy.
+
 ## Resource limits
 
 The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket handlers and the client. Uploads have a separate fixed 32 MiB ceiling. Encoding can make the transmitted message larger than the underlying sample.

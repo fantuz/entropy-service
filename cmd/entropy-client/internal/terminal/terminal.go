@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -38,6 +39,16 @@ type Profile struct {
 	Interactive bool
 	Columns     int
 	Rows        int
+}
+
+// DisplayInterval caps all interactive layouts at 20 frames per second.
+// Redirected output retains its requested cadence; reception is independent.
+func (p Profile) DisplayInterval(requested time.Duration) time.Duration {
+	if p.Interactive {
+		return max(requested, 50*time.Millisecond)
+	}
+
+	return requested
 }
 
 // FullLayout keeps redirected/unknown terminals on the plain stacked view.

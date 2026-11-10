@@ -27,6 +27,7 @@
     </div>
 </div>
 
+<script src="/display-clock.js"></script>
 <script>
 "use strict";
 const params = new URLSearchParams(location.search);
@@ -39,8 +40,7 @@ const ws = new WebSocket(
     location.host + "/words" + (query ? "?" + query : "")
 );
 let failed = false;
-let latest = null;
-let paintScheduled = false;
+const displayClock = window.EntropyDisplayClock.create(paintLatest);
 
 function setStatus(state, message) {
     status.hidden = false;
@@ -48,11 +48,7 @@ function setStatus(state, message) {
     status.textContent = message;
 }
 
-function paintLatest() {
-    paintScheduled = false;
-    if (latest === null) return;
-    const data = latest;
-    latest = null;
+function paintLatest(data) {
     const phrase = document.createDocumentFragment();
     data.words.split(" ").forEach((word, i) => {
         if (i > 0) phrase.append(" ");
@@ -80,17 +76,15 @@ ws.onmessage = event => {
             !/^[0-9a-f]{64}$/.test(data.hash)) {
             throw new Error("Invalid words response");
         }
-        latest = data;
-        if (!paintScheduled) {
-            paintScheduled = true;
-            requestAnimationFrame(paintLatest);
-        }
+        displayClock.submit(data);
     } catch (error) {
         failed = true;
         setStatus("error", error.message);
+        displayClock.cancel();
         ws.close(1002, "invalid words response");
     }
 };
+window.addEventListener("pagehide", () => { displayClock.cancel(); ws.close(); });
 </script>
 
 </body>

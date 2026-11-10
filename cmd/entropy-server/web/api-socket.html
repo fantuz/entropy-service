@@ -68,7 +68,7 @@
       <div class="analysis-controls">
         <label>Window cap <select id="analysis-size"><option value="4096">4 KiB</option><option value="16384">16 KiB</option><option value="65536" selected>64 KiB</option><option value="262144">256 KiB</option><option value="1048576">1 MiB</option></select></label>
         <label>Start byte in sample <input id="analysis-offset" type="number" min="0" max="1048575" value="0" step="1" required></label>
-        <label>Display limit <select id="display-fps"><option value="1">1 fps</option><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option></select></label>
+        <label>Display limit <select id="display-fps"><option value="1">1 fps</option><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option><option value="20">20 fps</option></select></label>
         <button id="pause-plots" type="button" disabled>Plots frozen</button>
       </div>
       <p id="sample-info" class="analysis-meta">Awaiting a sample for analysis.</p>
@@ -184,6 +184,7 @@
   <script src="/lab-samples.js" defer></script>
   <script src="/lab-adapters.js" defer></script>
   <script src="/lab-registration.js" defer></script>
+  <script src="/display-clock.js" defer></script>
   <script src="/source-lab.js" defer></script>
 </body>
 </html>

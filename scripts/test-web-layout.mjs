@@ -29,12 +29,15 @@ function simulateFrame(view, frame) {
         postMessage(data) {this.messages.push(data);}
         terminate() {}
     }
-    vm.runInNewContext(source, {
+    const context = {
         document, window, Worker: FakeWorker, URL, URLSearchParams,
         location: { href: "http://localhost/api-" + view + ".html", protocol: "http:", search: "" },
         requestAnimationFrame: callback => {callback(); return 1;},
-        cancelAnimationFrame() {},
-    });
+        cancelAnimationFrame() {}, performance: {now: () => 0},
+    };
+    vm.createContext(context);
+    vm.runInContext(readFileSync(new URL("display-clock.js", root), "utf8"), context);
+    vm.runInContext(source, context);
     assert.equal(workers.length, 1);
     workers[0].onmessage({data: {type: "frame", ...frame}});
     return {value: id => document.getElementById(id).textContent, style: document.body.style,

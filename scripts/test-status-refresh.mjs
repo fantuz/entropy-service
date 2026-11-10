@@ -30,7 +30,7 @@ let resolveMetrics;
 let blockMetrics = true;
 const fetchFake = async (path) => {
     fetchCount++;
-    if (path === "/metrics-2") {
+    if (path === "/metrics") {
         if (blockMetrics) await new Promise(resolve => { resolveMetrics = resolve; });
         return {ok:true, text: async () => "rng_bytes_generated_total 100\nws_connections_active 0"};
     }
@@ -57,14 +57,14 @@ assert.equal(fetchCount, 3);
 assert.equal(active.size, 0, "must not schedule a new cycle while requests remain pending");
 
 const interval = document.getElementById("status-interval");
-interval.value = "0.25";
+interval.value = "0.05";
 listeners.get("status-interval:change")();
-assert.equal(interval.value, "0.25");
+assert.equal(interval.value, "0.05");
 assert.equal(active.size, 0, "changing interval during a fetch must not overlap");
 resolveMetrics();
 await flush();
 assert.equal(active.size, 1);
-assert.equal([...active.values()][0].delay, 250);
+assert.equal([...active.values()][0].delay, 50);
 assert.equal(document.getElementById("status-refresh").disabled, false);
 
 const [id, pending] = [...active.entries()][0];
@@ -74,13 +74,13 @@ pending.fn();
 await flush();
 assert.equal(fetchCount, 6, "second round must start only after the scheduled delay");
 assert.equal(active.size, 1);
-assert.equal([...active.values()][0].delay, 250);
+assert.equal([...active.values()][0].delay, 50);
 
 interval.value = "0.01";
 listeners.get("status-interval:change")();
-assert.equal(interval.value, "0.25", "invalid low interval clamps at 250ms");
+assert.equal(interval.value, "0.05", "invalid low interval clamps at 50ms");
 assert.equal(active.size, 1);
-assert.equal([...active.values()][0].delay, 250);
+assert.equal([...active.values()][0].delay, 50);
 
 interval.value = "90";
 listeners.get("status-interval:change")();

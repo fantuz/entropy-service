@@ -353,7 +353,7 @@ bytes. The main Shannon value can therefore differ from the server report;
 both scopes are labelled, and SHA-256 always identifies the entire upload.
 
 **Previous/Next** moves by one selected window. **Play windows** advances through
-the file at up to 1/2/5/10 windows per second and stops at EOF. A final-window
+the file at up to 1/2/5/10/20 windows per second and stops at EOF. A final-window
 Play action starts from byte zero. Pause or a hidden tab stops playback; a
 paused file supports the same A/B inspection as a frozen stream. Playback,
 seeking and plot-control changes never upload the file again. Power averaging
@@ -414,13 +414,13 @@ field and connection notice retain their positions.
 | --- | --- |
 | `/live` | HTTP liveness, independent of seed freshness |
 | `/ready` | Fresh reseeding and readiness (may return 503 when degraded) |
-| `/metrics-2` | Prometheus service counters and limits |
+| `/metrics` | Canonical Prometheus service counters and limits |
 
 This page polls the existing endpoints on a configurable interval (default
-five seconds, selectable from **0.25 to 60 seconds**). The next cycle starts only
+five seconds, selectable from **0.05 to 60 seconds**). The next cycle starts only
 after the current cycle completes, so slow responses never produce overlapping
-scrapes. Choosing 0.25 seconds specifies a minimum idle delay, **not** a
-guaranteed four updates per second; the network and parsing time are additional.
+scrapes. Choosing 0.05 seconds specifies a minimum idle delay, **not** a
+guaranteed twenty updates per second; the network and parsing time are additional.
 
 The dashboard renders an operational snapshot, four admission-capacity gauges
 and twelve activity indicators. Three additional indicators show **seed
@@ -468,7 +468,7 @@ readiness age limit; errors or readiness degradation mark it critical.
   counters. Rate calculations show *SAMPLING* until two good snapshots exist,
   and reset on failed scrapes or counter rollback. A bounded window of recent
   samples (up to approximately five seconds, plus one prior baseline for
-  slower polling) reduces rate jitter at 250 ms intervals.
+  slower polling) reduces rate jitter at fast polling intervals intervals.
 - **Seed freshness headroom** is computed from `/ready` values
   `reseed_age_ms` and `max_reseed_age_ms`, not an entropy-buffer measurement.
   A stale or error-marked root is flagged regardless of age headroom.
@@ -484,7 +484,7 @@ they are not a complete memory profiler. Use runtime/pprof data for heap/RSS
 investigation and hardware instrumentation for actual seed-source buffering. The original API endpoints are unchanged.
 For monitoring, continue querying the JSON/Prometheus routes directly.
 
-Compatibility aliases `/health-1`, `/health-2` and `/metrics-1` remain available,
+Compatibility aliases `/health-1`, `/health-2`, `/metrics-1` and `/metrics-2` remain available,
 and their links are grouped in a collapsible section. Do **not** scrape both
 metrics aliases as independent data sources: they represent the same service.
 
@@ -492,3 +492,25 @@ The dashboard is informational and does not add authentication. Use normal
 network/access controls for externally exposed deployments.
 
 [Main README](../README.md) · [API reference](api.md) · [Operations](operations.md)
+
+## Up to 20 FPS
+
+The stream, source and socket analysis pages offer 20 FPS alongside 1/2/5/10;
+file playback offers 20 windows/s. Their five-FPS defaults are unchanged. Set
+the source/server cadence to 50 ms or faster when enough input is needed.
+Analysis stays in its worker, with one active job and one newest queued sample;
+window, FFT and history limits are unchanged. Slow work reduces the achieved
+rate instead of growing a frame queue.
+
+The bytes, colours and words views paint at most 20 FPS and keep only the latest
+pending display value. Use `?refresh=50` on `/api-bytes.html`, `/api-colors.html`
+or `/api-words.html` to request 20 source updates per second. Their server-side
+default cadences are unchanged.
+
+Gallery refresh accepts 0.05–120 seconds in 0.05-second steps; its default is
+still two seconds. A batch finishes before the next begins. Status refresh
+accepts 0.05–60 seconds and defaults to five seconds; it also waits for the current
+cycle to finish. At fast status refresh rates, the dashboard's health/metrics
+requests contribute to `http_requests_total`. Network latency, browser scheduling,
+FFT settings and rendering cost can lower actual frame rates. Display FPS is
+independent of FFT frequency units (cycles/byte) and does not measure entropy rate.

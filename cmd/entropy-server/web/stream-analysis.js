@@ -3,21 +3,17 @@
 (() => {
     const $ = id => document.getElementById(id), controls = $("stream-controls");
     let ws, receivedFrames = 0, receivedBytes = 0, analyzedFrames = 0, analyzedBytes = 0;
-    let lastAccepted = -Infinity, statsScheduled = false, fatal = false, closed = false;
+    let lastAccepted = -Infinity, fatal = false, closed = false;
     function showNotice(state, text) {
         $("stream-notice").hidden = false;
         $("stream-notice").dataset.state = state;
         $("stream-notice").textContent = text;
     }
-    function statistics() {
-        if (statsScheduled) return;
-        statsScheduled = true;
-        requestAnimationFrame(() => {
-            statsScheduled = false;
-            for (const [id, value] of [["received-bytes", receivedBytes], ["received-frames", receivedFrames],
-                ["analysed-bytes", analyzedBytes], ["analysed-frames", analyzedFrames]]) $(id).textContent = value.toLocaleString();
-        });
-    }
+    const statsClock = window.EntropyDisplayClock.create(() => {
+        for (const [id, value] of [["received-bytes", receivedBytes], ["received-frames", receivedFrames],
+            ["analysed-bytes", analyzedBytes], ["analysed-frames", analyzedFrames]]) $(id).textContent = value.toLocaleString();
+    });
+    function statistics() { statsClock.submit(true); }
     function setPaused(value) {
         workspace.setFrozen(value);
         $("pause-plots").textContent = value ? "Resume plots" : "Pause plots";
@@ -76,5 +72,5 @@
     controls.addEventListener("submit", event => {
         event.preventDefault(); if (controls.reportValidity()) location.search = new URLSearchParams(new FormData(controls)).toString();
     });
-    window.addEventListener("pagehide", () => { ws?.close(); workspace?.destroy(); });
+    window.addEventListener("pagehide", () => { statsClock.cancel(); ws?.close(); workspace?.destroy(); });
 })();

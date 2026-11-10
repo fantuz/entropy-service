@@ -78,7 +78,7 @@ let second = first.replace("rng_bytes_generated_total 10485760", "rng_bytes_gene
     .replace("http_generation_rejected_memory_total 5", "http_generation_rejected_memory_total 7");
 update(second);
 assert.equal(value("kpi-generation-rate"), "1.00 MiB/s");
-assert.equal(value("kpi-ws-payload-rate"), "10.0 frames/s");
+assert.equal(value("kpi-ws-payload-rate"), "10.0 messages/s");
 assert.equal(value("kpi-http-request-rate"), "4.0 req/s");
 assert.equal(value("kpi-ws-reject-rate"), "12.0 rejects/min");
 assert.equal(value("kpi-http-reject-rate"), "24.0 rejects/min");

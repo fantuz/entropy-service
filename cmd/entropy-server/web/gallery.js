@@ -25,8 +25,8 @@
 
     function checkedInterval() {
         const seconds = Number(intervalInput.value);
-        if (!Number.isFinite(seconds) || seconds < 0.5 || seconds > 120 || !Number.isInteger(seconds * 2)) {
-            announce("Use 0.5–120 s in 0.5 s steps", "error");
+        if (!Number.isFinite(seconds) || seconds < 0.05 || seconds > 120 || Math.abs(seconds * 20 - Math.round(seconds * 20)) > 1e-7) {
+            announce("Use 0.05–120 s in 0.05 s steps (up to 20 FPS)", "error");
             return false;
         }
         intervalMs = seconds * 1000;
@@ -137,7 +137,7 @@
             busy = false;
             refreshButton.disabled = false;
             // Approximately the configured period between batch starts, never overlapping.
-            schedule(Math.max(300, intervalMs - (Date.now() - startedAt)));
+            schedule(Math.max(0, intervalMs - (Date.now() - startedAt)));
         }
     }
 

@@ -36,7 +36,7 @@
         refresh.disabled = true;
 
         try {
-        const checks = await Promise.allSettled([read("/live"), read("/ready"), read("/metrics-2")]);
+        const checks = await Promise.allSettled([read("/live"), read("/ready"), read("/metrics")]);
         const [live, ready, metrics] = checks;
 
         if (live.status === "fulfilled" && live.value.ok) {
@@ -101,7 +101,7 @@
             intervalInput.value = String(intervalMs / 1000);
             return;
         }
-        intervalMs = Math.round(Math.min(60, Math.max(0.25, requested)) * 1000);
+        intervalMs = Math.round(Math.min(60, Math.max(0.05, requested)) * 1000);
         intervalInput.value = String(intervalMs / 1000);
         // If a cycle is running, its completion will schedule the new interval.
         if (!running && !disposed) {

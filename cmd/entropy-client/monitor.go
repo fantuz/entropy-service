@@ -352,10 +352,7 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 		m.waterfall = diag.NewWaterfall(columns, rows, cfg.WaterfallMode)
 	}
 
-	interval := cfg.DisplayInterval
-	if cfg.Layout != terminal.LayoutCompact && profile.Interactive {
-		interval = max(interval, 100*time.Millisecond)
-	}
+	interval := profile.DisplayInterval(cfg.DisplayInterval)
 
 	display := time.NewTicker(interval)
 	defer display.Stop()

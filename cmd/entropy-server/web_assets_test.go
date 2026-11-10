@@ -106,7 +106,7 @@ func TestHomepageLinksAllPublicRoutes(t *testing.T) {
 	for _, route := range []string{
 		"/api-bytes.html", "/api-colors.html", "/api-words.html",
 		"/api-sound.html", "/api-sources.html", "/api-socket.html", "/api-upload.html", "/api-stream.html", "/api-gallery.html", "/api-status.html",
-		"/live", "/ready", "/health-1", "/health-2", "/metrics-1", "/metrics-2",
+		"/live", "/ready", "/health-1", "/health-2", "/metrics", "/metrics-1", "/metrics-2",
 		"/v1/data/random", "/v1/data/test", "/v1/meta/random",
 		"/v1/image/random", "/v1/image/heatmap", "/v1/qr/random",
 		"/sound", "/files", "/paroleparoleparole",
@@ -134,7 +134,7 @@ func TestNewWebPagesContainRealEndpoints(t *testing.T) {
 			"/v1/qr/random", "/v1/meta/random?words=8",
 		},
 		"api-status.html": {
-			"/live", "/ready", "/metrics-2", "/health-1", "/health-2", "/metrics-1",
+			"/live", "/ready", "/metrics", "/health-1", "/health-2", "/metrics-1",
 		},
 		"api-stream.html": {
 			"received-bytes", "received-frames", "analysed-bytes", "analysed-frames",

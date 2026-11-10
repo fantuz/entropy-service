@@ -67,6 +67,8 @@ jobs:
         run: node scripts/test-status-kpis.mjs
       - name: Test status refresh scheduling
         run: node scripts/test-status-refresh.mjs
+      - name: Test 20-FPS display pacing and controls
+        run: node scripts/test-display-clock.mjs
       - name: Test shared analysis mathematics and worker
         run: node scripts/test-analysis-math.mjs
       - name: Test stream Shannon entropy alerts
@@ -89,6 +91,8 @@ jobs:
         run: |
           make build-client
           python3 scripts/test_client_terminal.py
+      - name: Smoke-test 20-FPS terminal redraws
+        run: python3 scripts/test_client_20fps.py
       - name: Smoke-test client binary exports and pipe cancellation
         run: python3 scripts/test_client_output.py
       - name: Race-test all Go packages

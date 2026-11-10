@@ -1,6 +1,6 @@
 "use strict";
 
-// Derived browser KPIs from existing /metrics-2 data. Admission-budget
+// Derived browser KPIs from existing /metrics data. Admission-budget
 // pressure is not RAM usage or QRNG entropy-buffer fill.
 (function initKPIs() {
     const metricNames = {
@@ -29,7 +29,7 @@
         "rng_bytes_generated_total", "wss_payloads_total", "http_requests_total",
         "rng_reseeds_total", "rng_reseed_failures_total", ...httpRejectNames, ...wsRejectNames,
     ];
-    // Store a bounded history for rates. At 250 ms polling a 5s window
+    // Store a bounded history for rates. At fast polling intervals a 5s window
     // reduces the noise of using only two adjacent snapshots.
     const history = [];
 
@@ -168,7 +168,7 @@
 
         history.push({at: now, metrics});
         // Retain one older sample even when the refresh interval exceeds 5s.
-        while (history.length > 2 && now - history[1].at >= 5000) history.shift();
+        while (history.length > 2 && (history.length > 128 || now - history[1].at >= 5000)) history.shift();
         const baseline = history.length > 1 ? history[0] : null;
         const elapsed = baseline ? (now - baseline.at) / 1000 : 0;
         const prior = baseline ? baseline.metrics : null;
@@ -179,7 +179,7 @@
 
         const generationPerSecond = perSecond(metrics, prior, "rng_bytes_generated_total", elapsed);
         rate("kpi-generation-rate", generationPerSecond === null ? null : generationPerSecond / 1048576, "MiB/s", 2);
-        rate("kpi-ws-payload-rate", perSecond(metrics, prior, "wss_payloads_total", elapsed), "frames/s", 1);
+        rate("kpi-ws-payload-rate", perSecond(metrics, prior, "wss_payloads_total", elapsed), "messages/s", 1);
         rate("kpi-http-request-rate", perSecond(metrics, prior, "http_requests_total", elapsed), "req/s", 1);
         rate("kpi-ws-reject-rate", rejectionRate(metrics, prior, wsRejectNames, elapsed), "rejects/min", 1);
         const httpRejectPace = rejectionRate(metrics, prior, httpRejectNames, elapsed);
@@ -191,7 +191,7 @@
             get(metrics, "rng_generation_peak_bytes_per_second") === null ? null :
                 get(metrics, "rng_generation_peak_bytes_per_second") / 1048576, "MiB/s", 2);
         peakMeter("ws-payload-rate", perSecond(metrics, prior, "wss_payloads_total", elapsed),
-            get(metrics, "wss_payloads_peak_per_second"), "frames/s", 1);
+            get(metrics, "wss_payloads_peak_per_second"), "messages/s", 1);
         peakMeter("http-request-rate", perSecond(metrics, prior, "http_requests_total", elapsed),
             get(metrics, "http_requests_peak_per_second"), "req/s", 1);
         peakMeter("ws-reject-rate", rejectionRate(metrics, prior, wsRejectNames, elapsed),
