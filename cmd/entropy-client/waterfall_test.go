@@ -98,7 +98,7 @@ func TestWaterfallSurvivesStreamBufferRecycling(t *testing.T) {
 }
 
 func TestMonitorWaterfallFitsTerminalAndRetainsHistory(t *testing.T) {
-	cfg := &config.Config{ShowWaterfall: true, ShannonThreshold: 7.999}
+	cfg := &config.Config{ShowWaterfall: true, ShannonThreshold: 7.999, WaterfallColumns: 128, WaterfallRows: 32, Layout: "compact"}
 
 	m := monitorState{cfg: cfg, started: time.Now().Add(-time.Second), waterfall: diag.NewWaterfall(128, 32, diag.WaterfallByte)}
 	for i := range 32 {

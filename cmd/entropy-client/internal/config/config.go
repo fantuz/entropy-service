@@ -38,6 +38,7 @@ type Config struct {
 	WaterfallColumns int
 	WaterfallRows    int
 	Color            string
+	Layout           string
 	Slice            int64
 	AnalysisBytes    int
 	AnalysisInterval time.Duration
@@ -62,9 +63,10 @@ func ParseConfig() *Config {
 	flag.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
 	flag.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
 	flag.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
-	flag.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 32, "waterfall cells per row (8..128; two terminal columns per cell)")
-	flag.IntVar(&cfg.WaterfallRows, "waterfall-rows", 8, "retained waterfall samples (1..32; newest first)")
+	flag.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..256; two terminal columns per cell)")
+	flag.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..64; newest first)")
 	flag.StringVar(&cfg.Color, "color", "auto", "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
+	flag.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full; auto uses panels on large interactive terminals")
 
 	flag.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
 	flag.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
@@ -97,6 +99,10 @@ func ParseConfig() *Config {
 }
 
 func (cfg *Config) ValidateAnalysis() error {
+	if cfg.Layout != "" && cfg.Layout != terminal.LayoutAuto && cfg.Layout != terminal.LayoutCompact && cfg.Layout != terminal.LayoutFull {
+		return errors.New("layout must be auto, compact or full")
+	}
+
 	if !terminal.ValidColor(cfg.Color) {
 		return errors.New("color must be auto, always, never, 256 or truecolor")
 	}
@@ -105,12 +111,12 @@ func (cfg *Config) ValidateAnalysis() error {
 		return errors.New("waterfall-mode must be byte, rgb or gray")
 	}
 
-	if (cfg.ShowWaterfall || cfg.WaterfallColumns != 0) && (cfg.WaterfallColumns < 8 || cfg.WaterfallColumns > 128) {
-		return errors.New("waterfall-columns must be between 8 and 128")
+	if cfg.WaterfallColumns != 0 && (cfg.WaterfallColumns < 8 || cfg.WaterfallColumns > diag.MaxWaterfallColumns) {
+		return errors.New("waterfall-columns must be 0 (auto) or between 8 and 256")
 	}
 
-	if (cfg.ShowWaterfall || cfg.WaterfallRows != 0) && (cfg.WaterfallRows < 1 || cfg.WaterfallRows > 32) {
-		return errors.New("waterfall-rows must be between 1 and 32")
+	if cfg.WaterfallRows < 0 || cfg.WaterfallRows > diag.MaxWaterfallRows {
+		return errors.New("waterfall-rows must be between 0 (auto) and 64")
 	}
 
 	if math.IsNaN(cfg.ShannonThreshold) || math.IsInf(cfg.ShannonThreshold, 0) || cfg.ShannonThreshold < 0 || cfg.ShannonThreshold > 8 {

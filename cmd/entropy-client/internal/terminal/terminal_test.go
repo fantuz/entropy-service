@@ -83,3 +83,48 @@ func TestTextRowsIgnoresANSIAndCountsWrappedLines(t *testing.T) {
 		}
 	}
 }
+
+func TestFullLayoutSelection(t *testing.T) {
+	for _, tc := range []struct {
+		columns, rows int
+		tty           bool
+		choice        string
+		want          bool
+	}{
+		{80, 24, true, "auto", false},
+		{120, 30, true, "auto", true},
+		{240, 60, true, "compact", false},
+		{80, 24, true, "full", true},
+		{60, 24, true, "full", false},
+		{160, 20, true, "full", false},
+		{240, 60, false, "full", false},
+	} {
+		if got := (Profile{Columns: tc.columns, Rows: tc.rows, Interactive: tc.tty}).FullLayout(tc.choice); got != tc.want {
+			t.Errorf("layout case %+v = %v", tc, got)
+		}
+	}
+}
+
+func TestFitPreservesANSIAndMarksClipping(t *testing.T) {
+	for _, tc := range []struct {
+		text  string
+		width int
+		plain string
+	}{
+		{"abc", 5, "abc  "},
+		{"abcdef", 4, "abc~"},
+		{"\x1b[31mWARN\x1b[0m", 6, "WARN  "},
+		{"\x1b[31mabcdef\x1b[0m", 4, "abc~"},
+		{"█▆▃", 2, "█~"},
+		{"abc", 0, ""},
+	} {
+		text := Fit(tc.text, tc.width)
+		if got := controlSequence.ReplaceAllString(text, ""); got != tc.plain {
+			t.Errorf("Fit(%q,%d)=%q", tc.text, tc.width, got)
+		}
+
+		if strings.ContainsRune(controlSequence.ReplaceAllString(text, ""), '\x1b') {
+			t.Fatal("partial ANSI sequence survived clipping")
+		}
+	}
+}

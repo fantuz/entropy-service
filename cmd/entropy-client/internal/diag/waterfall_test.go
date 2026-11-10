@@ -29,12 +29,12 @@ func TestWaterfallBoundsAndCopiesHistory(t *testing.T) {
 	clear(data)
 	w.Add(nil, 101)
 
-	if w.width != 128 || w.height != 32 || len(w.rows) != 32 || cap(w.rows) > 32 {
+	if w.width != 256 || w.height != 64 || len(w.rows) != 64 || cap(w.rows) > 64 {
 		t.Fatalf("history is not bounded: width=%d height=%d len=%d cap=%d", w.width, w.height, len(w.rows), cap(w.rows))
 	}
 
 	for i, row := range w.rows {
-		if row.frame != uint64(69+i) || len(row.bytes) != 384 || cap(row.bytes) > 384 || row.bytes[0] != byte(row.frame) {
+		if row.frame != uint64(37+i) || len(row.bytes) != 768 || cap(row.bytes) > 768 || row.bytes[0] != byte(row.frame) {
 			t.Fatalf("history retained excess bytes or aliased a transport buffer: frame=%d bytes=%d cap=%d", row.frame, len(row.bytes), cap(row.bytes))
 		}
 	}

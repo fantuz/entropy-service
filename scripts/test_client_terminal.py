@@ -2,6 +2,7 @@
 """Smoke-test the built client in pipes and Linux PTYs using synthetic bytes."""
 
 import argparse
+import contextlib
 import errno
 import fcntl
 import http.server
@@ -38,13 +39,14 @@ class Fixture(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+            self.wfile.write(data)
 
     def log_message(self, *_args):
         pass
 
 
-def capture_pty(command, environment, columns, rows):
+def capture_pty(command, environment, columns, rows, resize=()):
     master, slave = pty.openpty()
     try:
         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))
@@ -52,8 +54,13 @@ def capture_pty(command, environment, columns, rows):
             os.close(slave)
             slave = None
             chunks = []
-            deadline = time.monotonic() + 12
+            began = time.monotonic()
+            deadline = began + 12
+            pending = list(resize)
             while time.monotonic() < deadline:
+                if pending and time.monotonic() - began >= pending[0][0]:
+                    _, new_columns, new_rows = pending.pop(0)
+                    fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", new_rows, new_columns, 0, 0))
                 if not select.select([master], [], [], 0.1)[0]:
                     continue
                 try:
@@ -80,13 +87,14 @@ def capture_pty(command, environment, columns, rows):
 
 
 def monitor_screens(output):
-    return [screen for screen in output.split(CLEAR) if "Received           :" in screen]
+    return [screen for screen in output.split(CLEAR) if "Received           :" in screen or "Latest sample & reception" in screen]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--client", type=Path, default=Path("bin/entropy-client"))
     parser.add_argument("--capture", type=Path, help="also save an 80x32 ANSI preview from the actual client")
+    parser.add_argument("--capture-full", type=Path, help="also save a 240x60 full-layout ANSI preview")
     args = parser.parse_args()
     client = args.client.resolve()
     if not client.is_file():
@@ -113,7 +121,7 @@ def main():
                 assert escape in result.stdout, result.stdout
             print(f"PASS: redirected stdout, color={color}, NO_COLOR=1")
 
-        result = subprocess.run(base + ["-headless", "-report=-", "-color=truecolor", "-duration=350ms"],
+        result = subprocess.run(base + ["-headless", "-report=-", "-color=truecolor", "-layout=full", "-duration=350ms"],
                                 env=environment, capture_output=True, text=True, timeout=5, check=True)
         assert "\x1b" not in result.stdout
         records = [json.loads(line) for line in result.stdout.splitlines()]
@@ -134,12 +142,40 @@ def main():
                 assert all(len(line) <= columns for line in lines if line.startswith("#")), plain
             print(f"PASS: {columns}x24 Linux PTY, automatic truecolor, no waterfall overflow")
 
+        for columns, rows, color in [(120, 30, "auto"), (160, 45, "never"), (240, 60, "auto")]:
+            output = capture_pty(base + [f"-color={color}", "-duration=550ms"], environment, columns, rows)
+            screens = monitor_screens(output)
+            assert screens, output
+            for screen in screens:
+                assert f"full ({columns}x{rows})" in screen
+                plain = ANSI.sub("", screen).removesuffix("\n")
+                lines = plain.split("\n")
+                assert len(lines) < rows and all(len(line) <= columns for line in lines), plain
+                if color == "never":
+                    assert not re.search(r"\x1b\[[0-9;]*m", screen), screen
+            print(f"PASS: full panels {columns}x{rows}, bounded geometry, color={color}")
+
+        output = capture_pty(base + ["-duration=1500ms"], environment, 80, 24,
+                             resize=[(3.35, 160, 45), (3.75, 80, 24)])
+        assert "full (160x45)" in output
+        screens = monitor_screens(output)
+        assert "Received           :" in screens[-1] and "full (" not in screens[-1], output
+        print("PASS: live PTY resize 80x24 -> 160x45 -> 80x24, compact/full/compact")
+
         if args.capture:
             output = capture_pty(base + ["-color=truecolor", "-duration=1500ms"], environment, 80, 32)
             screen = monitor_screens(output)[-1]
             assert screen.count("\n#") == 8, screen
             args.capture.write_text(screen)
             print(f"Captured actual 80x32 client preview: {args.capture}")
+
+        if args.capture_full:
+            output = capture_pty(base + ["-color=truecolor", "-analysis-interval=0", "-refresh=20ms", "-duration=3500ms"],
+                                 environment, 240, 60)
+            screen = monitor_screens(output)[-1]
+            assert "full (240x60)" in screen and "Offsets [0,115)" in screen, screen
+            args.capture_full.write_text(screen)
+            print(f"Captured actual 240x60 client preview: {args.capture_full}")
     finally:
         server.shutdown()
         server.server_close()

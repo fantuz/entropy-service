@@ -155,6 +155,11 @@ func (m *monitorState) render() {
 }
 
 func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
+	if profile.FullLayout(m.cfg.Layout) {
+		m.renderFull(out, profile)
+		return
+	}
+
 	elapsed := time.Since(m.started)
 	if !m.hasSample {
 		fmt.Fprintln(out, "Receiving; waiting for an analysed sample")
@@ -188,11 +193,11 @@ func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
 	}
 
 	if m.cfg.ShowGraph {
-		m.graph.RenderTo(&summary)
+		m.graph.RenderWidth(&summary, graphCells(profile))
 	}
 
 	if m.cfg.ShowDashboard {
-		m.dashboard.RenderTo(&summary)
+		m.dashboard.RenderWidth(&summary, graphCells(profile))
 	}
 
 	if m.cfg.ShowHistogram {
@@ -224,7 +229,16 @@ func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
 			}
 		}
 
-		m.waterfall.Render(out, profile)
+		columns, rows := m.cfg.WaterfallColumns, m.cfg.WaterfallRows
+		if columns == 0 {
+			columns = 32
+		}
+
+		if rows == 0 {
+			rows = 8
+		}
+
+		m.waterfall.RenderView(out, profile, columns, rows)
 	}
 }
 
@@ -273,19 +287,44 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 		}
 	}()
 
-	if cfg.ShowGraph && !cfg.Headless {
-		m.graph = diag.NewEntropyGraph(60)
+	profile := terminal.Profile{}
+	if !cfg.Headless {
+		profile = terminal.Detect(cfg.Color)
 	}
 
-	if cfg.ShowDashboard && !cfg.Headless {
-		m.dashboard = diag.NewDashboard(60)
+	if cfg.ShowGraph && !cfg.Headless {
+		m.graph = diag.NewEntropyGraph(256)
+	}
+
+	if !cfg.Headless && (cfg.ShowDashboard || (cfg.Layout != terminal.LayoutCompact && profile.Interactive)) {
+		m.dashboard = diag.NewDashboard(256)
 	}
 
 	if cfg.ShowWaterfall && !cfg.Headless {
-		m.waterfall = diag.NewWaterfall(cfg.WaterfallColumns, cfg.WaterfallRows, cfg.WaterfallMode)
+		columns, rows := cfg.WaterfallColumns, cfg.WaterfallRows
+		if columns == 0 {
+			columns = diag.MaxWaterfallColumns
+			if cfg.Layout == terminal.LayoutCompact || !profile.Interactive {
+				columns = 32
+			}
+		}
+
+		if rows == 0 {
+			rows = diag.MaxWaterfallRows
+			if cfg.Layout == terminal.LayoutCompact || !profile.Interactive {
+				rows = 8
+			}
+		}
+
+		m.waterfall = diag.NewWaterfall(columns, rows, cfg.WaterfallMode)
 	}
 
-	display := time.NewTicker(cfg.DisplayInterval)
+	interval := cfg.DisplayInterval
+	if cfg.Layout != terminal.LayoutCompact && profile.Interactive {
+		interval = max(interval, 100*time.Millisecond)
+	}
+
+	display := time.NewTicker(interval)
 	defer display.Stop()
 
 	for {

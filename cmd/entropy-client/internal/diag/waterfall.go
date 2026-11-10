@@ -15,9 +15,11 @@ type waterfallRow struct {
 }
 
 const (
-	WaterfallByte = "byte"
-	WaterfallRGB  = "rgb"
-	WaterfallGray = "gray"
+	WaterfallByte       = "byte"
+	WaterfallRGB        = "rgb"
+	WaterfallGray       = "gray"
+	MaxWaterfallColumns = 256
+	MaxWaterfallRows    = 64
 )
 
 // Waterfall retains copied prefixes, never transport buffers.
@@ -33,7 +35,7 @@ func NewWaterfall(width, height int, mode string) *Waterfall {
 		mode = WaterfallByte
 	}
 
-	width, height = max(1, min(width, 128)), max(1, min(height, 32))
+	width, height = max(1, min(width, MaxWaterfallColumns)), max(1, min(height, MaxWaterfallRows))
 
 	return &Waterfall{width: width, height: height, mode: mode, rows: make([]waterfallRow, 0, height)}
 }
@@ -128,13 +130,18 @@ func cell(out *strings.Builder, color terminal.Color, r, g, b int) {
 
 // Render uses two columns per cell. Profile.Rows is the available screen budget.
 func (w *Waterfall) Render(out io.Writer, profile terminal.Profile) {
+	w.RenderView(out, profile, w.width, w.height)
+}
+
+// RenderView changes only visible dimensions, retaining bounded original rows.
+func (w *Waterfall) RenderView(out io.Writer, profile terminal.Profile, columns, rows int) {
 	if len(w.rows) == 0 {
 		return
 	}
 
 	label := max(6, len(strconv.FormatUint(w.rows[len(w.rows)-1].frame, 10)))
 
-	width, height := w.width, len(w.rows)
+	width, height := min(w.width, max(1, columns)), min(len(w.rows), max(1, rows))
 	if profile.Columns > 0 {
 		width = min(width, (profile.Columns-label-4)/2)
 		if width < 1 {

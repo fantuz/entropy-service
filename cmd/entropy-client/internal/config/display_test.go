@@ -25,7 +25,7 @@ func TestDisplayFlags(t *testing.T) {
 		}
 
 		if len(args) == 1 {
-			if cfg.ShowWaterfall || cfg.WaterfallMode != "byte" || cfg.WaterfallColumns != 32 || cfg.WaterfallRows != 8 || cfg.Color != "auto" {
+			if cfg.ShowWaterfall || cfg.WaterfallMode != "byte" || cfg.WaterfallColumns != 0 || cfg.WaterfallRows != 0 || cfg.Color != "auto" || cfg.Layout != "auto" {
 				t.Fatalf("incorrect display defaults: %+v", cfg)
 			}
 		} else if !cfg.ShowWaterfall || cfg.WaterfallMode != "rgb" || cfg.WaterfallColumns != 128 || cfg.WaterfallRows != 32 || cfg.Color != "256" {
@@ -44,9 +44,10 @@ func TestDisplayValidation(t *testing.T) {
 		{"color", func(c *Config) { c.Color = "rainbow" }},
 		{"mode", func(c *Config) { c.WaterfallMode = "rgba" }},
 		{"columns-low", func(c *Config) { c.WaterfallColumns = 7 }},
-		{"columns-high", func(c *Config) { c.WaterfallColumns = 129 }},
-		{"rows-low", func(c *Config) { c.WaterfallRows = 0 }},
-		{"rows-high", func(c *Config) { c.WaterfallRows = 33 }},
+		{"columns-high", func(c *Config) { c.WaterfallColumns = 257 }},
+		{"rows-low", func(c *Config) { c.WaterfallRows = -1 }},
+		{"rows-high", func(c *Config) { c.WaterfallRows = 65 }},
+		{"layout", func(c *Config) { c.Layout = "huge" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := valid
@@ -68,9 +69,17 @@ func TestDisplayValidation(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cfg.WaterfallColumns, cfg.WaterfallRows = 128, 32
+			cfg.WaterfallColumns, cfg.WaterfallRows = 256, 64
 			if err := cfg.ValidateAnalysis(); err != nil {
 				t.Fatal(err)
+			}
+
+			cfg.WaterfallColumns, cfg.WaterfallRows = 0, 0
+			for _, layout := range []string{"auto", "compact", "full"} {
+				cfg.Layout = layout
+				if err := cfg.ValidateAnalysis(); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}
