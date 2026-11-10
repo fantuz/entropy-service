@@ -67,6 +67,10 @@ jobs:
         run: go test -race -tags=experimental_barzakh ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/config ./cmd/entropy-server
       - name: Validate monitoring configuration and alert behavior
         run: bash scripts/test-monitoring.sh
+      - name: Verify pinned wordlists and multilingual word controls
+        run: |
+          python3 scripts/check-wordlists.py
+          node scripts/test-word-languages.mjs
       - name: Test browser KPI calculations
         run: node scripts/test-status-kpis.mjs
       - name: Test status refresh scheduling

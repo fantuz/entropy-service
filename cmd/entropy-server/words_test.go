@@ -56,7 +56,7 @@ func TestWordFrameSampling(t *testing.T) {
 }
 
 func TestWordPageCountAndCookie(t *testing.T) {
-	wordPattern := regexp.MustCompile(`<div class="words">([^<]*)</div>`)
+	wordPattern := regexp.MustCompile(`<div class="words" lang="en">([^<]*)</div>`)
 	hashPattern := regexp.MustCompile(`<div class="hash">([^<]*)</div>`)
 
 	for _, tc := range []struct {

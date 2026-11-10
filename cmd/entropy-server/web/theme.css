@@ -741,3 +741,8 @@ body.page-home > .site-toolbar { width:min(calc(100% - 2rem),70rem); margin:1rem
 .page-lab .lab-help details { border-top:1px solid var(--border); padding:.7rem 0; }
 .page-lab .lab-help summary { color:var(--green); }
 .page-lab .lab-help .note { max-width:none; margin:.8rem 0; }
+
+/* Language selection shares the existing word panel and appearance controls. */
+.word-language-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .65rem; }
+.word-language-controls select { max-inline-size: 100%; }
+.wordlist-info { margin: .65rem 0; font-size: .85rem; color: var(--muted); text-align: center; }

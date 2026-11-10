@@ -1,0 +1,118 @@
+Entropy Service — wordlist data notices
+======================================
+
+The program code remains under its own license. The following embedded wordlist
+data retains its upstream licensing and attribution. No upstream generator code
+is copied. Lists are not machine translations of one another.
+
+Modifications: dice indexes (where present) removed; words normalized to Unicode
+NFC; one UTF-8 word per LF-terminated line. Source order is preserved. No words
+are filtered, translated or deduplicated. English matches the previous EFF list
+exactly. BIP39 data is reused as dictionaries; output is not a BIP39 wallet mnemonic.
+
+en — English: EFF long list
+Attribution: Electronic Frontier Foundation (2016)
+License: CC-BY-3.0 (https://creativecommons.org/licenses/by/3.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_en_eff.txt
+Source SHA-256: addd35536511597a02fa0a9ff1e5284677b8883b83e986e43f15a3db996b903e
+Bundled SHA-256: 6d557f0693958fb5e650b68b5bee585eb82cf4da32965505c789e924743bc522
+Entries: 7776
+
+it — Italian: Diceware Italian
+Attribution: victordargallo (2024)
+License: CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_it.txt
+Source SHA-256: 151de0dfd72bc0be91cc26b77b693957e04c0dd29991bd7fde84176244d7aac9
+Bundled SHA-256: 151de0dfd72bc0be91cc26b77b693957e04c0dd29991bd7fde84176244d7aac9
+Entries: 8192
+
+fr — French: Tails French Diceware
+Attribution: Tango (2024)
+License: CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_fr.txt
+Source SHA-256: 48014d49bbe0691fc82f0b6121f5e50db74b49501403571f80bd7b6e9fbbe022
+Bundled SHA-256: a340ea6904e2ac40980a5c90c14b5bb76ecf278616caba0331689ebf95327e94
+Entries: 7776
+
+de — German: Diceware German
+Attribution: Uli Fouquet (2021)
+License: CC-BY-3.0 (https://creativecommons.org/licenses/by/3.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_de.txt
+Source SHA-256: a4a33aa6a9fd93f3d35a8a12c5899308ce4cc8c92cab76556a411ca97b232537
+Bundled SHA-256: dc384a9c07454a2708eab76bb27b84d1f41a735493e454ef0b884efd1e90364f
+Entries: 7776
+
+es — Spanish: Diceware Spanish
+Attribution: victordargallo (2024)
+License: CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_es.txt
+Source SHA-256: 20e7e54f4d1fa1d7e23aca0d11002ef42b1ac140ff9f3494b8e2f5f0ad686c35
+Bundled SHA-256: 20e7e54f4d1fa1d7e23aca0d11002ef42b1ac140ff9f3494b8e2f5f0ad686c35
+Entries: 8192
+
+pt-BR — Portuguese (Brazil): Diceware Brazilian Portuguese
+Attribution: drebs (2019)
+License: CC-BY-3.0 (https://creativecommons.org/licenses/by/3.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_pt-br.txt
+Source SHA-256: e03a241cb53f251c9124ca85886e0316490319cca0eaea2c53883e89cefcafba
+Bundled SHA-256: e03a241cb53f251c9124ca85886e0316490319cca0eaea2c53883e89cefcafba
+Entries: 7776
+
+ca — Catalan: Diceware Catalan
+Attribution: victordargallo (2024)
+License: CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)
+Source: https://raw.githubusercontent.com/ulif/diceware/b3138e95ee4054f579b52baf269eec4f68a6b9a7/diceware/wordlists/wordlist_ca.txt
+Source SHA-256: 53b6b14d20315bb163ebe365e52b731d497388b8ff8314d3d5050b62c5c68432
+Bundled SHA-256: 53b6b14d20315bb163ebe365e52b731d497388b8ff8314d3d5050b62c5c68432
+Entries: 8192
+
+cs — Czech: BIP39 Czech word data
+Attribution: Pavol Rusnak / Trezor python-mnemonic contributors
+License: MIT (https://opensource.org/license/mit)
+Source: https://raw.githubusercontent.com/trezor/python-mnemonic/b57a5ad77a981e743f4167ab2f7927a55c1e82a8/src/mnemonic/wordlist/czech.txt
+Source SHA-256: 7e80e161c3e93d9554c2efb78d4e3cebf8fc727e9c52e03b83b94406bdcc95fc
+Bundled SHA-256: 7e80e161c3e93d9554c2efb78d4e3cebf8fc727e9c52e03b83b94406bdcc95fc
+Entries: 2048
+
+ja — Japanese: BIP39 Japanese word data
+Attribution: Pavol Rusnak / Trezor python-mnemonic contributors
+License: MIT (https://opensource.org/license/mit)
+Source: https://raw.githubusercontent.com/trezor/python-mnemonic/b57a5ad77a981e743f4167ab2f7927a55c1e82a8/src/mnemonic/wordlist/japanese.txt
+Source SHA-256: 2eed0aef492291e061633d7ad8117f1a2b03eb80a29d0e4e3117ac2528d05ffd
+Bundled SHA-256: c58cb719f782910cfcedb6ab64dc506322bd7ce4f7cede5a0563ac06d3d5c884
+Entries: 2048
+
+ko — Korean: BIP39 Korean word data
+Attribution: Pavol Rusnak / Trezor python-mnemonic contributors
+License: MIT (https://opensource.org/license/mit)
+Source: https://raw.githubusercontent.com/trezor/python-mnemonic/b57a5ad77a981e743f4167ab2f7927a55c1e82a8/src/mnemonic/wordlist/korean.txt
+Source SHA-256: 9e95f86c167de88f450f0aaf89e87f6624a57f973c67b516e338e8e8b8897f60
+Bundled SHA-256: 4e9e6759fceb0235d6c46f0364c1c2ce541521001a9add34049aa47500872ddf
+Entries: 2048
+
+Upstream licensing references:
+https://github.com/ulif/diceware/blob/b3138e95ee4054f579b52baf269eec4f68a6b9a7/COPYRIGHT
+https://github.com/trezor/python-mnemonic/blob/b57a5ad77a981e743f4167ab2f7927a55c1e82a8/LICENSE
+
+MIT license text for the Czech/Japanese/Korean word data:
+The MIT License (MIT)
+
+Copyright (c) 2013-2016 Pavol Rusnak
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

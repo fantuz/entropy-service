@@ -51,8 +51,10 @@ type EntropySource interface {
 }
 
 type EntropyFrame struct {
-	Words string `json:"words"`
-	Hash  string `json:"hash"`
+	Words    string `json:"words"`
+	Hash     string `json:"hash"`
+	Language string `json:"language"`
+	Wordlist string `json:"wordlist"`
 }
 
 type EntropyDataFrame struct {
@@ -382,6 +384,12 @@ func randomHandler(d *drbg.DRBG, maxBytes int, budget *httpRequestBudget) http.H
 
 func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webSocketBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		dictionary, err := requestedWordList(r.URL.RawQuery)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		quantity, refresh := maxWords, defaultRefresh
 		q := r.URL.Query()
 		fields := []struct {
@@ -446,7 +454,7 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				frame, err := newWordFrame(source, quantity)
+				frame, err := newWordFrameFromList(source, quantity, dictionary)
 				if err != nil {
 					log.Printf("ws word generation failed: %v", err)
 					closeUnavailableGeneration(conn, err)
@@ -482,7 +490,8 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 <nav class="site-toolbar" aria-label="Site and appearance"><a href="/">Entropy Service</a><button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button></nav>
 <main class="panel">
 <h1>Random Words</h1>
-<div class="words">{{.Words}}</div>
+<p>{{.LanguageName}} · {{.ListSize}} entries · {{.Bits}} bits/word of uniform selection</p>
+<div class="words" lang="{{.Language}}">{{.Words}}</div>
 <div class="hash">{{.Hash}}</div>
 </main>
 </body>
@@ -490,6 +499,12 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 `))
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		dictionary, err := requestedWordList(r.URL.RawQuery)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		prefs, err := extractPrefs(r, maxBytes, quantity, hasCookie)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -503,7 +518,7 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 		}
 		defer release()
 
-		frame, err := newWordFrame(source, prefs.Words)
+		frame, err := newWordFrameFromList(source, prefs.Words, dictionary)
 		if err != nil {
 			writeGenerationError(w, err, "word generation failed")
 
@@ -521,15 +536,27 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 		}
 
 		data := struct {
-			Words   string
-			Hash    string
-			Refresh int
+			Words        string
+			Hash         string
+			Refresh      int
+			Language     string
+			LanguageName string
+			ListSize     int
+			Bits         string
 		}{
-			Words:   frame.Words,
-			Hash:    frame.Hash,
-			Refresh: refreshSeconds,
+			Language:     frame.Language,
+			LanguageName: dictionary.Info().Name,
+			ListSize:     dictionary.Size(),
+			Bits:         fmt.Sprintf("%.2f", dictionary.Info().SelectionBitsPerWord),
+			Words:        frame.Words,
+			Hash:         frame.Hash,
+			Refresh:      refreshSeconds,
 		}
 
+		w.Header().Set("Content-Language", frame.Language)
+		w.Header().Set("X-Wordlist-ID", frame.Wordlist)
+		w.Header().Set("X-Wordlist-Size", strconv.Itoa(dictionary.Size()))
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		if err := page.Execute(w, data); err != nil {
@@ -1190,6 +1217,7 @@ func main() {
 	}
 
 	mux.Handle("/", http.FileServer(http.FS(webRoot)))
+	registerWordUI(mux)
 
 	mux.HandleFunc("/live", livenessHandler)
 	mux.HandleFunc("/ready", healthHandler(&root, maxReseedAge))
