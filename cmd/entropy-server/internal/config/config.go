@@ -130,7 +130,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		fmt.Fprintln(output, "Entropy Server")
 		fmt.Fprintln(output, "Usage: entropy-server [options]")
 		fmt.Fprintln(output, "Provision a unique self-signed TLS identity: entropy-server generate-cert -help")
-		fmt.Fprintln(output, "Millisecond flags use plain integers; source-timeout uses a Go duration, e.g. 3s.")
+		fmt.Fprintln(output, "Millisecond flags use plain integer milliseconds, e.g. 1000 (no unit suffix); source-timeout uses a Go duration, e.g. 3s.")
 		fmt.Fprintln(output, "WebSocket budgets are shared by HTTP/HTTPS and reserved until disconnect.")
 		fmt.Fprintln(output, "Inbound WebSocket messages are limited to 1 KiB.")
 		fmt.Fprintln(output, "/bytes and /colors accept format=json (default), compact, or hash.")
