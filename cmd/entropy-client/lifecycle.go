@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
-	"io"
+	"errors"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/client"
 )
+
+var errSampleComplete = errors.New("preflight sample received")
 
 func waitContext(ctx context.Context, delay time.Duration) bool {
 	timer := time.NewTimer(delay)
@@ -27,33 +29,17 @@ func sampleEntropy(ctx context.Context, mode, httpURL, wsURL string, quantity in
 		return client.FetchEntropy(ctx, httpURL, quantity)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	var data []byte
 
-	frames, err := client.StreamEntropy(ctx, wsURL)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		cancel()
-
-		for frame := range frames {
-			frame.Release()
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case frame, ok := <-frames:
-		if !ok {
-			return nil, io.EOF
-		}
-
-		data := bytes.Clone(frame.Data)
+	err := client.ReceiveEntropy(ctx, wsURL, func(frame client.StreamFrame) error {
+		data = bytes.Clone(frame.Data)
 		frame.Release()
 
+		return errSampleComplete
+	})
+	if errors.Is(err, errSampleComplete) {
 		return data, nil
 	}
+
+	return nil, err
 }

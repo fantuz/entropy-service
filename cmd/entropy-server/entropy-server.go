@@ -1096,6 +1096,21 @@ func main() {
 
 	reportTLS(startup, tlsCfg, time.Now())
 
+	if tlsCfg != nil {
+		certificateContext, stopCertificate := context.WithCancel(ctx)
+
+		certificateDone := make(chan struct{})
+		go func() {
+			defer close(certificateDone)
+
+			watchCertificateExpiry(certificateContext, tlsCfg.Certificates[0].Leaf, func(message string) {
+				log.Printf("TLS certificate warning: %s", message)
+			})
+		}()
+
+		defer func() { stopCertificate(); <-certificateDone }()
+	}
+
 	// Select and open exactly one source. Report the opened reader's identity,
 	// not merely the path requested before potential fallback.
 	qrngdev, actualSource, err := openEntropySource(cfg.DevicePath, cfg.RequireDevice)

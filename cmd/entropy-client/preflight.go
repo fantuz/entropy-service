@@ -20,6 +20,7 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Value("WebSocket endpoint", displayEndpoint(wsURL))
 	r.Value("Frame size", fmt.Sprintf("%d bytes", cfg.Slice))
 	r.Value("Refresh interval", fmt.Sprintf("%s (%.2f frames/s)", cfg.Refresh, 1/cfg.Refresh.Seconds()))
+	r.Value("Transport retries", fmt.Sprintf("%d total; initial delay %s; cap 30s", cfg.Retries, cfg.RetryDelay))
 	r.Value("Requested rate", fmt.Sprintf("%.3f MiB/s (payload target)", float64(cfg.Slice)/cfg.Refresh.Seconds()/(1<<20)))
 	r.Section("Analysis & output")
 	r.Value("Analysis prefix cap", fmt.Sprintf("%d bytes (0 = full frame)", cfg.AnalysisBytes))

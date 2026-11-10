@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -95,6 +96,7 @@ func certificateTemplate(opts CertificateOptions, now time.Time) (*x509.Certific
 
 	template := &x509.Certificate{
 		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "Entropy Service local TLS"},
 		NotBefore:    now.Add(-5 * time.Minute),
 		NotAfter:     now.Add(opts.ValidFor),
 		KeyUsage:     x509.KeyUsageDigitalSignature,

@@ -1,5 +1,8 @@
 # Raw client exports: files, pipes and devices
 
+Transport retries are opt-in with `-retries` and preserve the open destination
+and total `-output-bytes` limit. See [disconnect handling and retry policy](client-recovery.md).
+
 The client can save a binary sample, feed another application, or send a stream
 to another machine through SSH. These are useful for offline analysis and
 remote consumers without inventing a new transport protocol. Export writes

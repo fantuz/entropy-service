@@ -337,6 +337,8 @@ round-trip measurements.
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `-duration` | `0s` | Non-negative measurement duration, e.g. `10m` or `3h`; zero runs until interrupted. Excludes interactive preflight. |
+| `-retries` | `0` | Maximum total transport retries per measured run, 0–100; opt-in, without resetting output or timing limits. |
+| `-retry-delay` | `1s` | Initial backoff, 1ms–30s; exponential with jitter, capped at 30s. See [retryable failures and limits](client-recovery.md). |
 | `-report` | empty | Write JSONL metadata, analysed samples and a final summary to a **new** file (mode 0600). `-` selects stdout and requires `-headless`. |
 | `-headless` | `false` | Skip interactive preflight and all terminal rendering, previews and bells; suitable for scripts and JSONL stdout. |
 

@@ -60,6 +60,19 @@ func runCertificateCommand(args []string, output io.Writer) int {
 		fmt.Fprintf(output, "Reusing valid TLS certificate %q and owner-only private key %q.\n", opts.CertFile, opts.KeyFile)
 	}
 
+	tlsConfig, err := transport.NewTLSConfig(opts.CertFile, opts.KeyFile)
+	if err != nil {
+		fmt.Fprintf(output, "Inspect provisioned TLS certificate: %v\n", err)
+		return 1
+	}
+
+	state, message := certificateExpiry(tlsConfig.Certificates[0].Leaf, time.Now())
+	fmt.Fprintf(output, "[%s] Certificate expiry: %s\n", state, message)
+
+	if tlsConfig.Certificates[0].Leaf.Issuer.String() == "" {
+		fmt.Fprintf(output, "[%s] %s\n", reportWarning, emptyIssuerWarning)
+	}
+
 	fmt.Fprintln(output, "Clients must trust the certificate explicitly; monitor expiry and renew before it expires.")
 
 	return 0

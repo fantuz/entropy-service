@@ -50,7 +50,11 @@ type Config struct {
 	Duration         time.Duration
 	ReportPath       string
 	Headless         bool
+	Retries          int
+	RetryDelay       time.Duration
 }
+
+const MaxRetryDelay = 30 * time.Second
 
 func ParseConfig() *Config {
 	cfg := &Config{}
@@ -83,6 +87,8 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.ReportPath, "report", "", "write JSONL to a new file; - writes to stdout with -headless")
 	flag.BoolVar(&cfg.Headless, "headless", false, "disable terminal output and interactive preflight")
 	flag.StringVar(&cfg.Mode, "mode", "pull", "Preferred mode: pull|stream (HTTP vs websocket)")
+	flag.IntVar(&cfg.Retries, "retries", 0, "Maximum total transport retries per measured run (0..100; default 0 fails immediately)")
+	flag.DurationVar(&cfg.RetryDelay, "retry-delay", time.Second, "Initial retry delay (1ms..30s); exponential backoff capped at 30s, with jitter")
 
 	flag.StringVar(&cfg.HTTPUrl, "url", "http://127.0.0.1:8080/v1/data/random", "HTTP entropy endpoint (supports existing query parameters)")
 	flag.StringVar(&cfg.WSUrl, "wsurl", "ws://127.0.0.1:8080/stream", "WS entropy endpoint (supports existing query parameters)")
@@ -105,6 +111,14 @@ func ParseConfig() *Config {
 }
 
 func (cfg *Config) ValidateAnalysis() error {
+	if cfg.Retries < 0 || cfg.Retries > 100 {
+		return errors.New("retries must be between 0 and 100")
+	}
+
+	if cfg.RetryDelay < 0 || cfg.RetryDelay > MaxRetryDelay || (cfg.Retries > 0 && cfg.RetryDelay < time.Millisecond) {
+		return errors.New("retry-delay must be between 1ms and 30s when retries are enabled")
+	}
+
 	if err := cfg.validateOutput(); err != nil {
 		return err
 	}

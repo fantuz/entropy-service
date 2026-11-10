@@ -94,6 +94,8 @@ type reportSettings struct {
 	WaterfallRows    int     `json:"waterfall_rows"`
 	Color            string  `json:"color"`
 	Layout           string  `json:"layout"`
+	Retries          int     `json:"retries"`
+	RetryDelay       string  `json:"retry_delay"`
 }
 
 type startRecord struct {
@@ -126,7 +128,8 @@ func (r *runReport) start(cfg *config.Config, endpoint string) error {
 			OutputKind: cfg.OutputKind(), OutputLimit: cfg.OutputBytes,
 			Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
 			WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
-			Layout: cfg.Layout,
+			Layout:  cfg.Layout,
+			Retries: cfg.Retries, RetryDelay: cfg.RetryDelay.String(),
 		},
 		GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
 	})

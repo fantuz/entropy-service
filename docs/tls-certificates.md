@@ -89,6 +89,18 @@ world-readable to accommodate a dynamic UID. See [packaged deployment](packaged-
 
 ## Renewal and recovery
 
+Startup and `generate-cert` report the loaded certificate's expiry time and
+warn when it has 24 hours or less remaining. A running HTTPS server logs a
+warning at that boundary and again at expiry, without changing its identity.
+These notices do not renew files or update client trust automatically.
+
+Newly generated certificates include a nonempty subject/issuer name for TLS
+client compatibility; SANs remain the authority for hostname verification.
+Earlier generated pairs with an empty issuer can be rejected by some curl/TLS
+backends. Existing pairs are preserved and now produce a warning: use the
+explicit renewal procedure below to replace them rather than expecting
+`-if-missing` to change an established identity.
+
 `-if-missing` never renews or rotates an identity automatically. It rejects
 expired/not-yet-valid certificates, missing halves, mismatched keys, wrong
 hosts, symlinked files and keys readable by group/other users. An existing
@@ -102,6 +114,67 @@ trust/pins and configured paths, then explicitly restart. Failed provisioning
 does not fall back to plaintext. Two files cannot be atomically published
 as one filesystem operation, and automatic identity replacement would break
 existing trust. Use a CA/ACME lifecycle when unattended renewal is required.
+
+### Renew a self-signed identity managed by systemd
+
+The following procedure is exercised by the real systemd CI test. Use new
+filenames, retain the existing pair for rollback, and complete renewal before
+the old certificate expires. Keep the same DNS/IP SANs required by your clients.
+
+Generate the replacement under systemd's service identity and state-directory
+mapping. This also works with the packaged `DynamicUser` sandbox:
+
+```sh
+sudo systemd-run --wait --collect --unit=entropy-cert-renewal \
+  -p DynamicUser=yes -p User=entropy-service \
+  -p StateDirectory=entropy-service -p StateDirectoryMode=0700 -p UMask=0077 \
+  /usr/bin/entropy-server generate-cert \
+  -cert-file=/var/lib/entropy-service/renewed-cert.pem \
+  -key-file=/var/lib/entropy-service/renewed-key.pem \
+  -hosts=localhost,127.0.0.1,::1
+```
+
+Generation refuses existing filenames. For subsequent rotations choose another
+new pair of names. Distribute only the replacement **public certificate** over
+a trusted channel and verify its fingerprint. Stage client trust for both old
+and new identities before switching. For a local verification copy:
+
+```sh
+sudo openssl x509 -in /var/lib/entropy-service/renewed-cert.pem -noout -fingerprint -sha256 -dates
+sudo cat /var/lib/entropy-service/renewed-cert.pem > ./entropy-server-renewed.pem
+sudo cp /etc/systemd/system/entropy-server.service.d/override.conf \
+  /etc/systemd/system/entropy-server.service.d/override.conf.previous
+```
+
+Edit the existing override and **replace both certificate paths in both
+`ExecStartPre` and `ExecStart`** with the replacement paths. Keep the other
+listener/source settings. Do not append a second provisioning command that
+still checks an expired pair. The `.previous` backup is not a systemd `.conf`
+drop-in and is not loaded.
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl restart entropy-server
+curl --cacert ./entropy-server-renewed.pem https://localhost:8443/live
+```
+
+Clients trusting only the old self-signed certificate will reject the new
+identity until their trust/pins are updated. If verification fails, restore
+the retained override and reload/restart again; rollback requires that the
+previous certificate is still valid:
+
+```sh
+sudo cp /etc/systemd/system/entropy-server.service.d/override.conf.previous \
+  /etc/systemd/system/entropy-server.service.d/override.conf
+sudo systemctl daemon-reload
+sudo systemctl restart entropy-server
+```
+
+After all clients use the replacement successfully, remove old trust and
+retire the old private key under your own retention policy. The server loads
+TLS once per process, so replacing a file alone does not switch the active
+certificate. CA/ACME-managed deployments should use their existing renewal
+and service-reload lifecycle instead of the self-signed workflow above.
 
 ## Retired demonstration key
 

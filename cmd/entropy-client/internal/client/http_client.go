@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -110,14 +109,14 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 
 	resp, err := entropyHTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &requestError{cause: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
 
-		return nil, fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+		return nil, &HTTPStatusError{Code: resp.StatusCode, Body: string(body), RetryAfter: retryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
 
 	if resp.ContentLength > maxEntropyBytes {

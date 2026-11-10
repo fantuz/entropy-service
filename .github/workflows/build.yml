@@ -8,14 +8,12 @@ on:
     paths-ignore:
       - "**.md"
       - ".gitignore"
-      - "resources/**"
   pull_request:
     branches:
       - main
     paths-ignore:
       - "**.md"
       - ".gitignore"
-      - "resources/**"
 
 concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
@@ -97,7 +95,7 @@ jobs:
           python3 scripts/test_client_terminal.py
       - name: Smoke-test 20-FPS terminal redraws
         run: python3 scripts/test_client_20fps.py
-      - name: Smoke-test client binary exports and pipe cancellation
+      - name: Smoke-test client binary exports, retries and pipe cancellation
         run: python3 scripts/test_client_output.py
       - name: Race-test all Go packages
         run: make test-race
@@ -114,3 +112,5 @@ jobs:
         with:
           version: v2.17.0
           args: release --snapshot --skip=publish --clean
+      - name: Test real packaged systemd HTTP and HTTPS lifecycle
+        run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh dist/*_amd64.deb
