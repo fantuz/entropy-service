@@ -10,6 +10,7 @@ import (
 const (
 	certificateWarningLead = 24 * time.Hour
 	reportWarning          = "WARN"
+	emptyIssuerWarning     = "empty certificate issuer; some TLS clients reject it; renew explicitly using a new pair of filenames"
 )
 
 func certificateExpiry(cert *x509.Certificate, now time.Time) (string, string) {

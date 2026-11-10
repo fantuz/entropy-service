@@ -77,6 +77,13 @@ warn when it has 24 hours or less remaining. A running HTTPS server logs a
 warning at that boundary and again at expiry, without changing its identity.
 These notices do not renew files or update client trust automatically.
 
+Newly generated certificates include a nonempty subject/issuer name for TLS
+client compatibility; SANs remain the authority for hostname verification.
+Earlier generated pairs with an empty issuer can be rejected by some curl/TLS
+backends. Existing pairs are preserved and now produce a warning: use the
+explicit renewal procedure below to replace them rather than expecting
+`-if-missing` to change an established identity.
+
 `-if-missing` never renews or rotates an identity automatically. It rejects
 expired/not-yet-valid certificates, missing halves, mismatched keys, wrong
 hosts, symlinked files and keys readable by group/other users. An existing

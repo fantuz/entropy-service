@@ -69,6 +69,10 @@ func runCertificateCommand(args []string, output io.Writer) int {
 	state, message := certificateExpiry(tlsConfig.Certificates[0].Leaf, time.Now())
 	fmt.Fprintf(output, "[%s] Certificate expiry: %s\n", state, message)
 
+	if tlsConfig.Certificates[0].Leaf.Issuer.String() == "" {
+		fmt.Fprintf(output, "[%s] %s\n", reportWarning, emptyIssuerWarning)
+	}
+
 	fmt.Fprintln(output, "Clients must trust the certificate explicitly; monitor expiry and renew before it expires.")
 
 	return 0

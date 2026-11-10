@@ -48,6 +48,10 @@ func TestGenerateCertificateIdentityAndReuse(t *testing.T) {
 	}
 
 	leaf := cfg.Certificates[0].Leaf
+	if leaf.Subject.String() == "" || leaf.Issuer.String() == "" || !bytes.Equal(leaf.RawSubject, leaf.RawIssuer) {
+		t.Fatal("self-signed identity must have matching nonempty issuer and subject names for TLS client compatibility")
+	}
+
 	roots := x509.NewCertPool()
 	roots.AddCert(leaf)
 
