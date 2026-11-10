@@ -1162,8 +1162,10 @@ func main() {
 	mux.HandleFunc("/health-1", healthHandler(&root, maxReseedAge))
 	mux.HandleFunc("/health-2", healthHandler(&root, maxReseedAge))
 
-	mux.Handle("/metrics-1", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor))
-	mux.Handle("/metrics-2", metricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor))
+	mux.Handle("/metrics", canonicalMetricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor))
+	legacyMetrics := metricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor)
+	mux.Handle("/metrics-1", legacyMetrics)
+	mux.Handle("/metrics-2", legacyMetrics)
 
 	mux.HandleFunc("/stream", wsBinaryHandler(&root, cfg.RefreshColorMs, 2048, cfg.MaxBytes, wsBudget))
 	mux.HandleFunc("/colors", wsBytesHandler(&root, cfg.RefreshColorMs, cfg.MaxBytes, wsBudget))
