@@ -51,8 +51,24 @@ to clients or turn off certificate validation to make a deployment work.
 
 The package remains local-only HTTP and is not started/enabled by installation.
 It does not generate files or restart running services during upgrade. For
-an explicitly selected local HTTPS deployment, an operator can use this
-systemd drop-in (for example through `sudo systemctl edit entropy-server`):
+an explicitly selected local HTTPS deployment, use either method to create
+`/etc/systemd/system/entropy-server.service.d/override.conf`.
+
+Use systemd's editor:
+
+```sh
+sudo systemctl edit entropy-server
+```
+
+Or create the directory and edit the override file directly:
+
+```sh
+sudo mkdir -p /etc/systemd/system/entropy-server.service.d
+sudoedit /etc/systemd/system/entropy-server.service.d/override.conf
+```
+
+With either method, paste the following contents into the editable section
+and save:
 
 ```ini
 [Service]
@@ -60,12 +76,13 @@ StateDirectory=entropy-service
 StateDirectoryMode=0700
 ExecStartPre=/usr/bin/entropy-server generate-cert -if-missing -cert-file=/var/lib/entropy-service/cert.pem -key-file=/var/lib/entropy-service/key.pem -hosts=localhost,127.0.0.1,::1
 ExecStart=
-ExecStart=/usr/bin/entropy-server -http=127.0.0.1:8080 -https=127.0.0.1:8443 -device=/dev/urandom -require-device=true -cert-file=/var/lib/entropy-service/cert.pem -key-file=/var/lib/entropy-service/key.pem
+ExecStart=/usr/bin/entropy-server -http=127.0.0.1:8080 -https=127.0.0.1:8443 -enable-https=true -device=/dev/urandom -require-device=true -cert-file=/var/lib/entropy-service/cert.pem -key-file=/var/lib/entropy-service/key.pem
 ```
 
 `StateDirectory` supplies writable persistent storage with the correct
 ownership for the packaged `DynamicUser` sandbox. The certificate survives
-restarts. Review the effective unit before explicitly restarting it. For
+restarts. Direct file edits require `sudo systemctl daemon-reload` before
+restarting the service. Review the effective unit before explicitly restarting it. For
 root-owned CA-managed private keys, use systemd `LoadCredential` and `%d`
 credential paths or another explicit access policy; do not make keys
 world-readable to accommodate a dynamic UID. See [packaged deployment](packaged-service.md).
