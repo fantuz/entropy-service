@@ -33,3 +33,9 @@ vendor/
 
 # Runtime-generated files
 cookies.json
+
+# Operator TLS identities must never be committed.
+*.pem
+*.key
+*.p12
+*.pfx

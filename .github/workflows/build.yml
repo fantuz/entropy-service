@@ -30,6 +30,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.0
+      - name: Reject tracked TLS identities and private keys
+        run: |
+          python3 scripts/check_credential_files.py
+          python3 -m unittest discover -s scripts -p 'test_check_credential_files.py'
       - name: Setup Go
         uses: actions/setup-go@v6.5.0
         with:

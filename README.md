@@ -141,11 +141,24 @@ Require your hardware source explicitly when silent fallback would be inappropri
 
 Without `-require-device=true`, an unavailable device can fall back to the OS CSPRNG. `/dev/urandom` is a cryptographic source, not a deliberately weak test generator. Accepting a device path does not establish the quality of its output; the hardware, driver and source assessment remain part of your deployment.
 
-The standalone binary enables HTTPS by default and expects deployment-specific `cert.pem` and `key.pem`. **Never deploy the publicly committed `cmd/entropy-server/key.pem`: it is a development fixture, not a secret.** Use your own certificate and private key; see [SECURITY.md](SECURITY.md). To serve HTTP on port 8080 and TLS 1.3 on port 8443 using your own certificates:
+The standalone binary enables HTTPS by default and expects deployment-specific `cert.pem` and `key.pem`. No TLS identity is bundled. The old public demonstration key has been removed and is rejected by the TLS loader; replace it if you used an earlier checkout. For local testing, generate a unique, short-lived identity first:
+
+```sh
+mkdir -m 700 ./tls
+./bin/entropy-server generate-cert -cert-file=./tls/cert.pem -key-file=./tls/key.pem
+./bin/entropy-server -device=/dev/urandom -http=127.0.0.1:8080 -https=127.0.0.1:8443 \
+  -cert-file=./tls/cert.pem -key-file=./tls/key.pem
+# In another terminal: trust this certificate explicitly for local testing.
+curl --cacert ./tls/cert.pem https://localhost:8443/live
+```
+
+For public deployments, use your organization's CA/ACME certificate lifecycle. To serve HTTP on port 8080 and TLS 1.3 on port 8443 with an existing certificate chain and matching private key:
 
 ```sh
 ./bin/entropy-server -device=/dev/urandom -cert-file=/absolute/path/cert.pem -key-file=/absolute/path/key.pem
 ```
+
+See [certificate generation, startup provisioning and migration](docs/tls-certificates.md) and [SECURITY.md](SECURITY.md). Missing or invalid TLS files fail startup; certificates are never silently generated or replaced.
 
 Use `https://` and `wss://` for remote consumers. Configure authentication and access controls at the deployment boundary: the service has no built-in client authentication. The WebSocket upgrader uses Gorilla's default same-host browser origin policy; requests without an `Origin` header may still be admitted. Origin validation is not authentication. HTTP/2 is not enabled in the current listener setup.
 

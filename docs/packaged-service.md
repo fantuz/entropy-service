@@ -26,6 +26,10 @@ binary's default listener/source settings.
 
 ## Before enabling for the first time
 
+For an explicitly selected HTTPS deployment, see [certificate generation and
+the opt-in startup provisioning drop-in](tls-certificates.md#provision-at-service-startup).
+The package never installs a shared private key or silently generates an identity.
+
 Inspect the effective configuration and start only when satisfied:
 
 ```sh

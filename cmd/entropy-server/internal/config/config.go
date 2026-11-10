@@ -91,8 +91,8 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.Int64Var(&cfg.LabMemoryMiB, "lab-memory-mib", 32, "Experimental bridge working-memory budget in MiB")
 	flags.StringVar(&cfg.HTTPAddr, "http", ":8080", "HTTP listen address")
 	flags.StringVar(&cfg.HTTPSAddr, "https", ":8443", "HTTPS listen address")
-	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "Public Key File")
-	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "Private Key File")
+	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "TLS certificate chain PEM file (provision your own; see generate-cert -help)")
+	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "TLS private key PEM file matching cert-file; keep owner-only")
 	flags.StringVar(&cfg.DevicePath, "device", "/dev/qrandom0", "Entropy source, defaults to /dev/qrandom0")
 	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; barzakh-521-experimental requires -tags=experimental_barzakh")
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
@@ -120,6 +120,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.Usage = func() {
 		fmt.Fprintln(output, "Entropy Server")
 		fmt.Fprintln(output, "Usage: entropy-server [options]")
+		fmt.Fprintln(output, "Provision a unique self-signed TLS identity: entropy-server generate-cert -help")
 		fmt.Fprintln(output, "Timing values are plain integer milliseconds, e.g. 1000 (no unit suffix).")
 		fmt.Fprintln(output, "WebSocket budgets are shared by HTTP/HTTPS and reserved until disconnect.")
 		fmt.Fprintln(output, "Inbound WebSocket messages are limited to 1 KiB.")

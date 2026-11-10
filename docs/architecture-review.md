@@ -9,6 +9,12 @@
 >
 > **Primary security specification:** [Trust boundaries and threat model](security-boundaries.md).
 
+> **Later status:** this document preserves the November 4 baseline. Several
+> findings have since been addressed (packaged service identity/binding,
+> source selection, release validation and the shared TLS key). See the
+> [November 10 source-backed follow-up](review-followup-2026-11-10.md) for the
+> four findings revisited in the external PDF and remaining priorities.
+
 ## Executive summary
 
 The architecture has a coherent division between seed acquisition, one
