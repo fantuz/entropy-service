@@ -175,7 +175,7 @@ func TestPreferenceCookieRoundTrip(t *testing.T) {
 				for _, path := range []string{"/v1/meta/random", "/paroleparoleparole"} {
 					page, _ := preferenceGet(t, client, endpoint+path)
 
-					words := regexp.MustCompile(`<div class="words">([^<]*)</div>`).FindSubmatch(page)
+					words := regexp.MustCompile(`<div class="words" lang="en">([^<]*)</div>`).FindSubmatch(page)
 					if len(words) != 2 || len(strings.Fields(string(words[1]))) != wantWords {
 						t.Fatalf("word preferences did not cross HTTP endpoints: %s", page)
 					}
