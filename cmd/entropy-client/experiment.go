@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/device"
 )
 
 const (
@@ -15,9 +16,14 @@ const (
 	reasonTransportError = "transport_error"
 	reasonStartupError   = "startup_error"
 	reasonReportError    = "report_error"
+	reasonWriteoutError  = "writeout_error"
 )
 
-func runConfigured(ctx context.Context, cfg *config.Config) (runErr error) {
+func runConfigured(ctx context.Context, cfg *config.Config) error {
+	return runConfiguredWithWriteout(ctx, cfg, func() (writeoutSink, error) { return device.Open() })
+}
+
+func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevice func() (writeoutSink, error)) (runErr error) {
 	if err := cfg.ValidateAnalysis(); err != nil {
 		return err
 	}
@@ -58,6 +64,26 @@ func runConfigured(ctx context.Context, cfg *config.Config) (runErr error) {
 	}
 
 	m := monitorState{cfg: cfg}
+	defer func() { runErr = errors.Join(runErr, m.closeWriteout()) }()
+
+	finish := func(reason string, err error) error {
+		if closeErr := m.closeWriteout(); closeErr != nil {
+			if err == nil {
+				reason = reasonWriteoutError
+			}
+
+			err = errors.Join(err, closeErr)
+		}
+
+		return errors.Join(err, report.summary(&m, began, reason, err != nil))
+	}
+	if cfg.WriteOut {
+		m.writeout, err = openDevice()
+		if err != nil {
+			m.deviceErrors++
+			return finish(reasonStartupError, fmt.Errorf("enable writeout: %w", err))
+		}
+	}
 
 	if !cfg.Headless {
 		if err := showPreflight(ctx, cfg, httpURL, wsURL); err != nil {
@@ -66,17 +92,17 @@ func runConfigured(ctx context.Context, cfg *config.Config) (runErr error) {
 				reason, err = reasonInterrupted, nil
 			}
 
-			return errors.Join(err, report.summary(&m, began, reason, err != nil))
+			return finish(reason, err)
 		}
 	}
 
 	m.started = time.Now()
 
 	if err := report.write(newReportHeader("measurement_start")); err != nil {
-		return err
+		return finish(reasonReportError, err)
 	}
 
 	reason, err := runMonitor(ctx, &m, report, httpURL, wsURL)
 
-	return errors.Join(err, report.summary(&m, began, reason, err != nil))
+	return finish(reason, err)
 }

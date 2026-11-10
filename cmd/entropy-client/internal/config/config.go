@@ -52,7 +52,7 @@ func ParseConfig() *Config {
 	cfg := &Config{}
 
 	flag.Int64Var(&cfg.Slice, "slice", 2097152, "raw bytes per response/message (1..33554432)")
-	flag.BoolVar(&cfg.WriteOut, "writeout", false, "write out the received entropy back to local /dev/urandom (useful for low-entropy or isolated systems)")
+	flag.BoolVar(&cfg.WriteOut, "writeout", false, "Linux only: mix received bytes into /dev/urandom without entropy credit; fail on device errors (normally unnecessary)")
 	flag.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
 
 	flag.BoolVar(&cfg.ShowPreview, "preview", false, "print hex preview of first 64 bytes")
