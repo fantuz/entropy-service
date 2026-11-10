@@ -51,14 +51,24 @@ to clients or turn off certificate validation to make a deployment work.
 
 The package remains local-only HTTP and is not started/enabled by installation.
 It does not generate files or restart running services during upgrade. For
-an explicitly selected local HTTPS deployment, create
-`/etc/systemd/system/entropy-server.service.d/override.conf` with:
+an explicitly selected local HTTPS deployment, use either method to create
+`/etc/systemd/system/entropy-server.service.d/override.conf`.
+
+Use systemd's editor:
 
 ```sh
 sudo systemctl edit entropy-server
 ```
 
-Paste the following contents into the editable section and save:
+Or create the directory and edit the override file directly:
+
+```sh
+sudo mkdir -p /etc/systemd/system/entropy-server.service.d
+sudoedit /etc/systemd/system/entropy-server.service.d/override.conf
+```
+
+With either method, paste the following contents into the editable section
+and save:
 
 ```ini
 [Service]
