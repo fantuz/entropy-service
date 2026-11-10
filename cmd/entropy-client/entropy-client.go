@@ -109,6 +109,7 @@ func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl
 	fmt.Println("Data Preview         :", cfg.ShowPreview)
 	fmt.Println("Waterfall / mapping  :", cfg.ShowWaterfall, cfg.WaterfallMode)
 	fmt.Println("Terminal colors      :", cfg.Color)
+	fmt.Println("Terminal layout      :", cfg.Layout)
 	fmt.Println("----------------------------------------------")
 
 	if int(cfg.Slice) == len(testdata) {

@@ -91,6 +91,7 @@ type reportSettings struct {
 	WaterfallColumns int     `json:"waterfall_columns"`
 	WaterfallRows    int     `json:"waterfall_rows"`
 	Color            string  `json:"color"`
+	Layout           string  `json:"layout"`
 }
 
 type startRecord struct {
@@ -126,6 +127,7 @@ func (r *runReport) start(cfg *config.Config, endpoint string) error {
 			Headless: cfg.Headless, Matrix: cfg.ShowMatrix, WriteOut: cfg.WriteOut,
 			Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
 			WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
+			Layout: cfg.Layout,
 		},
 		GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
 	})

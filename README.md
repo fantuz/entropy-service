@@ -79,6 +79,10 @@ maps bytes to hues, RGB triplets or grayscale, with bounded history and
 terminal sizing. `-color=auto` detects Linux terminal capabilities and leaves
 redirected stdout unstyled; explicit color modes are available.
 
+Large interactive terminals use the [adaptive full layout](docs/client-terminal.md)
+with adjacent panels and wider histories. `-layout=compact` keeps stacked
+output; `-layout=full -waterfall` requests the larger dashboard explicitly.
+
 ![Entropy client with byte-hue waterfall](docs/images/client-waterfall.png)
 
 ### WebSocket examples with curl

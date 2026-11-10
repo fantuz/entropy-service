@@ -19,15 +19,22 @@ type Dashboard struct {
 }
 
 func NewDashboard(width int) *Dashboard {
+	width = max(1, min(width, 256))
+
 	return &Dashboard{
-		width: width,
-		rate:  NewRateMeter(),
+		width:   width,
+		rate:    NewRateMeter(),
+		entropy: make([]float64, 0, width), chiP: make([]float64, 0, width),
+		monoP: make([]float64, 0, width), serial: make([]float64, 0, width),
 	}
 }
 
 func push(series []float64, v float64, width int) []float64 {
 	if len(series) >= width {
-		series = series[1:]
+		copy(series, series[1:])
+		series[len(series)-1] = v
+
+		return series
 	}
 
 	return append(series, v)
@@ -91,6 +98,12 @@ func (d *Dashboard) Render() {
 }
 
 func (d *Dashboard) RenderTo(out io.Writer) {
+	d.RenderWidth(out, d.width)
+}
+
+func (d *Dashboard) RenderWidth(out io.Writer, cells int) {
+	cells = max(1, min(cells, d.width))
+	recent := func(values []float64) []float64 { return values[max(0, len(values)-cells):] }
 	total := ClientRateMeter.Total()
 	rate := ClientRateMeter.RateMiB()
 
@@ -106,22 +119,22 @@ func (d *Dashboard) RenderTo(out io.Writer) {
 
 	fmt.Fprintf(out,
 		"Shannon entropy      %s\n",
-		renderSeries(d.entropy, 7.995, 8.0),
+		renderSeries(recent(d.entropy), 7.995, 8.0),
 	)
 
 	fmt.Fprintf(out,
 		"Chi-square           %s\n",
-		renderSeries(d.chiP, 0.0, 1.0),
+		renderSeries(recent(d.chiP), 0.0, 1.0),
 	)
 
 	fmt.Fprintf(out,
 		"Monobit              %s\n",
-		renderSeries(d.monoP, 0.0, 1.0),
+		renderSeries(recent(d.monoP), 0.0, 1.0),
 	)
 
 	fmt.Fprintf(out,
 		"Serial correlation   %s\n",
-		renderSeries(d.serial, -0.02, 0.02), // 0.1
+		renderSeries(recent(d.serial), -0.02, 0.02), // 0.1
 	)
 	fmt.Fprintln(out, "----------------------------")
 }

@@ -373,6 +373,7 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	cfg := experimentConfig(modePull, serveExperiment(t, modePull), "-")
 	cfg.ShowWaterfall, cfg.ShowPreview, cfg.ShowGraph, cfg.ShowDashboard = true, true, true, true
 	cfg.WaterfallMode, cfg.WaterfallColumns, cfg.WaterfallRows, cfg.Color = "rgb", 128, 32, "truecolor"
+	cfg.Layout = "full"
 
 	cfg.Duration = 40 * time.Millisecond
 	if err := runConfigured(t.Context(), cfg); err != nil {
@@ -385,7 +386,7 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	}
 
 	settings := decodeRecord[startRecord](t, records[0]).Settings
-	if !settings.Waterfall || settings.WaterfallMode != "rgb" || settings.WaterfallColumns != 128 || settings.WaterfallRows != 32 || settings.Color != "truecolor" {
+	if !settings.Waterfall || settings.WaterfallMode != "rgb" || settings.WaterfallColumns != 128 || settings.WaterfallRows != 32 || settings.Color != "truecolor" || settings.Layout != "full" {
 		t.Fatalf("display settings missing from metadata: %+v", settings)
 	}
 }

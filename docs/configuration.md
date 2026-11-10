@@ -176,9 +176,10 @@ For example, this requests 64 KiB with a 100 ms refresh setting, overriding the 
 | `-histogram` | `false` | Byte-distribution bars from the analysed sample's existing counts. |
 | `-waterfall` | `false` | Recent analysed sample prefixes as colored cells or a monochrome ramp. |
 | `-waterfall-mode` | `byte` | `byte` (byte-value hues), `rgb` (consecutive RGB triplets) or `gray` (byte brightness). |
-| `-waterfall-columns` | `32` | Cells per retained row, 8–128; each cell uses two terminal columns. |
-| `-waterfall-rows` | `8` | Maximum retained samples, 1–32; rendered newest first. |
+| `-waterfall-columns` | `0` | Automatic fit; or 8–256 cells, each using two terminal columns. Compact auto shows 32 cells. |
+| `-waterfall-rows` | `0` | Automatic fit; or 1–64 retained samples. Compact auto shows 8 rows, newest first. |
 | `-color` | `auto` | `auto`, `always`, `never`, `256` or `truecolor`; details below. |
+| `-layout` | `auto` | `auto`, `compact` or `full`; [layout rules and trade-offs](client-terminal.md). |
 | `-debug` | `false` | Receive/fetch, analysis and runtime timings, to three decimal places in ms. |
 
 By default, the client receives and counts every frame but analyses **at most the first 1 MiB of a selected frame, once every 250 ms**. The first frame is analysed immediately; later samples require both a new frame and an elapsed analysis interval. Slow sources therefore produce fewer samples. The terminal redraws once per second using the latest available result.
@@ -235,10 +236,10 @@ same brightness ramp, and `rgb` uses luminance. Cells use the ASCII ramp
 ` .:-=+*#%@`; unused cells stay blank. This display is a visualization of
 sample bytes, not a statistical assessment or proof of entropy quality.
 
-The client copies at most `waterfall-columns × bytes-per-cell` bytes from
+The client copies at most `configured/automatic columns × bytes-per-cell` bytes from
 each **analysed prefix**, further limited by the sample's actual length.
-History retains at most `waterfall-rows` samples: at the maximum settings,
-12,288 copied payload bytes in RGB mode, plus bounded row metadata. It
+History retains at most the configured/automatic row bound: at the maximum
+settings, 49,152 copied payload bytes in RGB mode, plus bounded row metadata. It
 neither retains transport buffers nor changes analysis, reception, reports'
 statistics or `-writeout` data. Empty or unselected frames add no row.
 `-headless` allocates no waterfall history and renders nothing, even if
@@ -253,6 +254,14 @@ visible area without discarding the bounded history, so older rows and
 their wider prefixes can reappear after enlarging the terminal. Large
 optional panels such as `-matrix` can themselves exceed the screen; they
 leave no space for the waterfall on a small terminal.
+
+At 120×30 or larger, automatic layout uses adjacent panels and fits the
+waterfall to the remaining screen. `-layout=compact` retains stacked output.
+Zero dimensions request fitting; explicit positive dimensions override it.
+Full view also shows the existing sampled histories and histogram without
+requiring their flags. Interactive auto/full redraws are limited to 10 Hz.
+See [the adaptive terminal guide](client-terminal.md) for viewport/history
+bounds, clipping behavior, fullscreen examples and SSH considerations.
 
 | Color choice | Behavior |
 | --- | --- |

@@ -141,6 +141,11 @@ including in headless runs. They do not indicate that a display was
 allocated or that a particular terminal capability was detected. Raw
 waterfall bytes are never included in reports.
 
+`settings.layout` records `auto`, `compact` or `full`. Zero waterfall dimensions
+mean automatic fitting. Effective layout depends on the interactive terminal;
+these requests do not change sample selection or statistics. Use headless
+reports for throughput experiments so terminal output does not dominate I/O.
+
 `settings.endpoint` retains scheme, host and path but omits URL user
 information, **all query parameters** and fragments. Effective payload and
 refresh are recorded separately. Raw entropy, hex previews, histograms and
