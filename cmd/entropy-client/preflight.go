@@ -34,7 +34,7 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Section("Display")
 	r.Value("Terminal", fmt.Sprintf("%d columns x %d rows; interactive=%t", profile.Columns, profile.Rows, profile.Interactive))
 	r.Value("Layout / color", fmt.Sprintf("%s / %s", cfg.Layout, cfg.Color))
-	r.Value("Display interval", cfg.DisplayInterval)
+	r.Value("Display interval", fmt.Sprintf("%s requested; %s effective", cfg.DisplayInterval, profile.DisplayInterval(cfg.DisplayInterval)))
 	r.Value("Dashboard / graph", fmt.Sprintf("%t / %t", cfg.ShowDashboard, cfg.ShowGraph))
 	r.Value("Matrix / histogram", fmt.Sprintf("%t / %t", cfg.ShowMatrix, cfg.ShowHistogram))
 	r.Value("Preview / debug", fmt.Sprintf("%t / %t", cfg.ShowPreview, cfg.ShowDebug))

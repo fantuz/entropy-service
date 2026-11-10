@@ -99,14 +99,15 @@ Histogram, bit balance and entropy refer to the analysed prefix, not necessarily
 | `/ready` | Serving-root readiness JSON; 200 when fresh with no unresolved reseed error, otherwise 503. |
 | `/health-1` | Compatibility alias of the serving-root health check. |
 | `/health-2` | Serving-root health JSON, using the same readiness policy as `/ready`. |
-| `/metrics-1` | Compatibility alias of the serving-root metrics. |
-| `/metrics-2` | Prometheus text metrics with serving-root metadata; the normal operational target. |
+| `/metrics` | Canonical Prometheus text metrics in base units, without deprecated aliases or disabled-buffer gauges. The normal scrape target. |
+| `/metrics-1` | Compatibility metrics including deprecated aliases. |
+| `/metrics-2` | Same compatibility metrics as `/metrics-1`. |
 
-`/health-1`, `/health-2` and `/ready` inspect the same root; `/metrics-1` and `/metrics-2` expose the same root and service-wide counters and budgets. Scrape one metrics route to avoid counting the same service twice. Seed age, reseed interval/size, failure totals and last-error information are exposed in health JSON.
+`/health-1`, `/health-2` and `/ready` inspect the same root. All three metrics routes describe the same service; scrape **only `/metrics` for each instance**. The numbered routes retain compatibility aliases and identify the canonical endpoint in their `Link` header. Configuring multiple routes as scrape targets can double-count the same process; Prometheus does not infer that they are aliases. Seed age, reseed interval/size, failure totals and last-error information are exposed in health JSON.
 
 Useful metric families include `rng_ready`, `rng_reseed_age_seconds`, `rng_reseed_failures_total`, `rng_bytes_generated_total`, `http_requests_total`, `wss_payloads_total`, `drbg_instance_count`, `ws_connections_*`, `ws_memory_*`, `ws_rejected_*` and `http_generation_*`.
 
-`drbg_instance_count` normally starts at **1** for the root, then includes active children. Merely viewing metrics does not create a child generator. Generated-byte totals include internal child-seed derivation; they are not exact network-payload counters. Legacy software-buffer metrics remain zero because those buffers are disabled. The embedded `rng_version` value is still hard-coded and should not be used to identify the installed release.
+`drbg_instance_count` normally starts at **1** for the root, then includes active children. Merely viewing metrics does not create a child generator. Generated-byte totals include internal child-seed derivation; they are not exact network-payload counters. Legacy software-buffer metrics remain zero on the numbered compatibility routes because those buffers are disabled; `/metrics` omits them. `rng_version` reports the release tag in packaged builds and `dev` in ordinary source builds.
 
 ## Browser pages
 
@@ -131,7 +132,7 @@ seeking/playback and view changes do not repeat the upload. See the
 
 The duplicate `/bytes.html`, `/colors.html`, `/words.html`, `/sound.html`, `/upload.html` and `/stream.html` browser files have been removed; use the canonical `api-*` URLs. The HTTP and WebSocket API route names themselves are unchanged.
 
-The live stream-analysis page accepts integer `bytes` (1–33554432, default 65536) and `refresh` (1–60000 milliseconds, default 500), requesting raw binary WebSocket frames. Separate browser controls select a frame offset and analysis cap (4 KiB–1 MiB, default 64 KiB) at 1/2/5/10 updates per second (default five). FFT supports Auto and 512/2048/8192/32768/65536 points without zero padding, using the same window-energy-normalized, one-sided PSD calculation as file previews. Pause freezes plots while reception continues; hidden tabs skip analysis. These controls bound browser analysis, not the complete delivered payload or network traffic. See [browser controls and mathematical definitions](browser-ui.md#stream-analysis-shared-window-and-controls).
+The live stream-analysis page accepts integer `bytes` (1–33554432, default 65536) and `refresh` (1–60000 milliseconds, default 500), requesting raw binary WebSocket frames. Separate browser controls select a frame offset and analysis cap (4 KiB–1 MiB, default 64 KiB) at 1/2/5/10/20 updates per second (default five). FFT supports Auto and 512/2048/8192/32768/65536 points without zero padding, using the same window-energy-normalized, one-sided PSD calculation as file previews. Pause freezes plots while reception continues; hidden tabs skip analysis. These controls bound browser analysis, not the complete delivered payload or network traffic. See [browser controls and mathematical definitions](browser-ui.md#stream-analysis-shared-window-and-controls).
 
 Byte, colour, word and stream pages show a small **AWAITING FIRST SAMPLE** notice instead of a large connection-status panel. It disappears once the first valid sample is displayed; connection failures/disconnects remain visible. SHA-256 values use the shared bright-green terminal style, and Base64 previews are centered; long encodings may wrap visually at the container width without altering their text. Browser worker/paint backpressure prevents large or frequent samples from overloading the visual display.
 
@@ -158,7 +159,6 @@ Older README examples mentioned paths that are **not registered aliases**:
 | Old name | Current route |
 | --- | --- |
 | `/health` | `/ready` or `/health-2` |
-| `/metrics` | `/metrics-2` |
 | `/v1/random` | `/v1/data/random` |
 | `/data` | `/stream` (WebSocket) |
 | `/streams.html` | `/api-stream.html` (browser analysis); `/api-bytes.html` for byte previews. |

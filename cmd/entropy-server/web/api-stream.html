@@ -32,7 +32,7 @@
       <div class="analysis-controls">
         <label>Window cap <select id="analysis-size"><option value="4096">4 KiB</option><option value="16384">16 KiB</option><option value="65536" selected>64 KiB</option><option value="262144">256 KiB</option><option value="1048576">1 MiB</option></select></label>
         <label>Start byte in frame <input id="analysis-offset" type="number" min="0" max="33554431" value="0" step="1"></label>
-        <label>Display limit <select id="display-fps"><option value="1">1 fps</option><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option></select></label>
+        <label>Display limit <select id="display-fps"><option value="1">1 fps</option><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option><option value="20">20 fps</option></select></label>
         <button id="pause-plots" type="button" aria-pressed="false">Pause plots</button>
       </div>
       <p class="note" id="capture-state">Live · receiving continues while plots are paused. Hidden tabs skip analysis.</p>
@@ -136,6 +136,7 @@
   <script src="/analysis-plots.js" defer></script>
   <script src="/stream-entropy-alert.js" defer></script>
   <script src="/analysis-workspace.js" defer></script>
+  <script src="/display-clock.js" defer></script>
   <script src="/stream-analysis.js" defer></script>
 </body>
 </html>

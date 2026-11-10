@@ -102,7 +102,7 @@ func (m *monitorState) renderFull(out io.Writer, profile terminal.Profile) {
 	tests.PrintDiagnosticsWithColor(&left, &m.latest, m.cfg.ShannonThreshold, profile.Color != terminal.Monochrome)
 	fmt.Fprintf(&left, "\nReceived frames : %d\nReceived MiB    : %.3f\nAverage MiB/s   : %.3f\n", m.frames, float64(m.stats.TotalBytes)/(1<<20), m.stats.Rate/(1<<20))
 	fmt.Fprintf(&left, "Analysis samples: %d / %d\nAnalysed prefix : %d / %d bytes\nAnalysed MiB    : %.3f\nSample age ms   : %.3f\n", m.samples, m.frames, m.latest.N, m.sampleBytes, float64(m.analysedBytes)/(1<<20), time.Since(m.sampleAt).Seconds()*1000)
-	fmt.Fprintf(&left, "\nAnalysis & display policy\nAnalysis cap    : %d bytes (0 = full frame)\nAnalysis period : %s\nDisplay request : %s (full: <=10 Hz)\nRequested bytes : %d\nReceive interval: %s\n", m.cfg.AnalysisBytes, m.cfg.AnalysisInterval, m.cfg.DisplayInterval, m.cfg.Slice, m.cfg.Refresh)
+	fmt.Fprintf(&left, "\nAnalysis & display policy\nAnalysis cap    : %d bytes (0 = full frame)\nAnalysis period : %s\nDisplay request : %s (terminal: <=20 Hz)\nRequested bytes : %d\nReceive interval: %s\n", m.cfg.AnalysisBytes, m.cfg.AnalysisInterval, m.cfg.DisplayInterval, m.cfg.Slice, m.cfg.Refresh)
 
 	if m.cfg.WriteOut {
 		fmt.Fprintf(&left, "Device mixed    : %d frames, %.3f MiB\nDevice errors   : %d\n", m.deviceFrames, float64(m.deviceBytes)/(1<<20), m.deviceErrors)

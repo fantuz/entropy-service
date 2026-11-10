@@ -78,7 +78,7 @@ messages are rejected. Direct WebSocket messages are analysed whole; sample size
 sets request/read sizes for the other adapters. Native browser network/media
 buffers are outside the bounded analysis window, which is not a total-RSS guarantee.
 
-The **Analysis window & byte offset** cap/offset and 1/2/5/10-fps display limit bound analysis separately.
+The **Analysis window & byte offset** cap/offset and 1/2/5/10/20-fps display limit bound analysis separately.
 Pause freezes plots while input meters continue. Stop releases the source and
 freezes the current diagnostic view. Hidden tabs stop the source. A completed
 one-shot or EOF drains the final selected sample before freezing. Averages and

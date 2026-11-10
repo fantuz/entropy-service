@@ -77,7 +77,7 @@ func ParseConfig() *Config {
 	flag.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
 	flag.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
 	flag.DurationVar(&cfg.AnalysisInterval, "analysis-interval", 250*time.Millisecond, "minimum interval between analysed frames; 0 analyses every frame")
-	flag.DurationVar(&cfg.DisplayInterval, "display-interval", time.Second, "terminal redraw interval, independent of reception")
+	flag.DurationVar(&cfg.DisplayInterval, "display-interval", time.Second, "terminal redraw interval, independent of reception (interactive maximum 20 FPS)")
 	flag.Float64Var(&cfg.ShannonThreshold, "shannon-threshold", diag.DefaultShannonThreshold, "minimum empirical Shannon entropy for OK, in bits/byte (0..8)")
 	flag.DurationVar(&cfg.Duration, "duration", 0, "measurement duration, excluding interactive preflight (0 = until interrupted)")
 	flag.StringVar(&cfg.ReportPath, "report", "", "write JSONL to a new file; - writes to stdout with -headless")

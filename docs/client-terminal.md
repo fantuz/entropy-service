@@ -56,7 +56,7 @@ dimensions are honored; omit them or set zero for automatic fitting.
 | Resource/setting | Bound or behavior |
 | --- | --- |
 | Full viewport | At most 320 columns × 96 rows; additional terminal space is intentionally unused. |
-| Interactive auto/full redraw | At most 10 Hz; the default one-second interval is unchanged. Reception and analysis cadence are independent. Compact retains its requested interval. |
+| Interactive terminal redraw | At most 20 Hz (50 ms) in compact, auto and full layouts; the default one-second interval is unchanged. Reception and analysis cadence are independent. Redirected output retains its requested interval. |
 | Statistic histories | At most 256 selected points; compact displays up to 60 recent points, reduced further on narrow terminals. |
 | Waterfall | Up to 256 cells × 64 samples; compact automatic presentation remains 32 cells × 8 visible rows. Full view fits available space. |
 | Retained waterfall payload | At most 49,152 bytes (48 KiB) in RGB mode, plus bounded metadata/graph arrays. Rendered strings and Go heap overhead are additional. |
@@ -118,3 +118,20 @@ counts, retained history, waiting/overload states, viewport caps and unchanged
 analysis accounting. PTY checks cover 60×24, 80×24, 120×30, 160×45 and 240×60,
 a live 80×24 → 160×45 → 80×24 transition, redirected output and headless JSONL.
 The renderer benchmark excludes terminal I/O and cannot predict SSH throughput.
+
+## Up to 20 FPS
+
+All interactive layouts support a 50 ms redraw interval. For a matching source
+and analysis cadence with a small sample:
+
+```sh
+./bin/entropy-client -mode=stream -layout=full -waterfall \
+  -slice=65536 -refresh=50ms -analysis-interval=50ms -display-interval=50ms
+```
+
+The one-second display default is unchanged. Reception, analysis and painting
+remain independent: a 20-FPS display needs sufficiently frequent input and
+analysis to show new samples. Terminal speed, SSH bandwidth and analysis cost
+can lower the achieved rate. Wider RGB waterfalls produce more terminal output;
+smaller samples or waterfalls reduce that cost. History and terminal bounds
+remain unchanged.

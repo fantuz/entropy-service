@@ -263,7 +263,7 @@ The homepage at `/` is the interactive entry point. Common API routes include:
 | `WS /stream?bytes=4096&refresh=500` | Continuous raw binary frames. |
 | `WS /bytes` / `WS /colors` / `WS /words` | Framed bytes, colour/hash, or word streams. |
 | `POST /files` | JSON statistics about an uploaded binary file. |
-| `GET /ready` / `GET /metrics-2` | Readiness and Prometheus metrics. |
+| `GET /ready` / `GET /metrics` | Readiness and Prometheus metrics. |
 
 The stream and upload labs share analysis windows up to 1 MiB, FFTs up to 65,536 points, labelled plots, paused byte inspection, optional bit-position rates and a historical colour waterfall, with desktop/mobile layouts. The [file workspace](docs/browser-ui.md#shared-file-analysis-workspace) adds bounded local seeking/playback while preserving server upload analysis and full-file SHA-256. See [controls and mathematics](docs/browser-ui.md#stream-analysis-shared-window-and-controls). Normal shutdown prints a [served-traffic executive summary](docs/operations.md#shutdown-executive-summary).
 
@@ -403,7 +403,7 @@ These historical screenshots illustrate removed page URLs and earlier layouts; f
 
 <img width="600" height="600" alt="File analysis interface" src="https://github.com/user-attachments/assets/3166ab74-4e09-400a-9325-92e10cbfc28e" />
 
-**Metrics** — use `/metrics-2` for the current serving-root view.
+**Metrics** — use `/metrics` for the current serving-root view.
 
 <img width="647" height="755" alt="Historical metrics output" src="https://github.com/user-attachments/assets/cc4a0ba0-fec2-4d09-a6f9-1d08b581cc71" />
 

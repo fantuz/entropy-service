@@ -24,7 +24,7 @@ window.addEventListener("pageshow", () => {
     }catch(_){/* Restricted storage leaves measurements usable in memory. */}
     let generation=0,controller=null,cleanup=null,running=false,paused=false,once=false,finishing=false;
     let options=null,lastInput=null,previous=null,lastAccepted=-Infinity,finalFrame=0,frame=0,analysedBytes=0,analysedFrames=0;
-    let meterScheduled=false,lastSubmittedFrame=0,catalog={sources:[],allowed:false,max_bytes:helpers.MAX_BYTES};
+    let lastSubmittedFrame=0,catalog={sources:[],allowed:false,max_bytes:helpers.MAX_BYTES};
     function status(state,text){$("lab-status").dataset.state=state;if($("lab-status").textContent!==text)$("lab-status").textContent=text;}
     function buttons(){
         $("lab-start").disabled=$("lab-once").disabled=running;
@@ -37,18 +37,16 @@ window.addEventListener("pageshow", () => {
         $("lab-record").disabled=$("lab-download").disabled=!have;
         $("lab-export").disabled=!records.length;
     }
-    function updateMeters(){
-        if(meterScheduled)return;meterScheduled=true;
-        requestAnimationFrame(()=>{
-            meterScheduled=false;const data=meter.snapshot(performance.now());
-            $("lab-input-bytes").textContent=data.bytes.toLocaleString();$("lab-input-frames").textContent=data.frames.toLocaleString();
-            $("lab-input-unit").textContent=data.frames===1?"sample":"samples";
-            $("lab-rate").textContent=data.bytesPerSecond===null?"—":(data.bytesPerSecond/1e6).toFixed(4);
-            $("lab-interval").textContent=data.meanIntervalMs===null?"—":data.meanIntervalMs.toFixed(2);
-            $("lab-analysis-bytes").textContent=analysedBytes.toLocaleString();$("lab-analysis-frames").textContent=analysedFrames.toLocaleString();
-            $("lab-analysis-unit").textContent=analysedFrames===1?"window":"windows";
-        });
-    }
+    const meterClock=window.EntropyDisplayClock.create(()=>{
+        const data=meter.snapshot(performance.now());
+        $("lab-input-bytes").textContent=data.bytes.toLocaleString();$("lab-input-frames").textContent=data.frames.toLocaleString();
+        $("lab-input-unit").textContent=data.frames===1?"sample":"samples";
+        $("lab-rate").textContent=data.bytesPerSecond===null?"—":(data.bytesPerSecond/1e6).toFixed(4);
+        $("lab-interval").textContent=data.meanIntervalMs===null?"—":data.meanIntervalMs.toFixed(2);
+        $("lab-analysis-bytes").textContent=analysedBytes.toLocaleString();$("lab-analysis-frames").textContent=analysedFrames.toLocaleString();
+        $("lab-analysis-unit").textContent=analysedFrames===1?"window":"windows";
+    });
+    function updateMeters(){meterClock.submit(true);}
     const workspace=window.EntropyWorkspace({kind:"stream",
         describe:data=>`${data.sourceName} · ${data.representation} · sample #${data.frame.toLocaleString()} · [${data.offset.toLocaleString()}, ${(data.offset+data.analyzedBytes).toLocaleString()}) of ${data.totalBytes.toLocaleString()} bytes · worker ${data.analysisMs.toFixed(1)} ms`,
         onAnalyzed(data){if(data.sourceId===generation){analysedFrames++;analysedBytes+=data.analyzedBytes;updateMeters();}},
@@ -262,6 +260,6 @@ window.addEventListener("pageshow", () => {
             sourceFields();
         }catch(error){$("lab-catalog-info").textContent=error.message;}
     })();
-    window.addEventListener("pagehide",()=>{stopTransport();generation++;workspace.destroy();});
+    window.addEventListener("pagehide",()=>{stopTransport();generation++;meterClock.cancel();workspace.destroy();});
     sourceFields();renderRecords();buttons();
 })();
