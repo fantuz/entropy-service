@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 )
 
 func TestHTTPAndHTTPSStartupServeAndShutdown(t *testing.T) {
@@ -123,5 +125,63 @@ func TestStartupRejectsOccupiedAndInvalidAddresses(t *testing.T) {
 		if server, err := startHTTPS(t.Context(), address, http.NotFoundHandler(), &tls.Config{MinVersion: tls.VersionTLS13}); err == nil || server != nil {
 			t.Fatalf("HTTPS accepted unavailable address %q", address)
 		}
+	}
+}
+
+func TestDebugStartupServesAndShutsDownWithoutPublicMetrics(t *testing.T) {
+	before := metrics.ServingSnapshot()
+
+	server, err := startDebugHTTP(t.Context(), "127.0.0.1:0", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "debug response")
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { _ = server.Close() })
+
+	host, port, err := net.SplitHostPort(server.listenAddr)
+	if err != nil || host != "127.0.0.1" || port == "" || port == "0" {
+		t.Fatalf("debug startup did not report its bound loopback address: %q, %v", server.listenAddr, err)
+	}
+
+	transport := &http.Transport{DisableKeepAlives: true}
+	defer transport.CloseIdleConnections()
+
+	client := &http.Client{Transport: transport, Timeout: time.Second}
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+server.listenAddr+"/debug/probe", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := io.ReadAll(response.Body)
+
+	_ = response.Body.Close()
+	if err != nil || string(body) != "debug response" || response.StatusCode != http.StatusOK {
+		t.Fatalf("debug listener response: status=%d body=%q error=%v", response.StatusCode, body, err)
+	}
+
+	after := metrics.ServingSnapshot()
+	if after.TCPConnections != before.TCPConnections || after.HTTPRequests != before.HTTPRequests || after.HTTPBodyBytes != before.HTTPBodyBytes {
+		t.Fatalf("debug traffic polluted public serving metrics: before=%+v after=%+v", before, after)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if response, err := client.Do(request.Clone(t.Context())); err == nil {
+		_ = response.Body.Close()
+
+		t.Fatal("debug listener still served requests after shutdown")
 	}
 }
