@@ -1198,7 +1198,7 @@ func main() {
 	mux.HandleFunc("/health-1", healthHandler(&root, maxReseedAge))
 	mux.HandleFunc("/health-2", healthHandler(&root, maxReseedAge))
 
-	mux.Handle("/metrics", canonicalMetricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor))
+	mux.Handle("/metrics", withTLSMetrics(canonicalMetricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor), tlsCfg))
 	legacyMetrics := metricsHandler(&root, maxReseedAge, wsBudget, httpBudget, activityMonitor)
 	mux.Handle("/metrics-1", legacyMetrics)
 	mux.Handle("/metrics-2", legacyMetrics)

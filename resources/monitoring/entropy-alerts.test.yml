@@ -1,0 +1,249 @@
+rule_files:
+- entropy-alerts.yml
+evaluation_interval: 1m
+tests:
+- name: healthy service
+  interval: 1m
+  input_series:
+  - series: up{job="entropy-service",instance="fixture"}
+    values: 1x12
+  - series: rng_ready{job="entropy-service",instance="fixture"}
+    values: 1x12
+  - series: rng_https_enabled{job="entropy-service",instance="fixture"}
+    values: 1x12
+  - series: rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service",instance="fixture"}
+    values: 604800x12
+  - series: rng_reseed_failures_total{job="entropy-service",instance="fixture"}
+    values: '0x12'
+  - series: http_generation_rejected_requests_total{job="entropy-service",instance="fixture"}
+    values: '0x12'
+  - series: probe_success{job="entropy-service-https",instance="fixture"}
+    values: 1x12
+  - series: up{job="entropy-service-https",instance="fixture"}
+    values: 1x12
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyServiceDown
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropySeedNotReady
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyReseedFailures
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyTLSCertificateExpiring
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyTLSCertificateUrgent
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyAdmissionRejections
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyHTTPSProbeFailed
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyHTTPSProbeUnavailable
+    exp_alerts: []
+- name: HTTP only has no certificate alert
+  interval: 1m
+  input_series:
+  - series: rng_https_enabled{job="entropy-service",instance="fixture"}
+    values: '0x12'
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyTLSCertificateExpiring
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyTLSCertificateUrgent
+    exp_alerts: []
+- name: certificate warning
+  interval: 1m
+  input_series:
+  - series: rng_https_enabled{job="entropy-service",instance="fixture"}
+    values: 1x12
+  - series: rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service",instance="fixture"}
+    values: 40000x12
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyTLSCertificateExpiring
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: warning
+      exp_annotations:
+        summary: Entropy TLS certificate expires within one day
+        description: Stage renewal and client trust before switching the loaded identity.
+  - eval_time: 7m
+    alertname: EntropyTLSCertificateUrgent
+    exp_alerts: []
+- name: urgent
+  interval: 1m
+  input_series:
+  - series: rng_https_enabled{job="entropy-service",instance="fixture"}
+    values: 1x12
+  - series: rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service",instance="fixture"}
+    values: 3600x12
+  alert_rule_test:
+  - eval_time: 2m
+    alertname: EntropyTLSCertificateUrgent
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: critical
+      exp_annotations: &id001
+        summary: Entropy TLS certificate expires within six hours or has expired
+        description: Renew explicitly and verify the active HTTPS listener and client trust.
+  - eval_time: 2m
+    alertname: EntropyTLSCertificateExpiring
+    exp_alerts: []
+- name: already expired
+  interval: 1m
+  input_series:
+  - series: rng_https_enabled{job="entropy-service",instance="fixture"}
+    values: 1x12
+  - series: rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service",instance="fixture"}
+    values: -100x12
+  alert_rule_test:
+  - eval_time: 2m
+    alertname: EntropyTLSCertificateUrgent
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: critical
+      exp_annotations: *id001
+  - eval_time: 2m
+    alertname: EntropyTLSCertificateExpiring
+    exp_alerts: []
+- name: source and endpoint outage
+  interval: 1m
+  input_series:
+  - series: up{job="entropy-service",instance="fixture"}
+    values: '0x12'
+  - series: rng_ready{job="entropy-service",instance="fixture"}
+    values: '0x12'
+  - series: rng_reseed_failures_total{job="entropy-service",instance="fixture"}
+    values: 0 1x12
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyServiceDown
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: critical
+      exp_annotations:
+        summary: Entropy service scrape failed
+        description: Check the service, listener and scrape access policy.
+  - eval_time: 7m
+    alertname: EntropySeedNotReady
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: critical
+      exp_annotations:
+        summary: Entropy seed state is not ready
+        description: Inspect source errors and seed age; do not bypass the stop policy.
+  - eval_time: 7m
+    alertname: EntropyReseedFailures
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: warning
+      exp_annotations: &id002
+        summary: Entropy reseeds have failed recently
+        description: Check source availability even if readiness has recovered.
+- name: readiness recovers, recent failure still reported
+  interval: 1m
+  input_series:
+  - series: rng_ready{job="entropy-service",instance="fixture"}
+    values: 0 1x12
+  - series: rng_reseed_failures_total{job="entropy-service",instance="fixture"}
+    values: 0 1x12
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyReseedFailures
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: warning
+      exp_annotations: *id002
+  - eval_time: 7m
+    alertname: EntropySeedNotReady
+    exp_alerts: []
+- name: HTTPS probe failed
+  interval: 1m
+  input_series:
+  - series: probe_success{job="entropy-service-https",instance="fixture"}
+    values: '0x12'
+  - series: up{job="entropy-service-https",instance="fixture"}
+    values: 1x12
+  alert_rule_test:
+  - eval_time: 2m
+    alertname: EntropyHTTPSProbeFailed
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service-https
+        instance: fixture
+        severity: critical
+      exp_annotations:
+        summary: Entropy HTTPS readiness probe failed
+        description: Check TLS trust, expiry, hostname, listener and seed readiness.
+  - eval_time: 2m
+    alertname: EntropyHTTPSProbeUnavailable
+    exp_alerts: []
+- name: exporter unavailable
+  interval: 1m
+  input_series:
+  - series: up{job="entropy-service-https",instance="fixture"}
+    values: '0x12'
+  alert_rule_test:
+  - eval_time: 3m
+    alertname: EntropyHTTPSProbeUnavailable
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service-https
+        instance: fixture
+        severity: critical
+      exp_annotations:
+        summary: Entropy HTTPS probe exporter is unavailable
+        description: Restore the probe exporter or its scrape access policy.
+- name: sustained admission pressure
+  interval: 1m
+  input_series:
+  - series: http_generation_rejected_requests_total{job="entropy-service",instance="fixture"}
+    values: 0+120x12
+  - series: ws_rejected_memory_total{job="entropy-service",instance="fixture"}
+    values: 0+60x12
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyAdmissionRejections
+    exp_alerts:
+    - exp_labels:
+        job: entropy-service
+        instance: fixture
+        severity: warning
+      exp_annotations:
+        summary: Entropy admission limits are rejecting requests
+        description: Inspect request sizes and load before changing concurrency or memory budgets.
+- name: counter reset is not new failures
+  interval: 1m
+  input_series:
+  - series: http_generation_rejected_requests_total{job="entropy-service",instance="fixture"}
+    values: 1000 0x12
+  - series: rng_reseed_failures_total{job="entropy-service",instance="fixture"}
+    values: 1000 0x12
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: EntropyAdmissionRejections
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: EntropyReseedFailures
+    exp_alerts: []

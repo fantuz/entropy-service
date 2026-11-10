@@ -71,6 +71,17 @@ EOF
   systemctl daemon-reload
 }
 identity() { openssl x509 -in "$1" -noout -fingerprint -sha256; }
+assert_tls_metrics() {
+  curl -fsS --max-time 3 http://127.0.0.1:8080/metrics -o "$work/metrics"
+  grep -Fxq "rng_https_enabled $1" "$work/metrics" || fail 'HTTPS metric differs from active configuration.'
+  if [[ $1 == 1 ]]; then
+    expires=$(openssl x509 -in "$2" -noout -enddate)
+    timestamp=$(date -u -d "${expires#notAfter=}" +%s)
+    grep -Fxq "rng_tls_certificate_not_after_timestamp_seconds $timestamp" "$work/metrics" || fail 'TLS metric differs from the active identity.'
+  elif grep -q '^rng_tls_certificate_not_after_timestamp_seconds ' "$work/metrics"; then
+    fail 'HTTP-only service emitted a certificate expiry.'
+  fi
+}
 
 installed=1
 dpkg --install -- "$package"
@@ -79,6 +90,7 @@ if systemctl is-active --quiet entropy-server; then fail 'Package unexpectedly s
 systemd-analyze verify /usr/lib/systemd/system/entropy-server.service
 systemctl start entropy-server
 wait_ready http://127.0.0.1:8080/ready
+assert_tls_metrics 0
 pid=$(systemctl show entropy-server -p MainPID --value)
 [[ $(awk '/^Uid:/{print $2}' "/proc/$pid/status") != 0 ]] || fail 'Service is running as root.'
 [[ $(systemctl show entropy-server -p DynamicUser --value) == yes ]] || fail 'DynamicUser sandbox is missing.'
@@ -99,6 +111,7 @@ wait_ready --cacert "$state/current-cert.pem" https://127.0.0.1:8443/ready
 wait_ready http://127.0.0.1:8080/ready
 [[ $(stat -c %a "$state/current-key.pem") == 600 ]] || fail 'Private key permissions are unsafe.'
 [[ $(stat -Lc %a "$state") == 700 ]] || fail 'State directory permissions are unsafe.'
+assert_tls_metrics 1 "$state/current-cert.pem"
 first=$(identity "$state/current-cert.pem")
 systemctl restart entropy-server
 wait_ready --cacert "$state/current-cert.pem" https://127.0.0.1:8443/ready
@@ -113,6 +126,7 @@ systemd-run --quiet --wait --collect --unit="entropy-cert-renewal-$$" \
 write_override renewed
 systemctl restart entropy-server
 wait_ready --cacert "$state/renewed-cert.pem" https://127.0.0.1:8443/ready
+assert_tls_metrics 1 "$state/renewed-cert.pem"
 [[ $(identity "$state/renewed-cert.pem") != "$first" ]] || fail 'Renewal reused the previous identity.'
 if curl -fsS --max-time 2 --cacert "$work/previous-public-cert.pem" https://127.0.0.1:8443/live >/dev/null 2>&1; then
   fail 'Old certificate trust unexpectedly accepts the replacement identity.'

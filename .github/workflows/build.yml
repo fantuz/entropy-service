@@ -65,6 +65,8 @@ jobs:
         run: go test -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand
       - name: Race-test opt-in experimental Barzakh backend
         run: go test -race -tags=experimental_barzakh ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/config ./cmd/entropy-server
+      - name: Validate monitoring configuration and alert behavior
+        run: bash scripts/test-monitoring.sh
       - name: Test browser KPI calculations
         run: node scripts/test-status-kpis.mjs
       - name: Test status refresh scheduling

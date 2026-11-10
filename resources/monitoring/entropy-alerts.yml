@@ -1,0 +1,77 @@
+groups:
+  - name: entropy-service
+    rules:
+      - alert: EntropyServiceDown
+        expr: up{job="entropy-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Entropy service scrape failed
+          description: Check the service, listener and scrape access policy.
+      - alert: EntropySeedNotReady
+        expr: rng_ready{job="entropy-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Entropy seed state is not ready
+          description: Inspect source errors and seed age; do not bypass the stop policy.
+      - alert: EntropyReseedFailures
+        expr: increase(rng_reseed_failures_total{job="entropy-service"}[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Entropy reseeds have failed recently
+          description: Check source availability even if readiness has recovered.
+      - alert: EntropyTLSCertificateExpiring
+        expr: |
+          (rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service"} - time() < 86400)
+          and (rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service"} - time() >= 21600)
+          and on(job, instance) (rng_https_enabled{job="entropy-service"} == 1)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Entropy TLS certificate expires within one day
+          description: Stage renewal and client trust before switching the loaded identity.
+      - alert: EntropyTLSCertificateUrgent
+        expr: |
+          (rng_tls_certificate_not_after_timestamp_seconds{job="entropy-service"} - time() < 21600)
+          and on(job, instance) (rng_https_enabled{job="entropy-service"} == 1)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Entropy TLS certificate expires within six hours or has expired
+          description: Renew explicitly and verify the active HTTPS listener and client trust.
+      - alert: EntropyAdmissionRejections
+        expr: |
+          (rate(http_generation_rejected_requests_total{job="entropy-service"}[5m]) > 0)
+          or (rate(http_generation_rejected_memory_total{job="entropy-service"}[5m]) > 0)
+          or (rate(http_generation_rejected_size_total{job="entropy-service"}[5m]) > 0)
+          or (rate(ws_rejected_connections_total{job="entropy-service"}[5m]) > 0)
+          or (rate(ws_rejected_memory_total{job="entropy-service"}[5m]) > 0)
+          or (rate(ws_rejected_size_total{job="entropy-service"}[5m]) > 0)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Entropy admission limits are rejecting requests
+          description: Inspect request sizes and load before changing concurrency or memory budgets.
+      - alert: EntropyHTTPSProbeFailed
+        expr: probe_success{job="entropy-service-https"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Entropy HTTPS readiness probe failed
+          description: Check TLS trust, expiry, hostname, listener and seed readiness.
+      - alert: EntropyHTTPSProbeUnavailable
+        expr: up{job="entropy-service-https"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Entropy HTTPS probe exporter is unavailable
+          description: Restore the probe exporter or its scrape access policy.
