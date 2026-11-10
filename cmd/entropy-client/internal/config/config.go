@@ -27,6 +27,9 @@ type Config struct {
 	KeyFile          string
 	LogLevel         string
 	WriteOut         bool
+	OutputPath       string
+	OutputDevice     string
+	OutputBytes      int64
 	ShowDebug        bool
 	ShowPreview      bool
 	ShowGraph        bool
@@ -54,6 +57,9 @@ func ParseConfig() *Config {
 
 	flag.Int64Var(&cfg.Slice, "slice", 2097152, "raw bytes per response/message (1..33554432)")
 	flag.BoolVar(&cfg.WriteOut, "writeout", false, "Linux only: mix received bytes into /dev/urandom without entropy credit; fail on device errors (normally unnecessary)")
+	flag.StringVar(&cfg.OutputPath, "output", "", "export raw received bytes to a new 0600 file; - uses stdout with -headless (e.g. an SSH pipe)")
+	flag.StringVar(&cfg.OutputDevice, "output-device", "", "Linux only: export to a validated /dev/random, /dev/urandom or /dev/null device; no entropy credit")
+	flag.Int64Var(&cfg.OutputBytes, "output-bytes", 0, "stop after exporting this many bytes (0 = until duration/interruption); requires an output destination or -writeout")
 	flag.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
 
 	flag.BoolVar(&cfg.ShowPreview, "preview", false, "print hex preview of first 64 bytes")
@@ -99,6 +105,10 @@ func ParseConfig() *Config {
 }
 
 func (cfg *Config) ValidateAnalysis() error {
+	if err := cfg.validateOutput(); err != nil {
+		return err
+	}
+
 	if cfg.Layout != "" && cfg.Layout != terminal.LayoutAuto && cfg.Layout != terminal.LayoutCompact && cfg.Layout != terminal.LayoutFull {
 		return errors.New("layout must be auto, compact or full")
 	}
@@ -141,6 +151,50 @@ func (cfg *Config) ValidateAnalysis() error {
 
 	if cfg.DisplayInterval < time.Millisecond {
 		return errors.New("display-interval must be at least 1ms")
+	}
+
+	return nil
+}
+
+func (cfg *Config) OutputEnabled() bool {
+	return cfg.WriteOut || cfg.OutputPath != "" || cfg.OutputDevice != ""
+}
+
+// OutputKind is safe to include in logs/reports: it contains no operator path.
+func (cfg *Config) OutputKind() string {
+	switch {
+	case cfg.WriteOut:
+		return "urandom"
+	case cfg.OutputDevice != "":
+		return "device"
+	case cfg.OutputPath == "-":
+		return "stdout"
+	case cfg.OutputPath != "":
+		return "file"
+	default:
+		return "disabled"
+	}
+}
+
+func (cfg *Config) validateOutput() error {
+	destinations := 0
+
+	for _, enabled := range []bool{cfg.WriteOut, cfg.OutputPath != "", cfg.OutputDevice != ""} {
+		if enabled {
+			destinations++
+		}
+	}
+
+	if destinations > 1 {
+		return errors.New("choose only one of -writeout, -output or -output-device")
+	}
+
+	if cfg.OutputBytes < 0 || (cfg.OutputBytes > 0 && destinations == 0) {
+		return errors.New("output-bytes must be nonnegative and requires an output destination")
+	}
+
+	if cfg.OutputPath == "-" && (!cfg.Headless || cfg.ReportPath == "-") {
+		return errors.New("output=- requires -headless and a report destination other than stdout")
 	}
 
 	return nil

@@ -56,6 +56,10 @@ func TestHTTPAndHTTPSStartupServeAndShutdown(t *testing.T) {
 
 			t.Cleanup(func() { _ = server.Close() })
 
+			if server.listenAddr != address {
+				t.Fatalf("reported listener %q differs from bound address %q", server.listenAddr, address)
+			}
+
 			transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}}
 			defer transport.CloseIdleConnections()
 
@@ -108,6 +112,10 @@ func TestStartupRejectsOccupiedAndInvalidAddresses(t *testing.T) {
 	defer listener.Close()
 
 	for _, address := range []string{listener.Addr().String(), "127.0.0.1:invalid"} {
+		if server, err := startDebugHTTP(t.Context(), address, http.NotFoundHandler()); err == nil || server != nil {
+			t.Fatalf("debug server announced unavailable address %q", address)
+		}
+
 		if server, err := startHTTP(t.Context(), address, http.NotFoundHandler()); err == nil || server != nil {
 			t.Fatalf("HTTP accepted unavailable address %q", address)
 		}

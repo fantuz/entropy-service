@@ -1,5 +1,10 @@
 # Client write-out: Linux pool mixing
 
+For private binary files, stdout/SSH pipes, explicit Linux device destinations
+and byte-limited captures, see [raw client exports](client-output.md). Those
+options share the same fail-on-error lifecycle; `-writeout` retains the specific
+pool-mixing behavior described here.
+
 `entropy-client -writeout` is an opt-in Linux experiment that writes received
 bytes to `/dev/urandom`. It is **off by default** and normally unnecessary.
 It is not an entropy-crediting service, an early-boot seed mechanism, a way to

@@ -106,6 +106,8 @@ func (m *monitorState) renderFull(out io.Writer, profile terminal.Profile) {
 
 	if m.cfg.WriteOut {
 		fmt.Fprintf(&left, "Device mixed    : %d frames, %.3f MiB\nDevice errors   : %d\n", m.deviceFrames, float64(m.deviceBytes)/(1<<20), m.deviceErrors)
+	} else if m.cfg.OutputEnabled() {
+		fmt.Fprintf(&left, "Output bytes    : %d\nOutput frames   : %d full (%d errors)\n", m.outputBytes, m.outputFrames, m.outputErrors)
 	}
 
 	if m.cfg.ShowDebug {

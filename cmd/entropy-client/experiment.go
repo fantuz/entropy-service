@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
-	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/device"
 )
 
 const (
@@ -17,10 +17,11 @@ const (
 	reasonStartupError   = "startup_error"
 	reasonReportError    = "report_error"
 	reasonWriteoutError  = "writeout_error"
+	reasonOutputLimit    = "output_limit"
 )
 
 func runConfigured(ctx context.Context, cfg *config.Config) error {
-	return runConfiguredWithWriteout(ctx, cfg, func() (writeoutSink, error) { return device.Open() })
+	return runConfiguredWithWriteout(ctx, cfg, func() (writeoutSink, error) { return openOutput(cfg) })
 }
 
 func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevice func() (writeoutSink, error)) (runErr error) {
@@ -75,12 +76,19 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 			err = errors.Join(err, closeErr)
 		}
 
-		return errors.Join(err, report.summary(&m, began, reason, err != nil))
+		err = errors.Join(err, report.summary(&m, began, reason, err != nil))
+
+		if !cfg.Headless {
+			log.Printf("stopped: reason=%s failed=%t received_frames=%d received_bytes=%d analysed_samples=%d output_bytes=%d output_frames=%d output_errors=%d",
+				reason, err != nil, m.frames, m.stats.TotalBytes, m.samples, m.outputBytes, m.outputFrames, m.outputErrors)
+		}
+
+		return err
 	}
-	if cfg.WriteOut {
+	if cfg.OutputEnabled() {
 		m.writeout, err = openDevice()
 		if err != nil {
-			m.deviceErrors++
+			m.countOutputError()
 			return finish(reasonStartupError, fmt.Errorf("enable writeout: %w", err))
 		}
 	}

@@ -86,6 +86,8 @@ type reportSettings struct {
 	Headless         bool    `json:"headless"`
 	Matrix           bool    `json:"matrix"`
 	WriteOut         bool    `json:"writeout"`
+	OutputKind       string  `json:"output_kind"`
+	OutputLimit      int64   `json:"output_limit_bytes"`
 	Waterfall        bool    `json:"waterfall"`
 	WaterfallMode    string  `json:"waterfall_mode"`
 	WaterfallColumns int     `json:"waterfall_columns"`
@@ -108,23 +110,20 @@ func (r *runReport) start(cfg *config.Config, endpoint string) error {
 		return nil
 	}
 
-	// User information, fragments and arbitrary query values may contain secrets.
-	u, err := url.Parse(endpoint)
+	endpoint, err := sanitizedEndpoint(endpoint)
 	if err != nil {
 		return fmt.Errorf("report endpoint: %w", err)
 	}
 
-	u.User, u.RawQuery, u.Fragment = nil, "", ""
-	u.ForceQuery = false
-
 	return r.write(startRecord{
 		reportHeader: newReportHeader("run_start"),
 		Settings: reportSettings{
-			Mode: cfg.Mode, Endpoint: u.String(), PayloadBytes: cfg.Slice,
+			Mode: cfg.Mode, Endpoint: endpoint, PayloadBytes: cfg.Slice,
 			Refresh: cfg.Refresh.String(), AnalysisBytes: cfg.AnalysisBytes,
 			AnalysisInterval: cfg.AnalysisInterval.String(), DisplayInterval: cfg.DisplayInterval.String(),
 			ShannonThreshold: cfg.ShannonThreshold, Duration: cfg.Duration.String(),
 			Headless: cfg.Headless, Matrix: cfg.ShowMatrix, WriteOut: cfg.WriteOut,
+			OutputKind: cfg.OutputKind(), OutputLimit: cfg.OutputBytes,
 			Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
 			WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
 			Layout: cfg.Layout,
@@ -143,6 +142,9 @@ type reportCounts struct {
 	DeviceErrors    uint64 `json:"device_write_errors"`
 	DeviceBytes     uint64 `json:"device_written_bytes"`
 	DeviceFrames    uint64 `json:"device_written_frames"`
+	OutputBytes     uint64 `json:"output_written_bytes"`
+	OutputFrames    uint64 `json:"output_written_frames"`
+	OutputErrors    uint64 `json:"output_write_errors"`
 }
 
 func (m *monitorState) counts() reportCounts {
@@ -151,6 +153,7 @@ func (m *monitorState) counts() reportCounts {
 		AnalysedSamples: m.samples, AnalysedBytes: m.analysedBytes,
 		ShannonOK: m.okSamples, ShannonWarn: m.warnSamples, DeviceErrors: m.deviceErrors,
 		DeviceBytes: m.deviceBytes, DeviceFrames: m.deviceFrames,
+		OutputBytes: m.outputBytes, OutputFrames: m.outputFrames, OutputErrors: m.outputErrors,
 	}
 }
 
@@ -222,4 +225,17 @@ func (r *runReport) summary(m *monitorState, began time.Time, reason string, fai
 		ElapsedMS: elapsed.Seconds() * 1000, TotalElapsedMS: time.Since(began).Seconds() * 1000,
 		ReceivedMiBPerSec: rate, ShannonAssessment: diag.ShannonAssessment(&m.latest, m.cfg.ShannonThreshold),
 	})
+}
+
+// Never disclose credentials, arbitrary query values or fragments in reports.
+func sanitizedEndpoint(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	u.User, u.RawQuery, u.Fragment = nil, "", ""
+	u.ForceQuery = false
+
+	return u.String(), nil
 }

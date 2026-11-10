@@ -29,6 +29,8 @@ Entropy Service is a Go server and command-line client for generating, distribut
 The client's opt-in [`-writeout`](docs/client-writeout.md) mixes received bytes
 into Linux's random pool without entropy credit. It is normally unnecessary;
 it does not establish stronger randomness or replace OS boot seeding.
+For practical capture and remote consumers, [raw exports](docs/client-output.md)
+support private files, stdout/SSH pipes, explicit Linux devices and exact byte limits.
 
 [Quick start](#quick-start) · [Use cases](#use-cases) · [Architecture](#architecture) · [Configuration](#configuration) · [API reference](#api-reference) · [Performance](#performance) · [Statistical tests](#statistical-tests) · [Development](#development) · [Security](SECURITY.md) · [Full reference](docs/README.md)
 

@@ -1,5 +1,33 @@
 # Stability, operations and resource limits
 
+## Startup reports and logs
+
+Both utilities group their invocation settings, units and startup checks in a
+plain-text report. `OK` means an observed check succeeded; `OFF` marks a disabled
+feature and `WARN` calls attention to a fallback or limitation. Server startup
+and timestamped runtime logs share stderr, with the utility name on log lines;
+captured server logs contain no forced ANSI colors. Existing shutdown traffic
+and connection summaries are preserved. Interactive client runs also log their
+termination reason and reception/analysis totals. `-headless` keeps stdout
+available for machine-readable output and skips the interactive report.
+
+Server checks cover registry loading, TLS key-pair loading and certificate
+dates, the actual opened seed source (including fallback), complete root seed
+reading, DRBG initialization and successful HTTP/HTTPS/debug listener binding.
+Certificate date checks do not establish trust or hostname validity. Debug bind
+failure now fails startup instead of announcing an unavailable listener.
+`/live` and `/ready` remain the authoritative running-service probes; the
+startup report is a point-in-time observation.
+
+The client retains its separate preflight sample and three-second pause.
+Its report shows requested versus fetched bytes, analysis and display limits,
+terminal geometry and enabled panels. Endpoint credentials, queries and
+fragments are omitted from human and JSONL reports; control characters in
+reported paths are escaped. Statistical diagnostics screen the sample and do
+not certify its source or unpredictability.
+
+## Resource limits
+
 The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket handlers and the client. Uploads have a separate fixed 32 MiB ceiling. Encoding can make the transmitted message larger than the underlying sample.
 
 | Resource | Default policy |

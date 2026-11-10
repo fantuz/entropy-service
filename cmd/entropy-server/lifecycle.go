@@ -2,16 +2,42 @@ package main
 
 import (
 	"context"
+	"errors"
+	"log"
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+// Bind before announcing startup. Debug traffic stays outside public metrics.
+func startDebugHTTP(ctx context.Context, addr string, handler http.Handler) (*managedServer, error) {
+	var lc net.ListenConfig
+
+	ln, err := lc.Listen(ctx, "tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	s := newManagedServer(ctx, &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second})
+
+	s.listenAddr = ln.Addr().String()
+	go func() {
+		if err := s.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("debug serve error: %v", err)
+		}
+	}()
+
+	return s, nil
+}
+
 // managedServer also waits for handlers on hijacked WebSocket connections.
 type managedServer struct {
 	*http.Server
+
+	listenAddr string
 
 	cancel   context.CancelFunc
 	mu       sync.Mutex
