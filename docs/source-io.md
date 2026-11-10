@@ -19,12 +19,12 @@ OS random initialization. Before accepting either Linux random device (1:8 or
 1:9), a one-byte `getrandom(GRND_NONBLOCK)` readiness check must succeed. This
 avoids early-boot device waits, including kernel versions whose random device
 ignores `O_NONBLOCK` during initialization. A not-ready OS source fails startup;
-its state is never used as seed material. The opened descriptor must have
-device number 1:9, regardless of pathname. Requests are bounded to 32 KiB chunks
+its state is never used as seed material. The urandom exception requires the
+opened descriptor to have device number 1:9, regardless of pathname. Requests are bounded to 32 KiB chunks
 with context checks. If optional startup fallback cannot open urandom, Linux
 `getrandom(GRND_NONBLOCK)` supplies OS bytes; before OS initialization it returns
-an error rather than an indefinite wait. This deliberately requires OS initialization even when urandom would otherwise
-return early-boot bytes. No seed contents are logged.
+an error rather than an indefinite wait. This deliberately requires OS
+initialization even when urandom would otherwise return early-boot bytes. No seed contents are logged.
 
 ## Hardware compatibility
 

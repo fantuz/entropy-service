@@ -54,11 +54,11 @@ func TestLinuxOSSeedSourcesRemainUsable(t *testing.T) {
 
 func TestOSSeedReadinessRefusesBootWaitAndUnsupportedSyscall(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		n    int
-		err  error
+		name             string
+		n                int
+		readErr, wantErr error
 	}{
-		{"ready", 1, nil}, {"initializing", 0, unix.EAGAIN}, {"unsupported", 0, unix.ENOSYS}, {"short", 0, io.ErrUnexpectedEOF},
+		{"ready", 1, nil, nil}, {"initializing", 0, unix.EAGAIN, unix.EAGAIN}, {"unsupported", 0, unix.ENOSYS, unix.ENOSYS}, {"short", 0, nil, io.ErrUnexpectedEOF},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := checkOSSeedReady(func(p []byte, flags int) (int, error) {
@@ -68,9 +68,9 @@ func TestOSSeedReadinessRefusesBootWaitAndUnsupportedSyscall(t *testing.T) {
 
 				p[0] = 0xff
 
-				return tc.n, tc.err
+				return tc.n, tc.readErr
 			})
-			if tc.err == nil && err != nil || tc.err != nil && !errors.Is(err, tc.err) {
+			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("readiness %v", err)
 			}
 		})
