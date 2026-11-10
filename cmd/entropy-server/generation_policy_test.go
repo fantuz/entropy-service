@@ -216,6 +216,44 @@ func TestReseedFailureBeforeFirstHTTPByteReturns503(t *testing.T) {
 	}
 }
 
+func TestReseedPolicyLateHTTPDenialsReturn503(t *testing.T) {
+	root := observableTestDRBG(t)
+	if err := root.ConfigureReseedPolicy(drbg.ReseedStop, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	budget := newHTTPRequestBudget(8, 64<<20)
+	// Invoke the actual inner handlers to model failure after the outer route
+	// admission passed, but before their first root/child read. The HTTP error
+	// must still be retryable, and rejected work must not persist preferences.
+	handlers := []struct {
+		path    string
+		handler http.HandlerFunc
+	}{
+		{"/v1/data/random?bytes=64", randomBytesHandler(root, 1<<25, 3, true, budget)},
+		{"/v1/data/test?bytes=64", randomHandler(root, 1<<25, budget)},
+		{"/v1/meta/random?words=2", randomWordsHandler(root, 3, 5000, 1<<25, true, budget)},
+		{"/v1/image/random?size=64", randomImageHandler(root, budget)},
+		{"/v1/image/heatmap?size=64", entropyHeatmapHandler(root, budget)},
+		{"/v1/qr/random", budget.wrap(qrHandler(root), 4<<20)},
+		{"/sound?duration_ms=250", budget.wrap(randomSoundHandler(root), 8<<20)},
+	}
+	root.RecordReseedFailure(io.EOF)
+
+	for _, tc := range handlers {
+		response := httptest.NewRecorder()
+		tc.handler(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil))
+
+		if response.Code != http.StatusServiceUnavailable || response.Header().Get("Retry-After") != "1" || len(response.Result().Cookies()) != 0 {
+			t.Fatalf("late denial for %s: code=%d headers=%v", tc.path, response.Code, response.Header())
+		}
+
+		if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 {
+			t.Fatalf("late denial leaked a reservation: %+v", usage)
+		}
+	}
+}
+
 func dialGenerationSocket(t *testing.T, endpoint string) *websocket.Conn {
 	t.Helper()
 
