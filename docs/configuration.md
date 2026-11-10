@@ -85,7 +85,7 @@ Source selection establishes neither entropy quality nor physical provenance.
 with `O_NONBLOCK` and requires working Go read-deadline/poll support. Unsupported
 drivers are rejected: strict hardware mode fails; optional startup selection
 can use the logged OS fallback. The verified Linux urandom device (major 1,
-minor 9) is a special case because its reads do not wait for entropy; OS reads
+minor 9) is a special case after a nonblocking OS-initialization check; OS reads
 are chunked with deadline/cancellation checks. No timeout spawns a replacement
 reader. Runtime timeouts use the existing reseed-failure policy and can recover
 on a later successful read of the same source. See [driver limitations and

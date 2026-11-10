@@ -14,13 +14,17 @@ and joins the cancellation callback before clearing the deadline for reuse.
 There is no abandoned read goroutine. The single reseed worker is joined before
 root-generator cleanup on shutdown.
 
-Linux `/dev/urandom` is an explicit exception to the poll requirement: Linux
-does not wait for entropy in its read method. The opened descriptor must have
+Linux `/dev/urandom` is an explicit exception to the poll requirement after
+OS random initialization. Before accepting either Linux random device (1:8 or
+1:9), a one-byte `getrandom(GRND_NONBLOCK)` readiness check must succeed. This
+avoids early-boot device waits, including kernel versions whose random device
+ignores `O_NONBLOCK` during initialization. A not-ready OS source fails startup;
+its state is never used as seed material. The opened descriptor must have
 device number 1:9, regardless of pathname. Requests are bounded to 32 KiB chunks
 with context checks. If optional startup fallback cannot open urandom, Linux
 `getrandom(GRND_NONBLOCK)` supplies OS bytes; before OS initialization it returns
-an error rather than an indefinite wait. This does not change the OS urandom
-boot-time trust assumptions. No seed contents are logged.
+an error rather than an indefinite wait. This deliberately requires OS initialization even when urandom would otherwise
+return early-boot bytes. No seed contents are logged.
 
 ## Hardware compatibility
 

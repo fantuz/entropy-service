@@ -36,12 +36,22 @@ func openCharacterEntropySource(path string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("%q is not a character device", path)
 	}
 
+	stat, known := info.Sys().(*syscall.Stat_t)
+	if known && unix.Major(stat.Rdev) == 1 && (unix.Minor(stat.Rdev) == 8 || unix.Minor(stat.Rdev) == 9) {
+		// Some kernels wait during random initialization even for nonblocking
+		// device reads. Check readiness via the nonblocking syscall first.
+		if err := checkOSSeedReady(unix.Getrandom); err != nil {
+			_ = f.Close()
+			return nil, err
+		}
+	}
+
 	if err := f.SetReadDeadline(time.Time{}); err == nil {
 		return f, nil
 	}
-	// Linux urandom has no poll method but its reads do not wait for entropy.
+	// Initialized Linux urandom has no poll method; its reads do not wait for entropy.
 	// Verify the actual device number; a pathname alone cannot grant this exception.
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok && unix.Major(stat.Rdev) == 1 && unix.Minor(stat.Rdev) == 9 {
+	if known && unix.Major(stat.Rdev) == 1 && unix.Minor(stat.Rdev) == 9 {
 		return &nonblockingSeedSource{ReadCloser: f}, nil
 	}
 
@@ -71,4 +81,23 @@ func (getrandomSeedSource) Close() error { return nil }
 
 func openOSSeedSource() (io.ReadCloser, error) {
 	return &nonblockingSeedSource{ReadCloser: getrandomSeedSource{}}, nil
+}
+
+// An initialized Linux CSPRNG does not become uninitialized again. Requiring
+// readiness avoids early-boot device waits without ever consuming unsafe seed.
+func checkOSSeedReady(getrandom func([]byte, int) (int, error)) error {
+	var probe [1]byte
+
+	n, err := getrandom(probe[:], unix.GRND_NONBLOCK)
+	clear(probe[:])
+
+	if err != nil {
+		return fmt.Errorf("OS random initialization is not ready for bounded seeding: %w", err)
+	}
+
+	if n != len(probe) {
+		return io.ErrUnexpectedEOF
+	}
+
+	return nil
 }
