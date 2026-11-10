@@ -3,6 +3,7 @@
 
 import http.client
 import os
+import re
 from pathlib import Path
 import socket
 import ssl
@@ -83,32 +84,34 @@ class StartupTests(unittest.TestCase):
     def test_real_http_https_and_sigterm(self):
         for secure in (False, True):
             with self.subTest(https=secure):
-                reservation = listener()
-                port = reservation.getsockname()[1]
-                reservation.close()
-                address = f"-{'https' if secure else 'http'}=127.0.0.1:{port}"
-                with tempfile.TemporaryFile() as log:
+                label = b"HTTPS" if secure else b"HTTP"
+                address = f"-{'https' if secure else 'http'}=127.0.0.1:0"
+                log_path = self.directory / f"startup-{secure}.log"
+                with log_path.open("wb") as log:
                     process = subprocess.Popen([SERVER, *self.server_flags(secure), address], stdout=subprocess.PIPE, stderr=log)
                     try:
                         context = ssl.create_default_context(cafile=str(self.cert))
                         context.minimum_version = ssl.TLSVersion.TLSv1_3
                         deadline = time.monotonic() + 5
                         while True:
-                            connection = (http.client.HTTPSConnection("127.0.0.1", port, timeout=.3, context=context)
-                                          if secure else http.client.HTTPConnection("127.0.0.1", port, timeout=.3))
-                            try:
-                                connection.request("GET", "/ready")
-                                response = connection.getresponse()
-                                response.read(8192)
-                                if response.status == 200:
-                                    break
-                            except OSError:
-                                pass
-                            finally:
-                                connection.close()
+                            text = log_path.read_bytes()
+                            bound = re.search(label + rb" listener\s+\[OK\] 127\.0\.0\.1:(\d+)\n", text)
+                            if bound:
+                                port = int(bound.group(1))
+                                connection = (http.client.HTTPSConnection("127.0.0.1", port, timeout=.3, context=context)
+                                              if secure else http.client.HTTPConnection("127.0.0.1", port, timeout=.3))
+                                try:
+                                    connection.request("GET", "/ready")
+                                    response = connection.getresponse()
+                                    response.read(8192)
+                                    if response.status == 200:
+                                        break
+                                except OSError:
+                                    pass
+                                finally:
+                                    connection.close()
                             if process.poll() is not None or time.monotonic() >= deadline:
-                                log.seek(0)
-                                self.fail(f"server did not become ready: {log.read()[-8192:]!r}")
+                                self.fail(f"server did not become ready: {text[-8192:]!r}")
                             time.sleep(.02)
                         connection = (http.client.HTTPSConnection("127.0.0.1", port, timeout=1, context=context)
                                       if secure else http.client.HTTPConnection("127.0.0.1", port, timeout=1))
