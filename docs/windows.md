@@ -62,8 +62,8 @@ an interrupted or failed one. Existing output/report files are never replaced.
 | Feature | Initial Windows behaviour |
 | --- | --- |
 | OS seeding | `windows-csprng`, through `crypto/rand`. |
-| Direct QRNG/device seeding | A different `-device` or `-require-device` is rejected before TLS/source/network I/O, without silently substituting a source. |
-| Processor randomness | Optional `-cpu-mix` / `-rdrand-mix` retains shared support checks and retry limits. It supplements the OS seed. |
+| Hardware seeding | Experimental `-device=quantis-pci:0` for legacy Quantis PCI (`179a:0001`) with a separately installed driver. Explicit hardware selection never falls back, even without `-require-device`. Other device paths are rejected; `-require-device` requires the hardware selector. See [Quantis integration](quantis.md). |
+| Processor randomness | Optional `-cpu-mix` / `-rdrand-mix` retains shared support checks and retry limits. It supplements the selected seed source. |
 | Socket tuning | Go/Windows defaults; custom Linux tuning is disabled and reported at startup. |
 | Browser visualizations | Shared pages, including browser waterfalls and layout controls. |
 | Terminal output | Plain scrolling text in CMD, PowerShell or Windows Terminal. `-layout=auto` selects compact output; no sizing or cursor refresh. |
@@ -87,6 +87,14 @@ chunks and rejects late output. An OS call already in progress cannot be
 interrupted through Go's reader interface. No background read is abandoned to
 simulate cancellation. In-progress regular file writes/syncs likewise have no
 hard cancellation deadline.
+
+The experimental PCI adapter instead submits overlapped status/read operations,
+wakes on deadline changes or closure, requests cancellation with `CancelIoEx`,
+and waits for completion before reusing its buffers. Compatibility depends on
+the installed legacy kernel driver supporting those operations. There is no
+synchronous fallback or detached timeout worker. Native CI tests these Windows
+I/O mechanics with named pipes, not a physical Quantis card; see [hardware
+prerequisites and limits](quantis.md).
 
 ## Files, logs and TLS
 

@@ -69,6 +69,12 @@ class WindowsSmoke(unittest.TestCase):
             self.assertNotIn(b"load TLS certificate", result.stderr)
             self.assertNotIn(b"Source opened", result.stderr)
 
+        for source in ["quantis-pci", "quantis-pci:10", "quantis-pci:-1"]:
+            result = invoke(SERVER, f"-device={source}", "-cert-file=missing.pem",
+                            code=1, contains=b"use -device=quantis-pci:0")
+            self.assertNotIn(b"load TLS certificate", result.stderr)
+            self.assertNotIn(b"Source opened", result.stderr)
+
         for option in [
             "-writeout", "-output-device=/dev/null", "-output=-", "-waterfall",
             "-layout=full", "-layout=waterfall", "-waterfall-columns=32",

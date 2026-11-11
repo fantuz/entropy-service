@@ -10,7 +10,7 @@ All server timing flags accept **plain integer milliseconds**, without a unit su
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `-device` | `/dev/qrandom0` | Source device; OS fallback is allowed unless required. |
+| `-device` | Linux `/dev/qrandom0`; Windows `windows-csprng` | Linux device path with optional OS fallback; Windows OS source or experimental `quantis-pci:0` (no hardware fallback). See [Quantis PCI](quantis.md). |
 | `-require-device` | `false` | Fail startup if the requested device is unavailable. |
 | `-drbg` | `aes-256-ctr` on non-ARM/non-RISC-V; `chacha20` on ARM/RISC-V | Backend: `chacha20` or `aes-256-ctr`. An explicit flag always overrides the platform default. |
 | `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |

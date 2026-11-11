@@ -43,6 +43,10 @@ same source tree, using the native OS RNG, standard sockets, plain terminal text
 and file exports. Its capability limits are explicit; Linux remains the primary
 deployment target.
 
+An experimental [Quantis PCI Windows adapter](docs/quantis.md) also supports
+explicit hardware selection with an installed legacy driver. No driver is bundled;
+physical-card validation remains outstanding.
+
 ```sh
 git clone https://github.com/fantuz/entropy-service.git
 cd entropy-service

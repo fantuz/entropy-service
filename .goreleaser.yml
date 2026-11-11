@@ -70,6 +70,8 @@ archives:
       - LICENSE
       - README.md
       - docs/windows.md
+      - docs/quantis.md
+      - QUANTIS_NOTICES.txt
       - src: ./cmd/entropy-server/internal/wordlist/NOTICE.txt
         dst: WORDLIST_NOTICES.txt
 
