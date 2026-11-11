@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -229,6 +230,7 @@ func TestOverlappedDeadlineCanBeExtendedAndCleared(t *testing.T) {
 		}
 	}
 
+	runtime.GC() // Native operations retain pinned memory across Go GC.
 	writePipe(t, writer, []byte{42})
 
 	select {
@@ -266,8 +268,10 @@ func TestWaitTimeoutRounding(t *testing.T) {
 		t.Fatalf("wrong millisecond conversion: %d", got)
 	}
 
-	if got := waitMilliseconds(time.Now().Add(2000 * time.Hour)); got != windows.INFINITE-1 {
-		t.Fatalf("finite timeout overflowed to INFINITE: %d", got)
+	for _, duration := range []time.Duration{2000 * time.Hour, 1<<63 - 1} {
+		if got := waitMilliseconds(time.Now().Add(duration)); got != windows.INFINITE-1 {
+			t.Fatalf("finite timeout overflowed to INFINITE: %d", got)
+		}
 	}
 }
 

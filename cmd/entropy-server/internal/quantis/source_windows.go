@@ -171,14 +171,20 @@ func (s *Source) transfer(buffer []byte, code uint32) (int, error) {
 	defer func() { _ = windows.CloseHandle(event) }()
 
 	operation := &windows.Overlapped{HEvent: event}
-	defer func() {
-		// Both addresses must remain valid until completion/cancellation has
-		// been drained, including error returns from the wait path.
-		runtime.KeepAlive(operation)
-		runtime.KeepAlive(buffer)
-	}()
 
 	var transferred uint32
+
+	// The kernel retains these addresses beyond the submitting syscall.
+	// Follow Go's Windows poller: pin until completion/cancellation is drained.
+	var memory runtime.Pinner
+
+	memory.Pin(operation)
+	memory.Pin(&transferred)
+
+	if len(buffer) > 0 {
+		memory.Pin(&buffer[0])
+	}
+	defer memory.Unpin()
 
 	if code == 0 {
 		err = windows.ReadFile(s.handle, buffer, &transferred, operation)
@@ -266,5 +272,9 @@ func waitMilliseconds(deadline time.Time) uint32 {
 		return 0
 	}
 
-	return uint32(min((remaining+time.Millisecond-1)/time.Millisecond, time.Duration(windows.INFINITE-1)))
+	if remaining >= time.Duration(windows.INFINITE-1)*time.Millisecond {
+		return windows.INFINITE - 1
+	}
+
+	return uint32((remaining + time.Millisecond - 1) / time.Millisecond)
 }

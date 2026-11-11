@@ -72,6 +72,8 @@ and closure wake the waiting reader. Expiry/closure requests `CancelIoEx` and
 **drains completion before releasing the buffer, OVERLAPPED structure or handle**.
 It never abandons an I/O goroutine to simulate a timeout. Failed or late reads
 do not reach the DRBG; partial scratch buffers are cleared.
+Go buffers and the native operation structure remain pinned until completion
+has been drained, following the Go runtime's Windows I/O pattern.
 
 This is **not an unconditional hard timeout on kernel code**. The supplied
 repository lacks the legacy PCI kernel source, and synchronous SDK use does not
