@@ -249,10 +249,10 @@ trust; HTTP pull rejects redirects from HTTPS to plaintext.
 | `-histogram` | `false` | Byte-distribution bars from the analysed sample's existing counts. |
 | `-waterfall` | `false` | Recent analysed sample prefixes as colored cells or a monochrome ramp. |
 | `-waterfall-mode` | `byte` | `byte` (byte-value hues), `rgb` (consecutive RGB triplets) or `gray` (byte brightness). |
-| `-waterfall-columns` | `0` | Automatic fit; or 8–256 cells, each using two terminal columns. Compact auto shows 32 cells. |
-| `-waterfall-rows` | `0` | Automatic fit; or 1–64 retained samples. Compact auto shows 8 rows, newest first. |
+| `-waterfall-columns` | `0` | Automatic fit; or 8–512 cells, each using two terminal columns. Compact auto shows 32 cells. |
+| `-waterfall-rows` | `0` | Automatic fit; or 1–512 retained samples. Compact auto shows 8 rows, newest first. |
 | `-color` | `auto` | `auto`, `always`, `never`, `256` or `truecolor`; details below. |
-| `-layout` | `auto` | `auto`, `compact` or `full`; [layout rules and trade-offs](client-terminal.md). |
+| `-layout` | `auto` | `auto`, `compact`, `full` or `waterfall`; the latter enables a waterfall with only throughput and Shannon status on the first line. Adaptive canvas up to 1024×512; [rules and trade-offs](client-terminal.md). |
 | `-debug` | `false` | Receive/fetch, analysis and runtime timings, to three decimal places in ms. |
 
 By default, the client receives and counts every frame but analyses **at most the first 1 MiB of a selected frame, once every 250 ms**. The first frame is analysed immediately; later samples require both a new frame and an elapsed analysis interval. Slow sources therefore produce fewer samples. The terminal redraws once per second using the latest available result.

@@ -106,6 +106,8 @@ jobs:
         run: |
           make build-client
           python3 scripts/test_client_20fps.py
+      - name: Smoke-test fullscreen waterfall and unusual terminal proportions
+        run: python3 scripts/test_client_waterfall.py
       - name: Smoke-test packaged service configuration
         run: sh scripts/test-package-service.sh
       - name: Smoke-test client binary exports and retries

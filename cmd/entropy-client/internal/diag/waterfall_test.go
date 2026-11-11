@@ -21,20 +21,20 @@ func TestWaterfallBoundsAndCopiesHistory(t *testing.T) {
 	w := NewWaterfall(1000, 1000, WaterfallRGB)
 	data := bytes.Repeat([]byte{42}, 1<<20)
 
-	for frame := uint64(1); frame <= 100; frame++ {
+	for frame := uint64(1); frame <= MaxWaterfallRows+36; frame++ {
 		data[0] = byte(frame)
 		w.Add(data, frame)
 	}
 
 	clear(data)
-	w.Add(nil, 101)
+	w.Add(nil, MaxWaterfallRows+37)
 
-	if w.width != 256 || w.height != 64 || len(w.rows) != 64 || cap(w.rows) > 64 {
+	if w.width != MaxWaterfallColumns || w.height != MaxWaterfallRows || len(w.rows) != MaxWaterfallRows || cap(w.rows) > MaxWaterfallRows {
 		t.Fatalf("history is not bounded: width=%d height=%d len=%d cap=%d", w.width, w.height, len(w.rows), cap(w.rows))
 	}
 
 	for i, row := range w.rows {
-		if row.frame != uint64(37+i) || len(row.bytes) != 768 || cap(row.bytes) > 768 || row.bytes[0] != byte(row.frame) {
+		if row.frame != uint64(37+i) || len(row.bytes) != MaxWaterfallColumns*3 || cap(row.bytes) > MaxWaterfallColumns*3 || row.bytes[0] != byte(row.frame) {
 			t.Fatalf("history retained excess bytes or aliased a transport buffer: frame=%d bytes=%d cap=%d", row.frame, len(row.bytes), cap(row.bytes))
 		}
 	}

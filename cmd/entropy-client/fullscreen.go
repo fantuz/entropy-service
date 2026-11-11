@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/terminal"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/tests"
 )
 
 const (
-	fullMaxColumns = 320
-	fullMaxRows    = 96
+	fullMaxColumns = 1024
+	fullMaxRows    = 512
 )
 
 func graphCells(profile terminal.Profile) int {
@@ -185,7 +186,7 @@ func (m *monitorState) renderFull(out io.Writer, profile terminal.Profile) {
 
 		visibleRows := m.cfg.WaterfallRows
 		if visibleRows == 0 {
-			visibleRows = 64
+			visibleRows = diag.MaxWaterfallRows
 		}
 
 		m.waterfall.RenderView(&screen, view, columns, visibleRows)

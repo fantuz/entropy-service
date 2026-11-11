@@ -112,6 +112,8 @@ jobs:
           python3 scripts/test_client_terminal.py
       - name: Smoke-test 20-FPS terminal redraws
         run: python3 scripts/test_client_20fps.py
+      - name: Smoke-test fullscreen waterfall and unusual terminal proportions
+        run: python3 scripts/test_client_waterfall.py
       - name: Smoke-test client binary exports, retries and pipe cancellation
         run: python3 scripts/test_client_output.py
       - name: Race-test all Go packages

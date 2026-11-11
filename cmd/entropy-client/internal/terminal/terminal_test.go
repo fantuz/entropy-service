@@ -98,9 +98,29 @@ func TestFullLayoutSelection(t *testing.T) {
 		{60, 24, true, "full", false},
 		{160, 20, true, "full", false},
 		{240, 60, false, "full", false},
+		{900, 180, true, "waterfall", false},
 	} {
 		if got := (Profile{Columns: tc.columns, Rows: tc.rows, Interactive: tc.tty}).FullLayout(tc.choice); got != tc.want {
 			t.Errorf("layout case %+v = %v", tc, got)
+		}
+	}
+}
+
+func TestWaterfallLayoutSelection(t *testing.T) {
+	for _, tc := range []struct {
+		profile Profile
+		choice  string
+		want    bool
+	}{
+		{Profile{Columns: 47, Rows: 101, Interactive: true}, LayoutWaterfall, true},
+		{Profile{Columns: 900, Rows: 180, Interactive: true}, LayoutWaterfall, true},
+		{Profile{Columns: 80, Rows: 24}, LayoutWaterfall, false},
+		{Profile{Columns: 0, Rows: 24, Interactive: true}, LayoutWaterfall, false},
+		{Profile{Columns: 80, Rows: 2, Interactive: true}, LayoutWaterfall, false},
+		{Profile{Columns: 80, Rows: 24, Interactive: true}, LayoutAuto, false},
+	} {
+		if got := tc.profile.WaterfallLayout(tc.choice); got != tc.want {
+			t.Errorf("waterfall layout case %+v = %v", tc, got)
 		}
 	}
 }
