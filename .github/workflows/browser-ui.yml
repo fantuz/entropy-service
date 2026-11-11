@@ -43,8 +43,6 @@ jobs:
           python3 -m venv /tmp/entropy-browser-tests
           /tmp/entropy-browser-tests/bin/pip install playwright==1.62.0
           /tmp/entropy-browser-tests/bin/python -m playwright install --with-deps ${{ matrix.browser }}
-      - name: Test appearance, window restoration and responsive layout
-        run: /tmp/entropy-browser-tests/bin/python scripts/test_theme_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/theme
       - name: Provide a virtual audio output for headless Firefox
         if: matrix.browser == 'firefox'
         run: |
@@ -53,7 +51,13 @@ jobs:
           pulseaudio --start --exit-idle-time=-1
           pactl load-module module-null-sink sink_name=entropy_test_output
           pactl set-default-sink entropy_test_output
+      - name: Test appearance, window restoration and responsive layout
+        env:
+          DEBUG: pw:browser
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_theme_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/theme
       - name: Test source and socket controls with fake media
+        env:
+          DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_sources_browser.py --browser ${{ matrix.browser }} --chromium '' --artifacts browser-artifacts/sources
       - name: Upload browser evidence
         if: always()

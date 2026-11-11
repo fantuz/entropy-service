@@ -17,6 +17,11 @@ import urllib.request
 from test_stream_browser import assert_layout, number, set_value, wait_paint
 
 
+def wait_meters(page, **counts):
+    page.wait_for_function("""counts=>Object.entries(counts).every(([id,count])=>
+        Number(document.getElementById(id).textContent.replace(/\D/g,''))===count)""",arg=counts)
+
+
 class HTTPFixture(http.server.BaseHTTPRequestHandler):
     body=b"HTTP body sample\n"*1024
 
@@ -158,16 +163,18 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
     from playwright.sync_api import expect, sync_playwright
     with sync_playwright() as playwright:
         if engine=="firefox":
-            browser=playwright.firefox.launch(headless=True,firefox_user_prefs={"media.navigator.streams.fake":True,"media.navigator.permission.disabled":True,"media.autoplay.default":0})
+            browser=playwright.firefox.launch(headless=True,firefox_user_prefs={"media.navigator.streams.fake":True,"media.navigator.permission.disabled":True,"media.autoplay.default":0,"gfx.webrender.software":True,"layers.acceleration.disabled":True})
         else:
             browser=playwright.chromium.launch(executable_path=chromium or None,headless=True,args=["--no-sandbox","--disable-dev-shm-usage","--use-fake-ui-for-media-stream","--use-fake-device-for-media-stream"])
         context=browser.new_context(viewport={"width":1440,"height":1000},device_scale_factor=2,accept_downloads=True)
         context.add_init_script("""(() => {
-          window.labTracks=[];window.labMediaRequests=[];window.mediaDelay=0;window.serialClosed=0;
+          window.labTracks=[];window.labAudioTracks=[];window.labMediaRequests=[];window.mediaDelay=0;window.serialClosed=0;
           const media=navigator.mediaDevices;
           if(media){const original=media.getUserMedia.bind(media);media.getUserMedia=async options=>{
             labMediaRequests.push(options);
             const delay=mediaDelay,stream=await original(options);labTracks.push(...stream.getTracks());
+            const audioTracks=stream.getAudioTracks.bind(stream);
+            stream.getAudioTracks=()=>{const tracks=audioTracks();labAudioTracks.push(...tracks);return tracks;};
             if(delay)await new Promise(resolve=>setTimeout(resolve,delay));return stream;
           };}
           Object.defineProperty(navigator,'serial',{configurable:true,value:{requestPort:async()=>({
@@ -182,7 +189,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-once").click()
         expect(page.locator("#lab-download")).to_be_enabled()
         expect(page.locator("#entropy")).to_have_text("8.00000")
-        assert number(page,"lab-input-frames")==number(page,"lab-analysis-frames")==1
+        wait_meters(page,**{"lab-input-frames":1,"lab-analysis-frames":1})
         with page.expect_download() as downloaded:
             page.locator("#lab-download").click()
         assert Path(downloaded.value.path()).read_bytes()==bytes(range(256))*16
@@ -206,7 +213,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-transform").select_option("xor");page.locator("#lab-refresh").fill("20")
         page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
         expect(page.locator("#entropy")).to_have_text("0.00000")
-        page.wait_for_function("document.getElementById('lab-input-frames').textContent==='2' && document.getElementById('lab-analysis-frames').textContent==='1'")
+        wait_meters(page,**{"lab-input-frames":2,"lab-analysis-frames":1})
         page.locator("#lab-transform").select_option("raw")
         page.locator("#lab-start").click()
         page.wait_for_function("Number(document.getElementById('lab-input-frames').textContent.replaceAll(',',''))>5")
@@ -249,7 +256,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-bytes").fill("8388608")
         page.locator("#lab-once").click()
         expect(page.locator("#lab-download")).to_be_enabled()
-        assert number(page,"lab-input-bytes")==8388608
+        wait_meters(page,**{"lab-input-bytes":8388608})
         page.locator("#lab-bytes").fill("4096")
         for kind in ["crypto","pattern","camera","microphone","serial"]:
             print(f"{engine}: capture {kind}",flush=True)
@@ -294,11 +301,12 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         expect(page.locator("#lab-audio-device option:checked")).not_to_have_text("Selected input unavailable")
         page.locator("#lab-start").click()
         expect(page.locator("#lab-status")).to_contain_text("Source active")
-        # Select the active audio track explicitly. Firefox may retain older
-        # ended tracks while a new capture is being opened.
+        # End the same audio-track object delivered to the adapter. The generic
+        # track log also contains previous captures and camera tracks.
         page.evaluate("""() => {
-            const track=labTracks.findLast(track=>track.kind==='audio'&&track.readyState==='live');
+            const track=labAudioTracks.findLast(track=>track.readyState==='live');
             if(!track)throw new Error('Expected a live selected audio input');
+            track.stop();
             track.dispatchEvent(new Event('ended'));
         }""")
         expect(page.locator("#lab-status")).to_contain_text("disconnected")
@@ -334,7 +342,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-start").click()
         expect(page.locator("#lab-start")).to_be_enabled()
         expect(page.locator("#lab-download")).to_be_enabled()
-        assert number(page,"lab-input-bytes")==10240 and number(page,"lab-input-frames")==3
+        wait_meters(page,**{"lab-input-bytes":10240,"lab-input-frames":3})
         expect(page.locator("#sample-info")).to_contain_text("sample #3")
         page.locator("#lab-refresh").fill("200")
         page.locator("#lab-start").click();expect(page.locator("#lab-download")).to_be_enabled()
@@ -349,7 +357,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         for kind in ["self-ws","self-http"]:
             page.locator("#lab-kind").select_option(kind);page.locator("#lab-once").click()
             expect(page.locator("#lab-download")).to_be_enabled()
-            assert number(page,"lab-input-bytes")==4096
+            wait_meters(page,**{"lab-input-bytes":4096})
         # A browser-origin peer connection follows the upstream policy; use the
         # server bridge to connect peers without weakening that Origin policy.
         page.locator("#lab-kind").select_option("peer-ws");page.locator("#lab-url").fill(peer)
@@ -359,7 +367,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         for source in ["peer-ws","peer-http","self-ws","raw-ws","device","tcp","unix"]:
             page.locator("#lab-registered").select_option(source);page.locator("#lab-once").click()
             expect(page.locator("#lab-download")).to_be_enabled(timeout=15000)
-            assert number(page,"lab-input-bytes")==4096
+            wait_meters(page,**{"lab-input-bytes":4096})
             expect(page.locator("#sample-info")).to_contain_text(source)
         page.locator("#lab-registered").select_option("udp")
         page.locator("#lab-start").click()

@@ -32,7 +32,10 @@ def main():
         base = f"http://127.0.0.1:{port}"
         try:
             with sync_playwright() as playwright:
-                browser = getattr(playwright, args.browser).launch(headless=True)
+                options = {"headless": True}
+                if args.browser == "firefox":
+                    options["firefox_user_prefs"] = {"gfx.webrender.software": True, "layers.acceleration.disabled": True}
+                browser = getattr(playwright, args.browser).launch(**options)
                 for width, height in [(1440, 1000), (390, 844)]:
                     for theme in ["light", "dark"]:
                         context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=theme)
