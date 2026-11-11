@@ -9,8 +9,9 @@ import (
 // QuantisPCIPrefix selects the experimental legacy Quantis PCI Windows adapter.
 const QuantisPCIPrefix = "quantis-pci:"
 
-// ParseQuantisPCI accepts canonical, zero-based board numbers 0..9, matching
-// the legacy SDK's ten-board limit. A non-Quantis source is not selected.
+// ParseQuantisPCI accepts canonical, zero-based board numbers 0..9.
+// This adapter's limit follows the legacy PCI header's ten-board bound, not
+// the SDK's broader mixed-device numbering. Other sources are not selected.
 func ParseQuantisPCI(source string) (index int, selected bool, err error) {
 	if !strings.HasPrefix(source, "quantis-pci") {
 		return 0, false, nil
