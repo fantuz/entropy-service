@@ -39,11 +39,16 @@ def main():
                 for width, height in [(1440, 1000), (390, 844)]:
                     for theme in ["light", "dark"]:
                         context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=theme)
-                        page = context.new_page()
-                        errors = []
-                        page.on("pageerror", lambda error: errors.append(str(error)))
                         for path in PAGES:
+                            page = context.new_page()
+                            errors = []
+                            page.on("pageerror", lambda error: errors.append({"message": str(error), "stack": error.stack}))
                             page.goto(base + path)
+                            # Layout checks have their own page. Finish classic
+                            # worker bootstrap before closing/reloading it;
+                            # Firefox otherwise reports the cancelled import.
+                            for worker in page.workers:
+                                worker.evaluate("new Promise(resolve => setTimeout(resolve, 0))")
                             expect(page.locator("html")).to_have_attribute("data-theme", theme)
                             toggle = page.locator("[data-theme-toggle]")
                             expect(toggle).to_have_text("Light mode" if theme == "dark" else "Dark mode")
@@ -81,7 +86,8 @@ def main():
                                 name = path.strip("/").replace(".html", "") or "home"
                                 page.screenshot(path=str(args.artifacts / f"{name}-{theme}-{width}.png"))
                             results.append({"page": path, "theme": theme, "width": width, "passed": True})
-                        assert not errors, errors
+                            assert not errors, (path, errors)
+                            page.close()
                         context.close()
 
                 context = browser.new_context(color_scheme="dark")
