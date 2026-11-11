@@ -49,6 +49,13 @@ containing ID Quantique Software 20.2.4:
 | `pcie-chip-20.2.4-linux/Libs-Apps/Quantis/quantis_pci.h` | Legacy PCI vendor/device `179a:0001`, four modules maximum, `qrandom` device name. |
 | `pcie-chip-20.2.4-windows/Drivers/Windows/*/XDMA.inf` | Bundled x86/x64 driver targets **PCIe**, not proof that the package supplies the legacy PCI driver. |
 
+An official public **legacy** `pci-module-20.2.3.zip` has since been located.
+Its INF matches `179a:0001`, and its x86/amd64 SYS headers, GUID constants and
+catalog metadata have been inspected. The [driver guide](hardware-drivers.md)
+provides the download, recorded checksum, offline audit tool and remaining
+Windows signing/kernel-policy and physical I/O checks. The binary package
+does not supply legacy Windows kernel source or establish cancellation support.
+
 The repository's C/Java wrappers use these native interfaces. The adapter is
 original Go interoperability code using `golang.org/x/sys/windows`, which is
 already a project dependency. It enumerates the legacy interface, verifies the
@@ -60,9 +67,9 @@ device diagnostics, not an independent entropy estimate or certification.
 The bundled `XDMA.sys` and PCIe C implementation use a different interface and
 register/DMA protocol. They cannot be substituted for a missing legacy driver.
 Newer PCIe/USB/chip devices are outside this adapter's scope, even if marketed
-under the Quantis name. The old README identifies Quantis PCI but the examined
-history does not record a PCI ID; `179a:0001` comes from the vendor header and
-still needs confirmation on the actual host.
+under the Quantis name. Maintainer-supplied historical Linux output now confirms
+`179a:0001`, driver 2.9, core `0x040a1201` and `/dev/qrandom0` on the legacy card.
+Confirm the current host's binding and interface separately.
 
 ## Deadlines and failure handling
 
@@ -137,8 +144,8 @@ mechanics; they do not implement the vendor protocol or emulate a physical QRNG.
 CI also exercises driver-absent discovery on hardware-free Windows runners and
 the normal OS-seeded packaged binaries.
 
-**No physical Quantis PCI card or legacy Windows driver has been tested for this
-change.** Build success, mocked selection and named pipes do not establish
+**No physical Quantis PCI card or loaded legacy Windows driver has been exercised
+for these checks.** Static package inspection, build success and named pipes do not establish
 hardware compatibility, throughput, randomness quality or driver certification.
 
 The reference source offers permissive BSD-style terms as an alternative to

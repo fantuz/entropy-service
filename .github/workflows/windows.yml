@@ -25,6 +25,8 @@ jobs:
           go-version-file: go.mod
       - name: Verify module checksums
         run: go mod verify
+      - name: Test offline Quantis PCI package inspector
+        run: python -m unittest discover -s scripts -p 'test_inspect_quantis_pci.py'
       - name: Verify byte-exact pinned wordlists after Windows checkout
         run: python scripts/check-wordlists.py
       - name: Test shared code and Windows adapters

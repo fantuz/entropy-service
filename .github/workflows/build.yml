@@ -46,6 +46,8 @@ jobs:
         uses: actions/setup-go@v6.5.0
         with:
           go-version-file: go.mod
+      - name: Test offline Quantis PCI package inspector
+        run: python3 -m unittest discover -s scripts -p 'test_inspect_quantis_pci.py'
       - name: Ensure go.mod is already tidied
         run: go mod tidy -diff
       - name: Verify cached module checksums

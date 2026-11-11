@@ -10,7 +10,7 @@ import zipfile
 
 
 REQUIRED = {"entropy-server.exe", "entropy-client.exe", "LICENSE", "README.md",
-            "WORDLIST_NOTICES.txt", "windows.md", "quantis.md", "hardware-probe.md", "quantis-usb.md", "QUANTIS_NOTICES.txt"}
+            "WORDLIST_NOTICES.txt", "windows.md", "quantis.md", "hardware-probe.md", "hardware-drivers.md", "quantis-usb.md", "QUANTIS_NOTICES.txt"}
 
 
 def check_archive(path, extract_to=None):
