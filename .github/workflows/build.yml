@@ -67,6 +67,8 @@ jobs:
         run: |
           make build
           python3 scripts/test_startup_failures.py
+      - name: Verify client TLS trust and server identity replacement
+        run: python3 scripts/test_client_tls.py
       - name: Test pure-Go DRBG and CPU-random fallback
         run: go test -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand
       - name: Race-test opt-in experimental Barzakh backend

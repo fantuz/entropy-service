@@ -18,8 +18,12 @@ const maxEntropyBytes = 1 << 25 // 32 MiB
 // ErrEntropyTooLarge means the response exceeded the client's payload limit.
 var ErrEntropyTooLarge = errors.New("entropy response exceeds 32 MiB limit")
 
+// ErrInsecureRedirect means an HTTPS request tried to redirect to plaintext.
+var ErrInsecureRedirect = errors.New("refusing redirect from HTTPS to an insecure endpoint")
+
 var entropyHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
+	Timeout:       30 * time.Second,
+	CheckRedirect: checkEntropyRedirect,
 	Transport: &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -29,6 +33,21 @@ var entropyHTTPClient = &http.Client{
 		IdleConnTimeout:     60 * time.Second,
 		TLSHandshakeTimeout: 5 * time.Second,
 	},
+}
+
+func checkEntropyRedirect(req *http.Request, via []*http.Request) error {
+	const secureScheme = "https"
+
+	// A custom policy replaces net/http's default ten-request limit.
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+
+	if len(via) > 0 && via[len(via)-1].URL.Scheme == secureScheme && req.URL.Scheme != secureScheme {
+		return ErrInsecureRedirect
+	}
+
+	return nil
 }
 
 // "encoding/json"

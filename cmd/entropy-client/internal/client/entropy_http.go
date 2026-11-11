@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/stats"
 )
@@ -15,11 +14,7 @@ func TestEntropyHTTP(ctx context.Context, endpoint string) error {
 		return err
 	}
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := entropyHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}

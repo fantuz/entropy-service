@@ -230,6 +230,10 @@ For example, this requests 64 KiB with a 100 ms refresh setting, overriding the 
   -slice=65536 -refresh=100ms
 ```
 
+For remote HTTPS/WSS, see [client certificate trust and renewal](client-tls.md).
+Both transports verify the URL's name/IP against the certificate and use OS
+trust; HTTP pull rejects redirects from HTTPS to plaintext.
+
 ### Analysis and terminal display
 
 | Flag | Default | Purpose |

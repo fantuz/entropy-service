@@ -47,6 +47,9 @@ curl --cacert ./tls/cert.pem https://localhost:8443/live
 Browsers need an explicit trust decision. Never distribute the private key
 to clients or turn off certificate validation to make a deployment work.
 
+For `entropy-client` HTTPS/WSS commands, Linux trust configuration and the
+effect of renewal on existing streams, see [client TLS trust](client-tls.md).
+
 ## Provision at service startup
 
 The package remains local-only HTTP and is not started/enabled by installation.
