@@ -15,6 +15,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Client write-out](client-writeout.md) | Linux pool mixing, limited value, device validation, failure handling and progress counters. |
 | [Raw client exports](client-output.md) | Private files, raw stdout/SSH pipes, Linux devices, exact byte limits and delivery accounting. |
 | [Client recovery](client-recovery.md) | Disconnect causes, opt-in bounded retries, backoff, permanent failures and export limits. |
+| [Client TLS trust](client-tls.md) | HTTPS/WSS verification, Linux public-certificate trust, IPv4 SANs, renewal and downgrade protection. |
 | [Adaptive client terminal](client-terminal.md) | Compact/full layouts, sizing, bounded history, screenshots and display-cost trade-offs. |
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
 | [Experimental source/socket labs](source-labs.md) | Generate, meter and compare sources; browser media and registered peer/device/socket connections. |
