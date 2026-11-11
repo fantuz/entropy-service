@@ -39,6 +39,10 @@ jobs:
           go build -o bin/entropy-server ./cmd/entropy-server
       - name: Install pinned browser test tools
         run: |
+          # The runner's Azure mirror can fail DNS before browser tests start.
+          # Keep Ubuntu's package signatures; use its public HTTPS mirrors.
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          printf '%s\n' 'https://security.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-security-mirrors.txt >/dev/null
           python3 -m venv /tmp/entropy-browser-tests
           /tmp/entropy-browser-tests/bin/pip install playwright==1.62.0
           /tmp/entropy-browser-tests/bin/python -m playwright install --with-deps ${{ matrix.browser }}
