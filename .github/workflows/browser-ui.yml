@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths-ignore: ["**.md", ".gitignore"]
   pull_request:
-    branches: [main]
     paths-ignore: ["**.md", ".gitignore"]
   workflow_call:
 
@@ -40,14 +39,45 @@ jobs:
           go build -o bin/entropy-server ./cmd/entropy-server
       - name: Install pinned browser test tools
         run: |
+          # APT needs lowercase proxy variables, including after sudo. Do not
+          # print their values: a configured proxy can contain credentials.
+          export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"
+          export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"
+          export no_proxy="${no_proxy:-${NO_PROXY:-}}"
+          # Use direct HTTPS sources rather than mirror+file redirects. Keep
+          # suites, components and Signed-By unchanged; never disable signing.
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          sources = [Path('/etc/apt/sources.list')]
+          directory = Path('/etc/apt/sources.list.d')
+          sources.extend(directory.glob('*.list'))
+          sources.extend(directory.glob('*.sources'))
+          for source in sources:
+              if not source.is_file():
+                  continue
+              original = source.read_text()
+              updated = original.replace('mirror+file:/etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu')
+              updated = updated.replace('mirror+file:/etc/apt/apt-security-mirrors.txt', 'https://security.ubuntu.com/ubuntu')
+              if updated != original:
+                  source.write_text(updated)
+          Path('/etc/apt/apt.conf.d/80entropy-browser-ci').write_text(
+              'Acquire::Retries "2";\nAcquire::http::Timeout "10";\n'
+              'Acquire::https::Timeout "10";\nAPT::Update::Error-Mode "any";\n')
+          PY
           python3 -m venv /tmp/entropy-browser-tests
           /tmp/entropy-browser-tests/bin/pip install playwright==1.62.0
-          /tmp/entropy-browser-tests/bin/python -m playwright install --with-deps ${{ matrix.browser }}
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            /tmp/entropy-browser-tests/bin/python -m playwright install-deps ${{ matrix.browser }}
+          /tmp/entropy-browser-tests/bin/python -m playwright install ${{ matrix.browser }}
       - name: Provide a virtual audio output for headless Firefox
         if: matrix.browser == 'firefox'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
+          export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"
+          export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"
+          export no_proxy="${no_proxy:-${NO_PROXY:-}}"
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE apt-get update
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
           pulseaudio --start --exit-idle-time=-1
           pactl load-module module-null-sink sink_name=entropy_test_output
           pactl set-default-sink entropy_test_output

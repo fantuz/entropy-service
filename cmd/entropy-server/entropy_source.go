@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 )
 
 // selectEntropySource accepts an opener so both successful selection and
@@ -31,7 +32,7 @@ func selectEntropySource(
 	}
 
 	if path != DefaultCSPRNG {
-		log.Printf("entropy device %q unavailable (%v); trying OS CSPRNG %q", path, err, DefaultCSPRNG)
+		slog.Warn("entropy device unavailable; trying OS CSPRNG", "device", path, "error", err.Error(), "fallback", DefaultCSPRNG)
 
 		fallback, fallbackErr := open(DefaultCSPRNG)
 		if fallbackErr == nil {

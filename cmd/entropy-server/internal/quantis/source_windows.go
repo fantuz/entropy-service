@@ -20,6 +20,40 @@ const (
 	maxRead            = 32 << 10
 )
 
+// ProbeStatus reports the driver's read-only diagnostics, not entropy quality.
+// The caller sets the deadline covering all queries and the subsequent sample.
+func (s *Source) ProbeStatus() (map[string]uint32, error) {
+	s.readMu.Lock()
+	defer s.readMu.Unlock()
+
+	status := map[string]uint32{}
+
+	for _, query := range []struct {
+		name string
+		code uint32
+	}{
+		{"modules_mask", ioctlModulesMask},
+		{"modules_status", ioctlModulesStatus},
+		{"board_version_raw", 0x00222008},
+		{"driver_version_raw", 0x00222020},
+	} {
+		buffer := make([]byte, 4)
+
+		n, err := s.transfer(buffer, query.code)
+		if err != nil {
+			return status, err
+		}
+
+		if n != len(buffer) {
+			return status, io.ErrUnexpectedEOF
+		}
+
+		status[query.name] = binary.LittleEndian.Uint32(buffer)
+	}
+
+	return status, validateModules(status["modules_mask"], status["modules_status"])
+}
+
 // Source serializes reads and honours deadline changes and Close while waiting
 // for overlapped I/O. A canceled operation is always drained before its memory
 // or handle is released. A broken kernel driver can still prevent cancellation;

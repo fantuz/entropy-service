@@ -47,6 +47,9 @@ An experimental [Quantis PCI Windows adapter](docs/quantis.md) also supports
 explicit hardware selection with an installed legacy driver. No driver is bundled;
 physical-card validation remains outstanding.
 
+Use [`entropy-server hardware list` and `hardware probe`](docs/hardware-probe.md)
+to inspect known devices and test an explicit source without starting the server.
+
 ```sh
 git clone https://github.com/fantuz/entropy-service.git
 cd entropy-service

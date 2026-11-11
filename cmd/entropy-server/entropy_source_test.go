@@ -1,13 +1,44 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
+
+func TestSourceFallbackDiagnosticsEscapeDeviceInput(t *testing.T) {
+	var output bytes.Buffer
+
+	previous := log.Writer()
+
+	log.SetOutput(&output)
+	t.Cleanup(func() { log.SetOutput(previous) })
+
+	path := "/dev/missing\nFORGED_EVENT"
+
+	source, _, err := selectEntropySource(path, false, func(candidate string) (io.ReadCloser, error) {
+		if candidate == path {
+			return nil, errors.New("open failed\nFORGED_ERROR")
+		}
+
+		return &trackedEntropySource{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+
+	if strings.Contains(output.String(), "\nFORGED") || strings.Count(strings.TrimSpace(output.String()), "\n") != 0 {
+		t.Fatalf("device/error text forged a diagnostic record: %q", output.String())
+	}
+}
 
 type trackedEntropySource struct {
 	closed bool
