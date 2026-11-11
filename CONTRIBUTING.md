@@ -108,12 +108,18 @@ Use shared variables for UI and plot colors; keep sample RGB/grayscale values
 independent of the theme. Lab help comes from `webtemplates/lab-help.html`
 and the same render/check command. Run `node scripts/test-theme.mjs` and
 `python3 scripts/test_theme_browser.py` after appearance or help changes;
-the browser suite needs Python Playwright and Chromium.
+the browser suite needs Python Playwright and the selected browser. Use
+`--browser firefox` to check Firefox as well. The `browser-ui` workflow runs
+both engines and uploads screenshots/results; releases wait for it too.
 
-Experimental-source checks: `node scripts/test-lab-samples.mjs` and
+Experimental-source checks: `node scripts/test-lab-samples.mjs`, `node scripts/test-lab-audio.mjs` and
 `node scripts/test-lab-registration.mjs`, plus
 `python3 scripts/test_sources_browser.py --artifacts /tmp/entropy-source-lab`.
 The latter uses fake media and local fixtures; it does not activate real devices.
+It also accepts `--browser firefox`. To use Playwright's installed Chromium,
+pass `--chromium ''` instead of the system executable. Install the pinned test
+tools with `python3 -m pip install playwright==1.62.0`, then
+`python3 -m playwright install chromium firefox`.
 The optional `scripts/test_lab_cameras.py` uses FFmpeg and a supplied MediaMTX
 binary for authenticated RTSP and mocked ONVIF/HTTP browser integration.
 It also requires test-only Python packages `playwright` and `defusedxml`.

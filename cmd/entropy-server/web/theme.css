@@ -675,6 +675,8 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-lab .lab-url { flex:1 1 25rem; }
 .page-lab .lab-url input { width:100%; }
 .page-lab .lab-file { flex:1 1 24rem; }
+.page-lab .lab-audio-device { min-width:0; max-width:100%; }
+.page-lab #lab-audio-device { max-width:100%; }
 .page-lab #lab-video { width:min(100%,20rem); border:1px solid var(--border); border-radius:12px; }
 .page-lab #lab-video[hidden] { display:none; }
 .page-lab .lab-table-wrap { overflow:auto; }

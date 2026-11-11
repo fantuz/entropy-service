@@ -10,11 +10,11 @@ for(const value of ["f","zz","","00".repeat(513)])assert.throws(()=>lab.pattern(
 assert.deepEqual(Array.from(lab.generate("counter",4,{sequence:254})),[254,255,0,1]);
 assert.deepEqual(Array.from(lab.generate("pattern",7,{sequence:2,bytes:Uint8Array.of(1,2,3)})),[3,1,2,3,1,2,3]);
 assert.deepEqual(Array.from(lab.generate("constant",3,{value:128})),[128,128,128]);
-assert.throws(()=>lab.generate("constant",3,{value:256}));assert.throws(()=>lab.generate("crypto",1048577));
+assert.throws(()=>lab.generate("constant",3,{value:256}));assert.throws(()=>lab.generate("crypto",lab.MAX_BYTES+1));
 const requests=[];
 const crypto={getRandomValues(bytes){requests.push(bytes.length);bytes.fill(42);}};
-const output=lab.generate("crypto",1048576,{crypto});
-assert.equal(output.length,1048576);assert.equal(requests.length,16);assert.ok(requests.every(n=>n<=65536));assert.ok(output.every(n=>n===42));
+const output=lab.generate("crypto",lab.MAX_BYTES,{crypto});
+assert.equal(output.length,8388608);assert.equal(requests.length,128);assert.ok(requests.every(n=>n<=65536));assert.ok(output.every(n=>n===42));
 const bytes=Uint8Array.of(0,1,127,128,254,255);
 assert.deepEqual(Array.from(lab.transform(bytes,"lsb")),[0,255,255,0,0,255]);
 assert.equal(lab.transform(bytes,"xor"),null);

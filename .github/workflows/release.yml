@@ -83,7 +83,9 @@ jobs:
       - name: Test stream Shannon entropy alerts
         run: node scripts/test-stream-entropy-alert.mjs
       - name: Test experimental lab generators and meters
-        run: node scripts/test-lab-samples.mjs
+        run: |
+          node scripts/test-lab-samples.mjs
+          node scripts/test-lab-audio.mjs
       - name: Test assisted source configuration
         run: node scripts/test-lab-registration.mjs
       - name: Check shared analysis markup
@@ -119,9 +121,13 @@ jobs:
       - name: Test real packaged systemd HTTP and HTTPS lifecycle
         run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh dist/*_amd64.deb
 
+  browser:
+    name: Validate Firefox and Chromium UI
+    uses: ./.github/workflows/browser-ui.yml
+
   release:
     name: Publish only after full tag validation
-    needs: validate
+    needs: [validate, browser]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

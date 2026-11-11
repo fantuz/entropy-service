@@ -64,9 +64,9 @@
             if(source.max_bytes!==source.width*source.height*3)invalid("max_bytes","Camera max_bytes must equal the RGB frame size");
         }else if(source.width||source.height||source.profile_token)invalid("kind","Camera fields require an RTSP or ONVIF source");
         if(utf8(source.profile_token)>256||(source.profile_token&&source.kind!=="onvif"))invalid("profile_token","ONVIF profile token must be at most 256 UTF-8 bytes and requires an ONVIF source");
-        if(!source.max_bytes)source.max_bytes=1048576;
+        if(!source.max_bytes)source.max_bytes=33554432;
         if(!source.timeout_ms)source.timeout_ms=camera?10000:5000;
-        if(source.max_bytes<1||source.max_bytes>1048576)invalid("max_bytes","Sample bytes must be 1–1,048,576");
+        if(source.max_bytes<1||source.max_bytes>33554432)invalid("max_bytes","Sample bytes must be 1–33,554,432");
         if(source.timeout_ms<100||source.timeout_ms>60000)invalid("timeout_ms","Timeout must be 100–60,000 ms");
         const urls=value.urls??[];
         if(!Array.isArray(urls)||urls.some(url=>typeof url!=="string"))invalid("urls","URL pool must be an array of strings");
@@ -120,7 +120,7 @@
     const dialog=document.createElement("dialog");dialog.className="lab-registration";dialog.id="lab-registration";
     dialog.innerHTML=`<header class="registration-header"><div><h2 id="registration-title" class="analysis-label">Prepare source registry</h2><p id="registration-draft-state" class="note"></p></div><button type="button" id="registration-close">Close</button></header>
     <div class="registration-body">
-      <p class="note">Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server.</p>
+      <p class="note">Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server. Capture also obeys the server’s -max-bytes and lab memory limits; browser samples are capped at 8 MiB.</p>
       <section aria-labelledby="registration-list-title"><h3 id="registration-list-title" class="analysis-label">Draft sources</h3><ul id="registration-list" class="registration-list"></ul></section>
       <p id="registration-status" role="status" class="note"></p>
       <form id="lab-registration-form">
@@ -131,7 +131,7 @@
         <label class="registration-wide"><span id="registration-endpoint-label">Endpoint</span><input name="endpoint" required aria-describedby="registration-example registration-help" placeholder="https://example.org/"></label>
         <div class="registration-wide"><p id="registration-example" class="note"></p><button type="button" id="registration-use-example">Use example</button></div>
         <label class="registration-pages registration-wide" hidden>Web-page example<select id="registration-page-example"><option value="">Choose an example…</option>${pagePresets.map(p=>`<option value="${p.url}">${p.label}</option>`).join("")}</select></label>
-        <label>Maximum sample bytes<input name="max_bytes" type="number" min="1" max="1048576" value="1048576" required></label>
+        <label>Maximum sample bytes<input name="max_bytes" type="number" min="1" max="33554432" value="33554432" required></label>
         <label>Timeout (ms)<input name="timeout_ms" type="number" min="100" max="60000" value="5000" required></label>
         <label class="registration-camera" hidden>Decoded size<select name="resolution"><option>160x120</option><option selected>320x240</option><option>640x480</option></select></label>
         <label class="registration-onvif" hidden>ONVIF profile token<input name="profile_token" maxlength="256" placeholder="Empty: first Media profile"></label>

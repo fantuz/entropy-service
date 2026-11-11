@@ -22,7 +22,7 @@
       <form id="lab-config">
         <div class="analysis-controls">
           <label>Source <select id="lab-kind"><option value="self-ws">This instance · WebSocket</option><option value="self-http">This instance · HTTP</option><option value="peer-ws">Entropy-server peer · WebSocket</option><option value="peer-http">Entropy-server peer · HTTP</option><option value="websocket">Binary WebSocket URL</option><option value="http">HTTP body prefix</option><option value="bridge">Registered server source</option></select></label>
-          <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="1048576" value="65536" required></label>
+          <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="8388608" value="65536" required></label>
           <label>Cadence (ms) <input id="lab-refresh" type="number" min="20" max="60000" value="500" required></label>
           <label>Representation <select id="lab-transform"><option value="raw">Original bytes</option><option value="xor">XOR previous sample</option><option value="lsb">LSB → 0/255</option></select></label>
           <label class="lab-only lab-url" data-modes="peer-ws peer-http websocket http" hidden><span id="lab-url-label">Peer base URL or endpoint</span><input id="lab-url" type="text" inputmode="url" placeholder="http://127.0.0.1:8081" spellcheck="false"></label>
@@ -52,7 +52,7 @@
         <details><summary>Source notes</summary>
           <p class="note">Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the <a href="/api-upload.html">File lab</a> for detailed local-file seeking.</p>
           <p class="note">Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.</p>
-          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages are analysed whole, up to 1 MiB; sample size controls request/read sizes for the other adapters.</p>
+          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages may contain up to the configured byte limit (at most 8 MiB); analysis uses the selected window. Sample size controls request/read sizes for the other adapters.</p>
           <p class="note">XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.</p>
         </details>
       </div>

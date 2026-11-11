@@ -45,6 +45,12 @@
             throw failure;
         } finally {clearTimeout(timer);signal.removeEventListener("abort",stop);if(reader){await reader.cancel().catch(()=>{});reader.releaseLock();}}
     }
+    async function audioInputs() {
+        if(!navigator.mediaDevices?.enumerateDevices)return null;
+        const devices=await navigator.mediaDevices.enumerateDevices();
+        return devices.filter(device=>device.kind==="audioinput"&&device.deviceId&&device.deviceId!=="default")
+            .map(device=>({id:device.deviceId,label:device.label}));
+    }
     async function start(options,{signal,emit,ready,end,error,video,previewEnabled=()=>false,previewCanvas,info=()=>{}}) {
         const {kind,size,refresh}=options;
         if(["crypto","counter","constant","pattern"].includes(kind)) {
@@ -92,8 +98,8 @@
                     }catch(failure){close();error(failure);}
                     return;
                 }
-                if(!(event.data instanceof ArrayBuffer)||!event.data.byteLength||event.data.byteLength>helpers.MAX_BYTES){
-                    close();error(new Error("Source must send nonempty binary messages up to 1 MiB"));return;
+                if(!(event.data instanceof ArrayBuffer)||!event.data.byteLength||event.data.byteLength>Math.min(helpers.MAX_BYTES,options.maxBytes||helpers.MAX_BYTES)){
+                    close();error(new Error("Source must send nonempty binary messages within the configured lab byte limit (at most 8 MiB)"));return;
                 }
                 const bytes=new Uint8Array(event.data);
                 if(options.camera){
@@ -144,18 +150,31 @@
         }
         if(kind==="microphone") {
             const Audio=window.AudioContext||window.webkitAudioContext;
-            if(!navigator.mediaDevices?.getUserMedia||!Audio)throw new Error("Microphone access needs Web Audio and HTTPS or localhost");
+            if(!navigator.mediaDevices?.getUserMedia||!Audio)throw new Error("Audio input needs a supported browser, Web Audio and HTTPS or localhost");
+            if(signal.aborted)throw aborted();
             const context=new Audio();
-            let stream,cancelTimer=()=>{};
-            const close=()=>{cancelTimer();stream?.getTracks().forEach(track=>track.stop());void context.close().catch(()=>{});};
+            let stream,closed=false,cancelTimer=()=>{};
+            const close=()=>{
+                cancelTimer();stream?.getTracks().forEach(track=>track.stop());
+                if(!closed){closed=true;void context.close().catch(()=>{});}
+            };
             guard(signal,close);
             try{
                 await context.resume();
-                stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
-                if(signal.aborted){close();throw aborted();}
+                if(signal.aborted)throw aborted();
+                const audio={echoCancellation:false,noiseSuppression:false,autoGainControl:false};
+                if(options.audioDeviceId)audio.deviceId={exact:options.audioDeviceId};
+                stream=await navigator.mediaDevices.getUserMedia({audio,video:false});
+                if(signal.aborted)throw aborted();
+                const track=stream.getAudioTracks()[0];
+                if(!track||track.readyState==="ended")throw new Error("Audio input disconnected; choose an available input and Start again");
+                track.addEventListener("ended",()=>{
+                    if(!closed&&!signal.aborted){close();error(new Error("Audio input disconnected; choose an available input and Start again"));}
+                },{once:true});
                 const source=context.createMediaStreamSource(stream),analyser=context.createAnalyser(),mute=context.createGain();
                 analyser.fftSize=Math.max(32,2**Math.floor(Math.log2(Math.min(32768,Math.max(32,size/2)))));
                 mute.gain.value=0;source.connect(analyser);analyser.connect(mute);mute.connect(context.destination);
+                info(`Audio input: ${track.label||"system default"}. Choose a different input or use your system sound settings to select the physical line-in port.`);
                 const samples=new Float32Array(analyser.fftSize);ready();
                 cancelTimer=periodic(signal,refresh,()=>{
                     analyser.getFloatTimeDomainData(samples);
@@ -164,10 +183,16 @@
                         const sample=Math.max(-1,Math.min(1,samples[i]));
                         view.setInt16(i*2,Math.round(sample*(sample<0?32768:32767)),true);
                     }
-                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · latest audio window (may overlap)`);
+                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · ${track.label||"system default audio input"} · latest audio window (may overlap)`);
                 },error);
                 return close;
-            }catch(failure){close();throw failure;}
+            }catch(failure){
+                close();
+                if(failure.name==="NotAllowedError")throw new Error("Audio permission denied; allow audio input for this site in your browser, then Start again");
+                if(["NotFoundError","OverconstrainedError"].includes(failure.name))throw new Error("Selected audio input is unavailable; refresh inputs and choose another device or System default");
+                if(failure.name==="NotReadableError")throw new Error("Audio input could not be opened; check whether it is disconnected or in use by another application");
+                throw failure;
+            }
         }
         if(kind==="serial") {
             if(!navigator.serial?.requestPort)throw new Error("Web Serial is unavailable in this browser; use a registered socket adapter");
@@ -189,5 +214,5 @@
         }
         throw new Error("Unknown source type");
     }
-    window.EntropyLabAdapters=Object.freeze({start});
+    window.EntropyLabAdapters=Object.freeze({start,audioInputs});
 })();

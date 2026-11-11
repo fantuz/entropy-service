@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +16,67 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/lab"
 )
+
+func TestLabEightMiBSampleAndConfiguredLimits(t *testing.T) {
+	const sampleBytes = 8 << 20
+
+	payload := bytes.Repeat([]byte{0x5a}, sampleBytes)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(payload)
+	}))
+	defer upstream.Close()
+
+	registry, err := lab.New([]lab.Config{{ID: "large", Kind: "http", Endpoint: upstream.URL}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+
+	budget := newWebSocketBudget(1, 32<<20)
+
+	server := httptest.NewServer(labStreamHandler(registry, budget, sampleBytes, false))
+	defer server.Close()
+
+	conn := budgetConnect(t, server, "/lab/stream?source=large&bytes="+strconv.Itoa(sampleBytes)+"&refresh=100")
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+
+	typ, data, err := conn.ReadMessage()
+	if err != nil || typ != websocket.BinaryMessage || !bytes.Equal(data, payload) {
+		t.Fatalf("8 MiB source sample changed: type=%d bytes=%d error=%v", typ, len(data), err)
+	}
+
+	_ = conn.Close()
+
+	waitBudgetActive(t, budget, 0)
+
+	response := httptest.NewRecorder()
+	labCatalogHandler(registry, budget, 256<<10, false)(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/sources", nil))
+
+	var catalog struct {
+		MaxBytes int              `json:"max_bytes"`
+		Sources  []lab.Descriptor `json:"sources"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &catalog); err != nil || catalog.MaxBytes != 256<<10 || len(catalog.Sources) != 1 || catalog.Sources[0].MaxBytes != 256<<10 {
+		t.Fatal("catalog must advertise the configured effective ceiling", err, response.Body.String())
+	}
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/lab/stream?source=large&bytes="+strconv.Itoa(sampleBytes+1), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Body.Close()
+
+	_, _ = io.Copy(io.Discard, result.Body)
+	if result.StatusCode != http.StatusBadRequest || budget.usage().Active != 0 {
+		t.Fatal("request bypassed the operator's byte limit", result.StatusCode)
+	}
+}
 
 func TestLabAccessCatalogAndValidation(t *testing.T) {
 	registry, err := lab.New([]lab.Config{{ID: "private", Name: "Device", Kind: "http", Endpoint: "http://127.0.0.1:9000/private?token=hidden"}})
@@ -49,7 +113,7 @@ func TestLabAccessCatalogAndValidation(t *testing.T) {
 		t.Fatal("forwarded header bypassed loopback restriction")
 	}
 
-	for _, query := range []string{"source=missing", "source=private&source=private", "source=private&bytes=1048577", "source=private&refresh=0", "source=private&refresh=20&refresh=21", "source=private&bytes=8&bytes=9", "source=private&refesh=20", "source=private&bytes=%zz", "source=private&bytes=8;refresh=20", "source=private&preview=1"} {
+	for _, query := range []string{"source=missing", "source=private&source=private", "source=private&bytes=33554433", "source=private&refresh=0", "source=private&refresh=20&refresh=21", "source=private&bytes=8&bytes=9", "source=private&refesh=20", "source=private&bytes=%zz", "source=private&bytes=8;refresh=20", "source=private&preview=1"} {
 		request = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/stream?"+query, nil)
 		request.RemoteAddr = "127.0.0.1:1234"
 		recorder = httptest.NewRecorder()

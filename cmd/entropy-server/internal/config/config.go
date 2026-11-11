@@ -113,7 +113,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.IntVar(&cfg.SeedBuffer, "buffer-entropy", 64, "Deprecated; ignored (no separate entropy buffer)")
 	flags.IntVar(&cfg.ReseedSize, "buffer-reseed", 256, "Bytes supplied to each root reseed (32-1048576)")
 	flags.IntVar(&cfg.QRNGBuffer, "buffer-qrng", 2048, "Deprecated; ignored (reseeding reads the configured source directly)")
-	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum generated sample bytes (default 32 MiB; compact WebSocket messages add a 32-byte digest)")
+	flags.IntVar(&cfg.MaxBytes, "max-bytes", 1<<25, "Maximum generated or lab sample bytes (default 32 MiB; compact WebSocket messages add a 32-byte digest)")
 	flags.IntVar(&cfg.WSMaxConnections, "ws-max-connections", 128, "Maximum simultaneous entropy WebSockets across HTTP and HTTPS (positive)")
 	flags.Int64Var(&cfg.WSMemoryMiB, "ws-memory-mib", 1024, "Aggregate estimated WebSocket working-memory budget in MiB (positive; not an RSS limit)")
 	flags.IntVar(&cfg.HTTPMaxRequests, "http-max-requests", 128, "Maximum simultaneous HTTP generation requests across HTTP and HTTPS (positive)")

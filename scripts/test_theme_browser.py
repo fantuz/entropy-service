@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real Chromium checks for shared themes, navigation, plots and lab disclosures."""
+"""Real browser checks for shared themes, navigation, plots and lab disclosures."""
 import argparse
 import json
 from pathlib import Path
@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, default=Path("bin/entropy-server"))
     parser.add_argument("--artifacts", type=Path, default=Path("/tmp/entropy-theme-browser"))
+    parser.add_argument("--browser", choices=["chromium", "firefox"], default="chromium")
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
     results = []
@@ -31,7 +32,7 @@ def main():
         base = f"http://127.0.0.1:{port}"
         try:
             with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(headless=True)
+                browser = getattr(playwright, args.browser).launch(headless=True)
                 for width, height in [(1440, 1000), (390, 844)]:
                     for theme in ["light", "dark"]:
                         context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=theme)
@@ -70,7 +71,8 @@ def main():
                                 page.reload()
                                 assert page.locator(".lab-help details[open]").count() == 0
                                 help_sections.nth(0).locator("summary").click()
-                                page.evaluate("window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true}))")
+                                with page.expect_navigation():
+                                    page.evaluate("window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true}))")
                                 assert page.locator(".lab-help details[open]").count() == 0
                             if path in ["/", "/api-sources.html", "/api-socket.html", "/api-status.html"]:
                                 name = path.strip("/").replace(".html", "") or "home"
@@ -122,6 +124,35 @@ def main():
                 expect(page.locator("html")).to_have_attribute("data-theme", "light")
                 context.close()
 
+                # A missed storage event while another same-origin window
+                # changes appearance must be reconciled on focus/restoration.
+                context = browser.new_context(color_scheme="dark")
+                context.add_init_script("""window.addEventListener('storage', event => {
+                    if(window.holdThemeStorage)event.stopImmediatePropagation();
+                }, true)""")
+                first = context.new_page()
+                first.goto(base + "/")
+                first.evaluate("window.holdThemeStorage=true")
+                other = context.new_page()
+                other.goto(base + "/api-sources.html")
+                other.locator("[data-theme-toggle]").click()
+                expect(other.locator("html")).to_have_attribute("data-theme", "light")
+                assert first.evaluate("localStorage.getItem('entropy-theme')") == "light"
+                first.bring_to_front()
+                # Headless runners may report both windows as focused, so
+                # deliver the activation notification explicitly as well.
+                first.evaluate("window.dispatchEvent(new Event('focus'))")
+                expect(first.locator("html")).to_have_attribute("data-theme", "light")
+                expect(first.locator("[data-theme-toggle]")).to_have_text("Dark mode")
+                first.evaluate("window.holdThemeStorage=false; window.dispatchEvent(new StorageEvent('storage', {key:'entropy-theme', newValue:'dark'}))")
+                expect(first.locator("html")).to_have_attribute("data-theme", "light")
+                for path in ["/api-sources.html", "/api-socket.html", "/api-gallery.html", "/"]:
+                    first.goto(base + path)
+                    expect(first.locator("html")).to_have_attribute("data-theme", "light")
+                first.go_back()
+                expect(first.locator("html")).to_have_attribute("data-theme", "light")
+                context.close()
+
                 context = browser.new_context(color_scheme="light")
                 context.add_init_script("Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('disabled','SecurityError')}})")
                 page = context.new_page()
@@ -131,7 +162,8 @@ def main():
                 context.close()
                 browser.close()
             (args.artifacts / "results.json").write_text(json.dumps({"pages": results, "persistence": True,
-                "cross_tab": True, "blocked_storage": True, "frozen_plot_repaint": True}, indent=2))
+                "cross_tab": True, "window_reactivation": True, "stale_storage_event": True,
+                "blocked_storage": True, "frozen_plot_repaint": True}, indent=2))
             print(f"PASS: {len(results)} page/theme/viewport cases; saved theme, cross-tab sync, blocked storage, frozen plots and collapsed lab help")
         finally:
             server.send_signal(signal.SIGTERM)

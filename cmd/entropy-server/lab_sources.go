@@ -49,6 +49,11 @@ func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes
 
 		usage := budget.usage()
 
+		sources := registry.List()
+		for i := range sources {
+			sources[i].MaxBytes = min(sources[i].MaxBytes, maxBytes)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(struct {
 			Sources        []lab.Descriptor `json:"sources"`
@@ -56,7 +61,7 @@ func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes
 			MaxBytes       int              `json:"max_bytes"`
 			MaxConnections int              `json:"max_connections"`
 			Active         int              `json:"active"`
-		}{Sources: registry.List(), Allowed: labAllowed(r, allowRemote), MaxBytes: maxBytes, MaxConnections: usage.MaxConnections, Active: usage.Active})
+		}{Sources: sources, Allowed: labAllowed(r, allowRemote), MaxBytes: maxBytes, MaxConnections: usage.MaxConnections, Active: usage.Active})
 	}
 }
 

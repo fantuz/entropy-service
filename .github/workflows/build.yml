@@ -89,7 +89,9 @@ jobs:
       - name: Test stream Shannon entropy alerts
         run: node scripts/test-stream-entropy-alert.mjs
       - name: Test experimental lab generators and meters
-        run: node scripts/test-lab-samples.mjs
+        run: |
+          node scripts/test-lab-samples.mjs
+          node scripts/test-lab-audio.mjs
       - name: Test assisted source configuration
         run: node scripts/test-lab-registration.mjs
       - name: Check shared analysis markup

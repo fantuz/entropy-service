@@ -1,0 +1,65 @@
+name: browser-ui
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", ".gitignore"]
+  pull_request:
+    branches: [main]
+    paths-ignore: ["**.md", ".gitignore"]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-ui-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: Browser UI (${{ matrix.browser }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Build browser test server
+        run: |
+          mkdir -p bin
+          go build -o bin/entropy-server ./cmd/entropy-server
+      - name: Install pinned browser test tools
+        run: |
+          python3 -m venv /tmp/entropy-browser-tests
+          /tmp/entropy-browser-tests/bin/pip install playwright==1.62.0
+          /tmp/entropy-browser-tests/bin/python -m playwright install --with-deps ${{ matrix.browser }}
+      - name: Test appearance, window restoration and responsive layout
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_theme_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/theme
+      - name: Provide a virtual audio output for headless Firefox
+        if: matrix.browser == 'firefox'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=entropy_test_output
+          pactl set-default-sink entropy_test_output
+      - name: Test source and socket controls with fake media
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_sources_browser.py --browser ${{ matrix.browser }} --chromium '' --artifacts browser-artifacts/sources
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-ui-${{ matrix.browser }}
+          path: browser-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
