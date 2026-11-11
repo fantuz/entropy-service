@@ -17,7 +17,6 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -1214,7 +1213,7 @@ func main() {
 
 	sourceReadDetail := fmt.Sprintf("%s per complete seed; nonblocking source", cfg.SourceTimeout)
 
-	if runtime.GOOS == "windows" {
+	if windowsBuild {
 		sourceReadDetail = fmt.Sprintf("%s checked between bounded OS RNG calls; an in-flight native call cannot be interrupted", cfg.SourceTimeout)
 	}
 

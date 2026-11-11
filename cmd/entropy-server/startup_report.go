@@ -13,12 +13,14 @@ import (
 	"github.com/fantuz/entropy-service/internal/console"
 )
 
+const windowsBuild = runtime.GOOS == "windows"
+
 func serverInvocation(out io.Writer, cfg *config.Config) *console.Report {
 	r := console.New(out, "entropy-server "+appVersion+" | Startup invocation report")
 	r.Section("Runtime & listeners")
 	r.Value("Build / platform", fmt.Sprintf("%s / %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH))
 
-	if runtime.GOOS == "windows" {
+	if windowsBuild {
 		r.Value("Windows capabilities", "Windows OS CSPRNG (crypto/rand); Go socket defaults; direct QRNG/device access and custom socket tuning unavailable")
 	}
 

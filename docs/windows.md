@@ -140,3 +140,7 @@ mode-bit cases are explicitly skipped on Windows; native ACL tests cover its fil
 policy. Missing symlink privilege skips only the relevant symlink test. Hardware
 QRNG, Windows ARM64, RTSP devices and interactive colour/resize support are not
 established by cross-compilation.
+
+Shared seed-lifecycle tests retain real OS pipes on Linux. Windows anonymous pipes
+lack read deadlines, so those tests use a buffered loopback TCP pair on Windows.
+The native RNG adapter has separate tests for its actual deadline/close semantics.

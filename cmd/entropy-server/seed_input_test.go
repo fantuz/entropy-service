@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -12,15 +13,49 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
 
-func pipeSeedInput(t *testing.T, ctx context.Context, timeout time.Duration) (io.Reader, *os.File) {
+// Keep exercising real OS-pipe deadlines on Linux. Windows anonymous pipes do
+// not support them, so its shared lifecycle tests use a buffered TCP pair.
+func deadlineSeedPipe(t *testing.T, ctx context.Context) (seedDeadlineSource, io.WriteCloser) {
 	t.Helper()
 
-	r, w, err := os.Pipe()
+	if !windowsBuild {
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Cleanup(func() { _ = r.Close(); _ = w.Close() })
+
+		return r, w
+	}
+
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	writer, err := (&net.Dialer{}).DialContext(ctx, "tcp", listener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() { _ = r.Close(); _ = w.Close() })
+	reader, err := listener.Accept()
+	if err != nil {
+		_ = writer.Close()
+
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { _ = reader.Close(); _ = writer.Close() })
+
+	return reader, writer
+}
+
+func pipeSeedInput(t *testing.T, ctx context.Context, timeout time.Duration) (io.Reader, io.WriteCloser) {
+	t.Helper()
+
+	r, w := deadlineSeedPipe(t, ctx)
 
 	return (&seedInput{source: r, reader: r, timeout: timeout}).Reader(ctx), w
 }
@@ -71,12 +106,7 @@ func TestSeedInputCancellationInterruptsAndJoinsRead(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer reader.Close()
-	defer writer.Close()
+	reader, _ := deadlineSeedPipe(t, ctx)
 
 	signal := &seedReadSignal{reader: reader, started: make(chan struct{})}
 	input := (&seedInput{source: reader, reader: signal, timeout: time.Minute}).Reader(ctx)
