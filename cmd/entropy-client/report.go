@@ -11,6 +11,7 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 const reportSchemaVersion = 1
@@ -41,7 +42,7 @@ func openReport(path string) (*runReport, error) {
 		return &runReport{encoder: json.NewEncoder(os.Stdout)}, nil
 	}
 
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := privatefile.Create(path)
 	if err != nil {
 		return nil, fmt.Errorf("create report: %w", err)
 	}

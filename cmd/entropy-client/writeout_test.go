@@ -38,6 +38,8 @@ func TestWriteoutAllFramesOnBothTransports(t *testing.T) {
 			cfg := experimentConfig(mode, serveExperiment(t, mode), path)
 			cfg.WriteOut = true
 			cfg.AnalysisInterval = time.Hour
+			cfg.Duration = 5 * time.Second
+			cfg.OutputBytes = 3 * cfg.Slice // Three complete frames, independent of dial/scheduler speed.
 			sink := &fakeWriteout{}
 			opens := 0
 
@@ -48,7 +50,7 @@ func TestWriteoutAllFramesOnBothTransports(t *testing.T) {
 			records := readReport(t, path)
 
 			summary := decodeRecord[summaryRecord](t, records[len(records)-1])
-			if opens != 1 || sink.closes != 1 || summary.DeviceErrors != 0 || summary.DeviceFrames != summary.ReceivedFrames || int64(summary.DeviceBytes) != summary.ReceivedBytes || sink.Len() != int(summary.DeviceBytes) || summary.AnalysedSamples != 1 || summary.ReceivedFrames < 2 {
+			if opens != 1 || sink.closes != 1 || summary.DeviceErrors != 0 || summary.DeviceFrames != summary.ReceivedFrames || int64(summary.DeviceBytes) != summary.ReceivedBytes || sink.Len() != int(summary.DeviceBytes) || summary.AnalysedSamples != 1 || summary.ReceivedFrames != 3 || summary.Termination != reasonOutputLimit {
 				t.Fatalf("incomplete writeout accounting: %+v opens=%d closes=%d", summary, opens, sink.closes)
 			}
 
@@ -97,6 +99,9 @@ func TestWriteoutFailuresAndPartialCounts(t *testing.T) {
 
 			sink := &fakeWriteout{closeErr: tc.closeErr}
 			if tc.short {
+				// The injected error ends the run. A narrow duration can expire
+				// before the first dial/write on a busy Windows runner.
+				cfg.Duration = 5 * time.Second
 				sink.write = func(context.Context, []byte) (int, error) { return 7, io.ErrShortWrite }
 			}
 
@@ -120,6 +125,7 @@ func TestWriteoutCancellationAndConcurrentError(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cancel.jsonl")
 		cfg := experimentConfig(modePull, serveExperiment(t, modePull), path)
 		cfg.WriteOut = true
+		cfg.Duration = 5 * time.Second // The first writer invocation cancels the run.
 		ctx, cancel := context.WithCancel(t.Context())
 		sink := &fakeWriteout{write: func(context.Context, []byte) (int, error) {
 			cancel()

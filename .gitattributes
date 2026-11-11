@@ -1,3 +1,7 @@
-
+# Go formatting and module checks must see identical text on every OS.
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
 # Published dictionary data: keep source changes visible in review.
-cmd/entropy-server/internal/wordlist/data/*.txt linguist-vendored
+# Hash-pinned bytes must survive Windows autocrlf unchanged.
+cmd/entropy-server/internal/wordlist/data/*.txt linguist-vendored -text

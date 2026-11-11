@@ -15,6 +15,11 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r := console.New(out, "entropy-client | Startup invocation report")
 	r.Section("Connection & reception")
 	r.Value("Build / platform", fmt.Sprintf("%s / %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH))
+
+	if runtime.GOOS == "windows" {
+		r.Value("Windows capabilities", "plain scrolling text; file exports/JSONL; terminal sizing/colors/waterfall and raw stdout/device exports unavailable")
+	}
+
 	r.Value("Transport", cfg.Mode)
 	r.Value("HTTP endpoint", displayEndpoint(httpURL))
 	r.Value("WebSocket endpoint", displayEndpoint(wsURL))

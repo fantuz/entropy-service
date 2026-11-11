@@ -38,6 +38,11 @@ support private files, stdout/SSH pipes, explicit Linux devices and exact byte l
 
 Use **Go 1.26.11 or newer**, Git and Make. Linux is the primary deployment target; hardware devices also need their own working kernel driver and read permissions.
 
+An optional [Windows x64 port](docs/windows.md) builds both executables from the
+same source tree, using the native OS RNG, standard sockets, plain terminal text
+and file exports. Its capability limits are explicit; Linux remains the primary
+deployment target.
+
 ```sh
 git clone https://github.com/fantuz/entropy-service.git
 cd entropy-service

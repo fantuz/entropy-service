@@ -8,9 +8,12 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 func certificateOptions(t *testing.T) CertificateOptions {
@@ -66,9 +69,8 @@ func TestGenerateCertificateIdentityAndReuse(t *testing.T) {
 	}
 
 	for _, path := range []string{opts.CertFile, opts.KeyFile} {
-		info, err := os.Stat(path)
-		if err != nil || info.Mode().Perm() != 0o600 {
-			t.Fatalf("TLS file %q must have mode 0600: info=%v error=%v", path, info, err)
+		if err := privatefile.Check(path); err != nil {
+			t.Fatalf("TLS file %q must satisfy its platform's private-file policy: %v", path, err)
 		}
 	}
 
@@ -157,6 +159,10 @@ func TestGenerateCertificateRefusesUnsafeExistingPairs(t *testing.T) {
 		{"world-readable key", func(t *testing.T, o *CertificateOptions) {
 			t.Helper()
 
+			if runtime.GOOS == "windows" {
+				t.Skip("Unix mode-bit policy; Windows ACL broadening is tested in internal/privatefile")
+			}
+
 			if err := os.Chmod(o.KeyFile, 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -179,7 +185,7 @@ func TestGenerateCertificateRefusesUnsafeExistingPairs(t *testing.T) {
 
 			o.KeyFile += ".link"
 			if err := os.Symlink(original, o.KeyFile); err != nil {
-				t.Fatal(err)
+				t.Skipf("account cannot create symlinks: %v", err)
 			}
 		}},
 		{"client-only certificate", func(t *testing.T, o *CertificateOptions) {

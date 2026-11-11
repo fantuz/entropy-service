@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
@@ -55,7 +56,11 @@ type Config struct {
 	RetryDelay       time.Duration
 }
 
-const MaxRetryDelay = 30 * time.Second
+const (
+	MaxRetryDelay    = 30 * time.Second
+	defaultColorMode = "auto"
+	noColorMode      = "never"
+)
 
 func ParseConfig() *Config {
 	cfg, err := parseConfig(os.Args[1:], os.Stderr)
@@ -77,7 +82,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 	flags.Int64Var(&cfg.Slice, "slice", 2097152, "raw bytes per response/message (1..33554432)")
 	flags.BoolVar(&cfg.WriteOut, "writeout", false, "Linux only: mix received bytes into /dev/urandom without entropy credit; fail on device errors (normally unnecessary)")
-	flags.StringVar(&cfg.OutputPath, "output", "", "export raw received bytes to a new 0600 file; - uses stdout with -headless (e.g. an SSH pipe)")
+	flags.StringVar(&cfg.OutputPath, "output", "", "export raw bytes to a new private file (0600 on Linux, user-only ACL on Windows); - uses Linux stdout with -headless")
 	flags.StringVar(&cfg.OutputDevice, "output-device", "", "Linux only: export to a validated /dev/random, /dev/urandom or /dev/null device; no entropy credit")
 	flags.Int64Var(&cfg.OutputBytes, "output-bytes", 0, "stop after exporting this many bytes (0 = until duration/interruption); requires an output destination or -writeout")
 	flags.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
@@ -87,11 +92,11 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.BoolVar(&cfg.ShowGraph, "graph", false, "print distribution graph")
 	flags.BoolVar(&cfg.ShowDashboard, "dashboard", false, "print dashboard summaries")
 	flags.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
-	flags.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
+	flags.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall (unavailable on Windows)")
 	flags.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
 	flags.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..512; two terminal columns per cell)")
 	flags.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..512; newest first)")
-	flags.StringVar(&cfg.Color, "color", "auto", "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
+	flags.StringVar(&cfg.Color, "color", defaultColorMode, "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
 	flags.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full|waterfall; waterfall fills the viewport with one status line")
 
 	flags.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
@@ -135,6 +140,39 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// ValidatePlatform keeps unsupported Windows features explicit. Formula/flag
+// validation stays shared and can be tested independently of platform support.
+func (cfg *Config) ValidatePlatform() error {
+	// Keep Windows capability dispatch out of non-Windows release binaries,
+	// even when the larger policy helper exceeds the compiler's inline budget.
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	return cfg.validatePlatform(runtime.GOOS)
+}
+
+func (cfg *Config) validatePlatform(goos string) error {
+	if goos != "windows" {
+		return nil
+	}
+
+	switch {
+	case cfg.WriteOut || cfg.OutputDevice != "":
+		return errors.New("device output and -writeout are unavailable on Windows; use -output=FILE")
+	case cfg.OutputPath == "-":
+		return errors.New("raw stdout export is unavailable on Windows; use -output=FILE (normal text stdout remains available)")
+	case cfg.ShowWaterfall || cfg.Layout == terminal.LayoutWaterfall || cfg.WaterfallColumns != 0 || cfg.WaterfallRows != 0 || (cfg.WaterfallMode != "" && cfg.WaterfallMode != diag.WaterfallByte):
+		return errors.New("terminal waterfall is unavailable on Windows; use the browser stream page or plain diagnostics")
+	case cfg.Layout == terminal.LayoutFull:
+		return errors.New("full terminal layout and automatic sizing are unavailable on Windows; use -layout=compact or auto for scrolling text")
+	case cfg.Color != "" && cfg.Color != defaultColorMode && cfg.Color != noColorMode:
+		return errors.New("terminal colors are unavailable in this Windows build; use -color=auto or never for plain text")
+	default:
+		return nil
+	}
 }
 
 func (cfg *Config) ValidateAnalysis() error {

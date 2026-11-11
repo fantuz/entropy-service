@@ -280,8 +280,8 @@
     "valid": true,
     "source": {
       "id": "large",
-      "kind": "device",
-      "endpoint": "/dev/urandom",
+      "kind": "http",
+      "endpoint": "https://example.org/",
       "max_bytes": 8388608
     },
     "normalized": {
@@ -297,8 +297,8 @@
     "valid": false,
     "source": {
       "id": "too-large",
-      "kind": "device",
-      "endpoint": "/dev/urandom",
+      "kind": "http",
+      "endpoint": "https://example.org/",
       "max_bytes": 33554433
     }
   }

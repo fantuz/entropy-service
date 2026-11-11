@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"time"
+
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 const writeChunk = 32 * 1024
@@ -21,7 +23,7 @@ type Writer struct {
 }
 
 func OpenFile(path string) (*Writer, error) {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := privatefile.Create(path)
 	if err != nil {
 		return nil, fmt.Errorf("create output: %w", err)
 	}

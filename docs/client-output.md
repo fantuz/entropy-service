@@ -23,6 +23,10 @@ Choose one destination per invocation. Export is off by default.
 | `-output-device=/dev/random` or `/dev/urandom` | Ordinary Linux pool input with **no entropy credit**; see [write-out value and safeguards](client-writeout.md). Linux only. |
 | `-writeout` | Existing compatibility option for validated `/dev/urandom` mixing. Its meaning is unchanged. |
 
+On the optional [Windows port](windows.md), file/JSONL exports use protected
+user-only ACLs. Raw stdout and Linux device exports are explicitly unavailable;
+normal text stdout and JSONL stdout remain supported.
+
 `-output-device` accepts only those three literal paths and validates the actual
 opened character-device identity. It opens without creating, truncating or
 following a final symlink. It rejects block devices, arbitrary hardware and

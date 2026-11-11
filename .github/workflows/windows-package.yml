@@ -1,0 +1,33 @@
+name: Packaged Windows release
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Windows release ZIP
+    runs-on: windows-2025
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout matching source for smoke tests
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Download the GoReleaser Windows ZIP from this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-x64-release-zip
+          path: windows-release
+      - name: Validate and execute the packaged binaries
+        shell: pwsh
+        run: |
+          $archives = @(Get-ChildItem -LiteralPath windows-release -Filter *.zip)
+          if ($archives.Count -ne 1) { throw "Expected exactly one Windows x64 release ZIP" }
+          python scripts/check_windows_archive.py "$($archives[0].FullName)" --extract-to windows-package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/test_windows.py --bin-dir windows-package

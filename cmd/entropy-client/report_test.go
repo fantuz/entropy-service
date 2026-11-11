@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 func readReport(t *testing.T, path string) []json.RawMessage {
@@ -60,7 +62,7 @@ func experimentConfig(mode, endpoint, report string) *config.Config {
 		Mode: mode, HTTPUrl: endpoint, WSUrl: endpoint, Slice: 256,
 		Refresh: 5 * time.Millisecond, DisplayInterval: time.Second,
 		AnalysisBytes: 64, AnalysisInterval: 20 * time.Millisecond,
-		Duration: 150 * time.Millisecond, ShannonThreshold: 6.1,
+		Duration: time.Second, ShannonThreshold: 6.1,
 		ReportPath: report, Headless: true,
 	}
 }
@@ -167,9 +169,8 @@ func TestTimedReportsForBothTransports(t *testing.T) {
 				t.Fatalf("duration/throughput incorrect: %+v", summary)
 			}
 
-			info, err := os.Stat(path)
-			if err != nil || info.Mode().Perm() != 0o600 {
-				t.Fatalf("report permissions: %v, %v", info, err)
+			if err := privatefile.Check(path); err != nil {
+				t.Fatalf("report permissions: %v", err)
 			}
 		})
 	}
@@ -237,6 +238,8 @@ func TestReportCapturesTransportAndStartupFailures(t *testing.T) {
 		cfg := experimentConfig(modePull, server.URL, path)
 
 		cfg.Headless = headless
+		cfg.Duration = 5 * time.Second // The injected HTTP failure, not a short run budget, must end this case.
+
 		if err := runConfigured(t.Context(), cfg); err == nil {
 			t.Fatal("transport failure returned success")
 		}
@@ -309,6 +312,7 @@ func (w failingReportWriter) Write(_ []byte) (int, error) {
 func TestReportWriteFailureSurvivesConcurrentCancellation(t *testing.T) {
 	endpoint := serveExperiment(t, modePull)
 	cfg := experimentConfig(modePull, endpoint, "")
+	cfg.Duration = 5 * time.Second // The injected report write cancels this run.
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -375,6 +379,13 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	cfg.WaterfallMode, cfg.WaterfallColumns, cfg.WaterfallRows, cfg.Color = "rgb", 128, 32, "truecolor"
 	cfg.Layout = "full"
 
+	if runtime.GOOS == "windows" {
+		// Windows rejects explicit unsupported displays before starting a run.
+		// Keep exercising clean JSONL stdout with its supported plain controls.
+		cfg.ShowWaterfall, cfg.WaterfallColumns, cfg.WaterfallRows = false, 0, 0
+		cfg.WaterfallMode, cfg.Color, cfg.Layout = "byte", "auto", "compact"
+	}
+
 	cfg.Duration = 40 * time.Millisecond
 	if err := runConfigured(t.Context(), cfg); err != nil {
 		t.Fatal(err)
@@ -386,7 +397,7 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	}
 
 	settings := decodeRecord[startRecord](t, records[0]).Settings
-	if !settings.Waterfall || settings.WaterfallMode != "rgb" || settings.WaterfallColumns != 128 || settings.WaterfallRows != 32 || settings.Color != "truecolor" || settings.Layout != "full" {
+	if settings.Waterfall != cfg.ShowWaterfall || settings.WaterfallMode != cfg.WaterfallMode || settings.WaterfallColumns != cfg.WaterfallColumns || settings.WaterfallRows != cfg.WaterfallRows || settings.Color != cfg.Color || settings.Layout != cfg.Layout {
 		t.Fatalf("display settings missing from metadata: %+v", settings)
 	}
 }

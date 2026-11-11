@@ -44,7 +44,9 @@ func TestStreamTimingStaysWithBufferedPayload(t *testing.T) {
 	for i := range 12 {
 		select {
 		case frame, ok := <-frames:
-			if !ok || len(frame.Data) != 1 || frame.Data[0] != byte(i) || frame.ReceiveWait <= 0 {
+			// A buffered read can complete within one host clock tick. Zero is
+			// valid; inventing a positive duration would distort timing metrics.
+			if !ok || len(frame.Data) != 1 || frame.Data[0] != byte(i) || frame.ReceiveWait < 0 || frame.CycleRuntime != 0 {
 				t.Fatalf("payload/timing mismatch at frame %d: %+v", i, frame)
 			}
 

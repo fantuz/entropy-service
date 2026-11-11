@@ -13,7 +13,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const sourceOSFallback = "getrandom(GRND_NONBLOCK)"
+const (
+	DefaultCSPRNG    = "/dev/urandom"
+	sourceOSFallback = "getrandom(GRND_NONBLOCK)"
+)
+
+func openEntropySource(path string, require bool) (io.ReadCloser, string, error) {
+	return selectEntropySource(path, require, openCharacterEntropySource)
+}
 
 // Device opens must not wait for data. Deadline support is probed on the opened
 // descriptor, so neither pathname races nor unsupported blocking reads slip in.

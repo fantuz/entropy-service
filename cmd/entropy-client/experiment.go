@@ -21,6 +21,10 @@ const (
 )
 
 func runConfigured(ctx context.Context, cfg *config.Config) error {
+	if err := cfg.ValidatePlatform(); err != nil {
+		return err
+	}
+
 	return runConfiguredWithWriteout(ctx, cfg, func() (writeoutSink, error) { return openOutput(cfg) })
 }
 

@@ -29,6 +29,30 @@ func TestExperimentalDRBGSelection(t *testing.T) {
 	}
 }
 
+func TestWindowsSourceDefaultsAndUnsupportedDevices(t *testing.T) {
+	if defaultDeviceForOS("linux") != "/dev/qrandom0" || defaultDeviceForOS("windows") != WindowsCSPRNG {
+		t.Fatal("platform seed defaults changed")
+	}
+
+	for _, tc := range []struct {
+		cfg Config
+		ok  bool
+	}{
+		{Config{}, true},
+		{Config{DevicePath: WindowsCSPRNG}, true},
+		{Config{DevicePath: "/dev/qrandom0"}, false},
+		{Config{DevicePath: WindowsCSPRNG, RequireDevice: true}, false},
+	} {
+		if err := tc.cfg.validatePlatform("windows"); (err == nil) != tc.ok {
+			t.Fatalf("Windows source selection: %+v, %v", tc.cfg, err)
+		}
+
+		if err := tc.cfg.validatePlatform("linux"); err != nil {
+			t.Fatalf("Windows policy affected Linux: %v", err)
+		}
+	}
+}
+
 func TestTimingDefaultsAndMillisecondOverrides(t *testing.T) {
 	cfg, err := parseConfig(nil, io.Discard)
 	if err != nil {

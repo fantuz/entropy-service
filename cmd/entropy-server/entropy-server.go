@@ -65,8 +65,6 @@ type EntropyDataFrame struct {
 	Hash   string `json:"hash"`
 }
 
-const DefaultCSPRNG = "/dev/urandom"
-
 const (
 	Reset   = "\033[0m"
 	Red     = "\033[31m"
@@ -1124,6 +1122,10 @@ func main() {
 	defer stop()
 
 	cfg := config.ParseConfig()
+	if err := cfg.ValidatePlatform(); err != nil {
+		log.Fatal(err)
+	}
+
 	startup := serverInvocation(os.Stderr, cfg)
 
 	labRegistry, err := lab.Load(cfg.LabSources)
@@ -1208,7 +1210,14 @@ func main() {
 	}
 
 	boundedSeed := &seedInput{source: deadlineSource, reader: seedReader, timeout: cfg.SourceTimeout}
-	startup.Check("Source read deadline", "OK", fmt.Sprintf("%s per complete seed; nonblocking source", cfg.SourceTimeout))
+
+	sourceReadDetail := fmt.Sprintf("%s per complete seed; nonblocking source", cfg.SourceTimeout)
+
+	if windowsBuild {
+		sourceReadDetail = fmt.Sprintf("%s checked between bounded OS RNG calls; an in-flight native call cannot be interrupted", cfg.SourceTimeout)
+	}
+
+	startup.Check("Source read deadline", "OK", sourceReadDetail)
 
 	seedReader = boundedSeed.Reader(ctx)
 
