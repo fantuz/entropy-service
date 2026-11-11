@@ -7,19 +7,25 @@
     const system = window.matchMedia("(prefers-color-scheme: dark)");
     const valid = value => value === "light" || value === "dark";
     let preference = null;
-    try { preference = localStorage.getItem(key); } catch { /* Storage can be disabled. */ }
+
+    function sync() {
+        try { preference = localStorage.getItem(key); } catch { /* Keep this page's choice when storage is disabled. */ }
+        apply();
+    }
 
     function apply() {
         const dark = valid(preference) ? preference === "dark" : system.matches;
-        root.dataset.theme = dark ? "dark" : "light";
+        const theme = dark ? "dark" : "light";
+        const changed = root.dataset.theme !== theme;
+        root.dataset.theme = theme;
         for (const button of document.querySelectorAll("[data-theme-toggle]")) {
             button.hidden = false;
             button.textContent = dark ? "Light mode" : "Dark mode";
             button.title = `Switch to ${dark ? "light" : "dark"} mode`;
         }
-        window.dispatchEvent(new Event("entropythemechange"));
+        if (changed) window.dispatchEvent(new Event("entropythemechange"));
     }
-    apply();
+    sync();
     document.addEventListener("DOMContentLoaded", () => {
         for (const button of document.querySelectorAll("[data-theme-toggle]")) {
             button.addEventListener("click", () => {
@@ -28,10 +34,15 @@
                 apply();
             });
         }
-        apply();
+        sync();
     }, {once: true});
-    system.addEventListener("change", () => { if (!valid(preference)) apply(); });
+    system.addEventListener("change", sync);
     window.addEventListener("storage", event => {
-        if (event.key === key || event.key === null) { preference = event.newValue; apply(); }
+        // An event can be queued while another window makes a newer choice.
+        // Read the current value rather than replaying an old event payload.
+        if (event.key === key || event.key === null) sync();
     });
+    window.addEventListener("pageshow", sync);
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
 })();

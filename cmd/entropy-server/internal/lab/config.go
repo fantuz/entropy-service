@@ -35,7 +35,9 @@ const (
 	sourceONVIF       = "onvif"
 )
 
-const MaxBytes = 1 << 20
+// Match the entropy-server's absolute sample ceiling; each handler also
+// applies the operator's configured -max-bytes and the source's own limit.
+const MaxBytes = 32 << 20
 
 var validID = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 
@@ -188,7 +190,7 @@ func (c *Config) validate() error {
 	}
 
 	if c.MaxBytes < 1 || c.MaxBytes > MaxBytes || c.TimeoutMs < 100 || c.TimeoutMs > 60000 {
-		return errors.New("max_bytes must be 1–1048576 and timeout_ms 100–60000")
+		return errors.New("max_bytes must be 1–33554432 and timeout_ms 100–60000")
 	}
 
 	switch c.Kind {

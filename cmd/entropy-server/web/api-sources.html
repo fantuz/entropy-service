@@ -21,8 +21,8 @@
       <h2 class="analysis-label" id="lab-source-title">Source &amp; sampling</h2>
       <form id="lab-config">
         <div class="analysis-controls">
-          <label>Source <select id="lab-kind"><option value="crypto">Web Crypto</option><option value="counter">Counter 0…255</option><option value="constant">Constant byte</option><option value="pattern">Repeating hex pattern</option><option value="file">Local file</option><option value="camera">Camera pixels</option><option value="rtsp">Network camera · RTSP / ONVIF</option><option value="microphone">Microphone PCM</option><option value="serial">Serial port</option></select></label>
-          <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="1048576" value="65536" required></label>
+          <label>Source <select id="lab-kind"><option value="crypto">Web Crypto</option><option value="counter">Counter 0…255</option><option value="constant">Constant byte</option><option value="pattern">Repeating hex pattern</option><option value="file">Local file</option><option value="camera">Camera pixels</option><option value="rtsp">Network camera · RTSP / ONVIF</option><option value="microphone">Microphone / line-in PCM</option><option value="serial">Serial port</option></select></label>
+          <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="8388608" value="65536" required></label>
           <label>Cadence (ms) <input id="lab-refresh" type="number" min="20" max="60000" value="500" required></label>
           <label>Representation <select id="lab-transform"><option value="raw">Original bytes</option><option value="xor">XOR previous sample</option><option value="lsb">LSB → 0/255</option></select></label>
           <label class="lab-only" data-modes="constant" hidden>Constant (0–255) <input id="lab-constant" type="number" min="0" max="255" step="1" value="0"></label>
@@ -31,10 +31,13 @@
           <label class="lab-only" data-modes="camera" hidden>Pixel format <select id="lab-format"><option value="rgb">RGB8</option><option value="rgba">RGBA8 (includes alpha)</option></select></label>
           <label class="lab-only" data-modes="camera" hidden>Capture size <select id="lab-resolution"><option value="160x120">160 × 120</option><option value="320x240" selected>320 × 240</option><option value="640x480">640 × 480</option></select></label>
           <label class="lab-only" data-modes="serial" hidden>Baud <select id="lab-baud"><option>9600</option><option>19200</option><option>57600</option><option selected>115200</option><option>230400</option></select></label>
+          <label class="lab-only lab-audio-device" data-modes="microphone" hidden>Audio input <select id="lab-audio-device" aria-describedby="lab-audio-help"><option value="">System default</option></select></label>
+          <button class="lab-only" data-modes="microphone" id="lab-audio-refresh" type="button" hidden>Refresh inputs</button>
           <label class="lab-only" data-modes="rtsp" hidden>Registered camera <select id="lab-registered"><option value="">Loading cameras…</option></select></label>
           <label class="lab-only" data-modes="rtsp" hidden>Camera username <input id="lab-camera-user" type="text" maxlength="256" autocomplete="off"></label>
           <label class="lab-only" data-modes="rtsp" hidden>Camera password <input id="lab-camera-password" type="password" maxlength="1024" autocomplete="off"></label>
         </div>
+        <p id="lab-audio-help" class="note lab-only" data-modes="microphone" hidden>Start or Sample once requests audio permission and reveals input names. Choose your line-in or USB audio interface here; if it is not listed separately, select the Line In port in your system sound settings. Captured audio stays in this browser and is not played.</p>
         <div class="lab-actions"><button id="lab-start" type="submit">Start</button><button id="lab-once" type="button">Sample once</button><button id="lab-stop" type="button" disabled>Stop</button></div>
       </form>
       <p id="lab-status" class="stream-notice" role="status" aria-live="polite" data-state="waiting">Choose a source, then Start or Sample once.</p>
@@ -56,7 +59,7 @@
         <details><summary>Source notes</summary>
           <p class="note">Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the <a href="/api-upload.html">File lab</a> for detailed local-file seeking.</p>
           <p class="note">Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.</p>
-          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages are analysed whole, up to 1 MiB; sample size controls request/read sizes for the other adapters.</p>
+          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages may contain up to the configured byte limit (at most 8 MiB); analysis uses the selected window. Sample size controls request/read sizes for the other adapters.</p>
           <p class="note">XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.</p>
         </details>
       </div>

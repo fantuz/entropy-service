@@ -5,6 +5,10 @@ window.addEventListener("pageshow", () => {
     for (const details of document.querySelectorAll(".lab-help details")) details.open = false;
 });
 
+// pagehide releases the analysis worker and sources. A cached page needs a
+// fresh workspace before it can sample again; media is never resumed silently.
+window.addEventListener("pageshow", event => { if(event.persisted)location.reload(); });
+
 (() => {
     const $=id=>document.getElementById(id), helpers=window.EntropyLabSamples;
     const guidance=window.EntropyLabRegistration;
@@ -25,6 +29,32 @@ window.addEventListener("pageshow", () => {
     let generation=0,controller=null,cleanup=null,running=false,paused=false,once=false,finishing=false;
     let options=null,lastInput=null,previous=null,lastAccepted=-Infinity,finalFrame=0,frame=0,analysedBytes=0,analysedFrames=0;
     let lastSubmittedFrame=0,catalog={sources:[],allowed:false,max_bytes:helpers.MAX_BYTES};
+    let audioRequest=0,disposed=false;
+    const audioHelp=$("lab-audio-help")?.textContent;
+    async function refreshAudioInputs(){
+        if(!$("lab-audio-device")||disposed)return;
+        const request=++audioRequest;
+        $("lab-audio-refresh").disabled=true;
+        try{
+            const devices=await window.EntropyLabAdapters.audioInputs();
+            if(disposed||request!==audioRequest)return;
+            if(devices===null){$("lab-audio-help").textContent="This browser cannot list audio devices. Choose the input in your system sound settings, then use System default. "+audioHelp;return;}
+            const select=$("lab-audio-device"),selected=select.value;
+            const option=document.createElement("option");option.value="";option.textContent="System default";select.replaceChildren(option);
+            devices.forEach((device,index)=>{
+                const option=document.createElement("option");option.value=device.id;option.textContent=device.label||`Audio input ${index+1}`;select.append(option);
+            });
+            if(selected&&!devices.some(device=>device.id===selected)){
+                const missing=document.createElement("option");missing.value=selected;missing.textContent="Selected input unavailable";missing.dataset.unavailable="true";select.append(missing);
+            }
+            select.value=selected;
+            $("lab-audio-help").textContent=audioHelp;
+        }catch(_){if(!disposed&&request===audioRequest)$("lab-audio-help").textContent="Could not list audio inputs. Check this site's audio permission or use System default. "+audioHelp;}
+        finally{if(!disposed&&request===audioRequest)$("lab-audio-refresh").disabled=false;}
+    }
+    const audioDevicesChanged=()=>{if($("lab-kind").value==="microphone")void refreshAudioInputs();};
+    $("lab-audio-refresh")?.addEventListener("click",()=>void refreshAudioInputs());
+    if($("lab-audio-device"))navigator.mediaDevices?.addEventListener?.("devicechange",audioDevicesChanged);
     function status(state,text){$("lab-status").dataset.state=state;if($("lab-status").textContent!==text)$("lab-status").textContent=text;}
     function buttons(){
         $("lab-start").disabled=$("lab-once").disabled=running;
@@ -88,7 +118,7 @@ window.addEventListener("pageshow", () => {
     }
     function capture(bytes,encoding,token){
         if(token!==generation||!controller||controller.signal.aborted)return;
-        if(!(bytes instanceof Uint8Array)||!bytes.length||bytes.length>helpers.MAX_BYTES){stop("error","Source sample must contain 1–1,048,576 bytes");return;}
+        if(!(bytes instanceof Uint8Array)||!bytes.length||bytes.length>Math.min(helpers.MAX_BYTES,catalog.max_bytes)){stop("error","Source sample exceeds the configured lab byte limit (at most 8 MiB)");return;}
         const now=performance.now();meter.add(bytes.length,now);frame++;
         const output=helpers.transform(bytes,options.transform,previous);
         previous=options.transform==="xor"?bytes.slice():null;
@@ -104,9 +134,14 @@ window.addEventListener("pageshow", () => {
     function readOptions(){
         if(!$("lab-config").reportValidity())return null;
         const selected=$("lab-kind").value,size=Number($("lab-bytes").value),refresh=Number($("lab-refresh").value);
-        const result={kind:selected,selection:selected,size,refresh,cadenceApplied:!["websocket","serial"].includes(selected),transform:$("lab-transform").value,label:$("lab-kind").selectedOptions[0].textContent,
+        const result={kind:selected,selection:selected,size,refresh,maxBytes:Math.min(helpers.MAX_BYTES,catalog.max_bytes),cadenceApplied:!["websocket","serial"].includes(selected),transform:$("lab-transform").value,label:$("lab-kind").selectedOptions[0].textContent,
             value:Number($("lab-constant")?.value||0),pattern:selected==="pattern"?helpers.pattern($("lab-pattern").value):Uint8Array.of(0,255),
             file:$("lab-file")?.files[0],resolution:$("lab-resolution")?.value||"320x240",format:$("lab-format")?.value||"rgb",baud:Number($("lab-baud")?.value||115200)};
+        if(selected==="microphone"){
+            const input=$("lab-audio-device");
+            if(input.selectedOptions[0]?.dataset.unavailable)throw new Error("Selected audio input is unavailable; refresh inputs and choose another device or System default");
+            result.audioDeviceId=input.value;
+        }
         if(selected==="self-ws"||selected==="self-http"||selected==="peer-ws"||selected==="peer-http"){
             const base=selected.startsWith("self")?new URL(location.href):endpoint($("lab-url").value,"http",selected==="peer-ws"?"entropy-ws":"entropy-http");
             const websocket=selected.endsWith("ws");
@@ -152,7 +187,7 @@ window.addEventListener("pageshow", () => {
             const close=await window.EntropyLabAdapters.start(options,{signal,video:$("lab-video"),
                 info(message){if(token===generation&&!signal.aborted)$("lab-transport-info").textContent=message;},
                 previewEnabled:()=>$("lab-show-preview").checked,previewCanvas:$("lab-network-preview"),
-                ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");}},
+                ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");if(options.kind==="microphone")void refreshAudioInputs();}},
                 emit:(bytes,encoding)=>capture(bytes,encoding,token),
                 end:message=>{if(token===generation&&!signal.aborted)finish(message);},
                 error:error=>{if(token===generation&&!signal.aborted)stop("error",error.message);}
@@ -162,6 +197,8 @@ window.addEventListener("pageshow", () => {
     }
     function sourceFields(){
         const kind=$("lab-kind").value;
+        if(document.body.dataset.lab==="sources")$("lab-catalog-info").hidden=kind!=="rtsp";
+        if(kind==="microphone")void refreshAudioInputs();
         const serverHTTP=kind==="http"&&$("lab-http-route")?.value==="registered";
         if($("lab-registered")){
             const select=$("lab-registered"),selected=select.value;
@@ -200,7 +237,7 @@ window.addEventListener("pageshow", () => {
             $("lab-route-help").textContent=hint;
         }
         if($("lab-body-card"))$("lab-body-card").hidden=kind!=="http"&&!(kind==="bridge"&&source?.kind==="webpage");
-        const limit=kind==="bridge"||kind==="rtsp"||serverHTTP?Math.min(catalog.max_bytes,source?.max_bytes||helpers.MAX_BYTES):helpers.MAX_BYTES;
+        const limit=Math.min(helpers.MAX_BYTES,catalog.max_bytes,kind==="bridge"||kind==="rtsp"||serverHTTP?source?.max_bytes||helpers.MAX_BYTES:helpers.MAX_BYTES);
         $("lab-bytes").max=limit;if(Number($("lab-bytes").value)>limit)$("lab-bytes").value=limit;
     }
     $("lab-config").addEventListener("submit",event=>{event.preventDefault();void start(false);});
@@ -260,6 +297,6 @@ window.addEventListener("pageshow", () => {
             sourceFields();
         }catch(error){$("lab-catalog-info").textContent=error.message;}
     })();
-    window.addEventListener("pagehide",()=>{stopTransport();generation++;meterClock.cancel();workspace.destroy();});
+    window.addEventListener("pagehide",()=>{disposed=true;audioRequest++;navigator.mediaDevices?.removeEventListener?.("devicechange",audioDevicesChanged);stopTransport();generation++;meterClock.cancel();workspace.destroy();});
     sourceFields();renderRecords();buttons();
 })();

@@ -182,10 +182,13 @@ With `-debug=true`, a separate listener on **127.0.0.1:6060** exposes `/debug/pp
 
 `GET /lab/sources` returns registered IDs, display names, kinds, limits and
 requester access status. It omits private endpoints. `WS /lab/stream` accepts
-`source=ID`, `bytes=1..1048576` (also capped by source/server limits), and
+`source=ID`, `bytes=1..33554432` (also capped by source/server limits), and
 `refresh=20..60000` milliseconds. It sends binary source samples, with deadlines
 and separate admission budgets. Bridges are loopback-only by default and
 configured with `-lab-sources`; see [the source/socket lab guide](source-labs.md).
+The browser Source/Socket Lab sample controls allow up to 8 MiB, further capped
+by the reported server/source limits. Their analysis window remains at most
+1 MiB. The catalog reports effective per-source limits after `-max-bytes`.
 
 Camera sources (`rtsp`/`onvif`) also accept `preview=0|1` and require an initial
 text WS frame `{"username":"...","password":"..."}` within ten seconds.

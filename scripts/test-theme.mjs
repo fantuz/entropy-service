@@ -5,14 +5,14 @@ import vm from "node:vm";
 const root = new URL("../cmd/entropy-server/web/", import.meta.url);
 const source = readFileSync(new URL("theme.js", root), "utf8");
 function page({saved = null, dark = false, blocked = false} = {}) {
-    const events = new Map(), clicks = new Map(), mediaEvents = new Map();
+    const events = new Map(), documentEvents = new Map(), clicks = new Map(), mediaEvents = new Map();
     const attributes = new Map(), document = {documentElement: {dataset: {}}};
     const button = {hidden: true, setAttribute: (key, value) => attributes.set(key, value),
         addEventListener: (key, handler) => clicks.set(key, handler)};
     let ready = false, stored = saved, changes = 0;
     const media = {matches: dark, addEventListener: (key, handler) => mediaEvents.set(key, handler)};
     document.querySelectorAll = () => ready ? [button] : [];
-    document.addEventListener = (key, handler) => events.set(key, handler);
+    document.addEventListener = (key, handler) => documentEvents.set(key, handler);
     const window = {matchMedia: () => media, addEventListener: (key, handler) => events.set(key, handler),
         dispatchEvent: () => changes++};
     const storage = {getItem() {if (blocked) throw new Error("disabled"); return stored;},
@@ -21,13 +21,19 @@ function page({saved = null, dark = false, blocked = false} = {}) {
     const initial = document.documentElement.dataset.theme;
     assert.equal(button.hidden, true, "head initializer must not require a body");
     ready = true;
-    events.get("DOMContentLoaded")();
+    documentEvents.get("DOMContentLoaded")();
     assert.equal(button.hidden, false);
     return {initial, button, attributes, theme: () => document.documentElement.dataset.theme,
         stored: () => stored, changes: () => changes,
         click: () => clicks.get("click")(),
         system(value) {media.matches = value; mediaEvents.get("change")();},
-        storage(value, key = "entropy-theme") {events.get("storage")({key, newValue: value});}};
+        setStored(value) {stored = value;},
+        event(key, value = {}) {events.get(key)(value);},
+        visibility(hidden) {document.hidden = hidden; documentEvents.get("visibilitychange")();},
+        storage(value, key = "entropy-theme") {
+            if (key === "entropy-theme" || key === null) stored = value;
+            events.get("storage")({key, newValue: value});
+        }};
 }
 
 for (const [options, want] of [
@@ -44,7 +50,10 @@ for (const [options, want] of [
     assert.equal(p.theme(), want === "dark" ? "light" : "dark");
     assert.equal(p.button.textContent, want === "dark" ? "Dark mode" : "Light mode");
     if (!options.blocked) assert.equal(p.stored(), p.theme());
-    assert.ok(p.changes() >= 3, "notify canvas consumers without reloading");
+    assert.equal(p.changes(), 2, "notify canvas consumers only when appearance actually changes");
+    p.event("focus");
+    assert.equal(p.theme(), want === "dark" ? "light" : "dark", "focus must retain the local choice even if storage is blocked");
+    assert.equal(p.changes(), 2, "unchanged focus must not repaint plots");
 }
 const p = page();
 p.system(true); assert.equal(p.theme(), "dark");
@@ -55,6 +64,27 @@ p.storage("light"); assert.equal(p.button.textContent, "Dark mode");
 p.storage("dark");
 p.storage("light", "unrelated-key"); assert.equal(p.theme(), "dark");
 p.storage(null, null); assert.equal(p.theme(), "dark", "cleared preferences fall back to current OS choice");
+
+for (const event of ["focus", "pageshow", "visibilitychange"]) {
+    const restored = page({saved: "dark", dark: true});
+    restored.setStored("light");
+    if (event === "visibilitychange") {
+        restored.visibility(true);
+        assert.equal(restored.theme(), "dark", "hidden pages wait for reactivation");
+        restored.visibility(false);
+    } else restored.event(event, {persisted: true});
+    assert.equal(restored.theme(), "light", `${event} must reconcile a missed cross-window change`);
+    assert.equal(restored.button.textContent, "Dark mode");
+}
+const delayed = page({saved: "dark", dark: true});
+delayed.setStored("light");
+delayed.event("storage", {key: "entropy-theme", newValue: "dark"});
+assert.equal(delayed.theme(), "light", "a stale event must not override the current stored choice");
+delayed.event("storage", {key: null, newValue: null});
+assert.equal(delayed.theme(), "light", "a queued clear event must not erase a newer preference");
+const noChange = delayed.changes();
+delayed.event("pageshow", {persisted: true}); delayed.event("focus"); delayed.visibility(false);
+assert.equal(delayed.changes(), noChange, "restoration without a theme change must avoid repeated canvas redraws");
 
 for (const name of readdirSync(root).filter(name => name.endsWith(".html") && !name.startsWith("zz_"))) {
     const html = readFileSync(new URL(name, root), "utf8");

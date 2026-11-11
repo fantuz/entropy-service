@@ -9,7 +9,7 @@
     },
     "normalized": {
       "name": "page",
-      "max_bytes": 1048576,
+      "max_bytes": 33554432,
       "timeout_ms": 5000,
       "width": 0,
       "height": 0
@@ -137,7 +137,7 @@
     },
     "normalized": {
       "name": "Web pages",
-      "max_bytes": 1048576,
+      "max_bytes": 33554432,
       "timeout_ms": 5000,
       "width": 0,
       "height": 0
@@ -223,7 +223,7 @@
     },
     "normalized": {
       "name": "漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢漢",
-      "max_bytes": 1048576,
+      "max_bytes": 33554432,
       "timeout_ms": 5000,
       "width": 0,
       "height": 0
@@ -269,10 +269,37 @@
     },
     "normalized": {
       "name": "tcp",
-      "max_bytes": 1048576,
+      "max_bytes": 33554432,
       "timeout_ms": 5000,
       "width": 0,
       "height": 0
+    }
+  },
+  {
+    "name": "eight MiB source limit",
+    "valid": true,
+    "source": {
+      "id": "large",
+      "kind": "device",
+      "endpoint": "/dev/urandom",
+      "max_bytes": 8388608
+    },
+    "normalized": {
+      "name": "large",
+      "max_bytes": 8388608,
+      "timeout_ms": 5000,
+      "width": 0,
+      "height": 0
+    }
+  },
+  {
+    "name": "above server ceiling",
+    "valid": false,
+    "source": {
+      "id": "too-large",
+      "kind": "device",
+      "endpoint": "/dev/urandom",
+      "max_bytes": 33554433
     }
   }
 ]

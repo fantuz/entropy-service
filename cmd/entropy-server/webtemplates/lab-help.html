@@ -12,7 +12,7 @@
         <details><summary>Source notes</summary>
           <p class="note">Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the <a href="/api-upload.html">File lab</a> for detailed local-file seeking.</p>
           <p class="note">Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.</p>
-          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages are analysed whole, up to 1 MiB; sample size controls request/read sizes for the other adapters.</p>
+          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages may contain up to the configured byte limit (at most 8 MiB); analysis uses the selected window. Sample size controls request/read sizes for the other adapters.</p>
           <p class="note">XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.</p>
         </details>
       </div>

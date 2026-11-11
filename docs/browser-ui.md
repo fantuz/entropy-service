@@ -15,9 +15,18 @@ The **Dark mode** / **Light mode** button in the top toolbar names the appearanc
 it will switch to, updating its visible label and tooltip together. The initial
 choice follows the operating system; a manual choice is saved for this browser
 and server origin and applied before the stylesheet paints. It survives
-navigation and reloads and synchronizes between tabs. If browser storage is
+navigation and reloads and synchronizes between tabs/windows. Reactivating a
+page or restoring it from browser history re-reads the current saved choice;
+queued storage events cannot overwrite a newer value. An unchanged theme does
+not trigger another canvas redraw. If browser storage is
 disabled, the switch still works for the current page. OS changes are followed
 until a manual choice is made.
+
+Preferences belong to an exact browser origin. `localhost`, `127.0.0.1`, HTTP,
+HTTPS and different ports use separate storage; ordinary and private browser
+profiles also have separate preferences. Use the same address when testing
+navigation between windows. A tab with blocked storage retains its choice only
+for that page.
 
 On desktop, the homepage's five live WebSocket cards share one row. In its
 three-column sections, a lone final card is centered; two final cards use the
@@ -45,15 +54,27 @@ node scripts/test-theme.mjs
 node scripts/test-web-layout.mjs
 node scripts/render-analysis-pages.mjs --check
 make build-server
-# Requires Python Playwright and its Chromium browser.
+# Requires Python Playwright and the selected browser.
 python3 scripts/test_theme_browser.py --artifacts /tmp/entropy-theme-browser
+python3 scripts/test_theme_browser.py --browser firefox --artifacts /tmp/entropy-theme-firefox
 ```
 
-The Chromium suite checks all 12 views in both themes at 1440×1000 and 390×844
+The suite runs in Chromium and Firefox and checks all 12 views in both themes at 1440×1000 and 390×844
 (48 combinations), disclosure interaction/reload/restoration, saved settings,
-cross-tab updates, blocked storage, and frozen canvas repainting. Screenshots
+cross-window reactivation, stale storage events, blocked storage, and frozen canvas repainting. Screenshots
 and machine-readable results are written to the artifact directory. Set
 `PLAYWRIGHT_BROWSERS_PATH` when using a non-default browser installation.
+The `browser-ui` GitHub workflow runs these checks and the source/socket suite
+in both engines, retaining screenshots and results for seven days. Release
+publication also waits for both browser checks.
+
+The current interface already shares its colors, controls and responsive
+layouts. The next useful UX work is state reliability and shorter task-specific
+guidance, followed by measured analysis cost on slower devices. Another visual
+redesign or higher default frame rate would add little value. The default
+5-fps analysis pacing remains useful for conserving CPU; 20 fps is an explicit
+choice. Source Lab shows network-camera setup guidance only when that source
+is selected, keeping local inputs easier to scan.
 
 ## Endpoint gallery
 

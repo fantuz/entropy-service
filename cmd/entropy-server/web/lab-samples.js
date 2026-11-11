@@ -1,14 +1,14 @@
 "use strict";
 
 (() => {
-    const MAX_BYTES = 1048576;
+    const MAX_BYTES = 8 * 1024 * 1024;
     function pattern(text) {
         const normalized = text.replace(/\s+/g, "");
         if (!/^(?:[0-9a-f]{2}){1,512}$/i.test(normalized)) throw new Error("Pattern needs 1–512 complete hexadecimal bytes");
         return Uint8Array.from(normalized.match(/../g), pair => parseInt(pair,16));
     }
     function generate(kind,size,{value = 0,sequence = 0,bytes = Uint8Array.of(0,255),crypto = globalThis.crypto} = {}) {
-        if (!Number.isInteger(size) || size < 1 || size > MAX_BYTES) throw new Error("Sample size must be 1–1,048,576 bytes");
+        if (!Number.isInteger(size) || size < 1 || size > MAX_BYTES) throw new Error("Sample size must be 1–8,388,608 bytes");
         const output = new Uint8Array(size);
         if (kind === "crypto") {
             if (!crypto?.getRandomValues) throw new Error("Web Crypto is unavailable");

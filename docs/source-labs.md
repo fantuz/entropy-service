@@ -10,13 +10,13 @@ desktop/mobile layouts.
 
 | Source | Bytes shown | Access and interpretation |
 | --- | --- | --- |
-| Web Crypto | `crypto.getRandomValues` bytes, using calls of at most 65,536 bytes | Local browser CSPRNG baseline; up to 1 MiB per sample. |
+| Web Crypto | `crypto.getRandomValues` bytes, using calls of at most 65,536 bytes | Local browser CSPRNG baseline; up to 8 MiB per sample, capped by reported server limits. |
 | Counter | Continuing 0…255 sequence | Deterministic control: flat byte histogram and Shannon eight do not establish unpredictability. |
 | Constant | User-selected value 0…255 | Tests bias, extreme bit proportions and histogram clipping. |
 | Hex pattern | Repeating 1–512-byte pattern | Whitespace-separated complete hex byte pairs, e.g. `00 ff 3a`. |
-| Local file | Successive local slices up to 1 MiB | No upload; maximum file size 32 MiB. Stops at EOF. Use the file lab for detailed seeking. |
+| Local file | Successive local slices up to 8 MiB | No upload; maximum file size 32 MiB. Stops at EOF. Use the file lab for detailed seeking. |
 | Camera | RGB8 or RGBA8 row-major prefix at 160×120, 320×240 or 640×480 | Explicit permission, HTTPS/localhost; browser-processed/resampled frames. RGBA includes alpha. Actual camera dimensions/rate appear in metadata. |
-| Microphone | PCM16LE mono prefix from the latest audio window | Explicit permission, HTTPS/localhost and Web Audio. Actual sample rate is shown. Windows can overlap; browser/driver processing can apply. |
+| Microphone / line-in | PCM16LE mono prefix from the selected audio input's latest window | Explicit permission, HTTPS/localhost and Web Audio. Actual input name/sample rate is shown. Windows can overlap; browser/driver processing can apply. |
 | Serial | Prefix of each Web Serial read at the chosen baud | Supported browsers only, secure context and explicit port chooser. The lab reads bytes and does not send device commands. |
 | Network camera | Decoded RGB8 prefix from a registered RTSP or ONVIF camera | Server-side FFmpeg; session-only username/password. ONVIF Media1 obtains the RTSP stream URI. |
 
@@ -26,6 +26,37 @@ Start actions request permission; Stop, a hidden tab or leaving the page stops
 tracks, timers and readers. A permission request cannot always be dismissed by
 script, but any stream granted after Stop is closed immediately. Microphone
 monitoring uses a muted output path, without playing captured audio.
+
+### Line-in and USB audio inputs
+
+Line-in uses the same browser `getUserMedia` and Web Audio support as a
+microphone; **no browser plugin is required**:
+
+1. Select **Microphone / line-in PCM**, then **Start** or **Sample once** to
+   grant the site's audio permission. This is the only action that opens capture.
+2. Choose the desired device under **Audio input**. Input names often become
+   available only after permission is granted. **Refresh inputs** lists devices
+   without opening capture; device changes also refresh the list.
+3. Start again after changing the input. Selecting a named device requests it
+   exactly; an unavailable selection is retained and reported instead of silently
+   substituting the default microphone. **System default** deliberately follows
+   the operating system's selected input.
+
+A physical line-in jack may share one capture device with a microphone. Browsers
+cannot enumerate or switch every sound-card connector. On Linux, use the sound
+settings or PipeWire/PulseAudio controls (for example, `pavucontrol`) to select
+**Line In** as the input port/profile, then choose that device in the lab. A USB
+audio interface may appear separately. Browser support and the sound driver
+determine which devices are exposed.
+
+Echo cancellation, noise suppression and automatic gain are requested off;
+browser/driver processing or resampling can still apply. Input is downmixed to
+mono PCM16LE and is not played through the speakers. Captured samples stay in
+the browser until an explicit local download/export. Device IDs remain in page
+memory; the existing explicit measurement export can include the input's display
+name in its encoding description. This is a diagnostic input, not a new server
+entropy seed. Stop, navigation, a hidden tab and a disconnected track release
+capture; a stream granted after Stop is immediately closed.
 
 ### Optional camera preview
 
@@ -46,10 +77,27 @@ byte**, including for media/serial sources; it is not silently relabelled Hz.
 
 ## Capture, meter, compare and generate
 
-Choose sample size (1–1,048,576 bytes), cadence (20–60,000 ms), representation,
+Choose sample size (1–8,388,608 bytes), cadence (20–60,000 ms), representation,
 and **Start** or **Sample once**. Start repeats until Stop; Sample once collects
 one represented sample and releases its source. XOR needs two equal-length
 inputs before producing a sample.
+
+The browser cap is **8 MiB**, also capped by the server's reported `-max-bytes`
+and a registered source's effective limit. The initial sample remains 65,536
+bytes. Registered server sources accept `max_bytes` up to the server's absolute
+32 MiB ceiling; actual bridge requests use the smaller of that source limit
+and the configured `-max-bytes`. Existing lab connection/memory admission
+budgets still apply. The catalog advertises the effective per-source ceiling.
+When `max_bytes` is omitted for a non-camera registration, it now defaults to
+32 MiB, subject to those runtime limits; existing explicit smaller limits stay
+effective.
+
+The analysis window remains separately capped at **1 MiB** (default 64 KiB),
+with its byte-offset control for exploring a larger sample. Increasing capture
+size therefore does not automatically increase FFT/statistics work. Large
+captures still cost reception/copy/representation memory and time. Camera,
+audio and serial sources may return fewer bytes than requested; audio windows
+remain at most 65,536 bytes under the browser analyser's platform limit.
 
 - **Original bytes** preserves the sampled representation.
 - **XOR previous sample** compares equal-length successive inputs; a size
@@ -73,8 +121,9 @@ throughput benchmarks.
 Cadence controls local generators, HTTP/file/media polling, entropy-server
 links and registered bridges. Arbitrary WebSocket/serial sources arrive on
 their own clock. Only one HTTP request or file read runs at a time. Raw
-WebSocket messages must be nonempty binary samples up to 1 MiB; larger/text
-messages are rejected. Direct WebSocket messages are analysed whole; sample size
+WebSocket messages must be nonempty binary samples within the effective browser
+limit (at most 8 MiB); larger/text
+messages are rejected. The selected analysis window is taken from each accepted message; sample size
 sets request/read sizes for the other adapters. Native browser network/media
 buffers are outside the bounded analysis window, which is not a total-RSS guarantee.
 
@@ -163,7 +212,7 @@ Only the configured sources are opened, and only on a client Start action.
 | `device` | Absolute readable Linux device/file/FIFO path | Read-only, nonblocking I/O with polling/deadlines. A device must support byte reads; `/dev/video0` can require external driver setup. Browser camera capture or a Unix-socket helper is more portable. |
 
 Each entry has `id`, optional display `name`, `kind`, `endpoint`, optional
-`max_bytes` (1–1,048,576, default 1 MiB) and `timeout_ms` (100–60,000, default
+`max_bytes` (1–33,554,432, default 32 MiB for non-camera sources) and `timeout_ms` (100–60,000, default
 5000). IDs start with a lowercase letter and contain up to 32 lowercase letters,
 digits, hyphens or underscores. Names are at most 80 bytes. The strict JSON file
 is at most 64 KiB with at most 32 entries. URL userinfo/fragments are rejected;
@@ -178,8 +227,8 @@ reads a registered source. Camera registrations additionally accept
 `{"username":"...","password":"..."}` within ten seconds, bounded to 8 KiB;
 empty strings permit anonymous cameras. Credentials are limited to 256/1024
 UTF-8 bytes. Unknown/duplicate/invalid parameters are rejected
-before opening a source. Existing `-max-bytes` also caps bridge samples, up to
-1 MiB. An oversized source message or datagram terminates the bridge rather
+before opening a source. `-max-bytes` also caps bridge samples, up to
+32 MiB; browser controls additionally cap their requests at 8 MiB. An oversized source message or datagram terminates the bridge rather
 than disguising truncation.
 
 Bridges have a separate `-lab-max-connections=8` and `-lab-memory-mib=32`
@@ -227,7 +276,8 @@ recovery after a tab/process crash.
 
 Imports preserve valid settings and reject inconsistent fields instead of
 silently rewriting them. Camera defaults match the server: 320×240 RGB, 230,400
-bytes and a 10,000-ms timeout; other sources default to 1 MiB and 5,000 ms.
+bytes and a 10,000-ms timeout; other sources default to 32 MiB and 5,000 ms,
+with capture additionally capped by the server's configured `-max-bytes`.
 Explicit camera sizes require the matching RGB frame byte count. Names, endpoint
 paths/URLs and ONVIF profile tokens use the server's UTF-8 **byte** limits, not
 JavaScript character counts. A shared browser/Go fixture checks these defaults,
