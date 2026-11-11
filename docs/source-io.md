@@ -28,6 +28,10 @@ initialization even when urandom would otherwise return early-boot bytes. No see
 
 ## Hardware compatibility
 
+See the [driver guide](hardware-drivers.md) for the legacy Quantis kernel
+patch history, a pinned modern source backup, the two Linux source paths and
+the current ChaosKey character-device limitations.
+
 This is a deliberate compatibility change for hardware drivers without
 poll/deadline support. With `-require-device=true` startup fails clearly; with
 optional source selection, the existing OS fallback policy applies and reports

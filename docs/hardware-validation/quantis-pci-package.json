@@ -1,0 +1,42 @@
+{
+  "archive_sha256": "f088ebb9175592485e9809581b4c8631a4b535c6e4eea0d4f7df6cc0ab56633b",
+  "cancellation_verified": false,
+  "catalog_member_hashes_verified": false,
+  "catalog_sha256": "5eab826d7894af065598e01316f12b57c702f98e5161eac56175732accfb676b",
+  "catalog_signature_verified": false,
+  "drivers": {
+    "amd64": {
+      "bytes": 15872,
+      "embedded_signature_present": false,
+      "legacy_guid_constant_present": true,
+      "machine": "0x8664",
+      "member": "windows/Drivers/Windows/QuantisPci/amd64/QuantisPCI.sys",
+      "pe_format": "PE32+",
+      "sha256": "ef96477b513a6fb32bd26a0eb6664906fcdec6bdf4b3c106d860cd899cc242b4",
+      "subsystem": "native"
+    },
+    "x86": {
+      "bytes": 13824,
+      "embedded_signature_present": false,
+      "legacy_guid_constant_present": true,
+      "machine": "0x014c",
+      "member": "windows/Drivers/Windows/QuantisPci/x86/QuantisPCI.sys",
+      "pe_format": "PE32",
+      "sha256": "c13a4a36815de5254c5783684593931766256ee38f6708a9006c0576a981c216",
+      "subsystem": "native"
+    }
+  },
+  "hardware_id": "PCI\\VEN_179A&DEV_0001",
+  "hardware_tested": false,
+  "inf_class_guid": "f2f5f1e5-380e-4194-8fc0-ed5af63e93df",
+  "inf_driver_version": "04/01/2010, 5.0",
+  "inf_sha256": "3ca72d5a1cffcc95a3f5926d140c308ff8a6ee23a41bd8ac278ef303cd583cbf",
+  "interface_registration_verified": false,
+  "matches_reference_sha256": true,
+  "metadata_ok": true,
+  "overlapped_io_verified": false,
+  "quality_assessed": false,
+  "reference_sha256": "f088ebb9175592485e9809581b4c8631a4b535c6e4eea0d4f7df6cc0ab56633b",
+  "schema_version": 1,
+  "windows_kernel_policy_verified": false
+}

@@ -36,7 +36,9 @@ support private files, stdout/SSH pipes, explicit Linux devices and exact byte l
 
 ## Quick start
 
-Use **Go 1.26.11 or newer**, Git and Make. Linux is the primary deployment target; hardware devices also need their own working kernel driver and read permissions.
+Use **Go 1.26.11 or newer**, Git and Make. Linux is the primary deployment target.
+Hardware sources need appropriate OS support, binding and permissions; PCI
+kernel drivers and native USB transports have different requirements.
 
 An optional [Windows x64 port](docs/windows.md) builds both executables from the
 same source tree, using the native OS RNG, standard sockets, plain terminal text
@@ -154,7 +156,22 @@ Require your hardware source explicitly when silent fallback would be inappropri
 ./bin/entropy-server -device=/dev/qrandom0 -require-device=true -enable-https=false -http=127.0.0.1:8080
 ```
 
-Without `-require-device=true`, an unavailable device can fall back to the OS CSPRNG. `/dev/urandom` is a cryptographic source, not a deliberately weak test generator. Accepting a device path does not establish the quality of its output; the hardware, driver and source assessment remain part of your deployment.
+An unavailable optional Linux device path can fall back to the OS CSPRNG;
+`quantis-pci:N` and `quantis-usb:N` selectors always require the requested
+hardware. `/dev/qrandom0` reads through the Quantis driver, whereas
+`/dev/urandom` is Linux's mixed CSPRNG. Installing a Quantis PCI driver alone
+does not feed that OS pool. Direct hardware seeding also requires working
+nonblocking reads and polling/deadlines; compiling a driver is only one check.
+See [hardware driver compatibility and source layers](docs/hardware-drivers.md)
+for official packages, a pinned modern-kernel source backup, validation steps
+and the proposed ChaosKey USB path.
+
+For safekeeping, [download the pinned community legacy PCI driver sources](https://codeload.github.com/tcdent/quantis-pci/tar.gz/00fffc49306d748b34a95c14769b30908ef5985f).
+This is a source archive to build for your kernel; the guide records its
+compile-only Linux 6.12 check and the remaining direct-seeding requirements.
+
+Accepting a device path does not establish the quality of its output; the
+hardware, driver and source assessment remain part of your deployment.
 
 The standalone binary enables HTTPS by default and expects deployment-specific `cert.pem` and `key.pem`. No TLS identity is bundled. The old public demonstration key has been removed and is rejected by the TLS loader; replace it if you used an earlier checkout. For local testing, generate a unique, short-lived identity first:
 
@@ -402,7 +419,18 @@ analysis controls remain available in the shared light/dark interface.
 </details>
 
 
-The project began as a demonstration around an older Quantis PCI QRNG, with driver adaptation for newer Linux kernels. Hardware-driver maintenance is separate from this Go suite. The service can also run with the OS CSPRNG and no external card.
+The project began around a legacy Quantis PCI QRNG. Historical Linux output
+supplied by the maintainer records `179a:0001`, `quantis_pci` driver **2.9**,
+core version **`0x040a1201`** and **`/dev/qrandom0`**. EasyQuantis 20.2.3 also
+recognized the card and reported approximately 4 Mbit/s with one module.
+These are historical observations, rather than current-kernel qualification.
+
+Massimiliano Fantuzzi's [18.x kernel patch notes](https://gist.github.com/fantuz/8deb4eeb6963645bfb9ccd2bbe9116a7)
+and [20.x kernel patch notes](https://gist.github.com/fantuz/d45080e87e438ded307979b3402f9950)
+record the Linux 5.x adaptation work. They need review before reuse on current
+kernels, particularly MMIO caching, procfs handlers and readiness/deadline
+support; see the [driver guide](docs/hardware-drivers.md). Hardware-driver
+maintenance is separate from this Go suite, which can also use the OS CSPRNG.
 
 <details>
 <summary>Historical interface gallery (February–March 2026)</summary>

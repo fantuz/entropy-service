@@ -1,0 +1,27 @@
+{
+  "btf_debug_generated": false,
+  "btf_note": "Optional BTF generation disabled because pahole is unavailable.",
+  "build_override": {
+    "CONFIG_DEBUG_INFO_BTF_MODULES": ""
+  },
+  "cancellation_verified": false,
+  "compile_and_link_passed": true,
+  "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+  "direct_seed_contract_verified": false,
+  "driver_source_modified": false,
+  "hardware_tested": false,
+  "header_build_paths_relocated": true,
+  "header_packages_version": "6.12.115-2",
+  "headers_unpacked_in_user_directory": true,
+  "module_alias": "pci:v0000179Ad00000001sv*sd*bc*sc*i*",
+  "module_loaded": false,
+  "nonblocking_branch_present_in_reviewed_source": false,
+  "observed_on": "2026-11-11",
+  "poll_operation_present_in_reviewed_source": false,
+  "quality_assessed": false,
+  "schema_version": 1,
+  "source_archive_sha256": "159989355fbfb688c39864846886e1a2b1e14479b07d46bad06cfa31f1f94f16",
+  "source_commit": "00fffc49306d748b34a95c14769b30908ef5985f",
+  "source_url": "https://codeload.github.com/tcdent/quantis-pci/tar.gz/00fffc49306d748b34a95c14769b30908ef5985f",
+  "target_kernel_headers": "6.12.115+deb13.1-amd64"
+}
