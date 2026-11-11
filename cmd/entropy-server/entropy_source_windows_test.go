@@ -68,9 +68,48 @@ func TestWindowsNeverSubstitutesForExplicitDeviceRequests(t *testing.T) {
 		{"/dev/qrandom0", false},
 		{DefaultCSPRNG, true},
 		{"", true},
+		{"quantis-pci:-1", false},
+		{"quantis-pci:10", true},
 	} {
 		if source, origin, err := openEntropySource(tc.path, tc.require); err == nil || source != nil || origin != "" {
 			t.Fatalf("unsupported request silently fell back: %+v, %q, %v", tc, origin, err)
 		}
+	}
+}
+
+func TestWindowsHardwareFailureDoesNotSubstituteOSSource(t *testing.T) {
+	want := errors.New("test: legacy driver unavailable")
+
+	for _, require := range []bool{false, true} {
+		calls := 0
+		opener := func(index int) (io.ReadCloser, error) {
+			calls++
+
+			if index != 0 {
+				t.Fatalf("wrong board: %d", index)
+			}
+
+			return nil, want
+		}
+
+		if source, origin, err := selectWindowsEntropySource("quantis-pci:0", require, opener); !errors.Is(err, want) || source != nil || origin != "" || calls != 1 {
+			t.Fatalf("explicit hardware failure silently fell back: source=%v origin=%q error=%v", source, origin, err)
+		}
+	}
+}
+
+func TestWindowsHardwareSelectionReportsHardwareIdentity(t *testing.T) {
+	fixture := &windowsSeedSource{}
+	defer fixture.Close()
+
+	source, origin, err := selectWindowsEntropySource("quantis-pci:2", true, func(index int) (io.ReadCloser, error) {
+		if index != 2 {
+			t.Fatalf("wrong board: %d", index)
+		}
+
+		return fixture, nil
+	})
+	if err != nil || source != fixture || origin != "quantis-pci:2" {
+		t.Fatalf("hardware selection identity changed: source=%v origin=%q error=%v", source, origin, err)
 	}
 }

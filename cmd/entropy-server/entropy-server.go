@@ -1212,12 +1212,18 @@ func main() {
 	boundedSeed := &seedInput{source: deadlineSource, reader: seedReader, timeout: cfg.SourceTimeout}
 
 	sourceReadDetail := fmt.Sprintf("%s per complete seed; nonblocking source", cfg.SourceTimeout)
+	sourceReadStatus := "OK"
 
 	if windowsBuild {
-		sourceReadDetail = fmt.Sprintf("%s checked between bounded OS RNG calls; an in-flight native call cannot be interrupted", cfg.SourceTimeout)
+		if actualSource == DefaultCSPRNG || actualSource == sourceOSFallback {
+			sourceReadDetail = fmt.Sprintf("%s checked between bounded OS RNG calls; an in-flight native call cannot be interrupted", cfg.SourceTimeout)
+		} else {
+			sourceReadStatus = reportWarning
+			sourceReadDetail = fmt.Sprintf("%s; experimental overlapped PCI reads; cancellation depends on the installed kernel driver", cfg.SourceTimeout)
+		}
 	}
 
-	startup.Check("Source read deadline", "OK", sourceReadDetail)
+	startup.Check("Source read deadline", sourceReadStatus, sourceReadDetail)
 
 	seedReader = boundedSeed.Reader(ctx)
 

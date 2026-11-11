@@ -107,9 +107,12 @@ func reportSource(r *console.Report, requested, actual string) {
 		r.Check("Source selection", "WARN", "configured device unavailable; using operating-system CSPRNG fallback")
 	}
 
-	if actual == DefaultCSPRNG || actual == sourceOSFallback {
+	switch {
+	case actual == DefaultCSPRNG || actual == sourceOSFallback:
 		r.Value("Source type", "operating-system CSPRNG")
-	} else {
+	case windowsBuild:
+		r.Value("Source type", "experimental Quantis PCI driver; hardware quality not independently verified")
+	default:
 		r.Value("Source type", "character device; quality not independently verified")
 	}
 }

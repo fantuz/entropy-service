@@ -41,6 +41,8 @@ class WindowsArchiveTests(unittest.TestCase):
     def test_invalid_deliverables_are_rejected(self):
         for options in [
             {"missing": "WORDLIST_NOTICES.txt"},
+            {"missing": "QUANTIS_NOTICES.txt"},
+            {"missing": "quantis.md"},
             {"missing": "entropy-client.exe"},
             {"machine": 0xaa64},
             {"extra": "../unexpected"},
