@@ -16,15 +16,16 @@ import (
 )
 
 type usbfsFixture struct {
-	mu       sync.Mutex
-	active   *usbURB
-	buffer   []byte
-	complete bool
-	canceled bool
-	reaped   bool
-	closed   bool
-	fatal    bool
-	requests []uint
+	mu        sync.Mutex
+	active    *usbURB
+	buffer    []byte
+	complete  bool
+	canceled  bool
+	reaped    bool
+	closed    bool
+	fatal     bool
+	requests  []uint
+	submitted chan struct{}
 }
 
 func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
@@ -50,6 +51,10 @@ func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
 				}
 
 				runtime.GC()
+
+				if fixture.submitted != nil {
+					close(fixture.submitted)
+				}
 
 				return nil
 			case 0x550b:
@@ -145,7 +150,7 @@ func TestLinuxUSBReapsSuccessAndCancellationBeforeReturning(t *testing.T) {
 }
 
 func TestLinuxUSBCloseInterruptsAndFatalReapClosesHandle(t *testing.T) {
-	fixture := &usbfsFixture{buffer: make([]byte, 64)}
+	fixture := &usbfsFixture{buffer: make([]byte, 64), submitted: make(chan struct{})}
 
 	driver := usbfsDriver(t, fixture)
 	if err := driver.SetReadDeadline(time.Now().Add(time.Minute)); err != nil {
@@ -156,7 +161,11 @@ func TestLinuxUSBCloseInterruptsAndFatalReapClosesHandle(t *testing.T) {
 
 	go func() { _, err := driver.Bulk(fixture.buffer); done <- err }()
 
-	time.Sleep(10 * time.Millisecond)
+	select {
+	case <-fixture.submitted:
+	case <-time.After(time.Second):
+		t.Fatal("USB read was not submitted")
+	}
 
 	if err := driver.Close(); err != nil {
 		t.Fatal(err)

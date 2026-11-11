@@ -106,11 +106,24 @@ func TestWinUSBCloseJoinsPendingReadAndSystemAPIsExist(t *testing.T) {
 	}
 
 	driver, _ := windowsUSBPipe(t)
+	started := make(chan struct{})
+	read := driver.calls.read
+	driver.calls.read = func(handle uintptr, pipe byte, p []byte, n *uint32, operation *windows.Overlapped) error {
+		err := read(handle, pipe, p, n, operation)
+
+		close(started)
+
+		return err
+	}
 
 	done := make(chan error, 1)
 	go func() { _, err := driver.Bulk(make([]byte, 64)); done <- err }()
 
-	time.Sleep(10 * time.Millisecond)
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("overlapped read was not submitted")
+	}
 
 	if err := driver.Close(); err != nil {
 		t.Fatal(err)
