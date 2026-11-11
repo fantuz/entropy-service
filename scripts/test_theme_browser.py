@@ -42,7 +42,7 @@ def main():
                         for path in PAGES:
                             page = context.new_page()
                             errors = []
-                            page.on("pageerror", lambda error: errors.append({"message": str(error), "stack": error.stack}))
+                            page.on("pageerror", lambda error, errors=errors: errors.append({"message": str(error), "stack": error.stack}))
                             page.goto(base + path)
                             # Layout checks have their own page. Finish classic
                             # worker bootstrap before closing/reloading it;
