@@ -6,7 +6,8 @@ const root = new URL("../cmd/entropy-server/", import.meta.url);
 const source = readFileSync(new URL("web/words-page.js", root), "utf8");
 const languages = JSON.parse(readFileSync(new URL("internal/wordlist/manifest.json", root), "utf8"))
     .map(info => ({...info, selection_bits_per_word: Math.log2(info.size)}));
-const catalog = {default: "en", languages};
+const aliases = {pt: "pt-BR", zh: "zh-Hans", "zh-cn": "zh-Hans", "zh-sg": "zh-Hans", "zh-tw": "zh-Hant", "zh-hk": "zh-Hant", "zh-mo": "zh-Hant"};
+const catalog = {default: "en", languages, aliases};
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 class Element {
@@ -18,7 +19,7 @@ class Element {
     addEventListener(key, callback) { this.events.set(key, callback); }
 }
 
-async function page(query = "", {secure = false, pending = false, catalogFailure = false} = {}) {
+async function page(query = "", {secure = false, pending = false, catalogFailure = false, selected} = {}) {
     const elements = new Map(["stream-notice", "words-content", "hash", "word-language", "word-language-apply", "word-language-form", "wordlist-info"]
         .map(id => [id, new Element()]));
     const events = new Map(), sockets = [], submitted = [], assigned = [];
@@ -34,7 +35,7 @@ async function page(query = "", {secure = false, pending = false, catalogFailure
         constructor(endpoint) { this.url = endpoint; this.closed = []; sockets.push(this); }
         close(...args) { this.closed.push(args); }
     }
-    const response = {ok: !catalogFailure, json: async () => catalog};
+    const response = {ok: !catalogFailure, json: async () => ({...catalog, selected})};
     const fetch = (endpoint, options) => {
         assert.equal(endpoint, "/wordlists.json"); signal = options.signal;
         return pending ? new Promise(resolve => { resolveFetch = () => resolve(response); }) : Promise.resolve(response);
@@ -48,9 +49,10 @@ async function page(query = "", {secure = false, pending = false, catalogFailure
 
 for (const language of languages) {
     const p = await page(`?words=6&refresh=50&lang=${language.code}`, {secure: true});
-    assert.equal(p.elements.get("word-language").children.length, 10);
+    assert.equal(p.elements.get("word-language").children.length, languages.length);
     assert.equal(p.elements.get("word-language").value, language.code);
     assert.equal(p.elements.get("words-content").attributes.lang, language.code);
+    assert.equal(p.elements.get("words-content").attributes.dir, "auto");
     const endpoint = new URL(p.sockets[0].url);
     assert.equal(endpoint.protocol, "wss:");
     assert.equal(endpoint.pathname, "/words");
@@ -66,6 +68,7 @@ for (const language of languages) {
     assert.equal(p.elements.get("hash").textContent, data.hash);
     assert.equal(p.status().hidden, true);
     if (language.kind === "bip39-word-data") assert.match(p.elements.get("wordlist-info").textContent, /not wallet mnemonics/);
+    if (language.kind === "spelling-word-data") assert.match(p.elements.get("wordlist-info").textContent, /not curated as a passphrase list/);
 }
 
 const defaultPage = await page("?words=8&refresh=100#section");
@@ -81,6 +84,17 @@ for (const query of ["?lang=PT", "?lang=pt-br"]) {
     const p = await page(query);
     assert.equal(new URL(p.sockets[0].url).searchParams.get("lang"), "pt-BR");
 }
+for (const [alias, code] of Object.entries(aliases)) {
+    const p = await page("?lang=" + alias.toUpperCase());
+    assert.equal(new URL(p.sockets[0].url).searchParams.get("lang"), code);
+}
+const remembered = await page("?words=6", {secure: true, selected: "ar"});
+assert.equal(remembered.elements.get("word-language").value, "ar");
+assert.equal(new URL(remembered.sockets[0].url).searchParams.get("lang"), "ar");
+const override = await page("?lang=ru", {selected: "ar"});
+assert.equal(override.elements.get("word-language").value, "ru");
+const invalidRemembered = await page("?lang=unknown", {selected: "ar"});
+assert.equal(invalidRemembered.sockets.length, 0, "invalid explicit query must not use a cookie selection");
 for (const query of ["?lang=unknown", "?lang=", "?lang=en&lang=ja"]) {
     const p = await page(query);
     assert.equal(p.sockets.length, 0, "invalid selection must not silently generate English");
@@ -114,4 +128,4 @@ assert.equal(disposed.sockets[0].closed.length, 1);
 assert.ok(disposed.cancellations > 0);
 disposed.events.get("pageshow")({persisted: true});
 assert.equal(disposed.reloads, 1);
-console.log("Ten-language selection, Unicode text, source identity, errors, navigation and cancellation passed");
+console.log(`${languages.length} dictionary choices, aliases, remembered language, Unicode text, source identity, errors, navigation and cancellation passed`);

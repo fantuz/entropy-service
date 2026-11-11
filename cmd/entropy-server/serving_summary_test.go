@@ -103,7 +103,7 @@ func TestServingCountersAcrossWebSocketFormats(t *testing.T) {
 				case "/stream":
 					handler = wsBinaryHandler(generator, 100, 64, 64, budget)
 				case "/words":
-					handler = wsWordsHandler(generator, 3, 100, budget)
+					handler = wsWordsHandler(generator, 3, 100, 1024, false, budget)
 				}
 
 				testServer := httptest.NewUnstartedServer(observeRequests(handler, log.New(io.Discard, "", 0)))

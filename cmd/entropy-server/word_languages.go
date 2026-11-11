@@ -38,16 +38,61 @@ func requestedWordList(rawQuery string) (*wordlist.Dictionary, error) {
 	return dictionary, nil
 }
 
-func registerWordUI(mux *http.ServeMux) {
-	catalog, err := json.Marshal(struct {
-		Default   string          `json:"default"`
-		Languages []wordlist.Info `json:"languages"`
-	}{Default: wordlist.Default().Info().Code, Languages: wordlist.Catalog()})
+// A query always wins, including an invalid query. Only a missing lang may
+// fall back to a validated, opt-in cookie; old or unknown values mean English.
+func preferredWordList(r *http.Request, hasCookie bool) (*wordlist.Dictionary, error) {
+	dictionary, err := requestedWordList(r.URL.RawQuery)
+	if err != nil || !hasCookie || r.URL.Query().Has("lang") {
+		return dictionary, err
+	}
+
+	if prefs, err := getPrefsCookie(r); err == nil {
+		if selected, ok := wordlist.Lookup(prefs.Lang); ok {
+			return selected, nil
+		}
+	}
+
+	return dictionary, nil
+}
+
+func registerWordUI(mux *http.ServeMux, hasCookie bool) {
+	metadata := struct {
+		Default   string            `json:"default"`
+		Languages []wordlist.Info   `json:"languages"`
+		Aliases   map[string]string `json:"aliases"`
+		Selected  string            `json:"selected,omitempty"`
+	}{Default: wordlist.Default().Info().Code, Languages: wordlist.Catalog(), Aliases: wordlist.Aliases()}
+
+	catalog, err := json.Marshal(metadata)
 	if err != nil {
 		panic(err)
 	}
 
-	mux.Handle("GET /wordlists.json", wordResource("wordlists.json", "application/json; charset=utf-8", catalog))
+	if !hasCookie {
+		mux.Handle("GET /wordlists.json", wordResource("wordlists.json", "application/json; charset=utf-8", catalog))
+	} else {
+		mux.HandleFunc("GET /wordlists.json", func(w http.ResponseWriter, r *http.Request) {
+			// Never share a remembered language through an intermediary cache.
+			w.Header().Set("Cache-Control", "private, no-store")
+			w.Header().Set("Vary", "Cookie")
+
+			dictionary, err := preferredWordList(r, true)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			current := metadata
+			current.Selected = dictionary.Info().Code
+
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+			if r.Method != http.MethodHead {
+				_ = json.NewEncoder(w).Encode(current)
+			}
+		})
+	}
+
 	mux.Handle("GET /wordlist-notices.txt", wordResource("wordlist-notices.txt", "text/plain; charset=utf-8", wordlist.Notices()))
 	mux.HandleFunc("GET /words.html", func(w http.ResponseWriter, r *http.Request) {
 		query, err := url.ParseQuery(r.URL.RawQuery)

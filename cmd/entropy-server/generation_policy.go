@@ -35,7 +35,7 @@ func registerGenerationRoutes(mux *http.ServeMux, root *drbg.DRBG, cfg *config.C
 		routeStream:   wsBinaryHandler(root, cfg.RefreshColorMs, 2048, cfg.MaxBytes, ws),
 		routeColors:   wsBytesHandler(root, cfg.RefreshColorMs, cfg.MaxBytes, ws),
 		routeBytes:    wsBytesHandler(root, cfg.RefreshRateMs, cfg.MaxBytes, ws),
-		routeWords:    wsWordsHandler(root, cfg.MaxWords, cfg.RefreshColorMs, ws),
+		routeWords:    wsWordsHandler(root, cfg.MaxWords, cfg.RefreshColorMs, cfg.MaxBytes, cfg.WantsCookie, ws),
 		routeRandom:   randomBytesHandler(root, cfg.MaxBytes, cfg.MaxWords, cfg.WantsCookie, requests),
 		routeTest:     randomHandler(root, cfg.MaxBytes, requests),
 		routeImage:    randomImageHandler(root, requests),

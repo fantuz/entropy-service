@@ -56,7 +56,7 @@ func TestWordFrameSampling(t *testing.T) {
 }
 
 func TestWordPageCountAndCookie(t *testing.T) {
-	wordPattern := regexp.MustCompile(`<div class="words" lang="en">([^<]*)</div>`)
+	wordPattern := regexp.MustCompile(`<div class="words" lang="en" dir="auto">([^<]*)</div>`)
 	hashPattern := regexp.MustCompile(`<div class="hash">([^<]*)</div>`)
 
 	for _, tc := range []struct {
@@ -114,7 +114,7 @@ func TestWordPageCountAndCookie(t *testing.T) {
 }
 
 func TestWordsRejectInvalidParameters(t *testing.T) {
-	handler := wsWordsHandler(wordTestDRBG(t), 8, 500, newWebSocketBudget(128, 1<<30))
+	handler := wsWordsHandler(wordTestDRBG(t), 8, 500, 1024, false, newWebSocketBudget(128, 1<<30))
 
 	for _, query := range []string{
 		"words=0", "words=-1", "words=", "words=null", "words=abc", "words=9",
@@ -142,7 +142,7 @@ func TestWordsConcurrentClients(t *testing.T) {
 	// that each request's refresh is applied before ticker creation.
 	budget := newWebSocketBudget(128, 1<<30)
 
-	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000, budget))
+	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 8, 60000, 1024, false, budget))
 	defer server.Close()
 	// Client Close/wg.Wait alone do not join the server's upgraded handlers.
 	defer waitBudgetActive(t, budget, 0)
@@ -209,7 +209,7 @@ func TestWordsIdleAndDisconnect(t *testing.T) {
 	source := wordTestDRBG(t)
 	reference := wordTestDRBG(t)
 	done := make(chan struct{})
-	handler := wsWordsHandler(source, 8, 60000, newWebSocketBudget(128, 1<<30))
+	handler := wsWordsHandler(source, 8, 60000, 1024, false, newWebSocketBudget(128, 1<<30))
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer close(done)

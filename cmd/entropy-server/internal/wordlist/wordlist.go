@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"strings"
 	"unicode"
@@ -41,6 +42,22 @@ type Dictionary struct {
 }
 
 var dictionaries = load()
+
+const (
+	brazilianPortuguese = "pt-BR"
+	simplifiedChinese   = "zh-Hans"
+	traditionalChinese  = "zh-Hant"
+)
+
+var languageAliases = map[string]string{
+	"pt":    brazilianPortuguese,
+	"zh":    simplifiedChinese,
+	"zh-cn": simplifiedChinese,
+	"zh-sg": simplifiedChinese,
+	"zh-tw": traditionalChinese,
+	"zh-hk": traditionalChinese,
+	"zh-mo": traditionalChinese,
+}
 
 func load() []*Dictionary {
 	data, err := files.ReadFile("manifest.json")
@@ -108,8 +125,8 @@ func parse(info Info, data []byte) (*Dictionary, error) {
 func Default() *Dictionary { return dictionaries[0] }
 
 func Lookup(code string) (*Dictionary, bool) {
-	if strings.EqualFold(code, "pt") {
-		code = "pt-BR"
+	if canonical, ok := languageAliases[strings.ToLower(code)]; ok {
+		code = canonical
 	}
 
 	for _, dictionary := range dictionaries {
@@ -120,6 +137,8 @@ func Lookup(code string) (*Dictionary, bool) {
 
 	return nil, false
 }
+
+func Aliases() map[string]string { return maps.Clone(languageAliases) }
 
 func Catalog() []Info {
 	result := make([]Info, 0, len(dictionaries))
