@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Native Windows smoke tests; no QRNG, external server or trust-store changes."""
 
+import argparse
 import ctypes
 from ctypes import wintypes
 import http.client
@@ -155,4 +156,8 @@ class WindowsSmoke(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--bin-dir", type=Path, default=ROOT / "bin", help="directory containing the two executables")
+    args, unittest_args = parser.parse_known_args()
+    SERVER, CLIENT = args.bin_dir / "entropy-server.exe", args.bin_dir / "entropy-client.exe"
+    unittest.main(argv=[sys.argv[0], *unittest_args], verbosity=2)

@@ -144,7 +144,15 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 // ValidatePlatform keeps unsupported Windows features explicit. Formula/flag
 // validation stays shared and can be tested independently of platform support.
-func (cfg *Config) ValidatePlatform() error { return cfg.validatePlatform(runtime.GOOS) }
+func (cfg *Config) ValidatePlatform() error {
+	// Keep Windows capability dispatch out of non-Windows release binaries,
+	// even when the larger policy helper exceeds the compiler's inline budget.
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	return cfg.validatePlatform(runtime.GOOS)
+}
 
 func (cfg *Config) validatePlatform(goos string) error {
 	if goos != "windows" {

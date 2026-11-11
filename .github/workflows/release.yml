@@ -16,9 +16,15 @@ jobs:
     name: Validate Windows before publishing
     uses: ./.github/workflows/windows.yml
 
+  windows-package:
+    name: Validate packaged Windows archive
+    needs: [validate, windows]
+    uses: ./.github/workflows/windows-package.yml
+
   validate:
     name: Validate tagged commit before publishing
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -128,6 +134,17 @@ jobs:
           args: release --snapshot --skip=publish --clean
       - name: Test real packaged systemd HTTP and HTTPS lifecycle
         run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh dist/*_amd64.deb
+      - name: Verify Windows release ZIP layout, notices and executable architecture
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_check_windows_archive.py'
+          python3 scripts/check_windows_archive.py dist/*_windows_amd64.zip
+      - name: Preserve Windows release ZIP for native package tests
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-x64-release-zip
+          path: dist/*_windows_amd64.zip
+          if-no-files-found: error
+          retention-days: 7
 
   browser:
     name: Validate Firefox and Chromium UI
@@ -135,8 +152,9 @@ jobs:
 
   release:
     name: Publish only after full tag validation
-    needs: [validate, browser, windows]
+    needs: [validate, browser, windows, windows-package]
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
@@ -144,6 +162,7 @@ jobs:
         uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Setup Go
         uses: actions/setup-go@v6.5.0
         with:

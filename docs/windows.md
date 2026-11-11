@@ -132,6 +132,68 @@ all Go tests, vet/lint, builds both executables and runs
 captures, certificate reuse, platform errors, plain stdout and console shutdown.
 Release publication waits for Linux/browser validation and native Windows checks.
 
+CI also uploads the GoReleaser-created Windows ZIP as the seven-day
+`windows-x64-release-zip` artifact. A separate Windows job verifies its contents,
+x64 PE headers, notices and CRC, then executes those extracted binaries using the
+same CLI smoke tests. Publishing waits for that packaged-binary check too. These
+jobs have explicit time limits and read-only checkout credentials; no code is
+published by a PR run.
+
+The release workflow enforces these dependencies before publishing. To enforce
+them before merging, make the Linux build, native Windows and packaged Windows
+checks required in repository rules/branch protection. Workflow YAML creates
+checks but does not configure repository merge requirements.
+
+## Linux runtime cost
+
+Windows-specific Go files are excluded from Linux compilation. `runtime.GOOS` is
+a compile-time constant, not an OS-detection syscall. The client capability entry
+point has an explicit non-Windows guard: Go 1.26.11 reduces its Linux body to
+`return nil`, so the Windows policy dispatch is not executed. Server selection
+and startup reporting likewise have constant platform decisions.
+
+DRBG generation, HTTP/WS payload processing, Linux socket tuning and Linux device
+I/O retain their existing implementations. There is no added per-byte, per-frame
+or per-request platform dispatch. The Linux private-file creation wrapper is
+inlined to the existing exclusive `os.OpenFile(..., 0600)` call. Extra private-key
+inspection applies to certificate reuse/provisioning rather than served traffic.
+
+Consequently, no steady-state Linux performance regression is expected from the
+platform adapters. This is not a claim of bit-identical complete executables or
+an exact zero-percent timing difference on every host. Go tests establish
+correctness; meaningful throughput comparisons also need controlled CPU load,
+the same Go version, backend, payload sizes and sufficient repeated measurements.
+Additional Windows build/package jobs cost CI time, not Linux serving time.
+
+A focused comparison on 2026-11-11 used Go 1.26.11, Linux amd64,
+`CGO_ENABLED=0`, `GOMAXPROCS=1`, `GOGC=100`, six alternating baseline/port samples
+and 300 ms per benchmark. Baseline: `64a8d61`. Positive time changes mean slower.
+
+| Case | Baseline median | Port median | Time change | Allocations per operation |
+| --- | ---: | ---: | ---: | ---: |
+| HTTP generation, ChaCha20, 64 KiB | 160.36 µs | 160.85 µs | +0.30% | 44 → 44 |
+| HTTP generation, ChaCha20, 2 MiB | 4.340 ms | 4.351 ms | +0.26% | 44 → 44 |
+| HTTP generation, AES-256-CTR, 64 KiB | 38.85 µs | 37.61 µs | −3.21% | 45 → 45 |
+| HTTP generation, AES-256-CTR, 2 MiB | 435.34 µs | 448.68 µs | +3.06% | 45 → 45 |
+| Client analysis, 1 MiB prefix | 3.422 ms | 3.412 ms | −0.29% | 1 → 1 |
+
+Allocated bytes were unchanged too. The HTTP benchmark exercises generation and
+handlers with a discard writer; it does not measure network/TLS throughput.
+Samples on this shared VM varied, including much noisier initial measurements,
+so these small median differences are not proof of a speedup or a precise
+regression bound. Instruction comparisons of the diagnostics routine, DRBG read,
+Linux listener and benchmark HTTP handler found the same instruction sequences
+after normalizing address relocations. They do not prove whole executables are
+identical or replace a dedicated production-host benchmark.
+
+To reproduce the selected benchmark cases in each revision, keep those settings
+fixed and alternate runs between checkouts:
+
+```sh
+go test -run '^$' -bench '^BenchmarkHTTPGeneration$/(ChaCha20|AES-256-CTR)$/random$/(65536|2097152)$' -benchmem -benchtime=300ms -count=1 -cpu=1 ./cmd/entropy-server
+go test -run '^$' -bench '^BenchmarkClientAnalysis16MiB$/Default1MiBPrefix$' -benchmem -benchtime=300ms -count=1 -cpu=1 ./cmd/entropy-client
+```
+
 Pinned dictionaries are marked `-text` in `.gitattributes` so Windows Git checkout
 cannot convert their LF bytes to CRLF and break their SHA-256 integrity checks.
 
