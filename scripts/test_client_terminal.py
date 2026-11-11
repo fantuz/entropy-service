@@ -88,7 +88,7 @@ def capture_pty(command, environment, columns, rows, resize=()):
 
 def monitor_screens(output):
     return [screen for screen in output.split(CLEAR) if "Received           :" in screen or "Latest sample & reception" in screen
-            or screen.startswith(("Throughput ", "RX "))]
+            or screen.startswith(("SHANNON: ", "H:"))]
 
 
 def main():

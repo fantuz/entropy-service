@@ -30,8 +30,8 @@ func PrintDiagnosticsWithColor(w io.Writer, result *diag.Diagnostics, threshold 
 	fmt.Fprintln(w, "Sample diagnostics")
 	fmt.Fprintln(w, "---------------------------")
 	fmt.Fprintf(w, "sample bytes       : %d\n", result.N)
-	fmt.Fprintf(w, "Shannon entropy    : %.5f bits/byte\n", result.Shannon)
-	fmt.Fprintf(w, "Shannon threshold  : %.5f bits/byte\n", threshold)
+	fmt.Fprintf(w, "Shannon entropy    : %.6f bits/byte\n", result.Shannon)
+	fmt.Fprintf(w, "Shannon threshold  : %.6f bits/byte\n", threshold)
 	status := diag.ShannonAssessment(result, threshold)
 
 	color := Green

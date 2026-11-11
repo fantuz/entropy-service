@@ -135,7 +135,7 @@ def check_upload_workspace(page, base, artifacts):
         page.locator("#submit-upload").click()
     upload("counter-with-zero-tail.bin", data)
     expect(page.locator("#upload-status")).to_have_text("Analysis complete")
-    expect(page.locator("#entropy")).to_have_text("8.00000")
+    expect(page.locator("#entropy")).to_have_text("8.000000")
     expect(page.locator("#file-sha256")).to_have_text(hashlib.sha256(data).hexdigest())
     page.locator("#server-report summary").click()
     report = json.loads(page.locator("#server-report-content").inner_text())
@@ -195,7 +195,7 @@ def check_upload_workspace(page, base, artifacts):
     page.set_viewport_size({"width":1440,"height":1050})
     # The final windows are zeros, not the API's counter-prefix preview.
     set_value(page,"analysis-offset",1048576)
-    expect(page.locator("#entropy")).to_have_text("0.00000")
+    expect(page.locator("#entropy")).to_have_text("0.000000")
     expect(page.locator("#one-count")).to_contain_text("0 (0.000%)")
     expect(page.locator("#sample-info")).to_contain_text("[1,048,576, 1,052,672)")
     page.locator("#play-file").click()
@@ -226,7 +226,7 @@ def check_upload_workspace(page, base, artifacts):
     upload("single-byte.bin", bytes([128]))
     expect(page.locator("#upload-status")).to_have_text("Analysis complete")
     expect(page.locator("#fftvalue")).to_contain_text("at least 32 bytes")
-    expect(page.locator("#entropy")).to_have_text("0.00000")
+    expect(page.locator("#entropy")).to_have_text("0.000000")
     expect(page.locator("#previous-window")).to_be_disabled()
     expect(page.locator("#next-window")).to_be_disabled()
     page.locator("#play-file").click()
@@ -263,7 +263,7 @@ def check_upload_workspace(page, base, artifacts):
     page.unroute("**/files")
     upload("recovered.bin",bytes(range(256))*16)
     expect(page.locator("#upload-status")).to_have_text("Analysis complete")
-    expect(page.locator("#entropy")).to_have_text("8.00000")
+    expect(page.locator("#entropy")).to_have_text("8.000000")
     page.remove_listener("request",track)
     return {"desktop":desktop,"maximum_read_bytes":max(s["size"] for s in reads["slices"]),
         "maximum_concurrent_reads":reads["maxActive"],"checks":"full SHA, separate server/window scopes, large FFT, EOF/pause/playback/averaging, local-only views, seek/file replacement races, size limits, abort/error/recovery, desktop/mobile"}
@@ -396,7 +396,7 @@ def run_browser(base, artifacts, chromium, upload_only=False):
             socket_route.send(bytes(range(256)) * 16)
         fixture.route_web_socket("**/stream?*", route)
         fixture.goto(base + "/api-stream.html?bytes=4096")
-        expect(fixture.locator("#entropy")).to_have_text("8.00000")
+        expect(fixture.locator("#entropy")).to_have_text("8.000000")
         expect(fixture.locator("#zero-count")).to_contain_text("50.000%")
         expect(fixture.locator("#one-count")).to_contain_text("50.000%")
         expect(fixture.locator("#byte-statistics")).to_contain_text("Mean 127.500")
@@ -414,7 +414,7 @@ def run_browser(base, artifacts, chromium, upload_only=False):
         page.screenshot(path=str(artifacts / "bytes-mobile.png"), full_page=True)
         page.goto(base + "/api-stream.html?bytes=1&refresh=50")
         expect(page.locator("#fftvalue")).to_contain_text("at least 32 bytes")
-        expect(page.locator("#entropy")).to_have_text("0.00000")
+        expect(page.locator("#entropy")).to_have_text("0.000000")
         # Query validation must not start a nonsensical transport.
         page.goto(base + "/api-stream.html?bytes=1&bytes=2")
         expect(page.locator("#stream-notice")).to_have_attribute("data-state", "error")

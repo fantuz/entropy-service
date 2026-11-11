@@ -37,11 +37,16 @@ screen or UI library is used; the terminal profile owns the background and
 default text colors. `-color` and `NO_COLOR` retain their existing meanings.
 
 Waterfall-only mode uses the same byte-hue, RGB and grayscale mappings as the
-other layouts. Its first line reports average received throughput over the run
-in MiB/s, the last selected sample's Shannon entropy in bits/byte, the configured
-minimum, and `OK`/`WARN`. Before analysis it shows `--` and `NO_SAMPLE`. Narrow
-terminals abbreviate the labels to `RX`, `H` and `min`; extremely narrow headers
-clip with `~`. There are no panel titles, frame numbers, offsets or footer.
+other layouts. The first line starts with `SHANNON`, `THRESHOLD` and `STATUS`
+on the left. Shannon entropy and its threshold use six decimal places in
+bits/byte. `OK` is green and `WARN` red when colors are enabled; `-color=never`
+and automatic monochrome output retain the text without ANSI color codes.
+Average received throughput appears as a numeric MiB/s value at the right edge
+of the same line, without a label. Before analysis the header shows `--` and
+neutral `NO_SAMPLE`. Narrow terminals abbreviate the labels to `H` and `MIN`;
+extremely narrow headers clip with `~`. There are no panel titles, frame
+numbers, offsets or footer. The status compares the original entropy estimate,
+so rounding to six decimals cannot suppress a warning.
 Each remaining usable row is one selected sample, newest first. History fills
 as samples arrive; missing history and missing sample bytes stay blank.
 

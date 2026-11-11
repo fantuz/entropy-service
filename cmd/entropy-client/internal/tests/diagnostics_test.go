@@ -16,7 +16,7 @@ func TestPrintDiagnosticsHasOneShannonMeasurementAndAssessment(t *testing.T) {
 	PrintDiagnostics(&out, &result, 1.1)
 
 	text := out.String()
-	for _, want := range []string{"Shannon entropy    : 1.00000 bits/byte", "Shannon threshold  : 1.10000 bits/byte", "Shannon assessment : " + Red + "WARN", "chi-square", "monobit", "serial correlation"} {
+	for _, want := range []string{"Shannon entropy    : 1.000000 bits/byte", "Shannon threshold  : 1.100000 bits/byte", "Shannon assessment : " + Red + "WARN", "chi-square", "monobit", "serial correlation"} {
 		if strings.Count(text, want) != 1 {
 			t.Errorf("wanted one %q in %q", want, text)
 		}

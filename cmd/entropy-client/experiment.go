@@ -33,8 +33,8 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 		return err
 	}
 
-	if cfg.Mode != modePull && cfg.Mode != modeStream {
-		return errors.New("mode must be pull or stream")
+	if err := cfg.NormalizeMode(); err != nil {
+		return err
 	}
 
 	if cfg.Slice < 1 || cfg.Slice > 1<<25 {

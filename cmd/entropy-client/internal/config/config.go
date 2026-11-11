@@ -57,6 +57,8 @@ type Config struct {
 }
 
 const (
+	ModePull         = "pull"
+	ModeStream       = "stream"
 	MaxRetryDelay    = 30 * time.Second
 	defaultColorMode = "auto"
 	noColorMode      = "never"
@@ -107,7 +109,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.DurationVar(&cfg.Duration, "duration", 0, "measurement duration, excluding interactive preflight (0 = until interrupted)")
 	flags.StringVar(&cfg.ReportPath, "report", "", "write JSONL to a new file; - writes to stdout with -headless")
 	flags.BoolVar(&cfg.Headless, "headless", false, "disable terminal output and interactive preflight")
-	flags.StringVar(&cfg.Mode, "mode", "pull", "Preferred mode: pull|stream (HTTP vs websocket)")
+	flags.StringVar(&cfg.Mode, "mode", ModePull, "transport: http|pull for HTTP; websocket|push|stream for WebSocket (stream is retained for compatibility)")
 	flags.IntVar(&cfg.Retries, "retries", 0, "Maximum total transport retries per measured run (0..100; default 0 fails immediately)")
 	flags.DurationVar(&cfg.RetryDelay, "retry-delay", time.Second, "Initial retry delay (1ms..30s); exponential backoff capped at 30s, with jitter")
 
@@ -140,6 +142,20 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// NormalizeMode preserves the established runtime/report names for all aliases.
+func (cfg *Config) NormalizeMode() error {
+	switch cfg.Mode {
+	case ModePull, "http":
+		cfg.Mode = ModePull
+	case ModeStream, "push", "websocket":
+		cfg.Mode = ModeStream
+	default:
+		return errors.New("mode must be http (pull) or websocket (push, stream)")
+	}
+
+	return nil
 }
 
 // ValidatePlatform keeps unsupported Windows features explicit. Formula/flag

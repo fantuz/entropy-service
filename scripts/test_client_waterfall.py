@@ -5,6 +5,7 @@ import http.server
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import threading
 
@@ -16,7 +17,7 @@ def check_screen(screen, columns, rows):
     lines = plain.split("\n")
     assert len(lines) == rows - 1, (columns, rows, len(lines))
     assert all(len(line) == columns for line in lines), (columns, rows)
-    assert all(value in lines[0] for value in ("MiB/s", "8.00000", "7.99900", "OK")), lines[0]
+    assert re.fullmatch(r"SHANNON: 8\.000000  THRESHOLD: 7\.999000  STATUS: OK +[0-9]+\.[0-9]{3} MiB/s", lines[0]), lines[0]
     assert not any(label in plain for label in ("Sample diagnostics", "Offsets", "Waterfall |", "Latest sample", "History"))
 
 
@@ -26,7 +27,7 @@ def main():
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     environment = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor", NO_COLOR="")
-    base = [str(Path("bin/entropy-client").resolve()), "-mode=pull", "-layout=waterfall",
+    base = [str(Path("bin/entropy-client").resolve()), "-mode=http", "-layout=waterfall",
             f"-url=http://127.0.0.1:{server.server_port}/data", "-slice=4096", "-refresh=5ms",
             "-analysis-interval=0", "-display-interval=50ms"]
     try:
@@ -42,7 +43,14 @@ def main():
                 check_screen(screen, columns, rows)
                 if escape:
                     assert escape in screen
+                    assert "\x1b[32mOK\x1b[0m" in screen
             print(f"PASS: waterfall {columns}x{rows}, mode={mode}, color={color}")
+
+        output = capture_pty(base + ["-color=truecolor", "-analysis-bytes=64", "-duration=200ms"],
+                             environment, 80, 24)
+        assert all("STATUS: \x1b[31mWARN\x1b[0m" in screen for screen in monitor_screens(output))
+        assert monitor_screens(output), output
+        print("PASS: low-Shannon samples show a red WARN status")
 
         output = capture_pty(base + ["-color=truecolor", "-duration=1200ms"], environment, 80, 24,
                              resize=[(3.35, 641, 37), (3.65, 100, 240), (3.9, 80, 24)])
@@ -62,6 +70,7 @@ def main():
         assert "\x1b" not in result.stdout
         records = [json.loads(line) for line in result.stdout.splitlines()]
         assert records[0]["settings"]["layout"] == "waterfall"
+        assert records[0]["settings"]["mode"] == "pull"
         assert records[0]["settings"]["waterfall"] is True
         assert records[-1]["type"] == "run_summary" and not records[-1]["failed"]
         print("PASS: waterfall request remains JSONL-only in headless mode")

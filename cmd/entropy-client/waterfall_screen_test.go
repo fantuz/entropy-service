@@ -54,7 +54,7 @@ func TestWaterfallScreenFitsWideTallAndResizedTerminals(t *testing.T) {
 				}
 
 				if columns >= 47 {
-					for _, want := range []string{"7.99900", "8.00000", "OK", "MiB/s"} {
+					for _, want := range []string{"7.999000", "8.000000", "OK", "MiB/s"} {
 						if !strings.Contains(lines[0], want) {
 							t.Errorf("first line missing %q: %q", want, lines[0])
 						}
@@ -83,7 +83,7 @@ func TestWaterfallScreenWaitingAssessmentAndPlainFallback(t *testing.T) {
 	var out strings.Builder
 	m.renderTo(&out, terminal.Profile{Columns: 120, Rows: 30, Interactive: true})
 
-	if !strings.Contains(out.String(), "Shannon --") || !strings.Contains(out.String(), diag.ShannonNoSample) {
+	if !strings.Contains(out.String(), "SHANNON: --") || !strings.Contains(out.String(), diag.ShannonNoSample) {
 		t.Fatal("waiting screen reported an entropy assessment without a sample")
 	}
 
@@ -93,7 +93,7 @@ func TestWaterfallScreenWaitingAssessmentAndPlainFallback(t *testing.T) {
 	out.Reset()
 	m.renderTo(&out, terminal.Profile{Columns: 120, Rows: 30, Interactive: true})
 
-	if !strings.Contains(out.String(), "Shannon 7.00000") || !strings.Contains(out.String(), "assessment WARN") {
+	if !strings.Contains(out.String(), "SHANNON: 7.000000") || !strings.Contains(out.String(), "STATUS: WARN") {
 		t.Fatal("waterfall did not preserve the configured Shannon assessment")
 	}
 
@@ -102,6 +102,43 @@ func TestWaterfallScreenWaitingAssessmentAndPlainFallback(t *testing.T) {
 
 	if strings.ContainsRune(out.String(), '\x1b') || !strings.Contains(out.String(), "Sample diagnostics") {
 		t.Fatal("noninteractive waterfall did not retain plain stacked output")
+	}
+}
+
+func TestWaterfallHeaderAlignmentAndStatusColors(t *testing.T) {
+	strip := strings.NewReplacer(Green, "", Red, "", Reset, "")
+	for _, color := range []terminal.Color{terminal.Monochrome, terminal.ANSI16, terminal.ANSI256, terminal.TrueColor} {
+		for _, tc := range []struct{ status, code string }{{diag.ShannonOK, Green}, {diag.ShannonWarn, Red}, {diag.ShannonNoSample, ""}} {
+			profile := terminal.Profile{Columns: 120, Color: color}
+			header := waterfallHeader(profile, "7.999901", 7.9999, tc.status, 123.456)
+			plain := strip.Replace(header)
+
+			prefix := "SHANNON: 7.999901  THRESHOLD: 7.999900  STATUS: " + tc.status
+			if len(plain) != 120 || !strings.HasPrefix(plain, prefix) || !strings.HasSuffix(plain, "123.456 MiB/s") || strings.Contains(plain, "Throughput") {
+				t.Fatalf("header positions changed: %q", plain)
+			}
+
+			if color == terminal.Monochrome || tc.code == "" {
+				if strings.ContainsRune(header, '\x1b') {
+					t.Fatalf("unstyled status emitted ANSI colors: %q", header)
+				}
+			} else if !strings.Contains(header, tc.code+tc.status+Reset) {
+				t.Fatalf("status has the wrong color: %q", header)
+			}
+		}
+	}
+}
+
+func TestWaterfallAssessmentUsesUnroundedEntropy(t *testing.T) {
+	m := fullMonitor(t)
+	m.cfg.Layout, m.cfg.ShannonThreshold = terminal.LayoutWaterfall, 7.9999
+	m.latest.Shannon = 7.9998999
+
+	var out strings.Builder
+	m.renderTo(&out, terminal.Profile{Columns: 120, Rows: 24, Interactive: true, Color: terminal.TrueColor})
+
+	if !strings.Contains(out.String(), "SHANNON: 7.999900  THRESHOLD: 7.999900  STATUS: "+Red+"WARN"+Reset) {
+		t.Fatal("formatting rounded away a real threshold warning")
 	}
 }
 

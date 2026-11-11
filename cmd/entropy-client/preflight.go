@@ -30,7 +30,7 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Section("Analysis & output")
 	r.Value("Analysis prefix cap", fmt.Sprintf("%d bytes (0 = full frame)", cfg.AnalysisBytes))
 	r.Value("Analysis interval", fmt.Sprintf("%s (0 = every frame)", cfg.AnalysisInterval))
-	r.Value("Shannon threshold", fmt.Sprintf("%.5f bits/byte", cfg.ShannonThreshold))
+	r.Value("Shannon threshold", fmt.Sprintf("%.6f bits/byte", cfg.ShannonThreshold))
 	r.Value("Measurement duration", fmt.Sprintf("%s (0 = until interrupted; excludes preflight)", cfg.Duration))
 	r.Value("JSONL report", cfg.ReportPath)
 	r.Value("Write-out /dev/urandom", fmt.Sprintf("%t (mix only; no entropy credit)", cfg.WriteOut))
