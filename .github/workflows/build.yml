@@ -9,8 +9,6 @@ on:
       - "**.md"
       - ".gitignore"
   pull_request:
-    branches:
-      - main
     paths-ignore:
       - "**.md"
       - ".gitignore"

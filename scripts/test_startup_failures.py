@@ -2,6 +2,7 @@
 """Exercise actual CLI startup/exit paths using local sockets and ephemeral TLS."""
 
 import http.client
+import json
 import os
 import re
 from pathlib import Path
@@ -35,6 +36,31 @@ def listener():
 
 
 class StartupTests(unittest.TestCase):
+    def test_hardware_subcommands_run_without_server_side_effects(self):
+        with tempfile.TemporaryDirectory(prefix="entropy-hardware-cli-") as directory:
+            def hardware(*args, code=0):
+                result = subprocess.run([SERVER, "hardware", *args], cwd=directory,
+                                        capture_output=True, timeout=5, check=False)
+                self.assertEqual(result.returncode, code, (result.stdout, result.stderr))
+                self.assertNotIn(b"PRIVATE KEY", result.stdout + result.stderr)
+                self.assertNotIn(b"Root seed", result.stderr)
+                return result
+
+            inventory = json.loads(hardware("list", "-json").stdout)
+            self.assertEqual(inventory["platform"], "linux")
+            self.assertIsInstance(inventory["devices"], list)
+            probe = json.loads(hardware("probe", "-device=/dev/urandom", "-json").stdout)
+            self.assertTrue(probe["read_ok"])
+            self.assertEqual(probe["actual_source"], "/dev/urandom")
+            self.assertEqual(probe["bytes_accepted"], 64)
+            self.assertFalse(probe["quality_assessed"])
+            self.assertFalse(probe["cancellation_tested"])
+            failed = json.loads(hardware("probe", "-device=/definitely-missing-qrng", "-json", code=1).stdout)
+            self.assertFalse(failed["read_ok"])
+            self.assertNotIn("actual_source", failed)
+            hardware("probe", "-device=/dev/urandom", "-bytes=0", code=2)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(prefix="entropy-startup-")

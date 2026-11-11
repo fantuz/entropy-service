@@ -47,6 +47,22 @@ def request(port, path, context=None):
 
 @unittest.skipUnless(sys.platform == "win32", "native Windows executables required")
 class WindowsSmoke(unittest.TestCase):
+    def test_hardware_discovery_and_os_control_probe(self):
+        inventory = json.loads(invoke(SERVER, "hardware", "list", "-json").stdout)
+        self.assertEqual(inventory["platform"], "windows")
+        self.assertIsInstance(inventory["devices"], list)
+        probe = json.loads(invoke(SERVER, "hardware", "probe", "-device=windows-csprng", "-json").stdout)
+        self.assertTrue(probe["read_ok"])
+        self.assertEqual(probe["bytes_accepted"], 64)
+        self.assertEqual(probe["actual_source"], "windows-csprng")
+        self.assertFalse(probe["quality_assessed"])
+        self.assertFalse(probe["cancellation_tested"])
+        invoke(SERVER, "hardware", "probe", "-bytes=0", code=2)
+        missing = json.loads(invoke(SERVER, "hardware", "probe", "-device=quantis-pci:10", "-json", code=1).stdout)
+        self.assertFalse(missing["read_ok"])
+        self.assertEqual(missing["bytes_accepted"], 0)
+        self.assertNotIn("actual_source", missing)
+
     @classmethod
     def setUpClass(cls):
         # Hosted runners can start without a console. Attach children to a private

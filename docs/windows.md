@@ -28,6 +28,10 @@ go build -o bin/entropy-client.exe ./cmd/entropy-client
 
 Make and a C compiler are not required.
 
+For local driver/device diagnostics, use `entropy-server.exe hardware list -json`
+or `hardware probe -device=quantis-pci:0 -json`. The [hardware probe guide](hardware-probe.md)
+explains OS controls, strict selection, status fields and hardware-test limits.
+
 ## Local demonstration
 
 Start an HTTP-only loopback demonstration without TLS certificate provisioning:
