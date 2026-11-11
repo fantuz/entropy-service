@@ -1233,6 +1233,11 @@ func main() {
 		}
 	}
 
+	if isUSBEntropySource(actualSource) {
+		sourceReadStatus = reportWarning
+		sourceReadDetail = fmt.Sprintf("%s; experimental asynchronous USB transfers; completion/cancellation depends on OS/driver", cfg.SourceTimeout)
+	}
+
 	startup.Check("Source read deadline", sourceReadStatus, sourceReadDetail)
 
 	seedReader = boundedSeed.Reader(ctx)

@@ -33,6 +33,7 @@ func Discover() (Inventory, error) {
 
 	slices.SortFunc(result.Devices, func(a, b Device) int { return strings.Compare(a.ID, b.ID) })
 	assignLegacySelectors(result.Devices)
+	assignUSBSelectors(result.Devices, true)
 
 	return result, nil
 }
@@ -94,7 +95,7 @@ func windowsDevices(bus string) ([]Device, error) {
 			device.State = "driver_present_interface_missing"
 		}
 
-		if device.Family != LegacyPCI {
+		if device.Family == ChipPCIe {
 			device.Notes = append(device.Notes, "no seed adapter for this model in this build")
 		}
 

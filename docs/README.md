@@ -14,6 +14,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Optional Windows port](windows.md) | Native x64 builds, OS randomness, capability limits, private ACL files, console output and validation. |
 | [Experimental Quantis PCI adapter](quantis.md) | Windows legacy PCI driver interface, explicit hardware seeding, validation limits and Linux device integration. |
 | [Hardware discovery and probe](hardware-probe.md) | Read-only inventory, driver binding, explicit source checks, JSON reports and limits of hardware assurance. |
+| [Experimental Quantis USB](quantis-usb.md) | Native WinUSB and Linux usbfs seeding, model/driver prerequisites, deadlines and physical-test limits. |
 | [Client experiments](client-experiments.md) | Configurable Shannon assessment, timed/headless runs, JSONL schema and reproducible experiments. |
 | [Client write-out](client-writeout.md) | Linux pool mixing, limited value, device validation, failure handling and progress counters. |
 | [Raw client exports](client-output.md) | Private files, raw stdout/SSH pipes, Linux devices, exact byte limits and delivery accounting. |

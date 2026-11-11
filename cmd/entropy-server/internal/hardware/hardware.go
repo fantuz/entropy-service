@@ -1,7 +1,13 @@
 // Package hardware inventories known Quantis devices without opening them.
 package hardware
 
-import "strings"
+import (
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/quantisusb"
+)
 
 const (
 	LegacyPCI = "quantis-pci"
@@ -48,5 +54,38 @@ func Identify(vendor, product string) (family, model string, known bool) {
 		return USB, "Quantis USB (legacy protocol)", true
 	default:
 		return "", "", false
+	}
+}
+
+// USB numbering follows sorted interface paths on Windows, sysfs IDs on Linux.
+// It is an inventory position, not a persistent serial-number binding.
+func assignUSBSelectors(devices []Device, byPath bool) {
+	indices := []int{}
+
+	if !quantisusb.Available {
+		return
+	}
+
+	for i, device := range devices {
+		if device.Family == USB && len(device.Paths) > 0 {
+			indices = append(indices, i)
+		}
+	}
+
+	slices.SortFunc(indices, func(a, b int) int {
+		if byPath {
+			return strings.Compare(devices[a].Paths[0], devices[b].Paths[0])
+		}
+
+		return strings.Compare(devices[a].ID, devices[b].ID)
+	})
+
+	for index, i := range indices {
+		if index > 126 {
+			break
+		}
+
+		devices[i].Source = quantisusb.Prefix + strconv.Itoa(index)
+		devices[i].ProbeAdapter = true
 	}
 }

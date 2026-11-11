@@ -27,8 +27,9 @@ Linux PCI sources are mapped to existing `qrandomN` character nodes through
 sysfs. Windows legacy PCI selectors match the adapter's sorted interface-path
 numbering (`quantis-pci:0` through `:9`). These numbers can change after hardware
 changes and are not serial-number bindings. USB paths in this first inventory
-are metadata, not byte-stream sources; PCIe/USB listing does not imply that a
-Windows seed adapter exists. `probe_adapter` describes software availability,
+are metadata, not byte-stream sources. The experimental [USB transport](quantis-usb.md)
+uses `quantis-usb:N` on supported Linux/Windows builds; Windows PCIe remains
+outside the seed adapters. `probe_adapter` describes software availability,
 not verified physical operation.
 
 JSON inventory schema version 1 contains `platform`, `devices` and optional

@@ -19,6 +19,10 @@ const (
 )
 
 func openEntropySource(path string, require bool) (io.ReadCloser, string, error) {
+	if source, actual, selected, err := openUSBEntropySource(path); selected {
+		return source, actual, err
+	}
+
 	return selectEntropySource(path, require, openCharacterEntropySource)
 }
 
@@ -44,6 +48,11 @@ func openCharacterEntropySource(path string) (io.ReadCloser, error) {
 	}
 
 	stat, known := info.Sys().(*syscall.Stat_t)
+	if known && unix.Major(stat.Rdev) == 189 {
+		_ = f.Close()
+		return nil, errors.New("raw USB device nodes expose descriptors, not entropy; use a supported quantis-usb:N transport")
+	}
+
 	if known && unix.Major(stat.Rdev) == 1 && (unix.Minor(stat.Rdev) == 8 || unix.Minor(stat.Rdev) == 9) {
 		// Some kernels wait during random initialization even for nonblocking
 		// device reads. Check readiness via the nonblocking syscall first.

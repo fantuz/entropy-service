@@ -66,7 +66,7 @@ an interrupted or failed one. Existing output/report files are never replaced.
 | Feature | Initial Windows behaviour |
 | --- | --- |
 | OS seeding | `windows-csprng`, through `crypto/rand`. |
-| Hardware seeding | Experimental `-device=quantis-pci:0` for legacy Quantis PCI (`179a:0001`) with a separately installed driver. Explicit hardware selection never falls back, even without `-require-device`. Other device paths are rejected; `-require-device` requires the hardware selector. See [Quantis integration](quantis.md). |
+| Hardware seeding | Experimental `-device=quantis-pci:0` for legacy PCI (`179a:0001`) with a matching installed driver, or `-device=quantis-usb:0` for the [referenced USB model](quantis-usb.md) with WinUSB binding. Explicit hardware selection never falls back. Other raw device paths are rejected. |
 | Processor randomness | Optional `-cpu-mix` / `-rdrand-mix` retains shared support checks and retry limits. It supplements the selected seed source. |
 | Socket tuning | Go/Windows defaults; custom Linux tuning is disabled and reported at startup. |
 | Browser visualizations | Shared pages, including browser waterfalls and layout controls. |

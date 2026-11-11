@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/quantisusb"
 )
 
 func TestLinuxDiscoveryDistinguishesMissingDriverAndDeviceNode(t *testing.T) {
@@ -76,8 +78,8 @@ func TestLinuxDiscoveryDistinguishesMissingDriverAndDeviceNode(t *testing.T) {
 		t.Fatalf("binding/node states confused: %+v", first.Devices)
 	}
 
-	if first.Devices[2].Serial != "CaseSensitiveSerial" || first.Devices[2].ProbeAdapter || first.Devices[2].Source != "" {
-		t.Fatalf("USB metadata treated as a byte source: %+v", first.Devices[2])
+	if first.Devices[2].Serial != "CaseSensitiveSerial" || first.Devices[2].ProbeAdapter != quantisusb.Available || (quantisusb.Available && first.Devices[2].Source != "quantis-usb:0") {
+		t.Fatalf("USB protocol selector missing: %+v", first.Devices[2])
 	}
 
 	if err := os.Symlink("/dev/null", filepath.Join(devRoot, "qrandom0")); err != nil {

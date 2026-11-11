@@ -1,7 +1,7 @@
-Quantis PCI interoperability references
+Quantis PCI/USB interoperability references
 
-The original Go adapter uses the documented legacy PCI GUID, read-only IOCTL
-identifiers and protocol described by ID Quantique's Quantis Software 20.2.4,
+The original Go adapters use documented PCI/USB GUIDs, read-only IOCTL/vendor
+request identifiers and protocols described by ID Quantique's Quantis Software 20.2.4,
 mirrored at https://github.com/lfd/idq-driver (revision
 d051aeaaaee63a10fad4cdfbeba9def9ecae3feb). No vendor driver, DLL or application
 source is bundled. The permissive redistribution option is retained below;
