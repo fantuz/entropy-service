@@ -132,6 +132,9 @@ all Go tests, vet/lint, builds both executables and runs
 captures, certificate reuse, platform errors, plain stdout and console shutdown.
 Release publication waits for Linux/browser validation and native Windows checks.
 
+Pinned dictionaries are marked `-text` in `.gitattributes` so Windows Git checkout
+cannot convert their LF bytes to CRLF and break their SHA-256 integrity checks.
+
 Existing suffixes select Linux device/PTY tests. POSIX shell camera fixtures and
 mode-bit cases are explicitly skipped on Windows; native ACL tests cover its file
 policy. Missing symlink privilege skips only the relevant symlink test. Hardware

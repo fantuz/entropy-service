@@ -1,3 +1,4 @@
 
 # Published dictionary data: keep source changes visible in review.
-cmd/entropy-server/internal/wordlist/data/*.txt linguist-vendored
+# Hash-pinned bytes must survive Windows autocrlf unchanged.
+cmd/entropy-server/internal/wordlist/data/*.txt linguist-vendored -text

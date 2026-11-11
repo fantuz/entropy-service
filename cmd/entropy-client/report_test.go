@@ -394,7 +394,7 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	}
 
 	settings := decodeRecord[startRecord](t, records[0]).Settings
-	if !settings.Waterfall || settings.WaterfallMode != "rgb" || settings.WaterfallColumns != 128 || settings.WaterfallRows != 32 || settings.Color != "truecolor" || settings.Layout != "full" {
+	if settings.Waterfall != cfg.ShowWaterfall || settings.WaterfallMode != cfg.WaterfallMode || settings.WaterfallColumns != cfg.WaterfallColumns || settings.WaterfallRows != cfg.WaterfallRows || settings.Color != cfg.Color || settings.Layout != cfg.Layout {
 		t.Fatalf("display settings missing from metadata: %+v", settings)
 	}
 }

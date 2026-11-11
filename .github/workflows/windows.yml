@@ -12,6 +12,7 @@ jobs:
     runs-on: windows-2025
     env:
       CGO_ENABLED: "0"
+      PYTHONUTF8: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.0
@@ -21,6 +22,8 @@ jobs:
           go-version-file: go.mod
       - name: Verify module checksums
         run: go mod verify
+      - name: Verify byte-exact pinned wordlists after Windows checkout
+        run: python scripts/check-wordlists.py
       - name: Test shared code and Windows adapters
         run: go test -count=1 -timeout=5m ./...
       - name: Vet Windows code

@@ -97,6 +97,9 @@ func TestWriteoutFailuresAndPartialCounts(t *testing.T) {
 
 			sink := &fakeWriteout{closeErr: tc.closeErr}
 			if tc.short {
+				// The injected error ends the run. A narrow duration can expire
+				// before the first dial/write on a busy Windows runner.
+				cfg.Duration = 5 * time.Second
 				sink.write = func(context.Context, []byte) (int, error) { return 7, io.ErrShortWrite }
 			}
 
@@ -120,6 +123,7 @@ func TestWriteoutCancellationAndConcurrentError(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cancel.jsonl")
 		cfg := experimentConfig(modePull, serveExperiment(t, modePull), path)
 		cfg.WriteOut = true
+		cfg.Duration = 5 * time.Second // The first writer invocation cancels the run.
 		ctx, cancel := context.WithCancel(t.Context())
 		sink := &fakeWriteout{write: func(context.Context, []byte) (int, error) {
 			cancel()
