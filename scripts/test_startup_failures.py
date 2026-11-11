@@ -58,6 +58,9 @@ class StartupTests(unittest.TestCase):
             failed = json.loads(hardware("probe", "-device=/definitely-missing-qrng", "-json", code=1).stdout)
             self.assertFalse(failed["read_ok"])
             self.assertNotIn("actual_source", failed)
+            usb_failed = json.loads(hardware("probe", "-device=quantis-usb:127", "-json", code=1).stdout)
+            self.assertFalse(usb_failed["read_ok"])
+            self.assertNotIn("actual_source", usb_failed)
             hardware("probe", "-device=/dev/urandom", "-bytes=0", code=2)
             self.assertEqual(list(Path(directory).iterdir()), [])
 

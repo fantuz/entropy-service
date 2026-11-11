@@ -62,6 +62,13 @@ class WindowsSmoke(unittest.TestCase):
         self.assertFalse(missing["read_ok"])
         self.assertEqual(missing["bytes_accepted"], 0)
         self.assertNotIn("actual_source", missing)
+        for source in ["quantis-usb:127", "quantis-usb:-1"]:
+            missing = json.loads(invoke(SERVER, "hardware", "probe", f"-device={source}", "-json", code=1).stdout)
+            self.assertFalse(missing["read_ok"])
+            self.assertNotIn("actual_source", missing)
+            result = invoke(SERVER, f"-device={source}", "-cert-file=missing.pem", code=1,
+                            contains=b"use -device=quantis-usb:0")
+            self.assertNotIn(b"load TLS certificate", result.stderr)
 
     @classmethod
     def setUpClass(cls):

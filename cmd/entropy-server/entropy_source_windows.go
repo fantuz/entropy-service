@@ -18,6 +18,10 @@ const (
 )
 
 func openEntropySource(path string, require bool) (io.ReadCloser, string, error) {
+	if source, actual, selected, err := openUSBEntropySource(path); selected {
+		return source, actual, err
+	}
+
 	return selectWindowsEntropySource(path, require, func(index int) (io.ReadCloser, error) {
 		return quantis.Open(index)
 	})
@@ -39,7 +43,7 @@ func selectWindowsEntropySource(path string, require bool, openBoard func(int) (
 	}
 
 	if require {
-		return nil, "", errors.New("-require-device on Windows requires -device=quantis-pci:0")
+		return nil, "", errors.New("-require-device on Windows requires -device=quantis-pci:0 or quantis-usb:0")
 	}
 
 	if path != "" && path != DefaultCSPRNG {

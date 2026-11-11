@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/quantisusb"
 )
 
 const (
@@ -100,7 +101,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.CertFile, "cert-file", "cert.pem", "TLS certificate chain PEM file (provision your own; see generate-cert -help)")
 	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "TLS private key PEM file matching cert-file; keep owner-only")
 	flags.DurationVar(&cfg.SourceTimeout, "source-timeout", 3*time.Second, "Deadline for each complete startup/reseed read (1ms..5m); hardware must support nonblocking read deadlines")
-	flags.StringVar(&cfg.DevicePath, "device", defaultDeviceForOS(runtime.GOOS), "Seed source: Linux device path; Windows windows-csprng or experimental quantis-pci:0 (legacy PCI driver required)")
+	flags.StringVar(&cfg.DevicePath, "device", defaultDeviceForOS(runtime.GOOS), "Seed source: Linux device path; Windows windows-csprng or experimental quantis-pci:0; experimental quantis-usb:0 on Linux/Windows (see hardware list)")
 	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; barzakh-521-experimental requires -tags=experimental_barzakh")
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default /stream, /colors and /words WebSocket interval in milliseconds")
@@ -179,6 +180,18 @@ func defaultDeviceForOS(goos string) string {
 func (cfg *Config) ValidatePlatform() error { return cfg.validatePlatform(runtime.GOOS) }
 
 func (cfg *Config) validatePlatform(goos string) error {
+	if _, selected, err := quantisusb.ParseSelector(cfg.DevicePath); selected {
+		if err != nil {
+			return err
+		}
+
+		if (goos == "linux" || goos == windowsOS) && quantisusb.Available {
+			return nil
+		}
+
+		return errors.New("native Quantis USB is available on Linux amd64/arm/arm64 and Windows x64")
+	}
+
 	_, quantis, err := ParseQuantisPCI(cfg.DevicePath)
 	if err != nil {
 		return err
@@ -197,7 +210,7 @@ func (cfg *Config) validatePlatform(goos string) error {
 	}
 
 	if cfg.RequireDevice {
-		return errors.New("-require-device on Windows requires -device=quantis-pci:0; windows-csprng is an OS source")
+		return errors.New("-require-device on Windows requires -device=quantis-pci:0 or quantis-usb:0; windows-csprng is an OS source")
 	}
 
 	if cfg.DevicePath != "" && cfg.DevicePath != WindowsCSPRNG {

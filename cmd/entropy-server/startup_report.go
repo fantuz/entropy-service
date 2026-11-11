@@ -110,6 +110,8 @@ func reportSource(r *console.Report, requested, actual string) {
 	switch {
 	case actual == DefaultCSPRNG || actual == sourceOSFallback:
 		r.Value("Source type", "operating-system CSPRNG")
+	case isUSBEntropySource(actual):
+		r.Value("Source type", "experimental Quantis USB protocol; hardware quality not independently verified")
 	case windowsBuild:
 		r.Value("Source type", "experimental Quantis PCI driver; hardware quality not independently verified")
 	default:

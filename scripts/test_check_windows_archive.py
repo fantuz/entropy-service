@@ -44,6 +44,7 @@ class WindowsArchiveTests(unittest.TestCase):
             {"missing": "QUANTIS_NOTICES.txt"},
             {"missing": "quantis.md"},
             {"missing": "hardware-probe.md"},
+            {"missing": "quantis-usb.md"},
             {"missing": "entropy-client.exe"},
             {"machine": 0xaa64},
             {"extra": "../unexpected"},

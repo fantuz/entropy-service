@@ -50,6 +50,7 @@ func discoverLinux(sysRoot, devRoot string) (Inventory, error) {
 	}
 
 	slices.SortFunc(result.Devices, func(a, b Device) int { return strings.Compare(a.ID, b.ID) })
+	assignUSBSelectors(result.Devices, false)
 
 	return result, nil
 }
@@ -87,7 +88,7 @@ func linuxDevice(path, bus, devRoot string) (Device, bool) {
 			device.Paths = []string{filepath.Join(devRoot, "bus", "usb", fmt.Sprintf("%03d", busNumber), fmt.Sprintf("%03d", address))}
 		}
 
-		device.State = "usb_protocol_adapter_unavailable"
+		device.State = "usbfs_path_reported"
 		device.Notes = []string{"USB device nodes are not entropy byte streams; a control/bulk transport is required"}
 	}
 

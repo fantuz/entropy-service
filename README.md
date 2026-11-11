@@ -50,6 +50,9 @@ physical-card validation remains outstanding.
 Use [`entropy-server hardware list` and `hardware probe`](docs/hardware-probe.md)
 to inspect known devices and test an explicit source without starting the server.
 
+Experimental [Quantis USB seeding](docs/quantis-usb.md) uses native WinUSB on
+Windows x64 and usbfs on released Linux targets, without CGO or a vendor DLL.
+
 ```sh
 git clone https://github.com/fantuz/entropy-service.git
 cd entropy-service
