@@ -124,7 +124,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.BoolVar(&cfg.MixRDRAND, "rdrand-mix", false, "Supplement startup/reseed bytes with CPU RDRAND (requires amd64 CPU support)")
 	flags.BoolVar(&cfg.MixCPU, "cpu-mix", false, "Supplement startup/reseed bytes with RDSEED, falling back to RDRAND; takes precedence over -rdrand-mix")
 	flags.BoolVar(&cfg.ShowDebug, "debug", false, "print debug information")
-	flags.BoolVar(&cfg.WantsCookie, "cookie", false, "remember HTTP byte/word preferences in Secure, HttpOnly cookies (browser persistence requires HTTPS)")
+	flags.BoolVar(&cfg.WantsCookie, "cookie", false, "remember HTTP byte/word preferences and word language in Secure, HttpOnly cookies (browser persistence requires HTTPS)")
 
 	flags.Usage = func() {
 		fmt.Fprintln(output, "Entropy Server")

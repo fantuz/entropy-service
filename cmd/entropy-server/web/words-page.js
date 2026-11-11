@@ -63,14 +63,17 @@
             if (values.length > 1 || values.length === 1 && !values[0]) {
                 throw new Error("lang must be supplied once with a supported code; choose a language and Apply");
             }
-            let requested = (values.length ? values[0] : catalog.default).toLowerCase();
-            if (requested === "pt") requested = "pt-br";
+            let requested = (values.length ? values[0] : catalog.selected || catalog.default).toLowerCase();
+            const aliases = catalog.aliases || {};
+            if (Object.hasOwn(aliases, requested)) requested = aliases[requested].toLowerCase();
             language = catalog.languages.find(item => item.code.toLowerCase() === requested);
             if (!language) throw new Error("Unsupported word language; choose a language and Apply");
             select.value = language.code;
             words.setAttribute("lang", language.code);
+            words.setAttribute("dir", "auto");
             const mnemonic = language.kind === "bip39-word-data" ? " Dictionary only; samples are not wallet mnemonics." : "";
-            info.textContent = `${language.title} · ${language.size.toLocaleString()} entries · ${language.selection_bits_per_word.toFixed(2)} bits/word of uniform selection.${mnemonic}`;
+            const spelling = language.kind === "spelling-word-data" ? " Spelling dictionary subset; not curated as a passphrase list." : "";
+            info.textContent = `${language.title} · ${language.size.toLocaleString()} entries · ${language.selection_bits_per_word.toFixed(2)} bits/word of uniform selection.${mnemonic}${spelling}`;
             params.set("lang", language.code);
             ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/words?" + params.toString());
             ws.onopen = () => { if (!disposed) setStatus("waiting", "Awaiting first sample"); };

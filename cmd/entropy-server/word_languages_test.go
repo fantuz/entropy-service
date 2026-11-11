@@ -48,7 +48,7 @@ func TestWordLanguagesHTTPPages(t *testing.T) {
 			want := dictionary.Word(0) + " " + dictionary.Word(0)
 			digest := sha256.Sum256([]byte(want))
 
-			if w.Code != http.StatusOK || w.Header().Get("Content-Language") != info.Code || w.Header().Get("X-Wordlist-ID") != info.ID || w.Header().Get("X-Wordlist-Size") != strconv.Itoa(info.Size) {
+			if w.Code != http.StatusOK || w.Header().Get("Content-Language") != info.Code || w.Header().Get("X-Wordlist-Id") != info.ID || w.Header().Get("X-Wordlist-Size") != strconv.Itoa(info.Size) {
 				t.Fatalf("wrong HTTP language metadata: %d %v", w.Code, w.Header())
 			}
 
@@ -72,14 +72,14 @@ func TestWordLanguagesRejectBeforeAdmissionAndReads(t *testing.T) {
 
 		budget := newWebSocketBudget(0, 1)
 		w = httptest.NewRecorder()
-		wsWordsHandler(wordTestDRBG(t), 4, 1, budget)(w, r)
+		wsWordsHandler(wordTestDRBG(t), 4, 1, 1024, false, budget)(w, r)
 
 		if w.Code != http.StatusBadRequest || budget.usage().RejectedSize != 0 {
 			t.Fatalf("invalid WS lang reached admission: %s %d", query, w.Code)
 		}
 	}
 
-	for _, query := range []string{"", "lang=EN", "lang=pt", "lang=PT-br", "lang=ko"} {
+	for _, query := range []string{"", "lang=EN", "lang=pt", "lang=PT-br", "lang=ko", "lang=zh", "lang=ZH-CN", "lang=zh-TW", "lang=ta", "lang=ar"} {
 		if _, err := requestedWordList(query); err != nil {
 			t.Fatal(query, err)
 		}
@@ -89,7 +89,7 @@ func TestWordLanguagesRejectBeforeAdmissionAndReads(t *testing.T) {
 func TestWordLanguagesLiveWebSocketsAreIndependent(t *testing.T) {
 	budget := newWebSocketBudget(16, 16<<20)
 
-	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 4, 1, budget))
+	server := httptest.NewServer(wsWordsHandler(wordTestDRBG(t), 4, 1, 1024, false, budget))
 	defer server.Close()
 	defer waitBudgetActive(t, budget, 0)
 
@@ -145,20 +145,21 @@ func TestWordLanguagesLiveWebSocketsAreIndependent(t *testing.T) {
 
 func TestWordLanguageCatalogAndLegacyRedirect(t *testing.T) {
 	mux := http.NewServeMux()
-	registerWordUI(mux)
+	registerWordUI(mux, false)
 
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/wordlists.json", nil))
 
 	var catalog struct {
-		Default   string          `json:"default"`
-		Languages []wordlist.Info `json:"languages"`
+		Default   string            `json:"default"`
+		Languages []wordlist.Info   `json:"languages"`
+		Aliases   map[string]string `json:"aliases"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &catalog); err != nil {
 		t.Fatal(err)
 	}
 
-	if w.Code != http.StatusOK || catalog.Default != "en" || len(catalog.Languages) != 10 {
+	if w.Code != http.StatusOK || catalog.Default != "en" || len(catalog.Languages) != len(wordlist.Catalog()) || catalog.Aliases["zh-cn"] != "zh-Hans" || catalog.Aliases["zh-tw"] != "zh-Hant" {
 		t.Fatal("wrong catalog")
 	}
 
@@ -181,7 +182,7 @@ func TestWordLanguageCatalogAndLegacyRedirect(t *testing.T) {
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/wordlist-notices.txt", nil))
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Copyright (c) 2013-2016 Pavol Rusnak") || !strings.Contains(w.Body.String(), "Electronic Frontier Foundation") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Copyright (c) 2013-2016 Pavol Rusnak") || !strings.Contains(w.Body.String(), "Electronic Frontier Foundation") || !strings.Contains(w.Body.String(), "Madan Puraskar Pustakalaya") || !strings.Contains(w.Body.String(), "MOZILLA PUBLIC LICENSE") {
 		t.Fatal("wordlist attribution missing")
 	}
 }

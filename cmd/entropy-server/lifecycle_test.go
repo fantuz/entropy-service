@@ -34,7 +34,7 @@ func TestWebSocketShutdown(t *testing.T) {
 					case "/stream":
 						handler = wsBinaryHandler(&parent, 5, 64, 64, budget)
 					case "/words":
-						handler = wsWordsHandler(&parent, 3, 5, budget)
+						handler = wsWordsHandler(&parent, 3, 5, 1024, false, budget)
 					}
 
 					ctx, cancel := context.WithCancel(t.Context())

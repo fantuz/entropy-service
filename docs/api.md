@@ -20,7 +20,7 @@ The normal request method below is GET, except where another method is specified
 
 Sound defaults to 2500 ms and `bloom`, with 48 kHz, 16-bit mono output. It uses 64 random bytes to select synthesis parameters; the PCM samples are harmonic synthesis, not raw random bytes. Heatmaps illustrate byte patterns rather than certifying entropy quality. QR dimensions and encoded sample length are not configurable.
 
-Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. Ten pinned language dictionaries are embedded and loaded once; `lang` defaults to English. See [word languages and selection-space differences](word-languages.md).
+Explicit byte counts must be positive and at most `-max-bytes`; duplicate or invalid values return 400. Word counts must be within the configured word limit. Dictionary sampling is unbiased, with replacement: repeated words are valid. Eighteen pinned dictionaries are embedded and loaded once; `lang` defaults to English or a validated opt-in cookie preference. See [word languages and selection-space differences](word-languages.md).
 
 Both image routes accept one integer `size` between 64 and 1024, inclusive;
 invalid, duplicate or malformed image queries return 400 before generation
@@ -43,14 +43,15 @@ scratch, plus 16 bytes per pixel. The shared HTTP request/memory limits still
 apply. For example, `size=128` reserves about 1.31 MiB versus 17.06 MiB for
 the default resolution; this estimate is not a process RSS limit.
 
-With `-cookie=true`, `/v1/data/random` and the HTTP word pages remember
+With `-cookie=true`, `/v1/data/random`, the HTTP word pages and `/words` upgrades remember
 validated preferences in a host-only `entropy_prefs` cookie with `Secure`,
 `HttpOnly`, `SameSite=Lax`, `Path=/` and a one-day lifetime. Use HTTPS,
 directly or through a TLS-terminating reverse proxy, for persistence.
 Explicit query values take precedence. Fresh cookie-mode defaults are
 512 KiB and 3 words, bounded by server limits. A stored/query `refresh`
 preference does not override the HTTP word page's server-configured refresh
-interval. Cookies contain numeric preferences only, never entropy or an
+interval. Cookies encode numeric preferences and a canonical `lang` as Base64
+of UTF-8 JSON, never entropy or an
 authentication token, and are ignored when the option is disabled. See
 [cookie policy and examples](configuration.md#preference-cookies).
 
@@ -63,7 +64,7 @@ authentication token, and are ignored when the option is disabled. See
 | `/colors` | Same protocol as `/bytes`. | `bytes=2048`<br>`refresh=1500`<br>`format=json` |
 | `/words` | JSON fields: `words`, `hash`, `language`, `wordlist`. | `words=20`<br>`refresh=1500`<br>`lang=en` |
 
-For `/words`, the word default and limit follow `-words`. The response contains a space-separated word string, its SHA-256 over exact UTF-8 bytes, the canonical language and the pinned wordlist identifier. Supported language codes and list metadata are available at `/wordlists.json`; sizes differ by language. Missing `lang` means English; empty, unsupported or repeated values return 400. See [all ten languages, provenance and examples](word-languages.md).
+For `/words`, the word default and limit follow `-words`. The response contains a space-separated word string, its SHA-256 over exact UTF-8 bytes, the canonical language and the pinned wordlist identifier. Supported language codes, aliases and list metadata are available at `/wordlists.json`; sizes differ by language. Missing `lang` means English, or the validated remembered language with `-cookie=true`; empty, unsupported or repeated values return 400. See [all 18 dictionary choices, provenance and examples](word-languages.md).
 
 The table shows factory defaults; server flags can change the intervals. Request `refresh` values are integer milliseconds from 1 to 60000. `/words` rejects invalid or duplicate values; `/stream`, `/bytes` and `/colors` currently fall back to the configured interval for an invalid `refresh` value. The first message is sent on the first timer tick, not immediately on connection.
 

@@ -70,6 +70,7 @@ jobs:
       - name: Verify pinned wordlists and multilingual word controls
         run: |
           python3 scripts/check-wordlists.py
+          python3 -m unittest discover -s scripts -p 'test_check_wordlists.py'
           node scripts/test-word-languages.mjs
       - name: Test browser KPI calculations
         run: node scripts/test-status-kpis.mjs

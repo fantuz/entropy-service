@@ -14,7 +14,7 @@
         root.dataset.theme = dark ? "dark" : "light";
         for (const button of document.querySelectorAll("[data-theme-toggle]")) {
             button.hidden = false;
-            button.setAttribute("aria-pressed", String(dark));
+            button.textContent = dark ? "Light mode" : "Dark mode";
             button.title = `Switch to ${dark ? "light" : "dark"} mode`;
         }
         window.dispatchEvent(new Event("entropythemechange"));

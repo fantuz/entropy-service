@@ -34,7 +34,7 @@ func assertPreferenceCookie(t *testing.T, cookies []*http.Cookie) {
 func TestPreferenceCookiePolicyAndContents(t *testing.T) {
 	response := httptest.NewRecorder()
 
-	prefs := ClientPrefs{Bytes: 64, Words: 5, Refresh: 700}
+	prefs := ClientPrefs{Bytes: 64, Words: 5, Refresh: 700, Lang: "en"}
 	if err := setPrefsCookie(response, prefs); err != nil {
 		t.Fatal(err)
 	}
@@ -47,13 +47,13 @@ func TestPreferenceCookiePolicyAndContents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var fields map[string]int
+	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(fields) != 3 || fields["bytes"] != 64 || fields["words"] != 5 || fields["refresh"] != 700 {
-		t.Fatalf("cookie must contain only the numeric preferences: %s", raw)
+	if len(fields) != 4 || string(fields["bytes"]) != "64" || string(fields["words"]) != "5" || string(fields["refresh"]) != "700" || string(fields["lang"]) != `"en"` {
+		t.Fatalf("cookie must contain only numeric preferences and canonical language: %s", raw)
 	}
 }
 
@@ -65,6 +65,8 @@ func preferenceTestServer(t *testing.T, transport string, enabled bool) (*http.C
 	mux.HandleFunc("/v1/data/random", randomBytesHandler(observableTestDRBG(t), 1024, 8, enabled, budget))
 	mux.HandleFunc("/v1/meta/random", randomWordsHandler(new(wordTestSource), 8, 5000, 1024, enabled, budget))
 	mux.HandleFunc("/paroleparoleparole", randomWordsHandler(new(wordTestSource), 8, 5000, 1024, enabled, budget))
+	mux.HandleFunc("/words", wsWordsHandler(wordTestDRBG(t), 8, 1, 1024, enabled, newWebSocketBudget(8, 32<<20)))
+	registerWordUI(mux, enabled)
 
 	var server *httptest.Server
 
@@ -175,7 +177,7 @@ func TestPreferenceCookieRoundTrip(t *testing.T) {
 				for _, path := range []string{"/v1/meta/random", "/paroleparoleparole"} {
 					page, _ := preferenceGet(t, client, endpoint+path)
 
-					words := regexp.MustCompile(`<div class="words" lang="en">([^<]*)</div>`).FindSubmatch(page)
+					words := regexp.MustCompile(`<div class="words" lang="en" dir="auto">([^<]*)</div>`).FindSubmatch(page)
 					if len(words) != 2 || len(strings.Fields(string(words[1]))) != wantWords {
 						t.Fatalf("word preferences did not cross HTTP endpoints: %s", page)
 					}
@@ -206,20 +208,20 @@ func TestPreferenceCookieRoundTrip(t *testing.T) {
 func TestExtractPrefsTreatsCookiesAsUntrusted(t *testing.T) {
 	valid := base64.StdEncoding.EncodeToString([]byte(`{"bytes":64,"words":5,"refresh":700}`))
 
-	defaults := ClientPrefs{Bytes: 1024, Words: 3, Refresh: 500}
+	defaults := ClientPrefs{Bytes: 1024, Words: 3, Refresh: 500, Lang: "en"}
 	for _, tc := range []struct {
 		name, cookie, query string
 		enabled             bool
 		want                ClientPrefs
 	}{
 		{"missing", "", "", true, defaults},
-		{"valid", valid, "", true, ClientPrefs{Bytes: 64, Words: 5, Refresh: 700}},
-		{"disabled", valid, "", false, ClientPrefs{Bytes: 1024, Words: 8, Refresh: 500}},
+		{"valid", valid, "", true, ClientPrefs{Bytes: 64, Words: 5, Refresh: 700, Lang: "en"}},
+		{"disabled", valid, "", false, ClientPrefs{Bytes: 1024, Words: 8, Refresh: 500, Lang: "en"}},
 		{"malformed base64", "not-base64!", "", true, defaults},
 		{"malformed JSON", base64.StdEncoding.EncodeToString([]byte("{")), "", true, defaults},
 		{"out of bounds", base64.StdEncoding.EncodeToString([]byte(`{"bytes":1025,"words":9,"refresh":-1}`)), "", true, defaults},
-		{"partial", base64.StdEncoding.EncodeToString([]byte(`{"bytes":0,"words":5}`)), "", true, ClientPrefs{Bytes: 1024, Words: 5, Refresh: 500}},
-		{"query overrides", valid, "?bytes=32&words=2&refresh=900", true, ClientPrefs{Bytes: 32, Words: 2, Refresh: 900}},
+		{"partial", base64.StdEncoding.EncodeToString([]byte(`{"bytes":0,"words":5}`)), "", true, ClientPrefs{Bytes: 1024, Words: 5, Refresh: 500, Lang: "en"}},
+		{"query overrides", valid, "?bytes=32&words=2&refresh=900", true, ClientPrefs{Bytes: 32, Words: 2, Refresh: 900, Lang: "en"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/data/random"+tc.query, nil)

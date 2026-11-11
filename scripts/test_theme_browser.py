@@ -41,9 +41,24 @@ def main():
                         for path in PAGES:
                             page.goto(base + path)
                             expect(page.locator("html")).to_have_attribute("data-theme", theme)
-                            toggle = page.get_by_role("button", name="Dark mode", exact=True)
-                            expect(toggle).to_have_attribute("aria-pressed", str(theme == "dark").lower())
+                            toggle = page.locator("[data-theme-toggle]")
+                            expect(toggle).to_have_text("Light mode" if theme == "dark" else "Dark mode")
+                            expect(toggle).to_have_attribute("title", f"Switch to {'light' if theme == 'dark' else 'dark'} mode")
                             assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), (path, width)
+                            if path == "/":
+                                rows = page.locator(".websocket-grid > .card").evaluate_all(
+                                    "cards => cards.map(card => Math.round(card.getBoundingClientRect().top))")
+                                assert len(rows) == 5 and len(set(rows)) == (1 if width == 1440 else 5), rows
+                                if width == 1440:
+                                    for section, remainder in [("explore-title", 2), ("http-title", 1)]:
+                                        boxes = page.locator(f"section[aria-labelledby='{section}'] .grid > .card").evaluate_all(
+                                            "cards => cards.map(card => {const r=card.getBoundingClientRect(); return {x:r.x,right:r.right,top:r.top}})")
+                                        if remainder == 2:
+                                            assert abs(boxes[-2]["x"] - boxes[0]["x"]) < 1, boxes
+                                            assert abs(boxes[-1]["right"] - boxes[2]["right"]) < 1, boxes
+                                            assert boxes[-2]["top"] == boxes[-1]["top"], boxes
+                                        else:
+                                            assert abs(boxes[-1]["x"] - boxes[1]["x"]) < 1, boxes
                             if path in ["/api-sources.html", "/api-socket.html"]:
                                 assert "Experimental" not in page.title()
                                 help_sections = page.locator(".lab-help details")
@@ -66,8 +81,15 @@ def main():
 
                 context = browser.new_context(color_scheme="dark")
                 page = context.new_page()
+                page.goto(base + "/")
+                toggle = page.locator("[data-theme-toggle]")
+                expect(toggle).to_have_text("Light mode")
+                toggle.click()
+                expect(toggle).to_have_text("Dark mode")
+                toggle.click()
+                expect(toggle).to_have_text("Light mode")
                 page.goto(base + "/api-sources.html")
-                page.get_by_role("button", name="Dark mode", exact=True).click()
+                page.locator("[data-theme-toggle]").click()
                 page.get_by_role("link", name="Socket lab", exact=True).first.click()
                 expect(page.locator("html")).to_have_attribute("data-theme", "light")
                 page.reload()
@@ -80,7 +102,7 @@ def main():
                 expect(page.locator("#entropy")).not_to_have_text("—")
                 for theme in ["light", "dark"]:
                     if page.locator("html").get_attribute("data-theme") != theme:
-                        page.get_by_role("button", name="Dark mode", exact=True).click()
+                        page.locator("[data-theme-toggle]").click()
                     wait_paint(page)
                     colors = page.evaluate("""() => {
                         const style = getComputedStyle(document.documentElement);
@@ -96,7 +118,7 @@ def main():
                     page.screenshot(path=str(args.artifacts / f"source-sample-{theme}.png"))
                 second = context.new_page()
                 second.goto(base + "/api-socket.html")
-                second.get_by_role("button", name="Dark mode", exact=True).click()
+                second.locator("[data-theme-toggle]").click()
                 expect(page.locator("html")).to_have_attribute("data-theme", "light")
                 context.close()
 
@@ -104,7 +126,7 @@ def main():
                 context.add_init_script("Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('disabled','SecurityError')}})")
                 page = context.new_page()
                 page.goto(base + "/api-socket.html")
-                page.get_by_role("button", name="Dark mode", exact=True).click()
+                page.locator("[data-theme-toggle]").click()
                 expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                 context.close()
                 browser.close()

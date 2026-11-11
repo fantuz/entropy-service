@@ -43,7 +43,7 @@ func TestWebSocketsUsePrivateGenerators(t *testing.T) {
 				case "/stream":
 					handler = wsBinaryHandler(&parent, 1, 64, 64, newWebSocketBudget(128, 1<<30))
 				case "/words":
-					handler = wsWordsHandler(&parent, 3, 1, newWebSocketBudget(128, 1<<30))
+					handler = wsWordsHandler(&parent, 3, 1, 1024, false, newWebSocketBudget(128, 1<<30))
 				}
 
 				done := make(chan struct{}, 2)

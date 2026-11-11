@@ -58,7 +58,7 @@ See [construction, provenance and patent limitations](experimental-barzakh.md).
 | `-lab-allow-remote` | `false` | Permit non-loopback clients to use registered lab bridges. |
 | `-lab-max-connections` | `8` | Separate simultaneous bridge limit. |
 | `-lab-memory-mib` | `32` | Separate estimated bridge working-memory budget; not RSS. |
-| `-cookie` | `false` | Remember byte/word preferences in Secure, HttpOnly cookies; use HTTPS for browser persistence. |
+| `-cookie` | `false` | Remember byte/word preferences and word language in Secure, HttpOnly cookies; use HTTPS for browser persistence. |
 | `-ws-max-connections` | `128` | Shared WS connection limit. |
 | `-ws-memory-mib` | `1024` | Shared WS estimated memory budget in MiB. |
 | `-http-max-requests` | `128` | Separate HTTP work limit. |
@@ -98,11 +98,43 @@ The systemd package overrides standalone defaults: it is **not enabled or starte
 ### Preference cookies
 
 Cookies remain **opt-in** with `-cookie=true`. They remember byte and word
-counts for `/v1/data/random`, `/v1/meta/random` and `/paroleparoleparole`.
+counts and word language for `/v1/data/random`, `/v1/meta/random` and
+`/paroleparoleparole`. A successful `/words` WebSocket upgrade also saves the
+canonical language, making the browser word selector remember its last choice.
 The existing format also retains a numeric `refresh` field, which does not
 control the HTTP word page's refresh interval. Cookies contain no generated
-random bytes, credentials or authentication/session token. WebSocket routes
-and the other browser demos continue to use their explicit settings.
+random bytes, credentials or authentication/session token. `/words` uses the
+remembered language when `lang` is absent; WebSocket word count and pacing
+still use their explicit query values or server defaults. Other WebSocket
+routes and browser demos continue to use their explicit settings.
+
+The encoding schema is **standard Base64 of UTF-8 JSON**, for example:
+
+```json
+{"bytes":65536,"refresh":500,"words":6,"lang":"ar"}
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `bytes` | Positive integer | HTTP byte count, bounded by `-max-bytes`. |
+| `refresh` | Positive integer | Retained millisecond preference; does not change the HTTP word-page interval. |
+| `words` | Positive integer | HTTP word count, bounded by `-words`. |
+| `lang` | String | Canonical dictionary code, such as `ru`, `ar` or `zh-Hant`. |
+
+Base64 is encoding, **not encryption or a signature**. Clients can decode or
+alter it; the server treats it as untrusted input and revalidates every value.
+Older cookies with only the three numeric fields remain valid and default to
+English. Unknown, empty or invalid stored language codes fall back to English;
+valid aliases are canonicalized. An explicit invalid `lang` query returns 400
+instead of using the cookie. Oversized cookie values (over 4,096 bytes), invalid
+Base64, malformed JSON or wrong field types are ignored.
+
+Appearance uses a separate browser setting, **not a cookie**:
+`localStorage["entropy-theme"]` holds the plain string `"light"` or `"dark"`.
+It is scoped to the browser origin (scheme, host and port), has no automatic
+expiry and synchronizes between tabs. With no valid stored value, appearance
+follows the operating system. Generated entropy is never stored in either
+preference mechanism.
 
 The `entropy_prefs` cookie is host-only (`Domain` omitted), uses `Path=/`,
 `Secure`, `HttpOnly` and `SameSite=Lax`, and has a one-day `Max-Age`, renewed
@@ -125,9 +157,14 @@ The cookie is unsigned, untrusted preference input: it never increases
 `-max-bytes` or `-words`, bypasses admission budgets or authenticates a
 caller. Fresh cookie-mode defaults remain 512 KiB and 3 words, capped by
 server limits. Stored `refresh` does not change the server-configured HTTP
-word page refresh interval. Invalid/rejected requests and failed generator
-setup do not save preferences; a later response-write failure can occur
-after cookie headers have already been sent.
+word page refresh interval. Rejected HTTP requests, failed HTTP generator
+setup and rejected WebSocket upgrades do not save preferences. A successful
+WebSocket upgrade saves settings before streaming starts; a later generation,
+connection or response-write failure can occur after cookie headers were sent.
+The cookie is host-scoped, so unlike localStorage it is shared across HTTPS
+ports on the same host. With cookies enabled, `/wordlists.json` reports the
+validated `selected` language using `private, no-store` and `Vary: Cookie`;
+reading that catalog never writes a cookie.
 
 For example, start the HTTPS server with a certificate trusted for
 `localhost` and opt in:
@@ -145,6 +182,17 @@ curl --fail --cacert /path/to/cert.pem --cookie prefs.txt \
 ```
 
 Both files are 65,536 bytes and contain separately generated responses.
+To remember a word language, request a word page with `lang`, or select it
+and Apply in `/words.html`:
+
+```sh
+curl --fail --cacert /path/to/cert.pem --cookie-jar prefs.txt \
+  'https://localhost:8443/v1/meta/random?lang=ru&words=8'
+curl --fail --cacert /path/to/cert.pem --cookie prefs.txt \
+  'https://localhost:8443/v1/meta/random'
+```
+
+Both word responses use Russian; a later explicit `lang=ar` overrides it.
 Omit `-cookie` or use `-cookie=false` for stateless operation: the server
 ignores incoming preference cookies and emits none. To remove previously
 stored preferences, clear this site's cookies in the browser or delete the

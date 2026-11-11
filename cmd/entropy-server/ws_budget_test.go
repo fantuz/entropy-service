@@ -31,7 +31,7 @@ func budgetTestServer(t *testing.T, budget *webSocketBudget, secure bool) *httpt
 	mux.HandleFunc("/stream", wsBinaryHandler(&parent, 60000, 64, 1<<25, budget))
 	mux.HandleFunc("/bytes", wsBytesHandler(&parent, 60000, 1<<25, budget))
 	mux.HandleFunc("/colors", wsBytesHandler(&parent, 60000, 1<<25, budget))
-	mux.HandleFunc("/words", wsWordsHandler(&parent, 20, 60000, budget))
+	mux.HandleFunc("/words", wsWordsHandler(&parent, 20, 60000, 1024, false, budget))
 	mux.HandleFunc("/metrics", metricsHandler(&parent, time.Hour, budget, newHTTPRequestBudget(128, 512<<20)))
 
 	server := httptest.NewUnstartedServer(mux)
@@ -325,7 +325,7 @@ func TestWebSocketWordReservationCannotOverflow(t *testing.T) {
 	budget := newWebSocketBudget(128, 1<<30)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/words?words="+strconv.Itoa(maxWords), nil)
-	wsWordsHandler(nil, maxWords, 60000, budget)(response, request)
+	wsWordsHandler(nil, maxWords, 60000, 1024, false, budget)(response, request)
 
 	if response.Code != http.StatusRequestEntityTooLarge || budget.usage().Reserved != 0 {
 		t.Fatalf("large word request bypassed accounting: %d, %+v", response.Code, budget.usage())

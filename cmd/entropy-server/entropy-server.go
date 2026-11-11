@@ -32,6 +32,7 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/metrics"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/transport"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/wordlist"
 )
 
 //go:embed web
@@ -41,9 +42,10 @@ var webFS embed.FS
 var appVersion = "dev"
 
 type ClientPrefs struct {
-	Bytes   int `json:"bytes"`
-	Refresh int `json:"refresh"`
-	Words   int `json:"words"`
+	Bytes   int    `json:"bytes"`
+	Refresh int    `json:"refresh"`
+	Words   int    `json:"words"`
+	Lang    string `json:"lang,omitempty"`
 }
 
 type EntropySource interface {
@@ -98,21 +100,9 @@ func ActiveInstances() int64 {
 const preferenceCookieName = "entropy_prefs"
 
 func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
-	data, err := json.Marshal(prefs)
+	cookie, err := newPrefsCookie(prefs)
 	if err != nil {
 		return err
-	}
-
-	// Always protect browser transport, including when TLS terminates at a
-	// reverse proxy. Request headers must not downgrade this policy.
-	cookie := &http.Cookie{
-		Name:     preferenceCookieName,
-		Value:    base64.StdEncoding.EncodeToString(data),
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400, // 1 day
 	}
 
 	http.SetCookie(w, cookie)
@@ -120,10 +110,33 @@ func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {
 	return nil
 }
 
+func newPrefsCookie(prefs ClientPrefs) (*http.Cookie, error) {
+	data, err := json.Marshal(prefs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Always protect browser transport, including when TLS terminates at a
+	// reverse proxy. Request headers must not downgrade this policy.
+	return &http.Cookie{
+		Name:     preferenceCookieName,
+		Value:    base64.StdEncoding.EncodeToString(data),
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400, // 1 day
+	}, nil
+}
+
 func getPrefsCookie(r *http.Request) (*ClientPrefs, error) {
 	c, err := r.Cookie(preferenceCookieName)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(c.Value) > 4096 {
+		return nil, errors.New("preference cookie is too large")
 	}
 
 	raw, err := base64.StdEncoding.DecodeString(c.Value)
@@ -195,10 +208,16 @@ func extractByteCount(r *http.Request, defaultBytes, maxBytes int) (int, error) 
 }
 
 func extractPrefs(r *http.Request, maxBytes, maxWords int, hasCookie bool) (ClientPrefs, error) {
+	dictionary, err := preferredWordList(r, hasCookie)
+	if err != nil {
+		return ClientPrefs{}, err
+	}
+
 	prefs := ClientPrefs{
 		Bytes:   min(2097152, maxBytes),
 		Refresh: 500,
 		Words:   maxWords,
+		Lang:    dictionary.Info().Code,
 	}
 
 	if hasCookie {
@@ -219,8 +238,6 @@ func extractPrefs(r *http.Request, maxBytes, maxWords int, hasCookie bool) (Clie
 			}
 		}
 	}
-
-	var err error
 
 	prefs.Bytes, err = extractByteCount(r, prefs.Bytes, maxBytes)
 	if err != nil {
@@ -382,9 +399,9 @@ func randomHandler(d *drbg.DRBG, maxBytes int, budget *httpRequestBudget) http.H
 	}
 }
 
-func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webSocketBudget) http.HandlerFunc {
+func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, maxBytes int, hasCookie bool, budget *webSocketBudget) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		dictionary, err := requestedWordList(r.URL.RawQuery)
+		dictionary, err := preferredWordList(r, hasCookie)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -423,13 +440,33 @@ func wsWordsHandler(d *drbg.DRBG, maxWords int, defaultRefresh int, budget *webS
 			*field.dst = v
 		}
 
+		var headers http.Header
+
+		if hasCookie {
+			prefs, err := extractPrefs(r, maxBytes, maxWords, true)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			cookie, err := newPrefsCookie(prefs)
+			if err != nil {
+				http.Error(w, "could not encode preferences", http.StatusInternalServerError)
+				return
+			}
+
+			headers = http.Header{"Set-Cookie": {cookie.String()}}
+		}
+
 		release, admitted := budget.admit(w, r, wsReservation(quantity, budget.wordMemory))
 		if !admitted {
 			return
 		}
 		defer release()
 
-		conn, err := upgrader.Upgrade(w, r, nil)
+		// Only a successful upgrade saves the language. Failed upgrades and
+		// admission rejections must not persist request preferences.
+		conn, err := upgrader.Upgrade(w, r, headers)
 		if err != nil {
 			log.Printf("ws upgrade failed (wsWordsHandler): %v", err)
 
@@ -487,11 +524,11 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-word-response">
-<nav class="site-toolbar" aria-label="Site and appearance"><a href="/">Entropy Service</a><button type="button" data-theme-toggle aria-pressed="false" hidden>Dark mode</button></nav>
+<nav class="site-toolbar" aria-label="Site and appearance"><a href="/">Entropy Service</a><button type="button" data-theme-toggle hidden>Dark mode</button></nav>
 <main class="panel">
 <h1>Random Words</h1>
 <p>{{.LanguageName}} · {{.ListSize}} entries · {{.Bits}} bits/word of uniform selection</p>
-<div class="words" lang="{{.Language}}">{{.Words}}</div>
+<div class="words" lang="{{.Language}}" dir="auto">{{.Words}}</div>
 <div class="hash">{{.Hash}}</div>
 </main>
 </body>
@@ -499,18 +536,14 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 `))
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		dictionary, err := requestedWordList(r.URL.RawQuery)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
 		prefs, err := extractPrefs(r, maxBytes, quantity, hasCookie)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 
 			return
 		}
+
+		dictionary, _ := wordlist.Lookup(prefs.Lang)
 
 		release, ok := budget.admit(w, r, httpReservation(prefs.Words, budget.wordMemory))
 		if !ok {
@@ -554,7 +587,7 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 		}
 
 		w.Header().Set("Content-Language", frame.Language)
-		w.Header().Set("X-Wordlist-ID", frame.Wordlist)
+		w.Header().Set("X-Wordlist-Id", frame.Wordlist)
 		w.Header().Set("X-Wordlist-Size", strconv.Itoa(dictionary.Size()))
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1217,7 +1250,7 @@ func main() {
 	}
 
 	mux.Handle("/", http.FileServer(http.FS(webRoot)))
-	registerWordUI(mux)
+	registerWordUI(mux, cfg.WantsCookie)
 
 	mux.HandleFunc("/live", livenessHandler)
 	mux.HandleFunc("/ready", healthHandler(&root, maxReseedAge))

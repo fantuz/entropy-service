@@ -38,9 +38,11 @@ for (const [options, want] of [
     const p = page(options);
     assert.equal(p.initial, want, "apply saved/system appearance before styles load");
     assert.equal(p.theme(), want);
-    assert.equal(p.attributes.get("aria-pressed"), String(want === "dark"));
+    assert.equal(p.button.textContent, want === "dark" ? "Light mode" : "Dark mode");
+    assert.equal(p.button.title, `Switch to ${want === "dark" ? "light" : "dark"} mode`);
     p.click();
     assert.equal(p.theme(), want === "dark" ? "light" : "dark");
+    assert.equal(p.button.textContent, want === "dark" ? "Dark mode" : "Light mode");
     if (!options.blocked) assert.equal(p.stored(), p.theme());
     assert.ok(p.changes() >= 3, "notify canvas consumers without reloading");
 }
@@ -48,6 +50,9 @@ const p = page();
 p.system(true); assert.equal(p.theme(), "dark");
 p.click(); p.system(false); p.system(true); assert.equal(p.theme(), "light", "explicit choice overrides later OS changes");
 p.storage("dark"); assert.equal(p.theme(), "dark");
+assert.equal(p.button.textContent, "Light mode");
+p.storage("light"); assert.equal(p.button.textContent, "Dark mode");
+p.storage("dark");
 p.storage("light", "unrelated-key"); assert.equal(p.theme(), "dark");
 p.storage(null, null); assert.equal(p.theme(), "dark", "cleared preferences fall back to current OS choice");
 

@@ -11,12 +11,18 @@ stylesheet and small appearance controller. The standard light view and dark
 view share typography, spacing, controls, borders and status colors. There
 are no external fonts, UI libraries or additional analysis features.
 
-The **Dark mode** button in the top toolbar switches appearance. The initial
+The **Dark mode** / **Light mode** button in the top toolbar names the appearance
+it will switch to, updating its visible label and tooltip together. The initial
 choice follows the operating system; a manual choice is saved for this browser
 and server origin and applied before the stylesheet paints. It survives
 navigation and reloads and synchronizes between tabs. If browser storage is
 disabled, the switch still works for the current page. OS changes are followed
 until a manual choice is made.
+
+On desktop, the homepage's five live WebSocket cards share one row. In its
+three-column sections, a lone final card is centered; two final cards use the
+left and right columns. Tablet and phone layouts retain their responsive
+two-column and single-column arrangements.
 
 Plot labels, guides and bit-balance colors follow the theme, including frozen
 samples. Raw RGB, grayscale, bit views, histogram values and statistical

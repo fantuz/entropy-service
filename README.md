@@ -162,7 +162,7 @@ See [certificate generation, startup provisioning and migration](docs/tls-certif
 
 Use `https://` and `wss://` for remote consumers. Configure authentication and access controls at the deployment boundary: the service has no built-in client authentication. The WebSocket upgrader uses Gorilla's default same-host browser origin policy; requests without an `Origin` header may still be admitted. Origin validation is not authentication. HTTP/2 is not enabled in the current listener setup.
 
-To remember byte/word preferences in a browser or a client's cookie jar, add
+To remember byte/word preferences and word language in a browser or a client's cookie jar, add
 `-cookie=true` and use the HTTPS API URLs. Preference cookies are always
 `Secure`, `HttpOnly` and `SameSite=Lax`; cookies remain disabled by default.
 See [cookie policy and a curl example](docs/configuration.md#preference-cookies).
@@ -280,7 +280,7 @@ The homepage at `/` is the interactive entry point. Common API routes include:
 
 The stream and upload labs share analysis windows up to 1 MiB, FFTs up to 65,536 points, labelled plots, paused byte inspection, optional bit-position rates and a historical colour waterfall, with desktop/mobile layouts. The [file workspace](docs/browser-ui.md#shared-file-analysis-workspace) adds bounded local seeking/playback while preserving server upload analysis and full-file SHA-256. See [controls and mathematics](docs/browser-ui.md#stream-analysis-shared-window-and-controls). Normal shutdown prints a [served-traffic executive summary](docs/operations.md#shutdown-executive-summary).
 
-Random-word endpoints support ten languages through `lang=CODE`; English remains the default. The browser offers a language selector. See [dictionary sources, selection space and examples](docs/word-languages.md).
+Random-word endpoints offer 18 dictionary choices across 17 languages through `lang=CODE`, including Russian, Afrikaans, Turkish, Tamil, Nepali, Arabic and both Chinese scripts; English remains the default. The browser offers a language selector, remembered when `-cookie=true`. See [dictionary sources, selection space and examples](docs/word-languages.md).
 
 Interactive demonstrations live at `/api-bytes.html`, `/api-stream.html`, `/api-words.html`, `/api-colors.html`, `/api-sound.html`, `/api-upload.html`, `/api-sources.html` and `/api-socket.html`. They are **browser pages**, not API version prefixes.
 
