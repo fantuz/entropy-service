@@ -141,7 +141,7 @@ including in headless runs. They do not indicate that a display was
 allocated or that a particular terminal capability was detected. Raw
 waterfall bytes are never included in reports.
 
-`settings.layout` records `auto`, `compact` or `full`. Zero waterfall dimensions
+`settings.layout` records `auto`, `compact`, `full` or `waterfall`. Zero waterfall dimensions
 mean automatic fitting. Effective layout depends on the interactive terminal;
 these requests do not change sample selection or statistics. Use headless
 reports for throughput experiments so terminal output does not dominate I/O.

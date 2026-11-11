@@ -4,6 +4,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 )
 
 func TestDisplayFlags(t *testing.T) {
@@ -40,9 +42,9 @@ func TestDisplayValidation(t *testing.T) {
 		{"color", func(c *Config) { c.Color = "rainbow" }},
 		{"mode", func(c *Config) { c.WaterfallMode = "rgba" }},
 		{"columns-low", func(c *Config) { c.WaterfallColumns = 7 }},
-		{"columns-high", func(c *Config) { c.WaterfallColumns = 257 }},
+		{"columns-high", func(c *Config) { c.WaterfallColumns = diag.MaxWaterfallColumns + 1 }},
 		{"rows-low", func(c *Config) { c.WaterfallRows = -1 }},
-		{"rows-high", func(c *Config) { c.WaterfallRows = 65 }},
+		{"rows-high", func(c *Config) { c.WaterfallRows = diag.MaxWaterfallRows + 1 }},
 		{"layout", func(c *Config) { c.Layout = "huge" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -65,18 +67,29 @@ func TestDisplayValidation(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cfg.WaterfallColumns, cfg.WaterfallRows = 256, 64
+			cfg.WaterfallColumns, cfg.WaterfallRows = diag.MaxWaterfallColumns, diag.MaxWaterfallRows
 			if err := cfg.ValidateAnalysis(); err != nil {
 				t.Fatal(err)
 			}
 
 			cfg.WaterfallColumns, cfg.WaterfallRows = 0, 0
-			for _, layout := range []string{"auto", "compact", "full"} {
+			for _, layout := range []string{"auto", "compact", "full", "waterfall"} {
 				cfg.Layout = layout
 				if err := cfg.ValidateAnalysis(); err != nil {
 					t.Fatal(err)
 				}
 			}
 		}
+	}
+}
+
+func TestWaterfallLayoutEnablesWaterfall(t *testing.T) {
+	cfg, err := parseConfig([]string{"-layout=waterfall", "-waterfall-columns=512", "-waterfall-rows=512"}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cfg.ValidateAnalysis(); err != nil || !cfg.ShowWaterfall {
+		t.Fatalf("waterfall layout did not enable its display: %+v, %v", cfg, err)
 	}
 }

@@ -89,10 +89,10 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
 	flags.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
 	flags.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
-	flags.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..256; two terminal columns per cell)")
-	flags.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..64; newest first)")
+	flags.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..512; two terminal columns per cell)")
+	flags.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..512; newest first)")
 	flags.StringVar(&cfg.Color, "color", "auto", "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
-	flags.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full; auto uses panels on large interactive terminals")
+	flags.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full|waterfall; waterfall fills the viewport with one status line")
 
 	flags.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
 	flags.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
@@ -130,6 +130,10 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		return nil, err
 	}
 
+	if cfg.Layout == terminal.LayoutWaterfall {
+		cfg.ShowWaterfall = true
+	}
+
 	return cfg, nil
 }
 
@@ -146,8 +150,8 @@ func (cfg *Config) ValidateAnalysis() error {
 		return err
 	}
 
-	if cfg.Layout != "" && cfg.Layout != terminal.LayoutAuto && cfg.Layout != terminal.LayoutCompact && cfg.Layout != terminal.LayoutFull {
-		return errors.New("layout must be auto, compact or full")
+	if cfg.Layout != "" && cfg.Layout != terminal.LayoutAuto && cfg.Layout != terminal.LayoutCompact && cfg.Layout != terminal.LayoutFull && cfg.Layout != terminal.LayoutWaterfall {
+		return errors.New("layout must be auto, compact, full or waterfall")
 	}
 
 	if !terminal.ValidColor(cfg.Color) {
@@ -159,11 +163,11 @@ func (cfg *Config) ValidateAnalysis() error {
 	}
 
 	if cfg.WaterfallColumns != 0 && (cfg.WaterfallColumns < 8 || cfg.WaterfallColumns > diag.MaxWaterfallColumns) {
-		return errors.New("waterfall-columns must be 0 (auto) or between 8 and 256")
+		return errors.New("waterfall-columns must be 0 (auto) or between 8 and 512")
 	}
 
 	if cfg.WaterfallRows < 0 || cfg.WaterfallRows > diag.MaxWaterfallRows {
-		return errors.New("waterfall-rows must be between 0 (auto) and 64")
+		return errors.New("waterfall-rows must be between 0 (auto) and 512")
 	}
 
 	if math.IsNaN(cfg.ShannonThreshold) || math.IsInf(cfg.ShannonThreshold, 0) || cfg.ShannonThreshold < 0 || cfg.ShannonThreshold > 8 {

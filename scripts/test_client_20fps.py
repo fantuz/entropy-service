@@ -19,7 +19,8 @@ def main():
     base = [client, "-mode=pull", f"-url=http://127.0.0.1:{server.server_port}/data",
             "-slice=4096", "-refresh=10ms", "-analysis-interval=50ms", "-duration=1200ms", "-color=never"]
     try:
-        for layout, columns, rows, interval in [("compact", 80, 24, "1ms"), ("full", 160, 45, "50ms")]:
+        for layout, columns, rows, interval in [("compact", 80, 24, "1ms"), ("full", 160, 45, "50ms"),
+                                                ("waterfall", 80, 24, "50ms")]:
             output = capture_pty(base + [f"-layout={layout}", f"-display-interval={interval}"], environment, columns, rows)
             screens = monitor_screens(output)
             # Wide headroom for scheduling jitter, while detecting the old

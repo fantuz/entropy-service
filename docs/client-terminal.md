@@ -15,6 +15,10 @@ available horizontal space while preserving a compact alternative.
 
 # Keep stacked output at every terminal size.
 ./bin/entropy-client -mode=stream -layout=compact -dashboard -waterfall
+
+# Waterfall only: one status line, all remaining usable rows for samples.
+./bin/entropy-client -mode=stream -layout=waterfall \
+  -refresh=50ms -analysis-interval=50ms -display-interval=50ms
 ```
 
 ## Selection and presentation
@@ -24,12 +28,28 @@ available horizontal space while preserving a compact alternative.
 | `auto` (default) | Full panels on supported interactive terminals at least 120×30; compact otherwise. |
 | `full` | Request panels down to 80×24; smaller/unknown/noninteractive terminals still use compact output. |
 | `compact` | Stacked diagnostics and optional panels at every size. |
+| `waterfall` | Waterfall cells with only throughput, Shannon entropy, threshold and assessment on the first line. Enables `-waterfall` automatically; supports wide, tall and odd-width interactive terminals. |
 
 Linux terminal dimensions are read on every redraw. Resizing changes the
 visible area of retained history and switches automatic layouts on the next
 redraw. Ctrl+C retains graceful shutdown. No raw keyboard mode, alternate
 screen or UI library is used; the terminal profile owns the background and
 default text colors. `-color` and `NO_COLOR` retain their existing meanings.
+
+Waterfall-only mode uses the same byte-hue, RGB and grayscale mappings as the
+other layouts. Its first line reports average received throughput over the run
+in MiB/s, the last selected sample's Shannon entropy in bits/byte, the configured
+minimum, and `OK`/`WARN`. Before analysis it shows `--` and `NO_SAMPLE`. Narrow
+terminals abbreviate the labels to `RX`, `H` and `min`; extremely narrow headers
+clip with `~`. There are no panel titles, frame numbers, offsets or footer.
+Each remaining usable row is one selected sample, newest first. History fills
+as samples arrive; missing history and missing sample bytes stay blank.
+
+Graph, dashboard and preview histories are not allocated in this mode, even if
+their display flags are supplied. Diagnostics, reports, exports and reception
+still follow their existing settings. The layout itself does not increase
+sampling or redraw rates: the example explicitly requests up to 20 selected
+samples and redraws per second. The default analysis interval remains 250 ms.
 
 Full view places sample/reception data and analysis/display settings on the
 left, sampled histories and the existing byte histogram on the right, and
@@ -55,14 +75,14 @@ dimensions are honored; omit them or set zero for automatic fitting.
 
 | Resource/setting | Bound or behavior |
 | --- | --- |
-| Full viewport | At most 320 columns × 96 rows; additional terminal space is intentionally unused. |
-| Interactive terminal redraw | At most 20 Hz (50 ms) in compact, auto and full layouts; the default one-second interval is unchanged. Reception and analysis cadence are independent. Redirected output retains its requested interval. |
+| Full viewport | At most 1024 columns × 512 rows in full/auto panels and waterfall-only mode. Width and height are independent: no fixed aspect ratio. One bottom row remains free to prevent scrolling. |
+| Interactive terminal redraw | At most 20 Hz (50 ms) in all layouts; the default one-second interval is unchanged. Reception and analysis cadence are independent. Redirected output retains its requested interval. |
 | Statistic histories | At most 256 selected points; compact displays up to 60 recent points, reduced further on narrow terminals. |
-| Waterfall | Up to 256 cells × 64 samples; compact automatic presentation remains 32 cells × 8 visible rows. Full view fits available space. |
-| Retained waterfall payload | At most 49,152 bytes (48 KiB) in RGB mode, plus bounded metadata/graph arrays. Rendered strings and Go heap overhead are additional. |
-| Automatic dimensions | New defaults: `-waterfall-columns=0 -waterfall-rows=0`. Positive limits: columns 8–256, rows 1–64. Auto-capable sessions retain larger bounded prefixes/history for later enlargement. |
+| Waterfall | Up to 512 cells × 512 samples; compact automatic presentation remains 32 cells × 8 visible rows. Full view fits available space. Cells use two columns; odd terminal widths leave one blank trailing column. |
+| Retained waterfall payload | At most 786,432 bytes (768 KiB) in RGB mode, plus bounded metadata/graph arrays. Rendered strings and Go heap overhead are additional. |
+| Automatic dimensions | Defaults: `-waterfall-columns=0 -waterfall-rows=0`. Positive limits: columns 8–512, rows 1–512. Auto-capable sessions retain bounded prefixes/history for later enlargement. Explicit positive limits still limit visible cells/history. |
 | JSONL | Additive `settings.layout`; zero dimensions record automatic requests, not effective rendered dimensions. Statistics and sample selection are unchanged. |
-| Headless/pipes | No headless display histories; `-headless -report=- -layout=full` remains JSONL. Pipes, unknown dimensions and `TERM=dumb` never receive a cursor-based full view, even with forced colors. |
+| Headless/pipes | No headless display histories; `-headless -report=- -layout=waterfall` remains JSONL. Pipes, unknown dimensions and `TERM=dumb` use plain stacked output, even with forced colors. Waterfall-only rendering requires at least 2 columns × 3 rows. |
 | Platform | Linux sizing is validated. Other platforms retain their existing unknown-size/unstyled fallback; cross-building does not validate terminal behavior on those systems. |
 
 ## Trade-offs and criticism
@@ -74,6 +94,14 @@ bounded transport queues apply backpressure rather than silently discarding
 received frames for animation. Use headless reports for load measurements.
 On slow SSH links, reduce visible history, choose 256 colors, lengthen
 `-display-interval`, or choose compact mode.
+
+The expanded cap supports large desktops and unusual terminal proportions while
+keeping retained data and rendering dimensions bounded. It is a ceiling, not a
+target size or a 20-FPS guarantee. A 900×180 truecolor waterfall contains about
+80,000 cells per redraw; its ANSI output and terminal paint cost are much larger
+than an 80×24 view. Leave the default one-second display interval or choose a
+smaller explicit waterfall on slow terminals/SSH connections. The client does
+not stretch, repeat or interpolate sample bytes to create a filled image.
 
 This renderer redraws complete frames. A captured 240×60 byte-hue frame was
 about 63 KiB of ANSI/text output; one frame per second is roughly 0.5 Mbit/s
@@ -110,6 +138,7 @@ make build-client
 go test ./cmd/entropy-client/...
 go test -race ./cmd/entropy-client/...
 python3 scripts/test_client_terminal.py --capture-full=/tmp/client-full.ansi
+python3 scripts/test_client_waterfall.py
 go test ./cmd/entropy-client -run '^$' -bench BenchmarkFullMonitor240x60 -benchmem
 ```
 
@@ -117,6 +146,9 @@ Go tests cover small/large layouts, colors, ANSI-safe clipping, histogram
 counts, retained history, waiting/overload states, viewport caps and unchanged
 analysis accounting. PTY checks cover 60×24, 80×24, 120×30, 160×45 and 240×60,
 a live 80×24 → 160×45 → 80×24 transition, redirected output and headless JSONL.
+Waterfall-only PTYs additionally cover 641×37, 100×240 and 900×180, live
+wide/tall resizing, all mappings, and headless reporting. Go renderer tests
+exercise the 1024×512 cap, tiny dimensions, assessments and retained history.
 The renderer benchmark excludes terminal I/O and cannot predict SSH throughput.
 
 ## Up to 20 FPS

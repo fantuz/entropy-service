@@ -19,9 +19,10 @@ const (
 )
 
 const (
-	LayoutAuto    = "auto"
-	LayoutCompact = "compact"
-	LayoutFull    = "full"
+	LayoutAuto      = "auto"
+	LayoutCompact   = "compact"
+	LayoutFull      = "full"
+	LayoutWaterfall = "waterfall"
 )
 
 const (
@@ -53,7 +54,7 @@ func (p Profile) DisplayInterval(requested time.Duration) time.Duration {
 
 // FullLayout keeps redirected/unknown terminals on the plain stacked view.
 func (p Profile) FullLayout(choice string) bool {
-	if !p.Interactive || choice == LayoutCompact {
+	if !p.Interactive || choice == LayoutCompact || choice == LayoutWaterfall {
 		return false
 	}
 
@@ -62,6 +63,11 @@ func (p Profile) FullLayout(choice string) bool {
 	}
 
 	return p.Columns >= 120 && p.Rows >= 30
+}
+
+// WaterfallLayout needs only one header row and space for a two-column cell.
+func (p Profile) WaterfallLayout(choice string) bool {
+	return choice == LayoutWaterfall && p.Interactive && p.Columns >= 2 && p.Rows >= 3
 }
 
 // Fit pads or clips generated monitor text without cutting an ANSI sequence.

@@ -162,7 +162,7 @@ func (m *monitorState) observe(frame client.StreamFrame, now time.Time) bool {
 		m.warnSamples++
 	}
 
-	if m.cfg.ShowPreview && !m.cfg.Headless {
+	if m.cfg.ShowPreview && !m.cfg.Headless && m.cfg.Layout != terminal.LayoutWaterfall {
 		m.preview = hex.EncodeToString(frame.Data[:min(64, len(frame.Data))])
 	}
 
@@ -186,6 +186,12 @@ func (m *monitorState) render() {
 }
 
 func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
+	if profile.WaterfallLayout(m.cfg.Layout) {
+		m.renderWaterfall(out, profile)
+
+		return
+	}
+
 	if profile.FullLayout(m.cfg.Layout) {
 		m.renderFull(out, profile)
 		return
@@ -308,11 +314,11 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 		profile = terminal.Detect(cfg.Color)
 	}
 
-	if cfg.ShowGraph && !cfg.Headless {
+	if cfg.ShowGraph && !cfg.Headless && cfg.Layout != terminal.LayoutWaterfall {
 		m.graph = diag.NewEntropyGraph(256)
 	}
 
-	if !cfg.Headless && (cfg.ShowDashboard || (cfg.Layout != terminal.LayoutCompact && profile.Interactive)) {
+	if !cfg.Headless && cfg.Layout != terminal.LayoutWaterfall && (cfg.ShowDashboard || (cfg.Layout != terminal.LayoutCompact && profile.Interactive)) {
 		m.dashboard = diag.NewDashboard(256)
 	}
 

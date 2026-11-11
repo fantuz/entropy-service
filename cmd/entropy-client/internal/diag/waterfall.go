@@ -18,8 +18,8 @@ const (
 	WaterfallByte       = "byte"
 	WaterfallRGB        = "rgb"
 	WaterfallGray       = "gray"
-	MaxWaterfallColumns = 256
-	MaxWaterfallRows    = 64
+	MaxWaterfallColumns = 512
+	MaxWaterfallRows    = 512
 )
 
 // Waterfall retains copied prefixes, never transport buffers.
@@ -175,32 +175,57 @@ func (w *Waterfall) RenderView(out io.Writer, profile terminal.Profile, columns,
 
 		fmt.Fprintf(&line, "#%*d | ", label, row.frame)
 
-		for x := range width {
-			offset := x * stride
-			if offset+stride > len(row.bytes) {
-				if profile.Color != terminal.Monochrome {
-					line.WriteString("\033[0m")
-				}
-
-				line.WriteString("  ")
-
-				continue
-			}
-
-			r, g, b := int(row.bytes[offset]), int(row.bytes[offset]), int(row.bytes[offset])
-			if w.mode == WaterfallRGB {
-				g, b = int(row.bytes[offset+1]), int(row.bytes[offset+2])
-			} else if w.mode == WaterfallByte && profile.Color != terminal.Monochrome {
-				r, g, b = byteHue(row.bytes[offset])
-			}
-
-			cell(&line, profile.Color, r, g, b)
-		}
-
-		if profile.Color != terminal.Monochrome {
-			line.WriteString("\033[0m")
-		}
+		w.cells(&line, row.bytes, width, profile.Color)
 
 		fmt.Fprintln(out, line.String())
+	}
+}
+
+// RenderCanvas fills the available rows with newest-first cells, without labels.
+// Missing samples/bytes remain blank; no samples are invented to fill space.
+func (w *Waterfall) RenderCanvas(out *strings.Builder, profile terminal.Profile, rows int) {
+	width := min(w.width, max(0, profile.Columns/2))
+	padding := strings.Repeat(" ", max(0, profile.Columns-width*2))
+	out.Grow(max(0, profile.Columns) * max(0, profile.Rows))
+
+	for y := range max(0, profile.Rows) {
+		var data []byte
+		if y < min(len(w.rows), rows) {
+			data = w.rows[len(w.rows)-1-y].bytes
+		}
+
+		w.cells(out, data, width, profile.Color)
+		out.WriteString(padding)
+		out.WriteByte('\n')
+	}
+}
+
+func (w *Waterfall) cells(line *strings.Builder, data []byte, width int, color terminal.Color) {
+	stride := w.bytesPerCell()
+
+	for x := range width {
+		offset := x * stride
+		if offset+stride > len(data) {
+			if color != terminal.Monochrome {
+				line.WriteString("\033[0m")
+			}
+
+			line.WriteString(strings.Repeat(" ", (width-x)*2))
+
+			break
+		}
+
+		r, g, b := int(data[offset]), int(data[offset]), int(data[offset])
+		if w.mode == WaterfallRGB {
+			g, b = int(data[offset+1]), int(data[offset+2])
+		} else if w.mode == WaterfallByte && color != terminal.Monochrome {
+			r, g, b = byteHue(data[offset])
+		}
+
+		cell(line, color, r, g, b)
+	}
+
+	if color != terminal.Monochrome {
+		line.WriteString("\033[0m")
 	}
 }
