@@ -38,6 +38,8 @@ func TestWriteoutAllFramesOnBothTransports(t *testing.T) {
 			cfg := experimentConfig(mode, serveExperiment(t, mode), path)
 			cfg.WriteOut = true
 			cfg.AnalysisInterval = time.Hour
+			cfg.Duration = 5 * time.Second
+			cfg.OutputBytes = 3 * cfg.Slice // Three complete frames, independent of dial/scheduler speed.
 			sink := &fakeWriteout{}
 			opens := 0
 
@@ -48,7 +50,7 @@ func TestWriteoutAllFramesOnBothTransports(t *testing.T) {
 			records := readReport(t, path)
 
 			summary := decodeRecord[summaryRecord](t, records[len(records)-1])
-			if opens != 1 || sink.closes != 1 || summary.DeviceErrors != 0 || summary.DeviceFrames != summary.ReceivedFrames || int64(summary.DeviceBytes) != summary.ReceivedBytes || sink.Len() != int(summary.DeviceBytes) || summary.AnalysedSamples != 1 || summary.ReceivedFrames < 2 {
+			if opens != 1 || sink.closes != 1 || summary.DeviceErrors != 0 || summary.DeviceFrames != summary.ReceivedFrames || int64(summary.DeviceBytes) != summary.ReceivedBytes || sink.Len() != int(summary.DeviceBytes) || summary.AnalysedSamples != 1 || summary.ReceivedFrames != 3 || summary.Termination != reasonOutputLimit {
 				t.Fatalf("incomplete writeout accounting: %+v opens=%d closes=%d", summary, opens, sink.closes)
 			}
 

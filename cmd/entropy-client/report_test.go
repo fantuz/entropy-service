@@ -62,7 +62,7 @@ func experimentConfig(mode, endpoint, report string) *config.Config {
 		Mode: mode, HTTPUrl: endpoint, WSUrl: endpoint, Slice: 256,
 		Refresh: 5 * time.Millisecond, DisplayInterval: time.Second,
 		AnalysisBytes: 64, AnalysisInterval: 20 * time.Millisecond,
-		Duration: 150 * time.Millisecond, ShannonThreshold: 6.1,
+		Duration: time.Second, ShannonThreshold: 6.1,
 		ReportPath: report, Headless: true,
 	}
 }
@@ -238,6 +238,8 @@ func TestReportCapturesTransportAndStartupFailures(t *testing.T) {
 		cfg := experimentConfig(modePull, server.URL, path)
 
 		cfg.Headless = headless
+		cfg.Duration = 5 * time.Second // The injected HTTP failure, not a short run budget, must end this case.
+
 		if err := runConfigured(t.Context(), cfg); err == nil {
 			t.Fatal("transport failure returned success")
 		}
@@ -310,6 +312,7 @@ func (w failingReportWriter) Write(_ []byte) (int, error) {
 func TestReportWriteFailureSurvivesConcurrentCancellation(t *testing.T) {
 	endpoint := serveExperiment(t, modePull)
 	cfg := experimentConfig(modePull, endpoint, "")
+	cfg.Duration = 5 * time.Second // The injected report write cancels this run.
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
