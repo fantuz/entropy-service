@@ -294,7 +294,13 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         expect(page.locator("#lab-audio-device option:checked")).not_to_have_text("Selected input unavailable")
         page.locator("#lab-start").click()
         expect(page.locator("#lab-status")).to_contain_text("Source active")
-        page.evaluate("labTracks.at(-1).dispatchEvent(new Event('ended'))")
+        # Select the active audio track explicitly. Firefox may retain older
+        # ended tracks while a new capture is being opened.
+        page.evaluate("""() => {
+            const track=labTracks.findLast(track=>track.kind==='audio'&&track.readyState==='live');
+            if(!track)throw new Error('Expected a live selected audio input');
+            track.dispatchEvent(new Event('ended'));
+        }""")
         expect(page.locator("#lab-status")).to_contain_text("disconnected")
         assert page.evaluate("labTracks.every(track=>track.readyState==='ended')")
         page.set_viewport_size({"width":390,"height":844})
