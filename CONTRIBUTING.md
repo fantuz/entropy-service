@@ -4,7 +4,7 @@ Thanks for considering improvements. Contributions in Go, browser UX, documentat
 
 ## Environment
 
-- Go **1.26.10** or newer, Git, and a supported C toolchain for race testing.
+- Go **1.26.11** or newer, Git, and a supported C toolchain for race testing.
 - `golangci-lint` **2.12.2** to match current GitHub Actions configuration, where available.
 - GoReleaser for local release snapshots, only when packaging changes are involved.
 - The server supports local development with `-device=/dev/urandom`; no QRNG card is necessary to run ordinary tests.
@@ -44,7 +44,7 @@ operations; pass contexts explicitly and make blocking work cancellable
 where the underlying API permits it. Avoid unrelated renaming or formatting
 churn and stale commented-out implementations.
 
-Keep one root `go.mod` for both commands. `go 1.26.10` is the minimum supported
+Keep one root `go.mod` for both commands. `go 1.26.11` is the minimum supported
 toolchain and security-patch baseline; it is not a request to create a module
 for each executable. Commit dependency changes with `go.sum`, test explicit
 version updates, and run `go mod tidy -diff`, `go mod verify` and

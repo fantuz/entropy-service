@@ -39,13 +39,22 @@ There is **one root `go.mod` and `go.sum`**. Both binaries are released
 together and share the same dependency graph; no nested module, workspace
 file or split module path is needed.
 
-`go 1.26.10` declares the minimum supported Go toolchain, including the
+`go 1.26.11` declares the minimum supported Go toolchain, including the
 project's security-patch baseline. Go's toolchain selection may download a
 suitable version when `GOTOOLCHAIN=auto`; installations that disable that
 behavior must provide a sufficiently recent Go themselves. An extra
 `toolchain` directive pointing to the same version adds no useful policy
 here. CI and release builds read the version from `go.mod`. Update the
 minimum deliberately and keep installation/contributor documentation in sync.
+
+The Go 1.26.11 minimum includes the standard-library fix for
+[GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859), an HTTP/1 server crash
+involving `MaxBytesReader` and concurrent response-header writes. The `v1.8.5`
+release validation rejected Go 1.26.10 for this advisory. Vulnerability scans
+use advisory data available at scan time, so a green PR scan does not guarantee
+that the same toolchain will pass a later release scan. Keep the release gate
+enabled. Once a toolchain/dependency fix is merged, create a new release tag
+containing that commit: retrying an old tag still validates its old `go.mod`.
 
 The November 2026 maintenance update moves `golang.org/x/crypto` from
 v0.48.0 to **v0.58.0** and its indirect `golang.org/x/sys` dependency from
