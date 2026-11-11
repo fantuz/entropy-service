@@ -174,7 +174,17 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
             labMediaRequests.push(options);
             const delay=mediaDelay,stream=await original(options);labTracks.push(...stream.getTracks());
             const audioTracks=stream.getAudioTracks.bind(stream);
-            stream.getAudioTracks=()=>{const tracks=audioTracks();labAudioTracks.push(...tracks);return tracks;};
+            stream.getAudioTracks=()=>{
+              const tracks=audioTracks();labAudioTracks.push(...tracks);
+              for(const track of tracks){
+                const add=track.addEventListener.bind(track);
+                // Firefox ignores synthetic media events unless this
+                // test-only listener opts in. Hardware events are trusted.
+                // Other engines ignore the optional fourth argument.
+                track.addEventListener=(type,listener,options)=>add(type,listener,options,type==='ended');
+              }
+              return tracks;
+            };
             if(delay)await new Promise(resolve=>setTimeout(resolve,delay));return stream;
           };}
           Object.defineProperty(navigator,'serial',{configurable:true,value:{requestPort:async()=>({
