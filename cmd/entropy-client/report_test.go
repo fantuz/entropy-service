@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 func readReport(t *testing.T, path string) []json.RawMessage {
@@ -167,9 +169,8 @@ func TestTimedReportsForBothTransports(t *testing.T) {
 				t.Fatalf("duration/throughput incorrect: %+v", summary)
 			}
 
-			info, err := os.Stat(path)
-			if err != nil || info.Mode().Perm() != 0o600 {
-				t.Fatalf("report permissions: %v, %v", info, err)
+			if err := privatefile.Check(path); err != nil {
+				t.Fatalf("report permissions: %v", err)
 			}
 		})
 	}
@@ -374,6 +375,13 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	cfg.ShowWaterfall, cfg.ShowPreview, cfg.ShowGraph, cfg.ShowDashboard = true, true, true, true
 	cfg.WaterfallMode, cfg.WaterfallColumns, cfg.WaterfallRows, cfg.Color = "rgb", 128, 32, "truecolor"
 	cfg.Layout = "full"
+
+	if runtime.GOOS == "windows" {
+		// Windows rejects explicit unsupported displays before starting a run.
+		// Keep exercising clean JSONL stdout with its supported plain controls.
+		cfg.ShowWaterfall, cfg.WaterfallColumns, cfg.WaterfallRows = false, 0, 0
+		cfg.WaterfallMode, cfg.Color, cfg.Layout = "byte", "auto", "compact"
+	}
 
 	cfg.Duration = 40 * time.Millisecond
 	if err := runConfigured(t.Context(), cfg); err != nil {

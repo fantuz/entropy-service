@@ -46,8 +46,9 @@ Retain strict hardware selection and verify reported `X-RNG-Source`/`/ready`
 on the target host. Exercise device starvation, disappearance and SIGTERM while
 waiting for input. Adjust the timeout to the documented device latency; its
 deadline covers the entire seed, rather than restarting for each short read.
-No automatic reopen is attempted. Normal release targets are Linux; other
-platforms refuse bounded device seeding until a supported adapter exists.
+No automatic reopen is attempted. Direct device seeding remains Linux-only.
+The optional [Windows port](windows.md) uses the native OS CSPRNG through
+`crypto/rand`, with explicit limits on interruption of an in-flight OS call.
 
 Focused tests use real OS pipes to verify interrupted waits, partial-read
 discard, deadline reset/recovery, total read budget and joined reseed shutdown.

@@ -1,0 +1,38 @@
+name: Optional Windows port
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Native Windows x64
+    runs-on: windows-2025
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+      - name: Setup Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Verify module checksums
+        run: go mod verify
+      - name: Test shared code and Windows adapters
+        run: go test -count=1 -timeout=5m ./...
+      - name: Vet Windows code
+        run: go vet ./...
+      - name: Run Windows linters
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.12.2
+          args: --timeout=3m0s
+      - name: Build native executables
+        run: |
+          go build -o bin/entropy-server.exe ./cmd/entropy-server
+          go build -o bin/entropy-client.exe ./cmd/entropy-client
+      - name: Exercise real Windows CLI, TLS, files and shutdown
+        run: python scripts/test_windows.py

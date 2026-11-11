@@ -23,6 +23,10 @@ permissions:
   contents: read
 
 jobs:
+  windows:
+    name: Optional Windows port
+    uses: ./.github/workflows/windows.yml
+
   build:
     runs-on: ubuntu-24.04
     steps:

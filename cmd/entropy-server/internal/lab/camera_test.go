@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -165,6 +166,10 @@ func TestONVIFDiscoveryAndCredentialBoundary(t *testing.T) {
 }
 
 func TestCameraDecoderCredentialsPrefixAndCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell decoder fixture; ONVIF/URL/credential checks run on every platform")
+	}
+
 	dir := t.TempDir()
 	input, args := filepath.Join(dir, "input"), filepath.Join(dir, "args")
 

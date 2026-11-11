@@ -35,3 +35,38 @@ func TestOutputValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestWindowsCapabilitiesRejectUnsupportedRequests(t *testing.T) {
+	for _, cfg := range []Config{
+		{WriteOut: true},
+		{OutputDevice: "/dev/null"},
+		{OutputPath: "-", Headless: true},
+		{ShowWaterfall: true},
+		{Layout: "waterfall"},
+		{WaterfallColumns: 32},
+		{WaterfallRows: 8},
+		{WaterfallMode: "rgb"},
+		{Layout: "full"},
+		{Color: "truecolor"},
+	} {
+		if err := cfg.validatePlatform("windows"); err == nil {
+			t.Fatalf("unsupported Windows request silently accepted: %+v", cfg)
+		}
+
+		if err := cfg.validatePlatform("linux"); err != nil {
+			t.Fatalf("Windows restriction affected Linux: %v", err)
+		}
+	}
+
+	for _, cfg := range []Config{
+		{},
+		{Layout: "auto", Color: "auto", WaterfallMode: "byte"},
+		{Layout: "compact", Color: "never", ShowDashboard: true},
+		{OutputPath: "capture.bin", ReportPath: "report.jsonl", Headless: true},
+		{ReportPath: "-", Headless: true},
+	} {
+		if err := cfg.validatePlatform("windows"); err != nil {
+			t.Fatalf("portable Windows request rejected: %+v, %v", cfg, err)
+		}
+	}
+}

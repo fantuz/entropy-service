@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Native Windows smoke tests; no QRNG, external server or trust-store changes."""
+
+import ctypes
+from ctypes import wintypes
+import http.client
+import json
+from pathlib import Path
+import re
+import signal
+import socket
+import ssl
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SERVER = ROOT / "bin/entropy-server.exe"
+CLIENT = ROOT / "bin/entropy-client.exe"
+
+
+def invoke(binary, *args, code=0, contains=b""):
+    result = subprocess.run(
+        [str(binary), *map(str, args)], capture_output=True, timeout=20, check=False
+    )
+    assert result.returncode == code, (result.returncode, result.stdout, result.stderr)
+    assert contains in result.stdout + result.stderr, (contains, result.stdout, result.stderr)
+    return result
+
+
+def request(port, path, context=None):
+    connection = (
+        http.client.HTTPSConnection("127.0.0.1", port, context=context, timeout=2)
+        if context else http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+    )
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        return response.status, response.read()
+    finally:
+        connection.close()
+
+
+@unittest.skipUnless(sys.platform == "win32", "native Windows executables required")
+class WindowsSmoke(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Hosted runners can start without a console. Attach children to a private
+        # test console so CTRL_BREAK exercises Go's actual console signal handler.
+        cls.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        cls.kernel.GetConsoleProcessList.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD]
+        processes = (wintypes.DWORD * 1)()
+        cls.allocated_console = not cls.kernel.GetConsoleProcessList(processes, 1)
+        if cls.allocated_console and not cls.kernel.AllocConsole():
+            raise ctypes.WinError(ctypes.get_last_error())
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.allocated_console:
+            cls.kernel.FreeConsole()
+
+    def test_unsupported_options_fail_before_io(self):
+        for option in ["-device=/dev/qrandom0", "-require-device"]:
+            result = invoke(SERVER, option, "-cert-file=missing.pem", code=1, contains=b"Windows")
+            self.assertNotIn(b"load TLS certificate", result.stderr)
+            self.assertNotIn(b"Source opened", result.stderr)
+
+        for option in [
+            "-writeout", "-output-device=/dev/null", "-output=-", "-waterfall",
+            "-layout=full", "-layout=waterfall", "-waterfall-columns=32",
+            "-waterfall-mode=rgb", "-color=truecolor",
+        ]:
+            result = invoke(CLIENT, "-headless", option, "-url=http://127.0.0.1:1", code=1, contains=b"Windows")
+            self.assertNotIn(b"connection refused", result.stderr.lower())
+
+    def test_real_http_https_ws_files_and_shutdown(self):
+        with tempfile.TemporaryDirectory(prefix="entropy-windows-") as directory:
+            work = Path(directory)
+            cert, key = work / "cert.pem", work / "key.pem"
+            provisioning = ["generate-cert", "-hosts=localhost,127.0.0.1", "-valid-for=1h",
+                            f"-cert-file={cert}", f"-key-file={key}"]
+            invoke(SERVER, *provisioning, contains=b"Created self-signed")
+            before = key.read_bytes()
+            invoke(SERVER, *provisioning, "-if-missing", contains=b"Reusing valid")
+            self.assertEqual(before, key.read_bytes())
+
+            log_path = work / "server.log"
+            with log_path.open("wb") as log:
+                process = subprocess.Popen(
+                    [str(SERVER), "-http=127.0.0.1:0", "-https=127.0.0.1:0",
+                     f"-cert-file={cert}", f"-key-file={key}", "-reseed-ms=100"],
+                    stdout=subprocess.PIPE, stderr=log,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                )
+                ports = {}
+                try:
+                    deadline = time.monotonic() + 15
+                    while len(ports) != 2:
+                        text = log_path.read_bytes()
+                        for protocol in ("HTTP", "HTTPS"):
+                            match = re.search(protocol.encode() + rb" listener\s+\[OK\] 127\.0\.0\.1:(\d+)", text)
+                            if match:
+                                ports[protocol] = int(match.group(1))
+                        if process.poll() is not None or time.monotonic() >= deadline:
+                            self.fail(f"Windows server failed to start: {text[-12000:]!r}")
+                        time.sleep(.02)
+
+                    self.assertIn(b"Windows OS CSPRNG (crypto/rand)", text)
+                    self.assertIn(b"Go socket defaults", text)
+                    self.assertNotIn(b"configured device unavailable", text)
+                    self.assertEqual(request(ports["HTTP"], "/ready")[0], 200)
+                    self.assertEqual(request(ports["HTTP"], "/api-stream.html")[0], 200)
+                    context = ssl.create_default_context(cafile=str(cert))
+                    context.minimum_version = ssl.TLSVersion.TLSv1_3
+                    status, data = request(ports["HTTPS"], "/v1/data/random?bytes=64", context)
+                    self.assertEqual((status, len(data)), (200, 64))
+
+                    for mode in ("pull", "stream"):
+                        raw, report = work / f"{mode}.bin", work / f"{mode}.jsonl"
+                        invoke(CLIENT, "-headless", f"-mode={mode}", "-slice=256", "-refresh=20ms",
+                               "-duration=5s", "-analysis-bytes=64", f"-output={raw}", "-output-bytes=700",
+                               f"-report={report}", f"-url=http://127.0.0.1:{ports['HTTP']}/v1/data/random",
+                               f"-wsurl=ws://127.0.0.1:{ports['HTTP']}/stream")
+                        self.assertEqual(raw.stat().st_size, 700)
+                        records = [json.loads(line) for line in report.read_text(encoding="utf-8").splitlines()]
+                        summary = records[-1]
+                        self.assertEqual(summary["termination"], "output_limit")
+                        self.assertEqual(summary["output_written_bytes"], 700)
+                        self.assertFalse(summary["failed"])
+                        self.assertNotIn("\x1b", report.read_text(encoding="utf-8"))
+
+                    plain = invoke(CLIENT, "-duration=120ms", "-display-interval=50ms", "-slice=256",
+                                   "-refresh=20ms", f"-url=http://127.0.0.1:{ports['HTTP']}/v1/data/random")
+                    self.assertIn(b"Windows capabilities", plain.stdout)
+                    self.assertIn(b"EntropyCTL Monitor", plain.stdout)
+                    self.assertNotIn(b"\x1b", plain.stdout)
+                    self.assertEqual(request(ports["HTTP"], "/ready")[0], 200)
+
+                    process.send_signal(signal.CTRL_BREAK_EVENT)
+                    stdout, _ = process.communicate(timeout=10)
+                    self.assertEqual(process.returncode, 0, log_path.read_bytes())
+                    self.assertFalse(stdout)
+                    self.assertIn(b"shutdown complete", log_path.read_bytes())
+                    for port in ports.values():
+                        with socket.socket() as probe:
+                            probe.settimeout(.5)
+                            self.assertNotEqual(probe.connect_ex(("127.0.0.1", port)), 0)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate()
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

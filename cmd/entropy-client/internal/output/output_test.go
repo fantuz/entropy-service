@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 func TestNewPrivateFileAndNoReplacement(t *testing.T) {
@@ -37,21 +39,24 @@ func TestNewPrivateFileAndNoReplacement(t *testing.T) {
 		t.Fatal("raw bytes changed", err)
 	}
 
-	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm()&0o077 != 0 {
+	if err := privatefile.Check(path); err != nil {
 		t.Fatal("output is not private", err)
 	}
 
-	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(path, link); err != nil {
-		t.Fatal(err)
+	if writer, err := OpenFile(path); err == nil || writer != nil {
+		t.Fatal("replaced existing output", path)
 	}
 
-	for _, target := range []string{path, link} {
-		if writer, err := OpenFile(target); err == nil || writer != nil {
-			t.Fatal("replaced existing output", target)
+	t.Run("symlink", func(t *testing.T) {
+		link := filepath.Join(t.TempDir(), "link")
+		if err := os.Symlink(path, link); err != nil {
+			t.Skipf("account cannot create symlinks: %v", err)
 		}
-	}
+
+		if writer, err := OpenFile(link); err == nil || writer != nil {
+			t.Fatal("replaced existing symlink", link)
+		}
+	})
 
 	got, err = os.ReadFile(path)
 	if err != nil || !bytes.Equal(data, got) {

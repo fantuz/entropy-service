@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -200,6 +201,10 @@ func TestWebSocketNormalCloseIsEOF(t *testing.T) {
 
 func TestTCPAndUnixEOF(t *testing.T) {
 	for _, kind := range []string{"tcp", "unix"} {
+		if kind == "unix" && runtime.GOOS == "windows" {
+			continue // Unix sources are explicitly unavailable in the Windows port.
+		}
+
 		address := "127.0.0.1:0"
 		if kind == "unix" {
 			address = filepath.Join(t.TempDir(), "sample.sock")

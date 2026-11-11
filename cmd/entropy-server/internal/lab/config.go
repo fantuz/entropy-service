@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 )
 
 const (
+	windowsOS         = "windows"
 	sourceHTTP        = "http"
 	sourceHTTPS       = "https"
 	sourceWS          = "websocket"
@@ -239,6 +241,10 @@ func (c *Config) validate() error {
 			return errors.New("socket port must be 1–65535")
 		}
 	case sourceUnix, sourceDevice:
+		if runtime.GOOS == windowsOS {
+			return errors.New("unix sockets and direct device LAB sources are unavailable on Windows; use a TCP/UDP or HTTP/WebSocket adapter")
+		}
+
 		if !filepath.IsAbs(c.Endpoint) || len(c.Endpoint) > 4096 {
 			return errors.New("socket/device endpoint must be an absolute path")
 		}

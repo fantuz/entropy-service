@@ -11,6 +11,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Full architecture review](architecture-review.md) | Five-question assurance assessment, component map, findings and remediation roadmap. |
 | [Security boundaries & threat model](security-boundaries.md) | Trust boundaries, seed failure modes, adversaries, explicit non-guarantees and prioritized threat register. |
 | [Configuration](configuration.md) | Server and client flags, timing semantics, source selection and client analysis settings. |
+| [Optional Windows port](windows.md) | Native x64 builds, OS randomness, capability limits, private ACL files, console output and validation. |
 | [Client experiments](client-experiments.md) | Configurable Shannon assessment, timed/headless runs, JSONL schema and reproducible experiments. |
 | [Client write-out](client-writeout.md) | Linux pool mixing, limited value, device validation, failure handling and progress counters. |
 | [Raw client exports](client-output.md) | Private files, raw stdout/SSH pipes, Linux devices, exact byte limits and delivery accounting. |

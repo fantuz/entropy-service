@@ -12,6 +12,10 @@ permissions:
   contents: read
 
 jobs:
+  windows:
+    name: Validate Windows before publishing
+    uses: ./.github/workflows/windows.yml
+
   validate:
     name: Validate tagged commit before publishing
     runs-on: ubuntu-24.04
@@ -131,7 +135,7 @@ jobs:
 
   release:
     name: Publish only after full tag validation
-    needs: [validate, browser]
+    needs: [validate, browser, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

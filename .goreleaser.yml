@@ -14,12 +14,18 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+      - windows
     goarch:
       - amd64
       - arm
       - arm64
     goarm:
       - "7"
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
 
   - id: entropy-client
     main: ./cmd/entropy-client
@@ -30,15 +36,25 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+      - windows
     goarch:
       - amd64
       - arm
       - arm64
     goarm:
       - "7"
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
 
 archives:
   - id: entropy-service-archive
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -53,6 +69,7 @@ archives:
     files:
       - LICENSE
       - README.md
+      - docs/windows.md
       - src: ./cmd/entropy-server/internal/wordlist/NOTICE.txt
         dst: WORDLIST_NOTICES.txt
 

@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
 // CertificateOptions describes an explicitly requested, self-signed server identity.
@@ -174,8 +176,12 @@ func existingCertificate(opts CertificateOptions) (bool, error) {
 		return false, fmt.Errorf("TLS files already exist; refusing to overwrite: %w", os.ErrExist)
 	}
 
-	if !cert.Mode().IsRegular() || !key.Mode().IsRegular() || key.Mode().Perm()&0o077 != 0 {
+	if !cert.Mode().IsRegular() || !key.Mode().IsRegular() {
 		return false, errors.New("existing TLS pair must use regular files, without symlinks, and an owner-only private key")
+	}
+
+	if err := privatefile.Check(opts.KeyFile); err != nil {
+		return false, fmt.Errorf("existing TLS private key: %w", err)
 	}
 
 	cfg, err := NewTLSConfig(opts.CertFile, opts.KeyFile)
@@ -204,7 +210,7 @@ func existingCertificate(opts CertificateOptions) (bool, error) {
 }
 
 func writeNewCertificateFile(path string, contents []byte) (os.FileInfo, error) {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := privatefile.Create(path)
 	if err != nil {
 		return nil, fmt.Errorf("create TLS file %q without overwriting: %w", path, err)
 	}

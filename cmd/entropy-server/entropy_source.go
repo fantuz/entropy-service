@@ -7,16 +7,9 @@ import (
 	"log"
 )
 
-// openEntropySource returns the selected reader and its *actual* origin.
-// -require-device requires the explicitly named source to open successfully;
-// fallback is never attempted in strict mode. Neither mode verifies the
-// entropy quality or hardware identity of a character device.
-func openEntropySource(path string, require bool) (io.ReadCloser, string, error) {
-	return selectEntropySource(path, require, openCharacterEntropySource)
-}
-
 // selectEntropySource accepts an opener so both successful selection and
 // open-time races/failures can be tested without live hardware.
+// Linux strict device mode never falls back; device quality is not certified.
 func selectEntropySource(
 	path string, require bool, open func(string) (io.ReadCloser, error),
 ) (io.ReadCloser, string, error) {

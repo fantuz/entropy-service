@@ -17,6 +17,11 @@ func serverInvocation(out io.Writer, cfg *config.Config) *console.Report {
 	r := console.New(out, "entropy-server "+appVersion+" | Startup invocation report")
 	r.Section("Runtime & listeners")
 	r.Value("Build / platform", fmt.Sprintf("%s / %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH))
+
+	if runtime.GOOS == "windows" {
+		r.Value("Windows capabilities", "Windows OS CSPRNG (crypto/rand); Go socket defaults; direct QRNG/device access and custom socket tuning unavailable")
+	}
+
 	r.Value("HTTP address", cfg.HTTPAddr)
 	r.Value("HTTPS enabled", cfg.EnableHTTPS)
 	r.Value("HTTPS address", cfg.HTTPSAddr)
