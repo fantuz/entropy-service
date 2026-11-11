@@ -119,7 +119,8 @@ class WindowsSmoke(unittest.TestCase):
                     status, data = request(ports["HTTPS"], "/v1/data/random?bytes=64", context)
                     self.assertEqual((status, len(data)), (200, 64))
 
-                    for mode in ("pull", "stream"):
+                    for mode, canonical in [("pull", "pull"), ("http", "pull"), ("stream", "stream"),
+                                            ("push", "stream"), ("websocket", "stream")]:
                         raw, report = work / f"{mode}.bin", work / f"{mode}.jsonl"
                         invoke(CLIENT, "-headless", f"-mode={mode}", "-slice=256", "-refresh=20ms",
                                "-duration=5s", "-analysis-bytes=64", f"-output={raw}", "-output-bytes=700",
@@ -128,15 +129,19 @@ class WindowsSmoke(unittest.TestCase):
                         self.assertEqual(raw.stat().st_size, 700)
                         records = [json.loads(line) for line in report.read_text(encoding="utf-8").splitlines()]
                         summary = records[-1]
+                        self.assertEqual(records[0]["settings"]["mode"], canonical)
                         self.assertEqual(summary["termination"], "output_limit")
                         self.assertEqual(summary["output_written_bytes"], 700)
                         self.assertFalse(summary["failed"])
                         self.assertNotIn("\x1b", report.read_text(encoding="utf-8"))
 
-                    plain = invoke(CLIENT, "-duration=120ms", "-display-interval=50ms", "-slice=256",
+                    plain = invoke(CLIENT, "-mode=http", "-shannon-threshold=7.123456",
+                                   "-duration=120ms", "-display-interval=50ms", "-slice=256",
                                    "-refresh=20ms", f"-url=http://127.0.0.1:{ports['HTTP']}/v1/data/random")
                     self.assertIn(b"Windows capabilities", plain.stdout)
                     self.assertIn(b"EntropyCTL Monitor", plain.stdout)
+                    self.assertRegex(plain.stdout, rb"Shannon entropy    : [0-9]+\.[0-9]{6} bits/byte")
+                    self.assertIn(b"Shannon threshold  : 7.123456 bits/byte", plain.stdout)
                     self.assertNotIn(b"\x1b", plain.stdout)
                     self.assertEqual(request(ports["HTTP"], "/ready")[0], 200)
 

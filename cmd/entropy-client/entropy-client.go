@@ -34,8 +34,8 @@ const (
 )
 
 const (
-	modePull   = "pull"
-	modeStream = "stream"
+	modePull   = config.ModePull
+	modeStream = config.ModeStream
 )
 
 func drawUI(out io.Writer, result *diag.Diagnostics, threshold float64, profile terminal.Profile) {

@@ -324,16 +324,21 @@ that every device can sustain the maximum settings.
 ### Shannon entropy sample alert
 
 The **Shannon entropy** instant value now has its own panel, independent of the
-byte histogram. Choose a red-alert threshold between **1.00000** and **8.00000**
-bits per byte, in increments of **0.00001** (default **7.99990**). The panel
+byte histogram. Choose a red-alert threshold between **1.000000** and **8.000000**
+bits per byte, in increments of **0.000001** (default **7.999900**). The panel
 alone turns red when the *full-precision* sample estimate is strictly below
 that threshold. Equality is not an alert. The numeric readout is rounded to
-five decimals and can therefore appear equal to the threshold at its boundary.
+six decimals and can therefore appear equal to the threshold at its boundary.
+The source/socket measurement tables also use six decimals; API and exported
+JSON numbers keep their original precision. Additional displayed digits expose
+variation in the estimate, not additional statistical accuracy.
 Changing the selector immediately reevaluates the most recently analysed
 sample, without reconnecting the WebSocket or contacting the server.
 
 The threshold is a **per-browser preference**, stored in `localStorage` if
-available. It persists across page reloads in that browser, but never changes
+available. Existing five-decimal preferences remain valid and six-decimal
+preferences persist without rounding them to the old precision. It persists
+across page reloads in that browser, but never changes
 the server, API responses or the preferences of other visitors. Restricted
 browser storage falls back gracefully to the default.
 

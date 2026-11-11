@@ -28,6 +28,12 @@ labels its single threshold result **Shannon assessment**:
 | `H >= -shannon-threshold` | `OK` |
 | `H < -shannon-threshold` | `WARN` |
 
+Human-readable Shannon estimates and thresholds use six decimal places, for
+example `7.999901` bits/byte. This makes small variations visible without adding
+measurement accuracy. Calculations and threshold decisions retain full
+precision, as do JSONL/API numeric fields. Rounded displayed values can appear
+equal while the unrounded estimate is still below the threshold.
+
 The default threshold is `7.999`, preserving the former monitor badge's
 minimum. Set any finite value in `[0, 8]`; equality is `OK`. The former
 separate aggregate diagnostics badge, with its different hard-coded

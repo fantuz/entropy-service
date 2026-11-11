@@ -159,6 +159,30 @@ def registration_checks(page, artifacts):
     dialog.locator("#registration-close").click()
 
 
+def shannon_precision_checks(browser, base):
+    from playwright.sync_api import expect
+    for path in ("/api-stream.html", "/api-upload.html", "/api-sources.html", "/api-socket.html"):
+        page = browser.new_page()
+        try:
+            page.goto(base + path)
+            page.wait_for_function("Boolean(window.EntropyShannonAlert)")
+            selector = page.locator("#entropy-threshold")
+            expect(selector).to_have_attribute("step", "0.000001")
+            selector.fill("7.123456")
+            selector.dispatch_event("change")
+            expect(selector).to_have_value("7.123456")
+            value = page.evaluate("""() => {
+                EntropyShannonAlert.update(7.1234556);
+                return {text: document.getElementById('entropy').textContent,
+                        state: document.getElementById('entropy-alert-card').dataset.state};
+            }""")
+            assert value == {"text": "7.123456", "state": "alert"}, (path, value)
+            page.reload()
+            expect(page.locator("#entropy-threshold")).to_have_value("7.123456")
+        finally:
+            page.close()
+
+
 def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="chromium"):
     from playwright.sync_api import expect, sync_playwright
     with sync_playwright() as playwright:
@@ -166,6 +190,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
             browser=playwright.firefox.launch(headless=True,firefox_user_prefs={"media.navigator.streams.fake":True,"media.navigator.permission.disabled":True,"media.autoplay.default":0,"gfx.webrender.software":True,"layers.acceleration.disabled":True})
         else:
             browser=playwright.chromium.launch(executable_path=chromium or None,headless=True,args=["--no-sandbox","--disable-dev-shm-usage","--use-fake-ui-for-media-stream","--use-fake-device-for-media-stream"])
+        shannon_precision_checks(browser, base)
         context=browser.new_context(viewport={"width":1440,"height":1000},device_scale_factor=2,accept_downloads=True)
         context.add_init_script("""(() => {
           window.labTracks=[];window.labAudioTracks=[];window.labMediaRequests=[];window.mediaDelay=0;window.serialClosed=0;
@@ -198,7 +223,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-bytes").fill("4096")
         page.locator("#lab-once").click()
         expect(page.locator("#lab-download")).to_be_enabled()
-        expect(page.locator("#entropy")).to_have_text("8.00000")
+        expect(page.locator("#entropy")).to_have_text("8.000000")
         wait_meters(page,**{"lab-input-frames":1,"lab-analysis-frames":1})
         with page.expect_download() as downloaded:
             page.locator("#lab-download").click()
@@ -207,9 +232,11 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-kind").select_option("constant")
         page.locator("#lab-once").click()
         expect(page.locator("#lab-download")).to_be_enabled()
-        expect(page.locator("#entropy")).to_have_text("0.00000")
+        expect(page.locator("#entropy")).to_have_text("0.000000")
         page.locator("#lab-record").click()
         assert page.locator("#lab-measurements tbody tr").count()==2
+        expect(page.locator("#lab-measurements tbody tr").nth(0).locator("td").nth(3)).to_have_text("8.000000")
+        expect(page.locator("#lab-measurements tbody tr").nth(1).locator("td").nth(3)).to_have_text("0.000000")
         with page.expect_download() as exported:
             page.locator("#lab-export").click()
         records=json.loads(Path(exported.value.path()).read_text())
@@ -219,10 +246,10 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         page.locator("#lab-kind").select_option("counter")
         page.locator("#lab-transform").select_option("lsb")
         page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
-        expect(page.locator("#entropy")).to_have_text("1.00000")
+        expect(page.locator("#entropy")).to_have_text("1.000000")
         page.locator("#lab-transform").select_option("xor");page.locator("#lab-refresh").fill("20")
         page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()
-        expect(page.locator("#entropy")).to_have_text("0.00000")
+        expect(page.locator("#entropy")).to_have_text("0.000000")
         wait_meters(page,**{"lab-input-frames":2,"lab-analysis-frames":1})
         page.locator("#lab-transform").select_option("raw")
         page.locator("#lab-start").click()
@@ -385,7 +412,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as sender:
             sender.sendto(bytes(range(256))*4,("127.0.0.1",udp_port))
         expect(page.locator("#lab-download")).to_be_enabled();page.locator("#lab-stop").click()
-        expect(page.locator("#entropy")).to_have_text("8.00000")
+        expect(page.locator("#entropy")).to_have_text("8.000000")
         page.locator("#lab-record").click()
         assert page.locator("#lab-measurements tbody tr").count()==4
         assert_layout(page,2);page.screenshot(path=str(artifacts/"socket-desktop.png"),full_page=True)

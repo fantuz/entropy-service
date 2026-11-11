@@ -260,7 +260,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         const labels=["Source","Representation","Window bytes","Shannon bits/B","Session sampled MB/s"];
         for(const record of records){
             const row=document.createElement("tr");row.setAttribute("role","row");
-            const values=[record.source,record.representation,record.window.bytes.toLocaleString(),record.statistics.entropy.toFixed(5),record.meter.bytesPerSecond===null?"—":(record.meter.bytesPerSecond/1e6).toFixed(4)];
+            const values=[record.source,record.representation,record.window.bytes.toLocaleString(),record.statistics.entropy.toFixed(6),record.meter.bytesPerSecond===null?"—":(record.meter.bytesPerSecond/1e6).toFixed(4)];
             values.forEach((value,index)=>{
                 const cell=document.createElement("td"),content=document.createElement("span");cell.setAttribute("role","cell");cell.dataset.label=labels[index];content.textContent=value;cell.append(content);
                 if(index===0){

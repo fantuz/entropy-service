@@ -5,6 +5,11 @@ client, DRBGs, HTTP/WebSocket protocols, analysis, reports and embedded browser
 pages. Small platform adapters select OS operations at compilation; there is no
 separate application tree or copied Windows implementation.
 
+Client transport aliases (`http`/`pull`, `websocket`/`push`/`stream`) and
+six-decimal plain-text Shannon diagnostics are shared with Linux. The native
+and packaged Windows smoke tests exercise every alias. Terminal waterfall and
+color support retain the explicit limits below.
+
 This first port targets x64 console applications on modern Windows. It does not
 install a Windows service. Windows ARM64 releases await native validation. Linux
 release targets and socket/device implementations remain unchanged.
@@ -44,7 +49,7 @@ rules or elevate privileges automatically.
 In a second terminal:
 
 ```powershell
-.\bin\entropy-client.exe -mode=stream -slice=65536 -refresh=100ms -duration=30s -layout=compact
+.\bin\entropy-client.exe -mode=websocket -slice=65536 -refresh=100ms -duration=30s -layout=compact
 .\bin\entropy-client.exe -headless -slice=65536 -refresh=100ms -duration=30s -output=sample.bin -output-bytes=1048576 -report=run.jsonl
 ```
 
