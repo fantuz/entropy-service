@@ -184,6 +184,7 @@ func (s *Source) transfer(buffer []byte, code uint32) (int, error) {
 	if len(buffer) > 0 {
 		memory.Pin(&buffer[0])
 	}
+
 	defer memory.Unpin()
 
 	if code == 0 {
