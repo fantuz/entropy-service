@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +16,38 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
+
+// A single unbuffered connection makes write backpressure deterministic across
+// Windows/Linux socket buffer policies. Closing the listener never closes an
+// accepted connection, matching net.Listener semantics.
+type lifecyclePipeListener struct {
+	connection net.Conn
+	accept     sync.Once
+	stop       sync.Once
+	closed     chan struct{}
+}
+
+func (listener *lifecyclePipeListener) Accept() (net.Conn, error) {
+	var connection net.Conn
+
+	listener.accept.Do(func() { connection = listener.connection })
+
+	if connection != nil {
+		return connection, nil
+	}
+
+	<-listener.closed
+
+	return nil, net.ErrClosed
+}
+
+func (listener *lifecyclePipeListener) Close() error {
+	listener.stop.Do(func() { close(listener.closed) })
+
+	return nil
+}
+
+func (listener *lifecyclePipeListener) Addr() net.Addr { return listener.connection.LocalAddr() }
 
 func TestWebSocketShutdown(t *testing.T) {
 	for _, secure := range []bool{false, true} {
@@ -183,6 +217,10 @@ func TestShutdownJoinsHijackedHandlersAndRejectsNewWork(t *testing.T) {
 }
 
 func TestShutdownInterruptsBlockedWebSocketWrite(t *testing.T) {
+	serverPipe, clientPipe := net.Pipe()
+	defer serverPipe.Close()
+	defer clientPipe.Close()
+
 	writing := make(chan struct{})
 	finished := make(chan struct{})
 	testServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -198,14 +236,20 @@ func TestShutdownInterruptsBlockedWebSocketWrite(t *testing.T) {
 
 		close(writing)
 
-		_ = conn.WriteMessage(websocket.BinaryMessage, make([]byte, 16<<20))
+		_ = conn.WriteMessage(websocket.BinaryMessage, make([]byte, 1<<20))
 	}))
+	_ = testServer.Listener.Close()
+	testServer.Listener = &lifecyclePipeListener{connection: serverPipe, closed: make(chan struct{})}
 	server := newManagedServer(t.Context(), testServer.Config)
 
 	testServer.Start()
 	defer testServer.Close()
 
-	conn, response, err := websocket.DefaultDialer.DialContext(t.Context(), "ws"+strings.TrimPrefix(testServer.URL, "http"), nil)
+	dialer := *websocket.DefaultDialer
+	dialer.Proxy = nil
+	dialer.NetDialContext = func(context.Context, string, string) (net.Conn, error) { return clientPipe, nil }
+
+	conn, response, err := dialer.DialContext(t.Context(), "ws"+strings.TrimPrefix(testServer.URL, "http"), nil)
 	if response != nil && response.Body != nil {
 		_ = response.Body.Close()
 	}
@@ -218,8 +262,8 @@ func TestShutdownInterruptsBlockedWebSocketWrite(t *testing.T) {
 
 	<-writing
 
-	// Read the frame header but leave its 16 MiB body unread, so the write
-	// has entered the transport and cannot finish before cancellation.
+	// Read only the frame header. net.Pipe has no transport buffering, so
+	// the 1 MiB body cannot finish without an application reader.
 	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 	if _, _, err := conn.NextReader(); err != nil {
 		t.Fatal(err)

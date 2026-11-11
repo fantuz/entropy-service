@@ -221,6 +221,7 @@ func (command hardwareCommand) probe(parent context.Context, path string, size i
 	}
 
 	deadline, _ := ctx.Deadline()
+
 	if err := ctx.Err(); err != nil {
 		report.Error = err.Error()
 
