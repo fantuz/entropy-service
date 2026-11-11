@@ -18,7 +18,7 @@ from test_stream_browser import assert_layout, number, set_value, wait_paint
 
 
 def wait_meters(page, **counts):
-    page.wait_for_function("""counts=>Object.entries(counts).every(([id,count])=>
+    page.wait_for_function(r"""counts=>Object.entries(counts).every(([id,count])=>
         Number(document.getElementById(id).textContent.replace(/\D/g,''))===count)""",arg=counts)
 
 
