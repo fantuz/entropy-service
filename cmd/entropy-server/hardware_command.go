@@ -284,9 +284,11 @@ func writeInventory(output io.Writer, inventory hardware.Inventory, jsonOutput b
 
 	for _, device := range inventory.Devices {
 		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", device.Model, device.ID, device.Driver, device.DriverVersion, device.State, device.Source)
+
 		if len(device.KernelPaths) > 0 {
 			fmt.Fprintf(writer, "  Kernel character path(s): %s\n", strings.Join(device.KernelPaths, ", "))
 		}
+
 		for _, note := range device.Notes {
 			fmt.Fprintf(writer, "  Note: %s\n", note)
 		}

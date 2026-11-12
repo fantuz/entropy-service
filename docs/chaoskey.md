@@ -54,8 +54,9 @@ fill routine; this does not establish the server's epoll/nonblocking-read
 contract. A successful ordinary `poll()` or the node's existence is insufficient.
 
 You may explicitly select `/dev/chaoskey0` with a driver that actually supports
-Go read deadlines and nonblocking reads. The server checks that contract; it
-never bypasses it for a ChaosKey pathname. A named `/dev/chaoskey*` request also
+Go read deadlines and nonblocking reads. The server checks deadline registration;
+correct `O_NONBLOCK` behaviour additionally needs driver review/qualification.
+It never bypasses deadline support based on a ChaosKey pathname. A named `/dev/chaoskey*` request also
 never falls back to the OS source. The reviewed stock driver is therefore
 rejected with guidance, rather than allowed to block the seed reader.
 
