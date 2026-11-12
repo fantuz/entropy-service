@@ -71,7 +71,7 @@ Each record captures:
   unavailable, record that explicitly rather than copying a vendor ZIP version.
 - Application commit/release, binary SHA-256 and any separate kernel-overlay
   revision; include commands and read budgets needed to reproduce the session.
-- Raw source read throughput with byte counts, elapsed time, chunk size, repeated
+- Direct source read throughput with byte counts, elapsed time, chunk size, repeated
   runs, errors/timeouts and measurement boundary.
 - Cancellation observations for deadlines, context cancellation, close,
   disconnect and shutdown: trial count, expected budget, worst observed return
@@ -98,7 +98,8 @@ probe deliberately does not claim those tests were performed.
 For throughput, record either `source_read` (a harness times only direct source
 reads) or `whole_probe` (the probe's full elapsed time, including discovery,
 open, health queries and cleanup). Record the exact method/command. The latter
-is end-to-end probe throughput, not steady-state device throughput. Repeat runs
+is end-to-end probe throughput, not steady-state device throughput. For ChaosKey,
+source throughput counts cooked bytes from `0x85`, not raw ADC samples. Repeat runs
 and report their individual counts/times; for an aggregate:
 
 ```text
