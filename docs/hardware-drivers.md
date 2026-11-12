@@ -98,7 +98,13 @@ module was installed or loaded, and no card was tested. The
 [recorded build evidence](https://github.com/fantuz/entropy-service/blob/main/docs/hardware-validation/quantis-pci-linux-build.json)
 captures the exact source, compiler, target and qualification limits.
 
-This community snapshot also has **no `.poll` operation and no `O_NONBLOCK`
+An optional [bounded-read Linux overlay](https://github.com/fantuz/entropy-service/blob/main/drivers/quantis-pci/README.md) now
+implements the separate read/readiness contract, with reference-counted open-file
+lifetime, uncached MMIO, periodic readiness checks, wait queues and isolated-VM
+file-operation tests. It is not installed by the Go application and still needs
+physical qualification on the target card.
+
+The **unmodified** community snapshot has **no `.poll` operation and no `O_NONBLOCK`
 branch**. Its ability to build or serve a blocking C reader does not establish
 direct compatibility with entropy-server's deadline-aware reader. A modern
 kernel module and a safe bounded seed reader are distinct deliverables.

@@ -153,3 +153,12 @@ GPLv2. Its notice is retained in `QUANTIS_NOTICES.txt` and release archives;
 no vendor binaries or implementation source are redistributed. The project
 remains MIT licensed. Vendor drivers retain their own installation and licence
 terms.
+
+### Optional Linux legacy-driver work
+
+The [bounded-read driver overlay](https://github.com/fantuz/entropy-service/blob/main/drivers/quantis-pci/README.md) targets the
+pinned community Linux port for `179a:0001`. It adds poll/nonblocking behaviour
+and safe open-file/removal lifetime, separately from this application's runtime.
+It is an experimental driver deliverable, not proof that an installed vendor
+2.9 driver already supports Go deadlines. Qualify it on the actual card before
+using direct `/dev/qrandomN` seeding.

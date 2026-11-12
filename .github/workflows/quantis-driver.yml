@@ -1,0 +1,92 @@
+name: Quantis PCI driver
+
+on:
+  pull_request:
+    paths: ['drivers/quantis-pci/**', '.github/workflows/quantis-driver.yml']
+  push:
+    branches: [main]
+    paths: ['drivers/quantis-pci/**', '.github/workflows/quantis-driver.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quantis-driver-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headers:
+    name: Headers (${{ matrix.distribution }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: ['debian:bookworm', 'debian:trixie']
+    container: ${{ matrix.distribution }}
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates gcc make python3 perl libc6-dev linux-headers-amd64
+      - name: Prepare pinned source and compile both modules
+        run: |
+          python3 drivers/quantis-pci/prepare.py /tmp/quantis-driver
+          for kernel_headers in /usr/src/linux-headers-*-amd64; do
+            make -C "$kernel_headers" M=/tmp/quantis-driver/linux CONFIG_DEBUG_INFO_BTF_MODULES= W=1 modules
+            make -C "$kernel_headers" M=/tmp/quantis-driver/tests CONFIG_DEBUG_INFO_BTF_MODULES= W=1 modules
+          done
+          gcc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g drivers/quantis-pci/tests/stream_test.c -o /tmp/quantis-core-test
+          /tmp/quantis-core-test
+
+  file-operations:
+    name: Kernel epoll and Go deadlines (VM)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Install isolated VM and kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends linux-image-generic linux-headers-generic qemu-system-x86 python3-venv busybox-static kmod ripgrep
+      - name: Install maintained VM launcher
+        run: |
+          python3 -m venv /tmp/quantis-virtme
+          /tmp/quantis-virtme/bin/pip install 'virtme-ng==1.42'
+      - name: Build production and simulated driver modules
+        run: |
+          python3 drivers/quantis-pci/prepare.py "$GITHUB_WORKSPACE/quantis-vm-build"
+          kernel_image=$(find /boot -maxdepth 1 -name 'vmlinuz-*-generic' | sort -V | tail -1)
+          kernel_version=${kernel_image#/boot/vmlinuz-}
+          sudo chmod a+r "$kernel_image"
+          echo "QUANTIS_TEST_KERNEL=$kernel_version" >> "$GITHUB_ENV"
+          make -C "/lib/modules/$kernel_version/build" M="$GITHUB_WORKSPACE/quantis-vm-build/linux" CONFIG_DEBUG_INFO_BTF_MODULES= W=1 modules
+          make -C "/lib/modules/$kernel_version/build" M="$GITHUB_WORKSPACE/quantis-vm-build/tests" CONFIG_DEBUG_INFO_BTF_MODULES= W=1 modules
+          go build -o "$GITHUB_WORKSPACE/quantis-vm-build/check-deadline" ./drivers/quantis-pci/tests/deadline
+      - name: Enable the runner's KVM device for this test user
+        run: |
+          if [ -c /dev/kvm ]; then
+            sudo chown "$(id -u):$(id -g)" /dev/kvm
+          fi
+      - name: Exercise real file operations without physical hardware
+        run: |
+          set -o pipefail
+          PYTHONUNBUFFERED=1 timeout 180s /tmp/quantis-virtme/bin/virtme-run --kimg "$QUANTIS_TEST_KERNEL" --force-9p --disable-microvm --rwdir "$GITHUB_WORKSPACE/quantis-vm-build" --mods=auto --memory 768M --cpus 2 --show-boot-console --show-command --script-sh "sh '$GITHUB_WORKSPACE/quantis-vm-build/tests/run-vm.sh' '$GITHUB_WORKSPACE/quantis-vm-build' '$GITHUB_WORKSPACE/quantis-vm-build/check-deadline'" 2>&1 | tee quantis-vm.log
+          grep -q '^QUANTIS_VM_TESTS_PASSED' quantis-vm.log
+      - name: Upload kernel simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: quantis-pci-kernel-tests
+          path: |
+            quantis-vm.log
+            quantis-vm-build/kernel-test.log
+          retention-days: 7
