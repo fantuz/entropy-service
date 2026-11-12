@@ -38,7 +38,7 @@ func ProbeFileStatus(file *os.File) (map[string]uint32, error) {
 
 	for path != "/" && path != "." {
 		candidate, _, known := Identify(trimHex(readAttribute(path, "vendor")), trimHex(readAttribute(path, "device")))
-		if known && candidate != USB {
+		if known && (candidate == LegacyPCI || candidate == ChipPCIe) {
 			family = candidate
 			break
 		}
@@ -66,6 +66,10 @@ func ProbeFileStatus(file *os.File) (map[string]uint32, error) {
 }
 
 func linuxStatus(fd int, family string, query func(int, uint) (uint32, error)) (map[string]uint32, error) {
+	if family != LegacyPCI && family != ChipPCIe {
+		return map[string]uint32{}, nil
+	}
+
 	status := map[string]uint32{}
 
 	for _, item := range []struct {

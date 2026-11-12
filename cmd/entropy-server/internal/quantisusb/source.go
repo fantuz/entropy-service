@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/usbtransport"
 )
 
 const (
@@ -24,12 +26,7 @@ const (
 	maxRead       = 32 << 10
 )
 
-type transport interface {
-	Control(request byte, p []byte) (int, error)
-	Bulk(p []byte) (int, error)
-	SetReadDeadline(deadline time.Time) error
-	Close() error
-}
+type transport = usbtransport.Transport
 
 // ParseSelector uses canonical indices 0..126, not arbitrary USB device paths.
 func ParseSelector(value string) (index int, selected bool, err error) {
@@ -222,85 +219,13 @@ func (s *Source) Read(p []byte) (int, error) {
 	return copy(p, buffer), nil
 }
 
-// validateDevice checks the cached USB device descriptor before any entropy I/O.
-func validateDevice(descriptor []byte) error {
-	if len(descriptor) < 18 || descriptor[0] != 18 || descriptor[1] != 1 || binary.LittleEndian.Uint16(descriptor[8:10]) != 0x0aba || binary.LittleEndian.Uint16(descriptor[10:12]) != 0x0102 || descriptor[17] != 1 {
-		return errors.New("unsupported USB identity or configuration count; expected Quantis 0aba:0102 with one configuration")
+const Available = usbtransport.Available
+
+func Open(path string) (*Source, error) {
+	device, packet, err := usbtransport.Open(path, usbtransport.Quantis)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
-}
-
-func controlSetup(request byte, length int) [8]byte {
-	var setup [8]byte
-
-	setup[0] = 0xc1
-	setup[1] = request
-	binary.LittleEndian.PutUint16(setup[6:8], uint16(length))
-
-	return setup
-}
-
-// packetSizeFromConfig accepts only interface zero, alternate zero and the known
-// bulk-IN endpoint. USB descriptor contents are never accepted as entropy.
-func packetSizeFromConfig(config []byte) (int, error) {
-	if len(config) < 9 || config[0] != 9 || config[1] != 2 || config[4] != 1 || config[5] != 1 {
-		return 0, errors.New("unsupported Quantis USB configuration")
-	}
-
-	length := int(binary.LittleEndian.Uint16(config[2:4]))
-	if length < 9 || length > len(config) {
-		return 0, io.ErrUnexpectedEOF
-	}
-
-	validInterface := false
-	packetSize := 0
-
-	for offset := 9; offset < length; {
-		if offset+2 > length {
-			return 0, io.ErrUnexpectedEOF
-		}
-
-		size := int(config[offset])
-		if size < 2 || offset+size > length {
-			return 0, io.ErrUnexpectedEOF
-		}
-
-		descriptor := config[offset : offset+size]
-		switch descriptor[1] {
-		case 4:
-			if len(descriptor) < 9 {
-				return 0, io.ErrUnexpectedEOF
-			}
-
-			if descriptor[2] != 0 {
-				return 0, errors.New("unexpected Quantis USB interface number")
-			}
-
-			validInterface = descriptor[2] == 0 && descriptor[3] == 0
-		case 5:
-			if len(descriptor) < 7 {
-				return 0, io.ErrUnexpectedEOF
-			}
-
-			if validInterface && descriptor[2] == Endpoint && descriptor[3]&3 == 2 {
-				packet := int(binary.LittleEndian.Uint16(descriptor[4:6]))
-				if packet == 64 || packet == 512 {
-					if packetSize != 0 {
-						return 0, errors.New("duplicate Quantis USB bulk endpoint")
-					}
-
-					packetSize = packet
-				}
-			}
-		}
-
-		offset += size
-	}
-
-	if packetSize != 0 {
-		return packetSize, nil
-	}
-
-	return 0, errors.New("expected Quantis USB bulk-IN endpoint 0x86 with 64/512-byte packets")
+	return newSource(device, packet)
 }

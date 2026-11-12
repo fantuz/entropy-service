@@ -110,6 +110,8 @@ func reportSource(r *console.Report, requested, actual string) {
 	switch {
 	case actual == DefaultCSPRNG || actual == sourceOSFallback:
 		r.Value("Source type", "operating-system CSPRNG")
+	case isChaosKeyEntropySource(actual):
+		r.Value("Source type", "experimental ChaosKey hardware-noise TRNG, cooked endpoint 0x85; hardware health/quality not certified")
 	case isUSBEntropySource(actual):
 		r.Value("Source type", "experimental Quantis USB protocol; hardware quality not independently verified")
 	case windowsBuild:

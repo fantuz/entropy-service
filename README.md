@@ -56,6 +56,9 @@ builds, simulated I/O and physical records, with a template for reproducible res
 
 Experimental [Quantis USB seeding](docs/quantis-usb.md) uses native WinUSB on
 Windows x64 and usbfs on released Linux targets, without CGO or a vendor DLL.
+Experimental [ChaosKey cooked seeding](docs/chaoskey.md) reuses those native I/O
+mechanics with its own hardware-noise TRNG identity/protocol checks; raw/flash
+endpoints are excluded.
 
 ```sh
 git clone https://github.com/fantuz/entropy-service.git
@@ -159,14 +162,14 @@ Require your hardware source explicitly when silent fallback would be inappropri
 ```
 
 An unavailable optional Linux device path can fall back to the OS CSPRNG;
-`quantis-pci:N` and `quantis-usb:N` selectors always require the requested
+`quantis-pci:N`, `quantis-usb:N` and `chaoskey-usb:N` selectors always require the requested
 hardware. `/dev/qrandom0` reads through the Quantis driver, whereas
 `/dev/urandom` is Linux's mixed CSPRNG. Installing a Quantis PCI driver alone
 does not feed that OS pool. Direct hardware seeding also requires working
 nonblocking reads and polling/deadlines; compiling a driver is only one check.
 See [hardware driver compatibility and source layers](docs/hardware-drivers.md)
 for official packages, a pinned modern-kernel source backup, validation steps
-and the proposed ChaosKey USB path.
+and the experimental cooked-only ChaosKey USB path.
 
 For safekeeping, [download the pinned community legacy PCI driver sources](https://codeload.github.com/tcdent/quantis-pci/tar.gz/00fffc49306d748b34a95c14769b30908ef5985f).
 This is a source archive to build for your kernel; the guide records its

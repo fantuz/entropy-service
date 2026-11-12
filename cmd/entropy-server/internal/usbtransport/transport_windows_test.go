@@ -1,6 +1,6 @@
 //go:build windows && amd64
 
-package quantisusb
+package usbtransport
 
 import (
 	"bytes"
@@ -14,8 +14,13 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func windowsUSBPipe(t *testing.T) (*windowsTransport, windows.Handle) {
+func windowsUSBPipe(t *testing.T, profiles ...Profile) (*windowsTransport, windows.Handle) {
 	t.Helper()
+
+	profile := Quantis
+	if len(profiles) > 0 {
+		profile = profiles[0]
+	}
 
 	name, err := windows.UTF16PtrFromString(fmt.Sprintf(`\\.\pipe\quantis-usb-test-%d-%d`, os.Getpid(), time.Now().UnixNano()))
 	if err != nil {
@@ -29,7 +34,11 @@ func windowsUSBPipe(t *testing.T) (*windowsTransport, windows.Handle) {
 	}
 
 	calls := winCalls{
-		read: func(_ uintptr, _ byte, p []byte, n *uint32, op *windows.Overlapped) error {
+		read: func(_ uintptr, endpoint byte, p []byte, n *uint32, op *windows.Overlapped) error {
+			if endpoint != profile.Endpoint() {
+				t.Errorf("wrong seed endpoint: 0x%x", endpoint)
+			}
+
 			return windows.ReadFile(file, p, n, op)
 		},
 		result: func(_ uintptr, op *windows.Overlapped, n *uint32, wait bool) error {
@@ -38,7 +47,7 @@ func windowsUSBPipe(t *testing.T) (*windowsTransport, windows.Handle) {
 		free: func(uintptr) error { return nil },
 	}
 
-	driver, err := newWindowsTransport(file, 1, calls)
+	driver, err := newWindowsTransport(file, 1, calls, profile.Endpoint())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,29 +79,37 @@ func windowsUSBPipe(t *testing.T) (*windowsTransport, windows.Handle) {
 }
 
 func TestWinUSBCompletionCancelDrainAndReuse(t *testing.T) {
-	driver, writer := windowsUSBPipe(t)
-	if err := driver.SetReadDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
-		t.Fatal(err)
-	}
+	for _, profile := range []Profile{Quantis, ChaosKey} {
+		driver, writer := windowsUSBPipe(t, profile)
+		if profile == ChaosKey {
+			if _, err := driver.Control(0x10, make([]byte, 4)); err == nil {
+				t.Fatal("ChaosKey vendor control accepted")
+			}
+		}
 
-	data := make([]byte, 64)
-	if n, err := driver.Bulk(data); n != 0 || !errors.Is(err, os.ErrDeadlineExceeded) {
-		t.Fatalf("timeout not drained: %d %v", n, err)
-	}
+		if err := driver.SetReadDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
 
-	if err := driver.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
-		t.Fatal(err)
-	}
+		data := make([]byte, 64)
+		if n, err := driver.Bulk(data); n != 0 || !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Fatalf("timeout not drained: %d %v", n, err)
+		}
 
-	want := bytes.Repeat([]byte{0x77}, 64)
+		if err := driver.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+			t.Fatal(err)
+		}
 
-	var n uint32
-	if err := windows.WriteFile(writer, want, &n, nil); err != nil {
-		t.Fatal(err)
-	}
+		want := bytes.Repeat([]byte{0x77}, 64)
 
-	if count, err := driver.Bulk(data); count != 64 || err != nil || !bytes.Equal(data, want) {
-		t.Fatalf("reuse after cancellation: %d %v", count, err)
+		var n uint32
+		if err := windows.WriteFile(writer, want, &n, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		if count, err := driver.Bulk(data); count != 64 || err != nil || !bytes.Equal(data, want) {
+			t.Fatalf("reuse after cancellation: %d %v", count, err)
+		}
 	}
 }
 

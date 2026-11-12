@@ -104,6 +104,12 @@ model-specific health, partial/error reads, budget exhaustion, source identity,
 sample non-disclosure and closure. Native Windows and packaged ZIP CLI checks
 run without a QRNG; they do not certify a physical card.
 
+[Experimental ChaosKey](https://github.com/fantuz/entropy-service/blob/main/docs/chaoskey.md)
+is selected with `chaoskey-usb:N`. Linux inventory distinguishes its existing
+kernel `kernel_paths` from raw USB transport `paths`; one does not imply the
+other's read contract. The cooked protocol has no documented runtime health
+query, so a successful sample still reports `health_available: false`.
+
 Use the [qualification matrix and physical-record template](https://github.com/fantuz/entropy-service/blob/main/docs/hardware-qualification.md)
 to record device identity, host/driver versions, source throughput and observed
 cancellation separately. A passing probe alone does not complete qualification.

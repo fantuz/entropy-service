@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +24,10 @@ func openEntropySource(path string, require bool) (io.ReadCloser, string, error)
 	if source, actual, selected, err := openUSBEntropySource(path); selected {
 		return source, actual, err
 	}
+
+	if isChaosKeyDevicePath(path) {
+		require = true
+	} // Explicit ChaosKey requests never select OS fallback.
 
 	return selectEntropySource(path, require, openCharacterEntropySource)
 }
@@ -50,7 +56,7 @@ func openCharacterEntropySource(path string) (io.ReadCloser, error) {
 	stat, known := info.Sys().(*syscall.Stat_t)
 	if known && unix.Major(stat.Rdev) == 189 {
 		_ = f.Close()
-		return nil, errors.New("raw USB device nodes expose descriptors, not entropy; use a supported quantis-usb:N transport")
+		return nil, errors.New("raw USB device nodes expose descriptors, not entropy; use a supported quantis-usb:N or chaoskey-usb:N transport")
 	}
 
 	if known && unix.Major(stat.Rdev) == 1 && (unix.Minor(stat.Rdev) == 8 || unix.Minor(stat.Rdev) == 9) {
@@ -72,6 +78,10 @@ func openCharacterEntropySource(path string) (io.ReadCloser, error) {
 	}
 
 	_ = f.Close()
+
+	if isChaosKeyDevicePath(path) {
+		return nil, fmt.Errorf("ChaosKey kernel interface %q lacks read deadlines: a pollable, nonblocking driver is required; direct cooked USB uses chaoskey-usb:N after the operator releases kernel-driver ownership (see docs/chaoskey.md)", path)
+	}
 
 	return nil, fmt.Errorf("entropy device %q does not support read deadlines; a pollable, nonblocking driver is required", path)
 }
@@ -116,4 +126,8 @@ func checkOSSeedReady(getrandom func([]byte, int) (int, error)) error {
 	}
 
 	return nil
+}
+
+func isChaosKeyDevicePath(path string) bool {
+	return strings.HasPrefix(path, "/dev/") && strings.HasPrefix(filepath.Base(path), "chaoskey")
 }

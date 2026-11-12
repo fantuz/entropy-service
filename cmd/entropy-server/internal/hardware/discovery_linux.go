@@ -31,7 +31,7 @@ func discoverLinux(sysRoot, devRoot string) (Inventory, error) {
 		for _, entry := range entries {
 			path := filepath.Join(sysRoot, "bus", bus, "devices", entry.Name())
 
-			device, ok := linuxDevice(path, bus, devRoot)
+			device, ok := linuxDevice(path, bus, sysRoot, devRoot)
 			if !ok {
 				continue
 			}
@@ -55,7 +55,7 @@ func discoverLinux(sysRoot, devRoot string) (Inventory, error) {
 	return result, nil
 }
 
-func linuxDevice(path, bus, devRoot string) (Device, bool) {
+func linuxDevice(path, bus, sysRoot, devRoot string) (Device, bool) {
 	vendorName, productName := "vendor", "device"
 	if bus == linuxUSBBus {
 		vendorName, productName = "idVendor", "idProduct"
@@ -65,7 +65,7 @@ func linuxDevice(path, bus, devRoot string) (Device, bool) {
 	product := strings.ToLower(strings.TrimPrefix(readAttribute(path, productName), "0x"))
 
 	family, model, known := Identify(vendor, product)
-	if !known || (bus == linuxUSBBus) != (family == USB) {
+	if !known || (bus == linuxUSBBus) != isUSBFamily(family) {
 		return Device{}, false
 	}
 
@@ -80,6 +80,11 @@ func linuxDevice(path, bus, devRoot string) (Device, bool) {
 	}
 
 	if bus == linuxUSBBus {
+		// Driver ownership belongs to interface 0, not the USB core device.
+		if target, err := os.Readlink(path + ":1.0/driver"); err == nil {
+			device.Driver = filepath.Base(target)
+		}
+
 		device.Serial = readAttribute(path, "serial")
 		busNumber, busErr := strconv.Atoi(readAttribute(path, "busnum"))
 
@@ -89,7 +94,16 @@ func linuxDevice(path, bus, devRoot string) (Device, bool) {
 		}
 
 		device.State = "usbfs_path_reported"
+
 		device.Notes = []string{"USB device nodes are not entropy byte streams; a control/bulk transport is required"}
+		if family == ChaosKey {
+			device.KernelPaths = linuxCharacterNodes(sysRoot, devRoot, path, "chaoskey*")
+
+			device.Notes = append(device.Notes, "Cooked endpoint 0x85 only; raw 0x86 and flash 0x87 are not seed sources", "The kernel /dev/chaoskeyN interface requires a poll/nonblocking deadline contract; device existence alone does not establish it")
+			if device.Driver != "" {
+				device.Notes = append(device.Notes, "USB interface is owned by "+device.Driver+"; direct USB never detaches a kernel driver automatically")
+			}
+		}
 	}
 
 	return device, true
@@ -105,6 +119,10 @@ func readAttribute(path, name string) string {
 }
 
 func linuxDeviceNodes(sysRoot, devRoot, path string) []string {
+	return linuxCharacterNodes(sysRoot, devRoot, path, "qrandom*")
+}
+
+func linuxCharacterNodes(sysRoot, devRoot, path, pattern string) []string {
 	paths := []string{}
 
 	realDevice, err := filepath.EvalSymlinks(path)
@@ -112,7 +130,7 @@ func linuxDeviceNodes(sysRoot, devRoot, path string) []string {
 		return paths
 	}
 
-	candidates, _ := filepath.Glob(filepath.Join(sysRoot, "class", "*", "qrandom*"))
+	candidates, _ := filepath.Glob(filepath.Join(sysRoot, "class", "*", pattern))
 	for _, candidate := range candidates {
 		realNode, err := filepath.EvalSymlinks(filepath.Join(candidate, "device"))
 		if err != nil || (realNode != realDevice && !strings.HasPrefix(realNode, realDevice+string(filepath.Separator))) {
