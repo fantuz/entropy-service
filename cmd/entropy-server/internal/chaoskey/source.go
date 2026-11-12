@@ -1,5 +1,5 @@
-// Package chaoskey reads the ChaosKey firmware's cooked endpoint, never its raw
-// ADC or flash endpoints. This experimental source does not certify device health.
+// Package chaoskey reads cooked ChaosKey output for seeding and optionally raw
+// samples for diagnostic capture. It never reads flash or certifies device health.
 package chaoskey
 
 import (
@@ -47,7 +47,18 @@ type Source struct {
 }
 
 func Open(path string) (*Source, error) {
-	device, packet, err := usbtransport.Open(path, usbtransport.ChaosKey)
+	return OpenCapture(path, false)
+}
+
+// OpenCapture selects raw samples only when explicitly requested by diagnostic
+// capture. Open and all server seed selectors always use cooked output.
+func OpenCapture(path string, raw bool) (*Source, error) {
+	profile := usbtransport.ChaosKey
+	if raw {
+		profile = usbtransport.ChaosKeyRaw
+	}
+
+	device, packet, err := usbtransport.Open(path, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +68,7 @@ func Open(path string) (*Source, error) {
 
 func newSource(device usbtransport.Transport, packet int) (*Source, error) {
 	if packet != packetSize {
-		return nil, errors.Join(errors.New("ChaosKey requires the referenced 64-byte cooked bulk endpoint"), device.Close())
+		return nil, errors.Join(errors.New("ChaosKey requires the referenced 64-byte bulk endpoint"), device.Close())
 	}
 
 	return &Source{device: device}, nil
@@ -131,7 +142,7 @@ func (s *Source) Read(p []byte) (int, error) {
 	}
 
 	if n < 0 || n > len(buffer) {
-		return 0, errors.New("invalid ChaosKey cooked transfer length")
+		return 0, errors.New("invalid ChaosKey transfer length")
 	}
 
 	if n == 0 {

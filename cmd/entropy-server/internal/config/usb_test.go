@@ -41,7 +41,7 @@ func TestChaosKeyExplicitPlatformSelection(t *testing.T) {
 		}
 	}
 
-	for _, selector := range []string{"chaoskey-usb:-1", "chaoskey-usb:127", "chaoskey-usb:00", "chaoskey-usb"} {
+	for _, selector := range []string{"chaoskey-usb:-1", "chaoskey-usb:127", "chaoskey-usb:00", "chaoskey-usb", "chaoskey-raw:0", "chaoskey-usb:0?mode=raw"} {
 		cfg := Config{DevicePath: selector}
 		if err := cfg.validatePlatform("linux"); err == nil {
 			t.Fatal(selector)

@@ -5,6 +5,8 @@ backend targets USB **1d50:60c6**, interface **0**, alternate **0**, cooked
 bulk-IN endpoint **0x85**, with the referenced full-speed 64-byte packets.
 Raw ADC samples (`0x86`) and firmware/flash data (`0x87`) are never seed sources.
 Unknown identities/layouts are rejected; there is no raw-endpoint fallback.
+An explicit [diagnostic capture](#diagnostic-capture-cooked-by-default-raw-on-demand)
+can save raw samples separately, without starting or changing server generation.
 
 The implementation uses one shared Go source tree and the same bounded native
 USB mechanics as Quantis USB, with separate identity and source-protocol checks.
@@ -134,6 +136,82 @@ checking with a ChaosKey.
 Protocol references are the [ChaosKey project](https://altusmetrum.org/ChaosKey/),
 [Keith Packard's reader](https://github.com/keith-packard/chaosread/blob/master/chaosread.c)
 and the upstream kernel driver. The author's `chaosread` defaults to **raw**;
-`-c -b` explicitly requests cooked binary output. Unlike that utility, this backend
+`-c` selects cooked output and `-b` extracts bits from 16-bit values. Unlike that utility, this backend
 does not automatically detach a Linux driver. No third-party ChaosKey reader or
 firmware implementation is bundled; the application remains MIT licensed.
+
+## Diagnostic capture: cooked by default, raw on demand
+
+Raw access has value for inspecting sensor bias, correlations, repeated or stuck
+readings, and comparing the acquisition path with firmware-processed output.
+Firmware conditioning can make those patterns harder to see. Raw is not
+automatically better randomness: ADC resolution, word packing and unused bits
+affect byte histograms and Shannon values. A low byte-wise Shannon value alone
+does not establish a fault, and a high value does not establish unpredictability.
+
+Use the separate `hardware capture` command for a bounded binary recording:
+
+```sh
+# The default remains cooked output, endpoint 0x85.
+entropy-server hardware capture -device=chaoskey-usb:0 -out=cooked.bin -bytes=1048576 -timeout=10s -json
+
+# Explicit diagnostic raw samples, endpoint 0x86.
+entropy-server hardware capture -device=chaoskey-usb:0 -mode=raw -out=raw.bin -bytes=1048576 -timeout=10s -json
+```
+
+In PowerShell, replace `entropy-server` with `.\entropy-server.exe`. To retain
+the JSON report, append `> raw-report.json` (or the corresponding cooked report
+name). Binary bytes go only to `-out`; stdout contains a human-readable report
+unless `-json` is selected. The capture command does not start HTTP(S), need a
+certificate, seed a DRBG or change the service configuration.
+
+- `-mode=cooked` is the default; `-mode=raw` selects only ChaosKey `0x86`.
+  There is no arbitrary endpoint option and no flash access. Normal server
+  `-device=chaoskey-usb:N` and `hardware probe` continue to select cooked `0x85`.
+  Raw is not a server seed selector or a fallback for missing cooked output.
+- `-bytes` is 64..8,388,608, in multiples of 64, default 1 MiB. The file contains
+  exactly the requested accepted prefix, unchanged: no ADC decoding, byte-order
+  conversion, bit extraction or whitening. Any unused transfer tail is discarded.
+  In particular this is not `chaosread -b`'s extraction of eight bits from each
+  16-bit value; decode according to the device's actual firmware/sample format.
+- `-timeout` is 1 ms..5 min, default 10 s. Discovery/open count toward the read
+  budget; partial reads must complete within that budget. The shared native USB
+  cancellation/draining contract still applies. Synchronous OS/driver calls and
+  output-file writes can outlast it; this is not a process watchdog.
+- `-out` must name a new regular file. Existing paths, including existing
+  symlinks, are refused; exclusive creation also handles a destination appearing
+  during acquisition. Read, cancellation or source-close errors discard the
+  sample before file creation. File-write/sync/close failures trigger removal of
+  the incomplete file; cleanup errors are reported. A crash or forced process
+  kill can still leave an incomplete artifact: require `capture_ok: true`, the
+  reported byte count and matching SHA-256 before accepting it. A report-output
+  error after a successful save leaves the completed binary file in place.
+- Unix creation requests mode `0600`; Windows uses the shared private-file helper
+  to create a protected current-account-only DACL before writing, failing closed
+  if that policy cannot be verified. Use an ACL-capable filesystem and a directory
+  you control. No directories are created and
+  no output is sent to stdout, a device node or the network as a binary stream.
+
+Capture needs the same operator-provisioned USB access and WinUSB binding as
+cooked operation. It claims the device/interface exclusively: stop the server
+or other reader first. It never detaches the Linux driver automatically or
+changes OS RNG policy. Simultaneous raw/cooked operation and their physical
+interaction have not been qualified.
+
+The JSON report records the requested/actual selector, mode, endpoint, OS and
+architecture, available discovery identity/driver metadata, exact byte count,
+read timing, output filename and SHA-256. `read_mib_per_second` times the complete
+accepted read, including waits/partial reads but excluding discovery, open,
+source close and file writing; `elapsed_ms` covers the whole capture operation.
+Discovery metadata is an OS inventory snapshot, not a firmware attestation.
+`firmware_version` stays `null`: the command sends no flash or undocumented
+health queries. `health_available`, `cancellation_tested` and `quality_assessed`
+stay false. A successful capture does not qualify the device.
+
+Record raw and cooked sessions separately using the
+[qualification guide](https://github.com/fantuz/entropy-service/blob/main/docs/hardware-qualification.md),
+including the firmware/sample-format reference, kernel/OS build and driver
+version. The historical CI checkpoints in its original matrix predate raw
+capture. Raw support has descriptor/routing tests and Linux/Windows simulated
+completion/cancellation tests; neither replaces physical qualification. LAB
+visualization and live raw network export are not provided by this command.

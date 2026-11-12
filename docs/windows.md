@@ -112,6 +112,12 @@ interface; it never installs a driver or silently substitutes OS randomness.
 See [ChaosKey setup and limits](https://github.com/fantuz/entropy-service/blob/main/docs/chaoskey.md).
 It is not a Windows CNG provider and has not been qualified with physical hardware.
 
+For a bounded diagnostic recording, `hardware capture -device=chaoskey-usb:0 -out=cooked.bin`
+defaults to cooked `0x85`; add `-mode=raw` for raw `0x86`. Capture uses the private-file ACL policy
+below, never overwrites an existing file and never changes server seed selection.
+See the [capture instructions](chaoskey.md#diagnostic-capture-cooked-by-default-raw-on-demand)
+for byte/time limits, metadata and raw sample interpretation.
+
 ## Files, logs and TLS
 
 Windows private files receive a protected DACL granting full access only to the

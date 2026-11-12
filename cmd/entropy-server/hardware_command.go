@@ -17,13 +17,15 @@ import (
 )
 
 type hardwareCommand struct {
-	discover func() (hardware.Inventory, error)
-	open     func(string) (io.ReadCloser, string, error)
+	discover    func() (hardware.Inventory, error)
+	open        func(string) (io.ReadCloser, string, error)
+	openCapture func(string, bool) (io.ReadCloser, string, error)
 }
 
 const (
-	hardwareList  = "list"
-	hardwareProbe = "probe"
+	hardwareList    = "list"
+	hardwareProbe   = "probe"
+	hardwareCapture = "capture"
 )
 
 type probeReport struct {
@@ -47,7 +49,7 @@ type probeReport struct {
 }
 
 func runHardwareCommand(ctx context.Context, args []string, output, diagnostics io.Writer) int {
-	command := hardwareCommand{discover: hardware.Discover, open: openProbeSource}
+	command := hardwareCommand{discover: hardware.Discover, open: openProbeSource, openCapture: openChaosKeyCapture}
 
 	return command.run(ctx, args, output, diagnostics)
 }
@@ -80,14 +82,20 @@ func (command hardwareCommand) run(ctx context.Context, args []string, output, d
 	if len(args) == 0 || args[0] == "-help" || args[0] == "--help" || args[0] == "-h" {
 		fmt.Fprintln(output, "Usage: entropy-server hardware list [-json]")
 		fmt.Fprintln(output, "       entropy-server hardware probe -device=SOURCE [-bytes=64] [-timeout=3s] [-json]")
+		fmt.Fprintln(output, "       entropy-server hardware capture -device=chaoskey-usb:N -out=FILE [-mode=cooked|raw] [-bytes=1048576] [-timeout=10s] [-json]")
 		fmt.Fprintln(output, "List reads OS metadata only. Probe opens one explicit source, queries supported health data and discards a sample.")
+		fmt.Fprintln(output, "Capture saves a bounded ChaosKey sample to a new file; raw mode is diagnostic only, never a seed selector.")
 
 		return 0
 	}
 
 	action := args[0]
+	if action == hardwareCapture {
+		return command.runCapture(ctx, args[1:], output, diagnostics)
+	}
+
 	if action != hardwareList && action != hardwareProbe {
-		fmt.Fprintf(diagnostics, "unknown hardware action %q; use list or probe\n", action)
+		fmt.Fprintf(diagnostics, "unknown hardware action %q; use list, probe or capture\n", action)
 
 		return 2
 	}

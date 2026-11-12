@@ -80,6 +80,25 @@ class WindowsSmoke(unittest.TestCase):
                             contains=b"use -device=chaoskey-usb:0")
             self.assertNotIn(b"load TLS certificate", result.stderr)
 
+    def test_chaoskey_capture_modes_do_not_fallback_or_create_failed_output(self):
+        with tempfile.TemporaryDirectory(prefix="entropy-capture-") as work:
+            target = Path(work) / "capture.bin"
+            for mode, endpoint in [(None, "0x85"), ("raw", "0x86")]:
+                args = ["hardware", "capture", "-device=chaoskey-usb:126",
+                        f"-out={target}", "-bytes=64", "-json"]
+                if mode:
+                    args.append(f"-mode={mode}")
+                report = json.loads(invoke(SERVER, *args, code=1).stdout)
+                self.assertEqual(report["mode"], mode or "cooked")
+                self.assertEqual(report["endpoint"], endpoint)
+                self.assertFalse(report["capture_ok"])
+                self.assertEqual(report["bytes_captured"], 0)
+                self.assertNotIn("actual_source", report)
+                self.assertFalse(target.exists())
+            invoke(SERVER, "hardware", "capture", "-device=windows-csprng",
+                   f"-out={target}", code=2)
+            self.assertFalse(target.exists())
+
     @classmethod
     def setUpClass(cls):
         # Hosted runners can start without a console. Attach children to a private
