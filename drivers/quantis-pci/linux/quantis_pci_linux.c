@@ -172,45 +172,63 @@ static ssize_t quantis_read(struct file *file, char __user *buffer,
 			    size_t length, loff_t *position)
 {
 	struct quantis_device *q = file->private_data;
-	u8 sample[QUANTIS_READ_MAX];
+	u8 *sample;
 	int count, result;
 	unsigned long remaining;
 	if (!length)
 		return 0;
-	length = min_t(size_t, length, sizeof(sample));
+	length = min_t(size_t, length, QUANTIS_READ_MAX);
+	/* Keep the kernel stack bounded even on CONFIG_FRAME_WARN=1024 kernels.
+  * Nonblocking callers never wait for memory reclaim or for sample data. */
+	sample = kmalloc(length,
+			 file->f_flags & O_NONBLOCK ? GFP_NOWAIT : GFP_KERNEL);
+	if (!sample)
+		return -ENOMEM;
 	for (;;) {
 		if (file->f_flags & O_NONBLOCK) {
-			if (!mutex_trylock(&q->lock))
-				return -EAGAIN;
-		} else if (mutex_lock_interruptible(&q->lock))
-			return -ERESTARTSYS;
+			if (!mutex_trylock(&q->lock)) {
+				result = -EAGAIN;
+				goto free;
+			}
+		} else if (mutex_lock_interruptible(&q->lock)) {
+			result = -ERESTARTSYS;
+			goto free;
+		}
 		if (q->removed) {
 			mutex_unlock(&q->lock);
-			return -ENODEV;
+			result = -ENODEV;
+			goto free;
 		}
 		if (q->suspended) {
 			mutex_unlock(&q->lock);
-			return -EIO;
+			result = -EIO;
+			goto free;
 		}
 		count = quantis_read_available(&q->stream, sample, length);
 		quantis_refresh(q);
 		mutex_unlock(&q->lock);
-		if (count < 0)
-			return count;
+		if (count < 0) {
+			result = count;
+			goto free;
+		}
 		if (count)
 			break;
-		if (file->f_flags & O_NONBLOCK)
-			return -EAGAIN;
+		if (file->f_flags & O_NONBLOCK) {
+			result = -EAGAIN;
+			goto free;
+		}
 		result = wait_event_interruptible(q->readers,
 						  READ_ONCE(q->ready));
 		if (result)
-			return result;
+			goto free;
 	}
-	/* User faults must not hold the MMIO/removal mutex. Kernel VFS holds the file
-  * reference until .read returns, even if another thread closes the fd. */
+	/* User faults must not hold the MMIO/removal mutex. VFS holds the file until
+  * .read returns, even if another thread closes the descriptor. */
 	remaining = copy_to_user(buffer, sample, count);
-	memzero_explicit(sample, sizeof(sample));
-	return remaining == count ? -EFAULT : count - remaining;
+	result = remaining == count ? -EFAULT : count - remaining;
+free:
+	kfree_sensitive(sample);
+	return result;
 }
 
 static __poll_t quantis_poll(struct file *file, poll_table *table)
