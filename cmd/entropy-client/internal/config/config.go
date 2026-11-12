@@ -94,7 +94,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.BoolVar(&cfg.ShowGraph, "graph", false, "print distribution graph")
 	flags.BoolVar(&cfg.ShowDashboard, "dashboard", false, "print dashboard summaries")
 	flags.BoolVar(&cfg.ShowHistogram, "histogram", false, "print extended histogram")
-	flags.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall (unavailable on Windows)")
+	flags.BoolVar(&cfg.ShowWaterfall, "waterfall", false, "show recent analysed sample prefixes as a terminal waterfall")
 	flags.StringVar(&cfg.WaterfallMode, "waterfall-mode", diag.WaterfallByte, "waterfall mapping: byte (vivid hue)|rgb (triplets)|gray")
 	flags.IntVar(&cfg.WaterfallColumns, "waterfall-columns", 0, "waterfall cells per row (0 = fit layout; otherwise 8..512; two terminal columns per cell)")
 	flags.IntVar(&cfg.WaterfallRows, "waterfall-rows", 0, "waterfall history (0 = fit layout; otherwise 1..512; newest first)")
@@ -180,12 +180,6 @@ func (cfg *Config) validatePlatform(goos string) error {
 		return errors.New("device output and -writeout are unavailable on Windows; use -output=FILE")
 	case cfg.OutputPath == "-":
 		return errors.New("raw stdout export is unavailable on Windows; use -output=FILE (normal text stdout remains available)")
-	case cfg.ShowWaterfall || cfg.Layout == terminal.LayoutWaterfall || cfg.WaterfallColumns != 0 || cfg.WaterfallRows != 0 || (cfg.WaterfallMode != "" && cfg.WaterfallMode != diag.WaterfallByte):
-		return errors.New("terminal waterfall is unavailable on Windows; use the browser stream page or plain diagnostics")
-	case cfg.Layout == terminal.LayoutFull:
-		return errors.New("full terminal layout and automatic sizing are unavailable on Windows; use -layout=compact or auto for scrolling text")
-	case cfg.Color != "" && cfg.Color != defaultColorMode && cfg.Color != noColorMode:
-		return errors.New("terminal colors are unavailable in this Windows build; use -color=auto or never for plain text")
 	default:
 		return nil
 	}

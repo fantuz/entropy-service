@@ -7,8 +7,8 @@ separate application tree or copied Windows implementation.
 
 Client transport aliases (`http`/`pull`, `websocket`/`push`/`stream`) and
 six-decimal plain-text Shannon diagnostics are shared with Linux. The native
-and packaged Windows smoke tests exercise every alias. Terminal waterfall and
-color support retain the explicit limits below.
+and packaged Windows smoke tests exercise every alias. Native VT-console sizing,
+monochrome waterfalls and opt-in colors share the Linux renderer.
 
 This first port targets x64 console applications on modern Windows. It does not
 install a Windows service. Windows ARM64 releases await native validation. Linux
@@ -63,31 +63,50 @@ an interrupted or failed one. Existing output/report files are never replaced.
 
 ## Explicit capability limits
 
-| Feature | Initial Windows behaviour |
+| Feature | Windows behaviour |
 | --- | --- |
 | OS seeding | `windows-csprng`, through `crypto/rand`. |
 | Hardware seeding | Experimental `-device=quantis-pci:0` for legacy PCI (`179a:0001`) with a matching installed driver, or `-device=quantis-usb:0` for the [referenced USB model](quantis-usb.md) with WinUSB binding. Explicit hardware selection never falls back. Other raw device paths are rejected. |
 | Processor randomness | Optional `-cpu-mix` / `-rdrand-mix` retains shared support checks and retry limits. It supplements the selected seed source. |
 | Socket tuning | Go/Windows defaults; custom Linux tuning is disabled and reported at startup. |
 | Browser visualizations | Shared pages, including browser waterfalls and layout controls. |
-| Terminal output | Plain scrolling text in CMD, PowerShell or Windows Terminal. `-layout=auto` selects compact output; no sizing or cursor refresh. |
-| Terminal full/waterfall layouts | Explicit requests, including waterfall bounds/nondefault modes, are rejected. Use compact diagnostics or the browser stream page. |
-| Terminal colours | `auto`/`never` select plain text; forced colours are rejected in this first port. |
+| Terminal output | Native viewport detection and redraw on VT-capable consoles; stacked text on legacy/unknown hosts and redirects. One spare right column avoids classic-console wrapping. |
+| Terminal full/waterfall layouts | Shared `auto`/`compact`/`full`/`waterfall` layouts and bounds. Unknown hosts fall back to stacked monochrome history. |
+| Terminal colours | Windows `auto` is monochrome; explicit `always`, `256` and `truecolor` work on a detected VT console. Redirected output stays unstyled. |
 | Raw binary export | Private `-output=FILE` with byte-limit accounting. `-output=-` is rejected with a file-export alternative. |
 | JSONL | Private `-report=FILE`, or text stdout with `-report=- -headless`. |
 | Linux device output | `-writeout` and `-output-device` are rejected. |
 | LAB sources | HTTP/WS peers, page fetches, TCP/UDP and browser camera/microphone remain shared. Direct devices and Unix socket registrations are rejected; use a network adapter. |
 | RTSP/ONVIF | Requires compatible `ffmpeg.exe` on PATH; Windows CI does not certify physical camera/decoder integration. |
 
-The existing non-Linux fallback files have narrow meanings: terminal sizing
-returns “unknown”, selecting scrolling text; device/raw-stdout adapters return
-explicit errors. They do **not** disable normal stdout, stderr, JSONL or file
+Windows uses its own console adapter; other unsupported terminals retain unknown
+sizing/scrolling text. Device/raw-stdout adapters return explicit errors. They
+do **not** disable normal stdout, stderr, JSONL or file
 exports. JSONL stdout pipes use cancellable writes; an unread or broken pipe is a report
 error and can leave an incomplete last record. Healthy consumers receive the
 normal summary. See [report lifecycle](client-experiments.md).
 
 Windows capability validation rejects explicit unsupported options
 before beginning an experiment, even with `-headless`.
+
+### Waterfall and optional colors
+
+Windows Terminal with PowerShell 7 is recommended. PowerShell selects the shell;
+the host determines cursor and color support. Start with the monochrome default:
+
+```powershell
+.\bin\entropy-client.exe -mode=push -layout=waterfall -color=never
+.\bin\entropy-client.exe -mode=push -layout=waterfall -waterfall-mode=rgb -color=truecolor
+```
+
+The second command opts into 24-bit colors on a compatible VT host. No plug-in or
+shell-profile change is required. Console output mode is enabled for this session
+and the added flags are restored on normal exit or console interruption; input
+mode/code page are unchanged. `TERM=dumb` disables interactive positioning.
+Files, pipes and unsupported hosts keep readable monochrome output. Resizing
+uses the visible viewport, not scrollback. See the
+[terminal guide](https://github.com/fantuz/entropy-service/blob/main/docs/client-terminal.md)
+for bounds, performance measurements and redraw trade-offs.
 
 OS randomness is read synchronously in bounded chunks. Deadlines/closure are
 checked before/after calls; the shared seed reader checks its context between
@@ -169,7 +188,8 @@ trust](client-tls.md).
 Linux CI/regression and packaging remain in place. A reusable Windows job runs
 all Go tests, vet/lint, builds both executables and runs
 `python scripts/test_windows.py` for real HTTP/HTTPS/WS exchanges, file/JSONL
-captures, certificate reuse, platform errors, plain stdout and console shutdown.
+captures, certificate reuse, platform errors, plain stdout, live console waterfalls
+and restoration after duration/console shutdown.
 Release publication waits for Linux/browser validation and native Windows checks.
 
 CI also uploads the GoReleaser-created Windows ZIP as the seven-day
@@ -204,6 +224,11 @@ an exact zero-percent timing difference on every host. Go tests establish
 correctness; meaningful throughput comparisons also need controlled CPU load,
 the same Go version, backend, payload sizes and sufficient repeated measurements.
 Additional Windows build/package jobs cost CI time, not Linux serving time.
+
+The broader [v2.0.3 Linux performance assessment](https://github.com/fantuz/entropy-service/blob/main/docs/linux-performance-v2.0.3.md)
+compares the released code with the last pre-port revision, including transfer,
+CPU, allocation and footprint evidence. The current renderer optimization is
+measured separately in the terminal guide.
 
 A focused comparison on 2026-11-11 used Go 1.26.11, Linux amd64,
 `CGO_ENABLED=0`, `GOMAXPROCS=1`, `GOGC=100`, six alternating baseline/port samples
@@ -240,8 +265,9 @@ cannot convert their LF bytes to CRLF and break their SHA-256 integrity checks.
 Existing suffixes select Linux device/PTY tests. POSIX shell camera fixtures and
 mode-bit cases are explicitly skipped on Windows; native ACL tests cover its file
 policy. Missing symlink privilege skips only the relevant symlink test. Hardware
-QRNG, Windows ARM64, RTSP devices and interactive colour/resize support are not
-established by cross-compilation.
+QRNG, Windows ARM64, RTSP devices and every desktop terminal's rendering quality
+are not established by cross-compilation. Native console sizing/resize/palette
+tests and actual executable console checks cover the implemented Windows adapter.
 
 Shared seed-lifecycle tests retain real OS pipes on Linux. Windows anonymous pipes
 lack read deadlines, so those tests use a buffered loopback TCP pair on Windows.

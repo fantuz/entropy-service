@@ -17,7 +17,7 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Value("Build / platform", fmt.Sprintf("%s / %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH))
 
 	if runtime.GOOS == "windows" {
-		r.Value("Windows capabilities", "plain scrolling text; file exports/JSONL; terminal sizing/colors/waterfall and raw stdout/device exports unavailable")
+		r.Value("Windows capabilities", "VT console: adaptive layouts/waterfall, monochrome auto, opt-in colors; pipes/legacy hosts: plain text; file exports/JSONL; raw stdout/device exports unavailable")
 	}
 
 	r.Value("Transport", cfg.Mode)

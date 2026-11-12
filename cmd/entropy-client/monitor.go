@@ -46,6 +46,7 @@ type monitorState struct {
 	graph         *diag.EntropyGraph
 	dashboard     *diag.Dashboard
 	waterfall     *diag.Waterfall
+	screen        []byte
 }
 
 type writeoutSink interface {

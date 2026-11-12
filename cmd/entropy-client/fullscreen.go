@@ -86,7 +86,8 @@ func (m *monitorState) renderFull(out io.Writer, profile terminal.Profile) {
 
 	if !m.hasSample {
 		line("Receiving; waiting for an analysed sample")
-		fmt.Fprint(out, screen.String())
+
+		_, _ = io.WriteString(out, screen.String())
 
 		return
 	}
@@ -205,5 +206,6 @@ func (m *monitorState) renderFull(out io.Writer, profile terminal.Profile) {
 	}
 
 	line(footer)
-	fmt.Fprint(out, screen.String())
+
+	_, _ = io.WriteString(out, screen.String())
 }
