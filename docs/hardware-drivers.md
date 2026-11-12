@@ -222,11 +222,11 @@ identifies USB **`1d50:60c6`**, interface zero and these bulk-IN endpoints:
 | Endpoint | Meaning in that implementation | Proposed use |
 | --- | --- | --- |
 | `0x85` | Cooked output | Candidate seed stream after device/descriptor validation |
-| `0x86` | Raw samples | Separate lab capture/analysis, not an interchangeable seed stream |
+| `0x86` | Raw samples | Explicit diagnostic `hardware capture -mode=raw`; never a seed selector |
 | `0x87` | Flash contents | Firmware data, not entropy |
 
-`chaosread` defaults to **raw**, not cooked; its cooked/binary capture options
-are `-c -b`. Refer to its own documentation before using it. Its Linux userspace
+`chaosread` defaults to **raw**, not cooked; `-c` selects cooked output and `-b`
+extracts eight bits from each 16-bit value. Refer to its own documentation before using it. Its Linux userspace
 implementation can detach the kernel driver, which can affect OS RNG collection;
 that behaviour should not be copied into an automatic seed-source open.
 
@@ -243,8 +243,10 @@ The separate [experimental ChaosKey cooked backend](https://github.com/fantuz/en
 now provides explicit `chaoskey-usb:N` selection on released Linux targets and
 Windows x64. It reuses the native USB cancellation mechanics through a neutral
 transport package, while retaining separate identity/descriptor and cooked-source
-checks. It never reads raw endpoint `0x86` or flash endpoint `0x87`, detaches the
-Linux kernel driver, installs WinUSB or changes OS RNG policy. Existing
+checks. Server seeding and probes never read raw endpoint `0x86` or flash `0x87`.
+The separate diagnostic capture command can explicitly read raw `0x86`; see the
+[rationale and capture instructions](chaoskey.md#diagnostic-capture-cooked-by-default-raw-on-demand).
+No path detaches the Linux kernel driver, installs WinUSB or changes OS RNG policy. Existing
 `/dev/chaoskeyN` nodes are reported separately and must meet the actual
 poll/nonblocking deadline contract before direct reads are allowed. Device
 health remains unavailable for the cooked protocol; simulated/native I/O tests

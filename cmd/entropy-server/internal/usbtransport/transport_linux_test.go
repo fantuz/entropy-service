@@ -16,7 +16,7 @@ import (
 )
 
 type usbfsFixture struct {
-	endpoint  byte
+	profile   Profile
 	mu        sync.Mutex
 	active    *usbURB
 	buffer    []byte
@@ -37,12 +37,7 @@ func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
 		t.Fatal(err)
 	}
 
-	endpoint := fixture.endpoint
-	if endpoint == 0 {
-		endpoint = Quantis.Endpoint()
-	}
-
-	driver := &linuxTransport{fd: 9999, wake: wake, endpoint: endpoint}
+	driver := &linuxTransport{fd: 9999, wake: wake, endpoint: fixture.profile.Endpoint(), profile: fixture.profile}
 	driver.calls = linuxCalls{
 		ioctl: func(_ int, request uint, pointer unsafe.Pointer) error {
 			fixture.mu.Lock()
@@ -127,12 +122,12 @@ func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
 }
 
 func TestLinuxUSBReapsSuccessAndCancellationBeforeReturning(t *testing.T) {
-	for _, profile := range []Profile{Quantis, ChaosKey} {
+	for _, profile := range []Profile{Quantis, ChaosKey, ChaosKeyRaw} {
 		for _, complete := range []bool{false, true} {
-			fixture := &usbfsFixture{buffer: make([]byte, 64), complete: complete, endpoint: profile.Endpoint()}
+			fixture := &usbfsFixture{buffer: make([]byte, 64), complete: complete, profile: profile}
 
 			driver := usbfsDriver(t, fixture)
-			if profile == ChaosKey {
+			if profile != Quantis {
 				if _, err := driver.Control(0x10, make([]byte, 4)); err == nil {
 					t.Fatal("ChaosKey vendor control accepted")
 				}

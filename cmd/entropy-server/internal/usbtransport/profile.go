@@ -15,6 +15,8 @@ type Profile uint8
 const (
 	Quantis Profile = iota
 	ChaosKey
+	// ChaosKeyRaw is diagnostic capture only, never a server seed selector.
+	ChaosKeyRaw
 )
 
 type Transport interface {
@@ -33,11 +35,15 @@ func (p Profile) Name() string {
 		return "ChaosKey cooked output"
 	}
 
+	if p == ChaosKeyRaw {
+		return "ChaosKey raw samples"
+	}
+
 	return "unsupported USB profile"
 }
 
 func (p Profile) Endpoint() byte {
-	if p == Quantis {
+	if p == Quantis || p == ChaosKeyRaw {
 		return 0x86
 	}
 
@@ -49,7 +55,7 @@ func (p Profile) Endpoint() byte {
 }
 
 func (p Profile) SupportsPacket(size int) bool {
-	return (p == Quantis && (size == 64 || size == 512)) || (p == ChaosKey && size == 64)
+	return (p == Quantis && (size == 64 || size == 512)) || ((p == ChaosKey || p == ChaosKeyRaw) && size == 64)
 }
 
 func (p Profile) ValidateDevice(descriptor []byte) error {
@@ -58,7 +64,7 @@ func (p Profile) ValidateDevice(descriptor []byte) error {
 	switch p {
 	case Quantis:
 		vendor, product = 0x0aba, 0x0102
-	case ChaosKey:
+	case ChaosKey, ChaosKeyRaw:
 		vendor, product = 0x1d50, 0x60c6
 	default:
 		return errors.New("unsupported USB profile")
@@ -82,8 +88,8 @@ func ControlSetup(request byte, length int) [8]byte {
 }
 
 // PacketSize validates the complete configuration; only interface/alternate 0
-// and the profile's seed endpoint can select an entropy stream. In particular,
-// ChaosKey raw 0x86 and firmware 0x87 are never fallback seed endpoints.
+// and the profile's endpoint can select a stream. ChaosKeyRaw must be explicitly
+// requested for diagnostic capture; raw 0x86 and flash 0x87 are never fallbacks.
 func (p Profile) PacketSize(config []byte) (int, error) {
 	if len(config) < 9 || config[0] != 9 || config[1] != 2 || config[4] != 1 || config[5] != 1 || p.Endpoint() == 0 {
 		return 0, fmt.Errorf("unsupported %s configuration", p.Name())

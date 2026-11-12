@@ -47,7 +47,7 @@ func windowsUSBPipe(t *testing.T, profiles ...Profile) (*windowsTransport, windo
 		free: func(uintptr) error { return nil },
 	}
 
-	driver, err := newWindowsTransport(file, 1, calls, profile.Endpoint())
+	driver, err := newWindowsTransport(file, 1, calls, profile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,9 +79,9 @@ func windowsUSBPipe(t *testing.T, profiles ...Profile) (*windowsTransport, windo
 }
 
 func TestWinUSBCompletionCancelDrainAndReuse(t *testing.T) {
-	for _, profile := range []Profile{Quantis, ChaosKey} {
+	for _, profile := range []Profile{Quantis, ChaosKey, ChaosKeyRaw} {
 		driver, writer := windowsUSBPipe(t, profile)
-		if profile == ChaosKey {
+		if profile != Quantis {
 			if _, err := driver.Control(0x10, make([]byte, 4)); err == nil {
 				t.Fatal("ChaosKey vendor control accepted")
 			}

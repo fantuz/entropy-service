@@ -65,9 +65,38 @@ func FuzzProfiles(f *testing.F) {
 	f.Add(device)
 	f.Add(config)
 	f.Fuzz(func(_ *testing.T, data []byte) {
-		for _, profile := range []Profile{Quantis, ChaosKey, 255} {
+		for _, profile := range []Profile{Quantis, ChaosKey, ChaosKeyRaw, 255} {
 			_ = profile.ValidateDevice(data)
 			_, _ = profile.PacketSize(data)
 		}
 	})
+}
+
+func TestChaosKeyRawCaptureCannotSubstituteCookedFlashOrQuantis(t *testing.T) {
+	device, config := chaosDescriptors()
+	if err := ChaosKeyRaw.ValidateDevice(device); err != nil {
+		t.Fatal(err)
+	}
+
+	if packet, err := ChaosKeyRaw.PacketSize(config); err != nil || packet != 64 || ChaosKeyRaw.Endpoint() != 0x86 || ChaosKey.Endpoint() != 0x85 {
+		t.Fatalf("incorrect raw/cooked routing: %d %v", packet, err)
+	}
+
+	for _, endpoint := range []byte{0x85, 0x87} {
+		changed := bytes.Clone(config)
+		changed[27] = endpoint
+
+		if _, err := ChaosKeyRaw.PacketSize(changed); err == nil {
+			t.Fatalf("missing raw endpoint replaced by 0x%02x", endpoint)
+		}
+	}
+
+	device[8], device[9], device[10], device[11] = 0xba, 0x0a, 0x02, 0x01
+	if err := ChaosKeyRaw.ValidateDevice(device); err == nil {
+		t.Fatal("Quantis identity accepted for ChaosKey raw capture")
+	}
+
+	if ChaosKeyRaw.SupportsPacket(512) {
+		t.Fatal("raw capture accepted unsupported packet size")
+	}
 }

@@ -54,7 +54,7 @@ func Identify(vendor, product string) (family, model string, known bool) {
 	case "1e89:0003":
 		return ChipPCIe, "Quantis PCIe-240M", true
 	case "1d50:60c6":
-		return ChaosKey, "ChaosKey hardware-noise TRNG (cooked output)", true
+		return ChaosKey, "ChaosKey hardware-noise TRNG", true
 	case "0aba:0102":
 		return USB, "Quantis USB (legacy protocol)", true
 	default:

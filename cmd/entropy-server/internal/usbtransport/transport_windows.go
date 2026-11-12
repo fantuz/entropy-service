@@ -43,6 +43,7 @@ type windowsTransport struct {
 	changed  windows.Handle
 	iface    uintptr
 	endpoint byte
+	profile  Profile
 	deadline time.Time
 	closed   bool
 	closeErr error
@@ -97,7 +98,7 @@ func Open(path string, profile Profile) (Transport, int, error) {
 		return nil, 0, err
 	}
 
-	device, err := newWindowsTransport(file, iface, nativeWinCalls(), profile.Endpoint())
+	device, err := newWindowsTransport(file, iface, nativeWinCalls(), profile)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -217,13 +218,13 @@ func winError(result uintptr, err error) error {
 	return err
 }
 
-func newWindowsTransport(file windows.Handle, iface uintptr, calls winCalls, endpoint byte) (*windowsTransport, error) {
+func newWindowsTransport(file windows.Handle, iface uintptr, calls winCalls, profile Profile) (*windowsTransport, error) {
 	changed, err := windows.CreateEvent(nil, 0, 0, nil)
 	if err != nil {
 		return nil, errors.Join(err, calls.free(iface), windows.CloseHandle(file))
 	}
 
-	return &windowsTransport{file: file, changed: changed, iface: iface, calls: calls, endpoint: endpoint}, nil
+	return &windowsTransport{file: file, changed: changed, iface: iface, calls: calls, endpoint: profile.Endpoint(), profile: profile}, nil
 }
 
 func (d *windowsTransport) state() (time.Time, error) {
@@ -277,8 +278,8 @@ func (d *windowsTransport) Close() error {
 }
 
 func (d *windowsTransport) Control(request byte, p []byte) (int, error) {
-	if d.endpoint != Quantis.Endpoint() {
-		return 0, errors.New("vendor control queries are not part of the cooked ChaosKey protocol")
+	if d.profile != Quantis {
+		return 0, errors.New("vendor control queries are not part of the ChaosKey protocol")
 	}
 
 	setup := ControlSetup(request, len(p))

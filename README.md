@@ -58,7 +58,9 @@ Experimental [Quantis USB seeding](docs/quantis-usb.md) uses native WinUSB on
 Windows x64 and usbfs on released Linux targets, without CGO or a vendor DLL.
 Experimental [ChaosKey cooked seeding](docs/chaoskey.md) reuses those native I/O
 mechanics with its own hardware-noise TRNG identity/protocol checks; raw/flash
-endpoints are excluded.
+endpoints are excluded from seeding. A separate
+[`hardware capture` command](docs/chaoskey.md#diagnostic-capture-cooked-by-default-raw-on-demand)
+can save bounded cooked samples by default or raw `0x86` samples explicitly for diagnostics.
 
 ```sh
 git clone https://github.com/fantuz/entropy-service.git

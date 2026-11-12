@@ -53,6 +53,7 @@ type linuxTransport struct {
 	mu       sync.Mutex
 	fd       int
 	endpoint byte
+	profile  Profile
 	wake     int
 	deadline time.Time
 	closed   bool
@@ -110,7 +111,7 @@ func Open(path string, profile Profile) (Transport, int, error) {
 		return nil, 0, err
 	}
 
-	device := &linuxTransport{fd: fd, wake: wake, endpoint: profile.Endpoint(), calls: linuxCalls{ioctl: usbIoctl, poll: unix.Poll, close: unix.Close}}
+	device := &linuxTransport{fd: fd, wake: wake, endpoint: profile.Endpoint(), profile: profile, calls: linuxCalls{ioctl: usbIoctl, poll: unix.Poll, close: unix.Close}}
 
 	return device, packet, nil
 }
@@ -200,8 +201,8 @@ func (d *linuxTransport) Close() error {
 }
 
 func (d *linuxTransport) Control(request byte, p []byte) (int, error) {
-	if d.endpoint != Quantis.Endpoint() {
-		return 0, errors.New("vendor control queries are not part of the cooked ChaosKey protocol")
+	if d.profile != Quantis {
+		return 0, errors.New("vendor control queries are not part of the ChaosKey protocol")
 	}
 
 	// USBDEVFS control URBs contain the eight-byte setup followed by data.

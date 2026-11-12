@@ -127,6 +127,15 @@ are device-specific: the referenced Quantis USB protocol legitimately uses
 `0x86` for entropy. Also record Linux kernel ownership or the Windows WinUSB
 binding; OS RNG output that may incorporate hardware is a separate measurement.
 
+The separate [diagnostic capture command](chaoskey.md#diagnostic-capture-cooked-by-default-raw-on-demand)
+can save cooked output by default or raw `0x86` with `-mode=raw`. Keep their
+physical records separate, setting `output_kind` and `endpoint` explicitly and
+documenting raw sample resolution/packing. Its read timing measures the accepted
+source read, not file writing or server DRBG throughput. The original matrix's
+historical CI checkpoints predate raw capture; a cooked record does not qualify
+raw operation or concurrent use. Do not publish raw capture contents as evidence;
+retain sanitized metadata, counts/timings and hashes instead.
+
 Link sanitized logs and their hashes, commands and relevant driver diagnostics.
 Record counts and timings rather than raw entropy or seed bytes. A stable device
 alias can replace a public serial number; explain any redactions without adding

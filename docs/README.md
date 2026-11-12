@@ -17,6 +17,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Hardware drivers and source layers](hardware-drivers.md) | Legacy card evidence, kernel patch history, pinned Linux source backup, offline Windows package audit and ChaosKey plan. |
 | [Hardware qualification records](hardware-qualification.md) | Build/simulation/physical evidence matrix, physical-result template, throughput boundaries and cancellation measurements. |
 | [Experimental Quantis USB](quantis-usb.md) | Native WinUSB and Linux usbfs seeding, model/driver prerequisites, deadlines and physical-test limits. |
+| [Experimental ChaosKey USB](chaoskey.md) | Cooked seeding, explicit raw diagnostic capture, Linux/Windows access, sample interpretation and qualification limits. |
 | [Client experiments](client-experiments.md) | Configurable Shannon assessment, timed/headless runs, JSONL schema and reproducible experiments. |
 | [Client write-out](client-writeout.md) | Linux pool mixing, limited value, device validation, failure handling and progress counters. |
 | [Raw client exports](client-output.md) | Private files, raw stdout/SSH pipes, Linux devices, exact byte limits and delivery accounting. |

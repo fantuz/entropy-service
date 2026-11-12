@@ -1,5 +1,11 @@
 # Hardware discovery and source probing
 
+For a saved ChaosKey sample, use the separate
+[`hardware capture` command](chaoskey.md#diagnostic-capture-cooked-by-default-raw-on-demand).
+It defaults to cooked `0x85`; `-mode=raw` explicitly captures diagnostic `0x86`
+without changing seed selection. The probes described below still discard
+samples and always use cooked output for ChaosKey.
+
 `entropy-server hardware` runs before normal server setup. It creates no TLS
 files or listeners, starts no DRBG and never installs or changes a driver.
 It supports Linux and Windows from the same application tree.
