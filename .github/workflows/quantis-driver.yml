@@ -67,10 +67,15 @@ jobs:
           make -C "/lib/modules/$kernel_version/build" M="$GITHUB_WORKSPACE/quantis-vm-build/linux" CONFIG_DEBUG_INFO_BTF_MODULES= W=1 modules
           make -C "/lib/modules/$kernel_version/build" M="$GITHUB_WORKSPACE/quantis-vm-build/tests" CONFIG_DEBUG_INFO_BTF_MODULES= W=1 modules
           go build -o "$GITHUB_WORKSPACE/quantis-vm-build/check-deadline" ./drivers/quantis-pci/tests/deadline
+      - name: Enable the runner's KVM device for this test user
+        run: |
+          if [ -c /dev/kvm ]; then
+            sudo chown "$(id -u):$(id -g)" /dev/kvm
+          fi
       - name: Exercise real file operations without physical hardware
         run: |
           set -o pipefail
-          timeout 180s virtme-run --installed-kernel "$QUANTIS_TEST_KERNEL" --rwdir "$GITHUB_WORKSPACE/quantis-vm-build" --mods=auto --memory 768M --script-sh "sh '$GITHUB_WORKSPACE/quantis-vm-build/tests/run-vm.sh' '$GITHUB_WORKSPACE/quantis-vm-build' '$GITHUB_WORKSPACE/quantis-vm-build/check-deadline'" 2>&1 | tee quantis-vm.log
+          timeout 180s virtme-run --installed-kernel "$QUANTIS_TEST_KERNEL" --rwdir "$GITHUB_WORKSPACE/quantis-vm-build" --mods=auto --memory 768M --cpus 2 --show-boot-console --show-command --script-sh "sh '$GITHUB_WORKSPACE/quantis-vm-build/tests/run-vm.sh' '$GITHUB_WORKSPACE/quantis-vm-build' '$GITHUB_WORKSPACE/quantis-vm-build/check-deadline'" 2>&1 | tee quantis-vm.log
           grep -q '^QUANTIS_VM_TESTS_PASSED' quantis-vm.log
       - name: Upload kernel simulation evidence
         if: always()
