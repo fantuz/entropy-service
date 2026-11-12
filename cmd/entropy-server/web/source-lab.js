@@ -38,7 +38,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         try{
             const devices=await window.EntropyLabAdapters.audioInputs();
             if(disposed||request!==audioRequest)return;
-            if(devices===null){$("lab-audio-help").textContent="This browser cannot list audio devices. Choose the input in your system sound settings, then use System default. "+audioHelp;return;}
+            if(devices===null){$("lab-audio-help").textContent="This browser cannot list audio devices. Select the physical input in system sound settings, then use Microphone PCM with System default. "+audioHelp;return;}
             const select=$("lab-audio-device"),selected=select.value;
             const option=document.createElement("option");option.value="";option.textContent="System default";select.replaceChildren(option);
             devices.forEach((device,index)=>{

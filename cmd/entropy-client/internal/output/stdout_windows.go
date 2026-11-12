@@ -46,6 +46,22 @@ func openTextStdout(stdout *os.File) (*Writer, error) {
 		return nil, errors.Join(fmt.Errorf("inspect report stdout pipe: %w", err), writer.Close())
 	}
 
+	// Some synchronous byte pipes accept a nonblocking write only when the
+	// whole chunk fits. A fixed 32 KiB chunk can therefore make no progress
+	// forever on the default 4 KiB anonymous pipe, even with a live reader.
+	var outbound, inbound uint32
+	if err := windows.GetNamedPipeInfo(handle, nil, &outbound, &inbound, nil); err != nil {
+		return nil, errors.Join(fmt.Errorf("inspect report stdout capacity: %w", err), writer.Close())
+	}
+
+	chunkSize := uint32(writeChunk)
+
+	for _, capacity := range []uint32{outbound, inbound} {
+		if capacity > 0 {
+			chunkSize = min(chunkSize, capacity)
+		}
+	}
+
 	mode := state | windows.PIPE_NOWAIT
 	if err := windows.SetNamedPipeHandleState(handle, &mode, nil, nil); err != nil {
 		return nil, errors.Join(fmt.Errorf("enable cancellable report stdout: %w", err), writer.Close())
@@ -62,7 +78,7 @@ func openTextStdout(stdout *os.File) (*Writer, error) {
 
 			var count uint32
 
-			err := windows.WriteFile(handle, data[:min(len(data), writeChunk)], &count, nil)
+			err := windows.WriteFile(handle, data[:min(len(data), int(chunkSize))], &count, nil)
 			written += int(count)
 			data = data[count:]
 
@@ -70,8 +86,8 @@ func openTextStdout(stdout *os.File) (*Writer, error) {
 				return written, err
 			}
 
-			if len(data) > 0 {
-				timer := time.NewTimer(10 * time.Millisecond)
+			if count == 0 {
+				timer := time.NewTimer(time.Millisecond)
 				select {
 				case <-ctx.Done():
 					timer.Stop()

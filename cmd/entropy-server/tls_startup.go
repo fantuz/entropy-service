@@ -20,7 +20,7 @@ func missingTLSHint(platform, certFile, keyFile string, err error) string {
 		return ""
 	}
 
-	command := "entropy-server"
+	command := "./entropy-server"
 	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
 	guide := "https://github.com/fantuz/entropy-service/blob/main/docs/tls-certificates.md"
 

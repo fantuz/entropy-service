@@ -103,8 +103,8 @@ failed write. A healthy consumer still receives a final summary on duration
 expiry or interruption; that final write has a one-second grace period. The
 client closes only its own duplicated stdout handle and restores pipe flags.
 Regular file/console writes and report-file synchronization cannot promise a
-hard interruption deadline for a system call already in progress. These limits also apply to slow
-or failing storage during report synchronization.
+hard interruption deadline for a system call already in progress, including
+slow or failing storage.
 
 ## Compare transport, chunk size and analysis cost
 
