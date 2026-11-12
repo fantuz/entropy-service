@@ -197,6 +197,8 @@ class WindowsSmoke(unittest.TestCase):
         kernel.GetConsoleScreenBufferInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(Info)]
         kernel.ReadConsoleOutputCharacterW.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD,
                                                        Coord, ctypes.POINTER(wintypes.DWORD)]
+        kernel.ReadConsoleOutputAttribute.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.WORD),
+                                                      wintypes.DWORD, Coord, ctypes.POINTER(wintypes.DWORD)]
         kernel.CloseHandle.argtypes = [wintypes.HANDLE]
 
         for color, interrupted in [("never", False), ("truecolor", True)]:
@@ -245,7 +247,20 @@ class WindowsSmoke(unittest.TestCase):
                     self.assertIn("THRESHOLD:", lines[0])
                     self.assertIn("STATUS:", lines[0])
                     self.assertIn("MiB/s", lines[0])
-                    self.assertTrue(any(line.strip() for line in lines[1:]), lines)
+                    if color == "never":
+                        self.assertTrue(any(line.strip() for line in lines[1:]), lines)
+                    else:
+                        # Colored cells intentionally contain only spaces. Inspect
+                        # their actual console background attributes, not glyphs.
+                        info = Info()
+                        self.assertTrue(kernel.GetConsoleScreenBufferInfo(handle, ctypes.byref(info)))
+                        attributes = (wintypes.WORD * 78)()
+                        count = wintypes.DWORD()
+                        self.assertTrue(kernel.ReadConsoleOutputAttribute(
+                            handle, attributes, 78, Coord(info.window.left, info.window.top + 1),
+                            ctypes.byref(count)))
+                        self.assertEqual(count.value, 78)
+                        self.assertTrue(any(value & 0xF0 for value in attributes), list(attributes))
                     self.assertNotIn("\x1b", "".join(lines))
                     mode = wintypes.DWORD()
                     self.assertTrue(kernel.GetConsoleMode(handle, ctypes.byref(mode)))
