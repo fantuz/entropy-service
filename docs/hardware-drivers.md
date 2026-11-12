@@ -5,6 +5,10 @@ physical device. Driver compilation, device detection, a successful sample,
 cancellation and entropy assessment are separate checks. This guide records
 evidence and an implementation plan without treating one check as all of them.
 
+The [hardware qualification matrix and record format](https://github.com/fantuz/entropy-service/blob/main/docs/hardware-qualification.md)
+track compilation, simulated I/O and physical results separately. Submit physical
+measurements against the exact device/host/driver/source revision tested.
+
 ## Historical card and official packages
 
 Maintainer-supplied photographs show a legacy **Quantis-PCI** board with one
