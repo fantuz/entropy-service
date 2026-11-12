@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0-only
+obj-m := quantis_pci.o
+quantis_pci-y := quantis_pci_linux.o
+ccflags-y += -I$(src)/../common

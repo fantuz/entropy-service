@@ -1,0 +1,1 @@
+obj-m := quantis_pci_test.o
