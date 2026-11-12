@@ -222,43 +222,59 @@ func TestLabEntropyPeerAndSelfConnections(t *testing.T) {
 	}
 }
 
-func TestLabShutdownCancelsBlockedUpstream(t *testing.T) {
-	started := make(chan struct{})
-	stopped := make(chan struct{})
+func TestLabCancellationDuringUpstreamHandshake(t *testing.T) {
+	for _, kind := range []string{"http", "websocket", "entropy-ws"} {
+		for _, action := range []string{"shutdown", "disconnect"} {
+			t.Run(kind+"/"+action, func(t *testing.T) {
+				started := make(chan struct{})
+				stopped := make(chan struct{})
 
-	peer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { close(started); <-r.Context().Done(); close(stopped) }))
-	defer peer.Close()
+				peer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { close(started); <-r.Context().Done(); close(stopped) }))
+				defer peer.Close()
+				defer peer.CloseClientConnections()
 
-	registry, err := lab.New([]lab.Config{{ID: "stalled", Kind: "http", Endpoint: peer.URL, TimeoutMs: 60000}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer registry.Close()
+				endpoint := peer.URL
+				if kind == "websocket" {
+					endpoint = "ws" + strings.TrimPrefix(endpoint, "http")
+				}
 
-	budget := newWebSocketBudget(1, 4<<20)
-	testServer := httptest.NewUnstartedServer(labStreamHandler(registry, budget, 4096, false))
-	server := newManagedServer(t.Context(), testServer.Config)
+				registry, err := lab.New([]lab.Config{{ID: "stalled", Kind: kind, Endpoint: endpoint, TimeoutMs: 60000}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer registry.Close()
 
-	testServer.Start()
-	defer testServer.Close()
+				budget := newWebSocketBudget(1, 4<<20)
+				testServer := httptest.NewUnstartedServer(labStreamHandler(registry, budget, 4096, false))
+				server := newManagedServer(t.Context(), testServer.Config)
 
-	conn := budgetConnect(t, testServer, "/lab/stream?source=stalled&bytes=64&refresh=20")
-	defer conn.Close()
+				testServer.Start()
+				defer testServer.Close()
 
-	<-started
+				conn := budgetConnect(t, testServer, "/lab/stream?source=stalled&bytes=64&refresh=20")
+				defer conn.Close()
 
-	shutdownCtx, cancel := context.WithTimeout(t.Context(), time.Second)
-	defer cancel()
+				<-started
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		t.Fatal(err)
-	}
+				if action == "shutdown" {
+					shutdownCtx, cancel := context.WithTimeout(t.Context(), time.Second)
+					defer cancel()
 
-	waitBudgetActive(t, budget, 0)
+					if err := server.Shutdown(shutdownCtx); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := conn.Close(); err != nil {
+					t.Fatal(err)
+				}
 
-	select {
-	case <-stopped:
-	case <-time.After(time.Second):
-		t.Fatal("upstream HTTP request survived shutdown")
+				waitBudgetActive(t, budget, 0)
+
+				select {
+				case <-stopped:
+				case <-time.After(time.Second):
+					t.Fatal("upstream request survived cancellation")
+				}
+			})
+		}
 	}
 }

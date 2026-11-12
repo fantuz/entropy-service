@@ -11,11 +11,17 @@ import (
 
 func OpenStdout() (*Writer, error) { return openStdout(os.Stdout) }
 
+// OpenTextStdout also allows human-readable reports to a terminal.
+func OpenTextStdout() (*Writer, error) { return openTextStdout(os.Stdout) }
+
+func openStdout(stdout *os.File) (*Writer, error)     { return duplicateStdout(stdout, false) }
+func openTextStdout(stdout *os.File) (*Writer, error) { return duplicateStdout(stdout, true) }
+
 // Duplicate stdout to own its lifetime without closing the caller's descriptor.
 // For a pipe, temporarily enable nonblocking I/O so Go deadlines can cancel a
 // blocked write. Restore its shared descriptor flags on close.
-func openStdout(stdout *os.File) (*Writer, error) {
-	if _, err := unix.IoctlGetTermios(int(stdout.Fd()), unix.TCGETS); err == nil {
+func duplicateStdout(stdout *os.File, text bool) (*Writer, error) {
+	if _, err := unix.IoctlGetTermios(int(stdout.Fd()), unix.TCGETS); !text && err == nil {
 		return nil, errors.New("refusing raw binary output to a terminal; redirect stdout to a file or pipe")
 	}
 

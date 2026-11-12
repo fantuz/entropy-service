@@ -379,8 +379,13 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 			frame.Release()
 
 			if analysed {
-				if err := report.sample(m); err != nil {
-					return reasonReportError, errors.Join(err, writeErr)
+				if err := report.sample(ctx, m); err != nil {
+					// Cancellation before Encode leaves a healthy reporter.
+					// Preserve independent writeout errors below; cancellation
+					// during an actual report write remains a report failure.
+					if report.failure != nil || !contextEnded(ctx) || !errors.Is(err, ctx.Err()) {
+						return reasonReportError, errors.Join(err, writeErr)
+					}
 				}
 			}
 

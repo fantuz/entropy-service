@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/fantuz/entropy-service/internal/websocketdial"
 )
 
 var ErrTooLarge = errors.New("source sample exceeds requested byte limit")
@@ -174,7 +176,7 @@ func (r *Registry) OpenAuthenticated(ctx context.Context, id string, count, refr
 		dialer := *websocket.DefaultDialer
 		dialer.HandshakeTimeout = stream.timeout
 
-		conn, response, err := dialer.DialContext(dialCtx, sourceURL(c, count, refresh), nil)
+		conn, response, err := websocketdial.Dial(dialCtx, dialer, sourceURL(c, count, refresh), nil)
 		if response != nil && response.Body != nil {
 			_ = response.Body.Close()
 		}

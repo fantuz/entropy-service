@@ -16,7 +16,7 @@ desktop/mobile layouts.
 | Hex pattern | Repeating 1–512-byte pattern | Whitespace-separated complete hex byte pairs, e.g. `00 ff 3a`. |
 | Local file | Successive local slices up to 8 MiB | No upload; maximum file size 32 MiB. Stops at EOF. Use the file lab for detailed seeking. |
 | Camera | RGB8 or RGBA8 row-major prefix at 160×120, 320×240 or 640×480 | Explicit permission, HTTPS/localhost; browser-processed/resampled frames. RGBA includes alpha. Actual camera dimensions/rate appear in metadata. |
-| Microphone / line-in | PCM16LE mono prefix from the selected audio input's latest window | Explicit permission, HTTPS/localhost and Web Audio. Actual input name/sample rate is shown. Windows can overlap; browser/driver processing can apply. |
+| Microphone; Line-in / external audio | PCM16LE prefix from an explicitly selected channel or mono mix | Permission, HTTPS/localhost and Web Audio. Input, channel, sample rate and signal level are shown. Windows can overlap; browser/driver processing can apply. |
 | Serial | Prefix of each Web Serial read at the chosen baud | Supported browsers only, secure context and explicit port chooser. The lab reads bytes and does not send device commands. |
 | Network camera | Decoded RGB8 prefix from a registered RTSP or ONVIF camera | Server-side FFmpeg; session-only username/password. ONVIF Media1 obtains the RTSP stream URI. |
 
@@ -25,38 +25,54 @@ on the entropy-server host use registered adapters instead. Camera and audio
 Start actions request permission; Stop, a hidden tab or leaving the page stops
 tracks, timers and readers. A permission request cannot always be dismissed by
 script, but any stream granted after Stop is closed immediately. Microphone
-monitoring uses a muted output path, without playing captured audio.
+monitoring uses a muted output path, without playing captured audio. Upstream
+WebSocket connection setup is canceled on Stop, browser disconnect or server
+shutdown, including a peer that accepts TCP/TLS but never completes its HTTP
+upgrade; established streams retain their configured deadlines and size limits.
 
 ### Line-in and USB audio inputs
 
 Line-in uses the same browser `getUserMedia` and Web Audio support as a
 microphone; **no browser plugin is required**:
 
-1. Select **Microphone / line-in PCM**, then **Start** or **Sample once** to
-   grant the site's audio permission. This is the only action that opens capture.
-2. Choose the desired device under **Audio input**. Input names often become
-   available only after permission is granted. **Refresh inputs** lists devices
-   without opening capture; device changes also refresh the list.
-3. Start again after changing the input. Selecting a named device requests it
-   exactly; an unavailable selection is retained and reported instead of silently
-   substituting the default microphone. **System default** deliberately follows
-   the operating system's selected input.
+1. Select **Microphone PCM** and **Start** or **Sample once** to grant the
+   site's microphone permission. Browsers use this same permission for line-in.
+   Input names often become available only after permission is granted.
+2. Select **Line-in / external audio PCM** and choose a device under **Audio
+   input**. This mode requires an explicit device; it never silently uses the
+   default microphone. **Refresh inputs** lists devices without opening capture.
+   An unavailable selection is retained and reported instead of substituted.
+3. Select **First / left**, **Second / right**, or **Mono mix**, then Start.
+   First / left is the default: stereo channels with opposite polarity cancel
+   when mixed. A known mono device rejects Second / right with guidance.
 
-A physical line-in jack may share one capture device with a microphone. Browsers
-cannot enumerate or switch every sound-card connector. On Linux, use the sound
-settings or PipeWire/PulseAudio controls (for example, `pavucontrol`) to select
-**Line In** as the input port/profile, then choose that device in the lab. A USB
-audio interface may appear separately. Browser support and the sound driver
-determine which devices are exposed.
+Microphone mode permits **System default**, deliberately following the operating
+system's selected input. Browsers cannot reliably classify physical microphones
+versus line-in ports: these two choices express capture intent, while the device
+picker and OS settings determine the actual source. A physical jack may share
+one capture device with a microphone. On Linux, use sound settings or
+PipeWire/PulseAudio controls (`pavucontrol`) to select **Line In** as the input
+port/profile, then choose that device in the lab. USB interfaces may appear
+separately. On Windows, check **Settings → System → Sound → Input**, input volume,
+mute and **Privacy & security → Microphone** permissions, including desktop-app
+access. In Firefox, allow microphone permission for this site and refresh inputs.
+The browser and sound driver determine which devices and channels are exposed.
 
 Echo cancellation, noise suppression and automatic gain are requested off;
-browser/driver processing or resampling can still apply. Input is downmixed to
-mono PCM16LE and is not played through the speakers. Captured samples stay in
-the browser until an explicit local download/export. Device IDs remain in page
-memory; the existing explicit measurement export can include the input's display
-name in its encoding description. This is a diagnostic input, not a new server
-entropy seed. Stop, navigation, a hidden tab and a disconnected track release
-capture; a stream granted after Stop is immediately closed.
+browser/driver processing and resampling can still apply. The selected channel
+is converted to mono PCM16LE. A complete analyser window is allowed to accumulate
+before the first sample, including **Sample once**. Muted tracks and suspended
+audio engines display a waiting explanation. Peak and RMS levels in dBFS help
+distinguish an active signal from silence or input below PCM16 resolution. Silent
+samples remain zero bytes; the lab never adds noise or fabricates entropy. If
+silence persists, check the selected input, cable, channel, mute and input level.
+
+Input is routed through a muted output and is not played through the speakers.
+Captured samples stay in the browser until an explicit local download/export.
+Device IDs remain in page memory; measurement exports can include the input's
+display name and channel in the encoding description. Audio is a diagnostic
+input, not a server entropy seed. Stop, navigation, a hidden tab and a
+disconnected track release capture; a stream granted after Stop is closed.
 
 ### Optional camera preview
 

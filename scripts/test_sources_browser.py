@@ -183,6 +183,54 @@ def shannon_precision_checks(browser, base):
             page.close()
 
 
+def audio_signal_checks(browser, base):
+    """A real stereo Web Audio graph, independent of physical input hardware."""
+    from playwright.sync_api import expect
+    page = browser.new_page(accept_downloads=True)
+    page.add_init_script("""(() => {
+      window.audioFixtureRequests=[];window.audioFixtureTracks=[];window.audioFixtureContexts=[];
+      navigator.mediaDevices.enumerateDevices=async()=>[{kind:'audioinput',deviceId:'stereo-fixture',label:'Line In fixture'}];
+      navigator.mediaDevices.getUserMedia=async options=>{
+        audioFixtureRequests.push(options);
+        const context=new AudioContext();audioFixtureContexts.push(context);await context.resume();
+        const tone=context.createOscillator(),gain=context.createGain(),opposite=context.createGain();
+        const stereo=context.createChannelMerger(2),output=context.createMediaStreamDestination();
+        gain.gain.value=.5;opposite.gain.value=-1;tone.connect(gain);
+        gain.connect(stereo,0,0);gain.connect(opposite);opposite.connect(stereo,0,1);
+        stereo.connect(output);tone.start();audioFixtureTracks.push(...output.stream.getTracks());return output.stream;
+      };
+    })();""")
+    try:
+        page.goto(base + "/api-sources.html")
+        page.locator("#lab-kind").select_option("linein")
+        page.wait_for_function("document.querySelectorAll('#lab-audio-device option').length===2")
+        page.locator("#lab-once").click()
+        expect(page.locator("#lab-status")).to_contain_text("Choose a line-in")
+        assert page.evaluate("audioFixtureRequests.length") == 0
+        page.locator("#lab-audio-device").select_option("stereo-fixture")
+        page.locator("#lab-refresh").fill("50")
+        page.locator("#lab-bytes").fill("65536")
+        for channel in ("left", "mix", "right"):
+            page.locator("#lab-audio-channel").select_option(channel)
+            page.locator("#lab-once").click()
+            expect(page.locator("#lab-download")).to_be_enabled(timeout=10000)
+            with page.expect_download() as downloaded:
+                page.locator("#lab-download").click()
+            data=Path(downloaded.value.path()).read_bytes()
+            assert len(data)==65536
+            if channel=="mix":
+                assert not any(data), "opposite stereo channels should cancel only in explicit mix mode"
+                expect(page.locator("#lab-transport-info")).to_contain_text("Silent input")
+            else:
+                assert any(data), "Sample once emitted initial zeros or downmixed opposite stereo channels"
+                expect(page.locator("#lab-transport-info")).to_contain_text("dBFS")
+            assert page.evaluate("audioFixtureTracks.every(track=>track.readyState==='ended')")
+            assert page.evaluate("audioFixtureRequests.at(-1).audio.deviceId.exact") == "stereo-fixture"
+            page.evaluate("Promise.all(audioFixtureContexts.filter(context=>context.state!=='closed').map(context=>context.close()))")
+    finally:
+        page.close()
+
+
 def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="chromium"):
     from playwright.sync_api import expect, sync_playwright
     with sync_playwright() as playwright:
@@ -191,6 +239,7 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         else:
             browser=playwright.chromium.launch(executable_path=chromium or None,headless=True,args=["--no-sandbox","--disable-dev-shm-usage","--use-fake-ui-for-media-stream","--use-fake-device-for-media-stream"])
         shannon_precision_checks(browser, base)
+        audio_signal_checks(browser, base)
         context=browser.new_context(viewport={"width":1440,"height":1000},device_scale_factor=2,accept_downloads=True)
         context.add_init_script("""(() => {
           window.labTracks=[];window.labAudioTracks=[];window.labMediaRequests=[];window.mediaDelay=0;window.serialClosed=0;

@@ -22,6 +22,8 @@ import (
 	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
+const reportWindowsOS = "windows"
+
 func readReport(t *testing.T, path string) []json.RawMessage {
 	t.Helper()
 
@@ -267,7 +269,7 @@ func TestReportRefusesOverwriteAndRemovesURLSecrets(t *testing.T) {
 	}
 
 	cfg := experimentConfig(modePull, "", path)
-	if err := report.start(cfg, "http://secret-user:secret-pass@localhost/data?token=secret-query#secret-fragment"); err != nil {
+	if err := report.start(t.Context(), cfg, "http://secret-user:secret-pass@localhost/data?token=secret-query#secret-fragment"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -379,7 +381,7 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	cfg.WaterfallMode, cfg.WaterfallColumns, cfg.WaterfallRows, cfg.Color = "rgb", 128, 32, "truecolor"
 	cfg.Layout = "full"
 
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == reportWindowsOS {
 		// Windows rejects explicit unsupported displays before starting a run.
 		// Keep exercising clean JSONL stdout with its supported plain controls.
 		cfg.ShowWaterfall, cfg.WaterfallColumns, cfg.WaterfallRows = false, 0, 0
@@ -399,5 +401,78 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 	settings := decodeRecord[startRecord](t, records[0]).Settings
 	if settings.Waterfall != cfg.ShowWaterfall || settings.WaterfallMode != cfg.WaterfallMode || settings.WaterfallColumns != cfg.WaterfallColumns || settings.WaterfallRows != cfg.WaterfallRows || settings.Color != cfg.Color || settings.Layout != cfg.Layout {
 		t.Fatalf("display settings missing from metadata: %+v", settings)
+	}
+}
+
+func TestReportStdoutCancelsBlockedRecord(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != reportWindowsOS {
+		t.Skip("cancellable stdout pipe adapter")
+	}
+
+	reader, stdout, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer stdout.Close()
+
+	saved := os.Stdout
+
+	os.Stdout = stdout
+	defer func() { os.Stdout = saved }()
+
+	report, err := openReport("-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer report.close()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+
+	err = report.write(ctx, map[string]string{"data": strings.Repeat("x", 1<<20)})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("blocked report did not cancel:", err)
+	}
+
+	if err := report.write(t.Context(), newReportHeader("run_summary")); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("failed report must not append after a partial record:", err)
+	}
+
+	if err := report.close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := stdout.Close(); err != nil {
+		t.Fatal("report closed caller's stdout", err)
+	}
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(data) == 0 || bytes.Contains(data, []byte("run_summary")) {
+		t.Fatalf("unexpected partial report: %d bytes", len(data))
+	}
+}
+
+func TestReportPreCanceledWriteDoesNotPoisonSummary(t *testing.T) {
+	var buffer bytes.Buffer
+
+	report := &runReport{encoder: json.NewEncoder(&buffer)}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if err := report.write(ctx, newReportHeader("sample")); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+
+	if err := report.write(t.Context(), newReportHeader("run_summary")); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Contains(buffer.Bytes(), []byte("run_summary")) || bytes.Contains(buffer.Bytes(), []byte("sample")) {
+		t.Fatal(buffer.String())
 	}
 }

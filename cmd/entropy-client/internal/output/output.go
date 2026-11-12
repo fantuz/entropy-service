@@ -16,10 +16,12 @@ const writeChunk = 32 * 1024
 
 // Writer has one owner. Close follows the last WriteContext call.
 type Writer struct {
-	file     *os.File
-	syncFile bool
-	pollable bool
-	cleanup  func() error
+	file         *os.File
+	syncFile     bool
+	pollable     bool
+	cleanup      func() error
+	keepOpen     bool
+	writeContext func(context.Context, []byte) (int, error)
 }
 
 func OpenFile(path string) (*Writer, error) {
@@ -41,6 +43,10 @@ func (w *Writer) WriteContext(ctx context.Context, data []byte) (int, error) {
 
 	if err := ctx.Err(); err != nil {
 		return 0, err
+	}
+
+	if w.writeContext != nil {
+		return w.writeContext(ctx, data)
 	}
 
 	if w.pollable {
@@ -108,6 +114,10 @@ func (w *Writer) Close() error {
 
 	if w.cleanup != nil {
 		err = errors.Join(err, w.cleanup())
+	}
+
+	if w.keepOpen {
+		return err
 	}
 
 	return errors.Join(err, f.Close())
