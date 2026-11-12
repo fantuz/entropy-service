@@ -1,10 +1,11 @@
 //go:build windows && amd64
 
-package quantisusb
+package usbtransport
 
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"sync"
@@ -41,6 +42,7 @@ type windowsTransport struct {
 	file     windows.Handle
 	changed  windows.Handle
 	iface    uintptr
+	endpoint byte
 	deadline time.Time
 	closed   bool
 	closeErr error
@@ -66,19 +68,19 @@ func findWinUSB() error {
 	return nil
 }
 
-func Open(path string) (*Source, error) {
+func Open(path string, profile Profile) (Transport, int, error) {
 	if err := findWinUSB(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	name, err := windows.UTF16PtrFromString(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	file, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OVERLAPPED, 0)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var (
@@ -92,23 +94,23 @@ func Open(path string) (*Source, error) {
 	r, _, callErr := winInitialize.Call(uintptr(file), uintptr(unsafe.Pointer(&iface)))
 	if err := winError(r, callErr); err != nil {
 		_ = windows.CloseHandle(file)
-		return nil, err
+		return nil, 0, err
 	}
 
-	device, err := newWindowsTransport(file, iface, nativeWinCalls())
+	device, err := newWindowsTransport(file, iface, nativeWinCalls(), profile.Endpoint())
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	packet, err := windowsPacketSize(iface)
+	packet, err := windowsPacketSize(iface, profile)
 	if err != nil {
-		return nil, errors.Join(err, device.Close())
+		return nil, 0, errors.Join(err, device.Close())
 	}
 
-	return newSource(device, packet)
+	return device, packet, nil
 }
 
-func windowsPacketSize(iface uintptr) (int, error) {
+func windowsPacketSize(iface uintptr, profile Profile) (int, error) {
 	device := make([]byte, 18)
 
 	var (
@@ -129,7 +131,7 @@ func windowsPacketSize(iface uintptr) (int, error) {
 		return 0, errors.New("short WinUSB device descriptor")
 	}
 
-	if err := validateDevice(device); err != nil {
+	if err := profile.ValidateDevice(device); err != nil {
 		return 0, err
 	}
 
@@ -145,6 +147,8 @@ func windowsPacketSize(iface uintptr) (int, error) {
 		return 0, errors.New("unsupported WinUSB interface layout")
 	}
 
+	packetSize := 0
+
 	for index := byte(0); index < setting[4]; index++ {
 		var pipe pipeInformation
 		memory.Pin(&pipe)
@@ -154,12 +158,24 @@ func windowsPacketSize(iface uintptr) (int, error) {
 			return 0, err
 		}
 
-		if pipe.Type == 2 && pipe.ID == Endpoint && (pipe.PacketSize == 64 || pipe.PacketSize == 512) {
-			return int(pipe.PacketSize), nil
+		if pipe.ID == profile.Endpoint() {
+			if pipe.Type != 2 || !profile.SupportsPacket(int(pipe.PacketSize)) {
+				return 0, errors.New("unsupported WinUSB seed endpoint type/packet size")
+			}
+
+			if packetSize != 0 {
+				return 0, errors.New("duplicate WinUSB seed endpoint")
+			}
+
+			packetSize = int(pipe.PacketSize)
 		}
 	}
 
-	return 0, errors.New("expected WinUSB bulk-IN endpoint 0x86 with 64/512-byte packets")
+	if packetSize == 0 {
+		return 0, fmt.Errorf("expected %s WinUSB bulk-IN endpoint 0x%02x", profile.Name(), profile.Endpoint())
+	}
+
+	return packetSize, nil
 }
 
 func nativeWinCalls() winCalls {
@@ -201,13 +217,13 @@ func winError(result uintptr, err error) error {
 	return err
 }
 
-func newWindowsTransport(file windows.Handle, iface uintptr, calls winCalls) (*windowsTransport, error) {
+func newWindowsTransport(file windows.Handle, iface uintptr, calls winCalls, endpoint byte) (*windowsTransport, error) {
 	changed, err := windows.CreateEvent(nil, 0, 0, nil)
 	if err != nil {
 		return nil, errors.Join(err, calls.free(iface), windows.CloseHandle(file))
 	}
 
-	return &windowsTransport{file: file, changed: changed, iface: iface, calls: calls}, nil
+	return &windowsTransport{file: file, changed: changed, iface: iface, calls: calls, endpoint: endpoint}, nil
 }
 
 func (d *windowsTransport) state() (time.Time, error) {
@@ -261,7 +277,11 @@ func (d *windowsTransport) Close() error {
 }
 
 func (d *windowsTransport) Control(request byte, p []byte) (int, error) {
-	setup := controlSetup(request, len(p))
+	if d.endpoint != Quantis.Endpoint() {
+		return 0, errors.New("vendor control queries are not part of the cooked ChaosKey protocol")
+	}
+
+	setup := ControlSetup(request, len(p))
 
 	return d.transfer(p, true, binary.LittleEndian.Uint64(setup[:]))
 }
@@ -274,6 +294,10 @@ func (d *windowsTransport) transfer(buffer []byte, control bool, setup uint64) (
 
 	if _, err := d.state(); err != nil {
 		return 0, err
+	}
+
+	if len(buffer) == 0 {
+		return 0, nil
 	}
 
 	event, err := windows.CreateEvent(nil, 1, 0, nil)
@@ -298,7 +322,7 @@ func (d *windowsTransport) transfer(buffer []byte, control bool, setup uint64) (
 	if control {
 		err = d.calls.control(d.iface, setup, buffer, &transferred, operation)
 	} else {
-		err = d.calls.read(d.iface, Endpoint, buffer, &transferred, operation)
+		err = d.calls.read(d.iface, d.endpoint, buffer, &transferred, operation)
 	}
 
 	if err != nil && !errors.Is(err, windows.ERROR_IO_PENDING) {

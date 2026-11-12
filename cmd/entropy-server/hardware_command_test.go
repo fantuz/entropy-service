@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/chaoskey"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/hardware"
 )
 
@@ -170,5 +171,12 @@ func TestHardwareProbeOSControlAndMissingSource(t *testing.T) {
 
 	if source, actual, err := openProbeSource("/definitely/not/a/qrng"); err == nil || source != nil || actual != "" {
 		t.Fatalf("missing source fell back: %v, %q, %v", source, actual, err)
+	}
+}
+
+func TestChaosKeyProbeDoesNotClaimHardwareHealth(t *testing.T) {
+	health, err := probePlatformStatus(&chaoskey.Source{})
+	if err != nil || len(health) != 0 {
+		t.Fatalf("ChaosKey has no documented device-health protocol: %v %v", health, err)
 	}
 }

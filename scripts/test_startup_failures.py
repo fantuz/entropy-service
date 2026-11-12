@@ -61,6 +61,11 @@ class StartupTests(unittest.TestCase):
             usb_failed = json.loads(hardware("probe", "-device=quantis-usb:127", "-json", code=1).stdout)
             self.assertFalse(usb_failed["read_ok"])
             self.assertNotIn("actual_source", usb_failed)
+            for source in ("chaoskey-usb:127", "chaoskey-usb:-1", "chaoskey:0", "/dev/chaoskey-entropy-test-missing"):
+                missing = json.loads(hardware("probe", f"-device={source}", "-json", code=1).stdout)
+                self.assertFalse(missing["read_ok"])
+                self.assertNotIn("actual_source", missing)
+                self.assertFalse(missing["health_available"])
             hardware("probe", "-device=/dev/urandom", "-bytes=0", code=2)
             self.assertEqual(list(Path(directory).iterdir()), [])
 

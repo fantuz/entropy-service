@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/usbtransport"
 )
 
 type fakeUSB struct {
@@ -163,11 +165,11 @@ func TestUSBIdentityDescriptorsAndSetup(t *testing.T) {
 	device := []byte{18, 1, 0, 2, 0, 0, 0, 64, 0xba, 0x0a, 2, 1, 0, 1, 0, 0, 0, 1}
 	config := []byte{9, 2, 25, 0, 1, 1, 0, 0x80, 50, 9, 4, 0, 0, 1, 0xff, 0, 0, 0, 7, 5, 0x86, 2, 0, 2, 0}
 
-	if err := validateDevice(device); err != nil {
+	if err := usbtransport.Quantis.ValidateDevice(device); err != nil {
 		t.Fatal(err)
 	}
 
-	if packet, err := packetSizeFromConfig(config); err != nil || packet != 512 {
+	if packet, err := usbtransport.Quantis.PacketSize(config); err != nil || packet != 512 {
 		t.Fatalf("configuration: %d %v", packet, err)
 	}
 
@@ -175,7 +177,7 @@ func TestUSBIdentityDescriptorsAndSetup(t *testing.T) {
 		changed := bytes.Clone(device)
 
 		changed[index] ^= 1
-		if err := validateDevice(changed); err == nil {
+		if err := usbtransport.Quantis.ValidateDevice(changed); err == nil {
 			t.Fatalf("changed device accepted at %d", index)
 		}
 	}
@@ -184,13 +186,13 @@ func TestUSBIdentityDescriptorsAndSetup(t *testing.T) {
 		changed := bytes.Clone(config)
 
 		changed[index] ^= 1
-		if _, err := packetSizeFromConfig(changed); err == nil {
+		if _, err := usbtransport.Quantis.PacketSize(changed); err == nil {
 			t.Fatalf("changed endpoint/config accepted at %d", index)
 		}
 	}
 
 	want := [8]byte{0xc1, 0x10, 0, 0, 0, 0, 4, 0}
-	if got := controlSetup(requestBoard, 4); got != want {
+	if got := usbtransport.ControlSetup(requestBoard, 4); got != want {
 		t.Fatalf("setup packet: %x", got)
 	}
 
@@ -246,7 +248,7 @@ func FuzzUSBDescriptors(f *testing.F) {
 			t.Skip()
 		}
 
-		_, _ = packetSizeFromConfig(descriptor)
-		_ = validateDevice(descriptor)
+		_, _ = usbtransport.Quantis.PacketSize(descriptor)
+		_ = usbtransport.Quantis.ValidateDevice(descriptor)
 	})
 }

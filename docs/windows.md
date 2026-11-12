@@ -104,6 +104,14 @@ synchronous fallback or detached timeout worker. Native CI tests these Windows
 I/O mechanics with named pipes, not a physical Quantis card; see [hardware
 prerequisites and limits](quantis.md).
 
+## Experimental ChaosKey
+
+`-device=chaoskey-usb:0` uses the hardware-noise TRNG's cooked endpoint through
+WinUSB. It requires an operator-provisioned binding and registered device
+interface; it never installs a driver or silently substitutes OS randomness.
+See [ChaosKey setup and limits](https://github.com/fantuz/entropy-service/blob/main/docs/chaoskey.md).
+It is not a Windows CNG provider and has not been qualified with physical hardware.
+
 ## Files, logs and TLS
 
 Windows private files receive a protected DACL granting full access only to the

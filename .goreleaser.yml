@@ -74,6 +74,7 @@ archives:
       - docs/hardware-probe.md
       - docs/hardware-drivers.md
       - docs/quantis-usb.md
+      - docs/chaoskey.md
       - QUANTIS_NOTICES.txt
       - src: ./cmd/entropy-server/internal/wordlist/NOTICE.txt
         dst: WORDLIST_NOTICES.txt

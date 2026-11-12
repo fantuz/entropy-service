@@ -10,6 +10,7 @@ func TestWindowsInventoryIdentitiesAndLegacyOnlySelection(t *testing.T) {
 		{`PCI\VEN_179A&DEV_0001&SUBSYS_00000000\1`, LegacyPCI},
 		{`PCI\VEN_1E89&DEV_0003&SUBSYS_00000000\2`, ChipPCIe},
 		{`USB\VID_0ABA&PID_0102\Serial`, USB},
+		{`USB\VID_1D50&PID_60C6\ChaosSerial`, ChaosKey},
 	} {
 		device, known := windowsIdentity(tc.id)
 		if !known || device.Family != tc.family || device.State != "no_driver" {

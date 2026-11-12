@@ -70,6 +70,16 @@ class WindowsSmoke(unittest.TestCase):
                             contains=b"use -device=quantis-usb:0")
             self.assertNotIn(b"load TLS certificate", result.stderr)
 
+    def test_chaoskey_selection_is_explicit_and_strict(self):
+        for source in ["chaoskey-usb:127", "chaoskey-usb:-1", "chaoskey:0"]:
+            missing = json.loads(invoke(SERVER, "hardware", "probe", f"-device={source}", "-json", code=1).stdout)
+            self.assertFalse(missing["read_ok"])
+            self.assertNotIn("actual_source", missing)
+            self.assertFalse(missing["health_available"])
+            result = invoke(SERVER, f"-device={source}", "-cert-file=missing.pem", code=1,
+                            contains=b"use -device=chaoskey-usb:0")
+            self.assertNotIn(b"load TLS certificate", result.stderr)
+
     @classmethod
     def setUpClass(cls):
         # Hosted runners can start without a console. Attach children to a private

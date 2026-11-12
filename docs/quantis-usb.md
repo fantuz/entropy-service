@@ -51,6 +51,8 @@ transport.
 
 ## Linux: usbfs without libusb
 
+Quantis and ChaosKey share the bounded native I/O owner, with independent
+identity/protocol checks; Quantis control/health checks remain unchanged.
 The transport uses the Linux kernel's standard usbfs UAPI on
 `/dev/bus/usb/BBB/DDD`; no Quantis-specific kernel module or libusb development
 package is needed for this USB protocol. The OS still needs working USB host

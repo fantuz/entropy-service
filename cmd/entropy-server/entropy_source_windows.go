@@ -43,7 +43,7 @@ func selectWindowsEntropySource(path string, require bool, openBoard func(int) (
 	}
 
 	if require {
-		return nil, "", errors.New("-require-device on Windows requires -device=quantis-pci:0 or quantis-usb:0")
+		return nil, "", errors.New("-require-device on Windows requires -device=quantis-pci:0 or quantis-usb:0 or chaoskey-usb:0")
 	}
 
 	if path != "" && path != DefaultCSPRNG {
