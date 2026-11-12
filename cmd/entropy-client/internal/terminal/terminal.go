@@ -132,15 +132,7 @@ func ValidColor(value string) bool {
 }
 
 func Detect(choice string) Profile {
-	columns, rows, tty := dimensions(os.Stdout)
-	term := os.Getenv("TERM")
-
-	return Profile{
-		Color:       resolveColor(choice, tty, term, os.Getenv("COLORTERM"), os.Getenv("NO_COLOR") != ""),
-		Interactive: tty && term != dumbTerminal && term != "",
-		Columns:     columns,
-		Rows:        rows,
-	}
+	return platformDetect(os.Stdout, choice)
 }
 
 func resolveColor(choice string, tty bool, term, colorTerm string, noColor bool) Color {

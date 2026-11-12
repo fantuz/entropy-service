@@ -41,8 +41,9 @@ Hardware sources need appropriate OS support, binding and permissions; PCI
 kernel drivers and native USB transports have different requirements.
 
 An optional [Windows x64 port](docs/windows.md) builds both executables from the
-same source tree, using the native OS RNG, standard sockets, plain terminal text
-and file exports. Its capability limits are explicit; Linux remains the primary
+same source tree, using the native OS RNG, standard sockets, adaptive VT-console
+visualizations and file exports. Monochrome is the Windows default; colors are
+opt-in on a compatible console. Linux remains the primary
 deployment target.
 
 An experimental [Quantis PCI Windows adapter](docs/quantis.md) also supports

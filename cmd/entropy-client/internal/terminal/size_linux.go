@@ -14,3 +14,8 @@ func dimensions(file *os.File) (columns, rows int, tty bool) {
 
 	return int(size.Col), int(size.Row), true
 }
+
+func platformDetect(file *os.File, choice string) Profile { return detectDefault(file, choice) }
+
+// Prepare leaves the existing Linux terminal policy unchanged.
+func Prepare(_ *os.File) func() { return func() {} }

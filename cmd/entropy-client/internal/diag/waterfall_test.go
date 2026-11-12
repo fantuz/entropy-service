@@ -66,7 +66,14 @@ func TestWaterfallIncompleteRGBTripletsAreBlank(t *testing.T) {
 		w.Add(bytes.Repeat([]byte{255}, n), 1)
 
 		out := renderWaterfall(w, terminal.Profile{Color: terminal.TrueColor})
-		if strings.Count(out, "\x1b[48;2;") != n/3 {
+		// Only the colored prefix counts as painted; repeated colors may share
+		// a single SGR command. Blank cells must follow a reset.
+		line := out[strings.LastIndex(out, "#"):]
+		_, line, _ = strings.Cut(line, " | ")
+		painted, _, _ := strings.Cut(line, "\x1b[0m")
+
+		painted = strings.ReplaceAll(painted, "\x1b[48;2;255;255;255m", "")
+		if painted != strings.Repeat(" ", 2*(n/3)) {
 			t.Errorf("partial triplet was painted: bytes=%d output=%q", n, out)
 		}
 	}

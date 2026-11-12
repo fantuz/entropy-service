@@ -10,8 +10,11 @@ import (
 )
 
 type waterfallRow struct {
-	frame uint64
-	bytes []byte
+	frame      uint64
+	bytes      []byte
+	cells      []byte
+	cacheWidth int
+	cacheColor terminal.Color
 }
 
 const (
@@ -28,6 +31,7 @@ type Waterfall struct {
 	height int
 	mode   string
 	rows   []waterfallRow
+	line   []byte
 }
 
 func NewWaterfall(width, height int, mode string) *Waterfall {
@@ -57,6 +61,9 @@ func (w *Waterfall) Add(data []byte, frame uint64) {
 	row := waterfallRow{frame: frame, bytes: append([]byte(nil), data[:n]...)}
 
 	if len(w.rows) == w.height {
+		row.cells = w.rows[0].cells[:0]
+		row.cacheWidth = -1
+
 		copy(w.rows, w.rows[1:])
 		w.rows[len(w.rows)-1] = row
 	} else {
@@ -85,10 +92,20 @@ func byteHue(value byte) (r, g, b int) {
 	}
 }
 
-func cell(out *strings.Builder, color terminal.Color, r, g, b int) {
+func appendCell(out []byte, color terminal.Color, r, g, b int, previous int) ([]byte, int) {
+	key := r<<16 | g<<8 | b
+
 	switch color {
 	case terminal.TrueColor:
-		fmt.Fprintf(out, "\033[48;2;%d;%d;%dm  ", r, g, b)
+		if key != previous {
+			out = append(out, "\033[48;2;"...)
+			out = strconv.AppendInt(out, int64(r), 10)
+			out = append(out, ';')
+			out = strconv.AppendInt(out, int64(g), 10)
+			out = append(out, ';')
+			out = strconv.AppendInt(out, int64(b), 10)
+			out = append(out, 'm')
+		}
 	case terminal.ANSI256:
 		index := 16 + 36*((r*5+127)/255) + 6*((g*5+127)/255) + (b*5+127)/255
 		if r == g && g == b {
@@ -102,7 +119,12 @@ func cell(out *strings.Builder, color terminal.Color, r, g, b int) {
 			}
 		}
 
-		fmt.Fprintf(out, "\033[48;5;%dm  ", index)
+		key = index
+		if key != previous {
+			out = append(out, "\033[48;5;"...)
+			out = strconv.AppendInt(out, int64(index), 10)
+			out = append(out, 'm')
+		}
 	case terminal.ANSI16:
 		index := 0
 		if r >= 128 {
@@ -117,15 +139,22 @@ func cell(out *strings.Builder, color terminal.Color, r, g, b int) {
 			index |= 4
 		}
 
-		fmt.Fprintf(out, "\033[%dm  ", 40+index)
+		key = index
+		if key != previous {
+			out = append(out, "\033["...)
+			out = strconv.AppendInt(out, int64(40+index), 10)
+			out = append(out, 'm')
+		}
 	case terminal.Monochrome:
 		const ramp = " .:-=+*#%@"
 
 		value := (2126*r + 7152*g + 722*b) / 10000
 		level := ramp[value*(len(ramp)-1)/255]
-		out.WriteByte(level)
-		out.WriteByte(level)
+
+		return append(out, level, level), key
 	}
+
+	return append(out, ' ', ' '), key
 }
 
 // Render uses two columns per cell. Profile.Rows is the available screen budget.
@@ -169,48 +198,112 @@ func (w *Waterfall) RenderView(out io.Writer, profile terminal.Profile, columns,
 	fmt.Fprint(out, heading)
 
 	for i := len(w.rows) - 1; i >= len(w.rows)-height; i-- {
-		row := w.rows[i]
+		var digits [20]byte
 
-		var line strings.Builder
-
-		fmt.Fprintf(&line, "#%*d | ", label, row.frame)
-
-		w.cells(&line, row.bytes, width, profile.Color)
-
-		fmt.Fprintln(out, line.String())
+		number := strconv.AppendUint(digits[:0], w.rows[i].frame, 10)
+		w.line = append(w.line[:0], '#')
+		w.line = appendSpaces(w.line, label-len(number))
+		w.line = append(w.line, number...)
+		w.line = append(w.line, " | "...)
+		w.line = append(w.line, w.rowCells(i, width, profile.Color)...)
+		w.line = append(w.line, '\n')
+		_, _ = out.Write(w.line)
 	}
 }
 
 // RenderCanvas fills the available rows with newest-first cells, without labels.
 // Missing samples/bytes remain blank; no samples are invented to fill space.
 func (w *Waterfall) RenderCanvas(out *strings.Builder, profile terminal.Profile, rows int) {
-	width := min(w.width, max(0, profile.Columns/2))
-	padding := strings.Repeat(" ", max(0, profile.Columns-width*2))
-	out.Grow(max(0, profile.Columns) * max(0, profile.Rows))
+	_, _ = out.Write(w.AppendCanvas(nil, profile, rows))
+}
 
-	for y := range max(0, profile.Rows) {
-		var data []byte
+// AppendCanvas reuses the caller's bounded frame buffer and immutable row caches.
+// Only a newly sampled row, changed visible width or changed palette is encoded.
+func (w *Waterfall) AppendCanvas(dst []byte, profile terminal.Profile, rows int) []byte {
+	columns, height := min(max(0, profile.Columns), MaxWaterfallColumns*2), min(max(0, profile.Rows), MaxWaterfallRows)
+
+	width := min(w.width, columns/2)
+	if columns == 0 || height == 0 {
+		return dst
+	}
+
+	// Reserve the worst encoded size once. The buffer stays bounded on resize.
+	need := len(dst) + height*(width*cellSize(profile.Color)+columns-width*2+9)
+	if cap(dst) < need {
+		buffer := make([]byte, len(dst), need)
+		copy(buffer, dst)
+		dst = buffer
+	}
+
+	for y := range height {
 		if y < min(len(w.rows), rows) {
-			data = w.rows[len(w.rows)-1-y].bytes
+			dst = append(dst, w.rowCells(len(w.rows)-1-y, width, profile.Color)...)
+			dst = appendSpaces(dst, columns-width*2)
+		} else {
+			dst = appendSpaces(dst, columns)
 		}
 
-		w.cells(out, data, width, profile.Color)
-		out.WriteString(padding)
-		out.WriteByte('\n')
+		dst = append(dst, '\n')
+	}
+
+	return dst
+}
+
+func cellSize(color terminal.Color) int {
+	switch color {
+	case terminal.TrueColor:
+		return 24
+	case terminal.ANSI256:
+		return 16
+	case terminal.ANSI16:
+		return 8
+	case terminal.Monochrome:
+		return 2
+	default:
+		return 2
 	}
 }
 
-func (w *Waterfall) cells(line *strings.Builder, data []byte, width int, color terminal.Color) {
+func appendSpaces(dst []byte, n int) []byte {
+	const spaces = "                                                                "
+	for n > 0 {
+		count := min(n, len(spaces))
+		dst = append(dst, spaces[:count]...)
+		n -= count
+	}
+
+	return dst
+}
+
+func (w *Waterfall) rowCells(index, width int, color terminal.Color) []byte {
+	row := &w.rows[index]
+	if row.cells != nil && row.cacheWidth == width && row.cacheColor == color {
+		return row.cells
+	}
+
+	need := width*cellSize(color) + 8
+	if cap(row.cells) < need {
+		row.cells = make([]byte, 0, need)
+	}
+
+	row.cells = w.appendCells(row.cells[:0], row.bytes, width, color)
+	row.cacheWidth, row.cacheColor = width, color
+
+	return row.cells
+}
+
+func (w *Waterfall) appendCells(line, data []byte, width int, color terminal.Color) []byte {
 	stride := w.bytesPerCell()
+	previous := -1
 
 	for x := range width {
 		offset := x * stride
 		if offset+stride > len(data) {
 			if color != terminal.Monochrome {
-				line.WriteString("\033[0m")
+				line = append(line, "\033[0m"...)
 			}
 
-			line.WriteString(strings.Repeat(" ", (width-x)*2))
+			line = appendSpaces(line, (width-x)*2)
 
 			break
 		}
@@ -222,10 +315,12 @@ func (w *Waterfall) cells(line *strings.Builder, data []byte, width int, color t
 			r, g, b = byteHue(data[offset])
 		}
 
-		cell(line, color, r, g, b)
+		line, previous = appendCell(line, color, r, g, b, previous)
 	}
 
 	if color != terminal.Monochrome {
-		line.WriteString("\033[0m")
+		line = append(line, "\033[0m"...)
 	}
+
+	return line
 }

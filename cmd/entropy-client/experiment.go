@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/terminal"
 )
 
 const (
@@ -48,6 +50,11 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 	httpURL, wsURL, err := requestEndpoints(cfg)
 	if err != nil {
 		return fmt.Errorf("configure endpoint: %w", err)
+	}
+
+	if !cfg.Headless {
+		restore := terminal.Prepare(os.Stdout)
+		defer restore()
 	}
 
 	report, err := openReport(cfg.ReportPath)

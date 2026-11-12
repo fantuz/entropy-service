@@ -6,6 +6,7 @@ import ctypes
 from ctypes import wintypes
 import http.client
 import json
+import os
 from pathlib import Path
 import re
 import signal
@@ -128,9 +129,7 @@ class WindowsSmoke(unittest.TestCase):
             self.assertNotIn(b"Source opened", result.stderr)
 
         for option in [
-            "-writeout", "-output-device=/dev/null", "-output=-", "-waterfall",
-            "-layout=full", "-layout=waterfall", "-waterfall-columns=32",
-            "-waterfall-mode=rgb", "-color=truecolor",
+            "-writeout", "-output-device=/dev/null", "-output=-",
         ]:
             result = invoke(CLIENT, "-headless", option, "-url=http://127.0.0.1:1", code=1, contains=b"Windows")
             self.assertNotIn(b"connection refused", result.stderr.lower())
@@ -172,6 +171,89 @@ class WindowsSmoke(unittest.TestCase):
                         process.wait()
                     if process.stdout and not process.stdout.closed:
                         process.stdout.close()
+
+    def check_console_waterfall(self, port, work):
+        import msvcrt
+
+        class Coord(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_short), ("y", ctypes.c_short)]
+
+        class Rect(ctypes.Structure):
+            _fields_ = [("left", ctypes.c_short), ("top", ctypes.c_short),
+                        ("right", ctypes.c_short), ("bottom", ctypes.c_short)]
+
+        class Info(ctypes.Structure):
+            _fields_ = [("size", Coord), ("cursor", Coord), ("attributes", wintypes.WORD),
+                        ("window", Rect), ("maximum", Coord)]
+
+        kernel = self.kernel
+        kernel.CreateConsoleScreenBuffer.argtypes = [wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                                      wintypes.DWORD, ctypes.c_void_p]
+        kernel.CreateConsoleScreenBuffer.restype = wintypes.HANDLE
+        kernel.SetConsoleScreenBufferSize.argtypes = [wintypes.HANDLE, Coord]
+        kernel.SetConsoleWindowInfo.argtypes = [wintypes.HANDLE, wintypes.BOOL, ctypes.POINTER(Rect)]
+        kernel.SetConsoleMode.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel.GetConsoleMode.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel.GetConsoleScreenBufferInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(Info)]
+        kernel.ReadConsoleOutputCharacterW.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD,
+                                                       Coord, ctypes.POINTER(wintypes.DWORD)]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        for color, interrupted in [("never", False), ("truecolor", True)]:
+            handle = kernel.CreateConsoleScreenBuffer(0xC0000000, 3, None, 1, None)
+            self.assertNotEqual(handle, ctypes.c_void_p(-1).value)
+            self.assertTrue(kernel.SetConsoleScreenBufferSize(handle, Coord(160, 120)))
+            viewport = Rect(0, 0, 79, 19)
+            self.assertTrue(kernel.SetConsoleWindowInfo(handle, True, ctypes.byref(viewport)))
+            self.assertTrue(kernel.SetConsoleMode(handle, 3))  # Processed + wrap, initially no VT.
+            fd = msvcrt.open_osfhandle(handle, os.O_WRONLY | os.O_BINARY)
+            with os.fdopen(fd, "wb", buffering=0) as console, (work / f"console-{color}.log").open("wb") as log:
+                console_env = os.environ.copy()
+                console_env.pop("TERM", None)  # Hosted-runner hints must not disable the private interactive console.
+                process = subprocess.Popen(
+                    [str(CLIENT), "-layout=waterfall", "-waterfall-mode=rgb", f"-color={color}",
+                     "-mode=http", "-slice=256", "-refresh=20ms", "-analysis-interval=50ms",
+                     "-display-interval=50ms", "-duration=30s" if interrupted else "-duration=350ms",
+                     f"-url=http://127.0.0.1:{port}/v1/data/random"],
+                    stdout=console, stderr=log, env=console_env,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+
+                def visible_rows():
+                    info = Info()
+                    self.assertTrue(kernel.GetConsoleScreenBufferInfo(handle, ctypes.byref(info)))
+                    lines = []
+                    for y in range(info.window.top, info.window.bottom + 1):
+                        buffer = ctypes.create_unicode_buffer(81)
+                        count = wintypes.DWORD()
+                        self.assertTrue(kernel.ReadConsoleOutputCharacterW(
+                            handle, buffer, 80, Coord(info.window.left, y), ctypes.byref(count)))
+                        lines.append(buffer.value)
+                    return lines
+
+                try:
+                    if interrupted:
+                        deadline = time.monotonic() + 10
+                        while not visible_rows()[0].startswith("SHANNON:"):
+                            if process.poll() is not None or time.monotonic() > deadline:
+                                self.fail("console waterfall did not replace preflight")
+                            time.sleep(.05)
+                        process.send_signal(signal.CTRL_BREAK_EVENT)
+                    process.wait(timeout=12)
+                    self.assertEqual(process.returncode, 0, (work / f"console-{color}.log").read_bytes())
+                    lines = visible_rows()
+                    self.assertTrue(lines[0].startswith("SHANNON:"), lines)
+                    self.assertIn("THRESHOLD:", lines[0])
+                    self.assertIn("STATUS:", lines[0])
+                    self.assertIn("MiB/s", lines[0])
+                    self.assertTrue(any(line.strip() for line in lines[1:]), lines)
+                    self.assertNotIn("\x1b", "".join(lines))
+                    mode = wintypes.DWORD()
+                    self.assertTrue(kernel.GetConsoleMode(handle, ctypes.byref(mode)))
+                    self.assertEqual(mode.value, 3, "client did not restore the console output mode")
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
 
     def test_real_http_https_ws_files_and_shutdown(self):
         with tempfile.TemporaryDirectory(prefix="entropy-windows-") as directory:
@@ -241,6 +323,16 @@ class WindowsSmoke(unittest.TestCase):
                     self.assertRegex(plain.stdout, rb"Shannon entropy    : [0-9]+\.[0-9]{6} bits/byte")
                     self.assertIn(b"Shannon threshold  : 7.123456 bits/byte", plain.stdout)
                     self.assertNotIn(b"\x1b", plain.stdout)
+
+                    for color in ("never", "truecolor"):
+                        redirected = invoke(CLIENT, "-layout=waterfall", "-waterfall-mode=rgb",
+                                            f"-color={color}", "-mode=http", "-duration=180ms",
+                                            "-display-interval=50ms", "-analysis-interval=50ms",
+                                            "-slice=256", "-refresh=20ms",
+                                            f"-url=http://127.0.0.1:{ports['HTTP']}/v1/data/random")
+                        self.assertIn(b"Waterfall | rgb", redirected.stdout)
+                        self.assertNotIn(b"\x1b", redirected.stdout)
+                    self.check_console_waterfall(ports["HTTP"], work)
                     self.assertEqual(request(ports["HTTP"], "/ready")[0], 200)
 
                     process.send_signal(signal.CTRL_BREAK_EVENT)

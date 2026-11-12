@@ -34,7 +34,7 @@ func TestWaterfallUsesOnlySelectedAnalysisPrefixes(t *testing.T) {
 	m.waterfall.Render(&out, terminal.Profile{Color: terminal.TrueColor})
 
 	text := out.String()
-	if strings.Count(text, "\x1b[48;2;") != 8 || strings.Contains(text, "\x1b[48;2;255;") || !strings.Contains(text, "\x1b[48;2;1;1;1m") {
+	if !strings.Contains(text, "#     4 | \x1b[48;2;0;0;0m        \x1b[0m        ") || strings.Contains(text, "\x1b[48;2;255;") || !strings.Contains(text, "\x1b[48;2;1;1;1m") {
 		t.Fatalf("display retained skipped bytes, unanalysed bytes or recycled buffers: %q", text)
 	}
 
@@ -90,7 +90,7 @@ func TestWaterfallSurvivesStreamBufferRecycling(t *testing.T) {
 	m.waterfall.Render(&out, terminal.Profile{Color: terminal.TrueColor})
 
 	for i := 1; i <= 12; i++ {
-		want := fmt.Sprintf("#%6d | ", i) + strings.Repeat(fmt.Sprintf("\x1b[48;2;%d;%d;%dm  ", i, i, i), 8)
+		want := fmt.Sprintf("#%6d | \x1b[48;2;%d;%d;%dm", i, i, i, i) + strings.Repeat(" ", 16) + "\x1b[0m"
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("frame %d changed after recycling: %q", i, out.String())
 		}

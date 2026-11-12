@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
@@ -26,9 +25,9 @@ func (m *monitorState) renderWaterfall(out io.Writer, profile terminal.Profile) 
 
 	header := waterfallHeader(profile, entropy, m.cfg.ShannonThreshold, assessment, m.stats.Rate/(1<<20))
 
-	var screen strings.Builder
-	fmt.Fprint(&screen, profile.Clear())
-	fmt.Fprintln(&screen, header)
+	m.screen = append(m.screen[:0], profile.Clear()...)
+	m.screen = append(m.screen, header...)
+	m.screen = append(m.screen, '\n')
 
 	// Leave the physical last row free so a trailing newline cannot scroll.
 	profile.Rows -= 2
@@ -39,10 +38,10 @@ func (m *monitorState) renderWaterfall(out io.Writer, profile terminal.Profile) 
 			rows = diag.MaxWaterfallRows
 		}
 
-		m.waterfall.RenderCanvas(&screen, profile, rows)
+		m.screen = m.waterfall.AppendCanvas(m.screen, profile, rows)
 	}
 
-	fmt.Fprint(out, screen.String())
+	_, _ = out.Write(m.screen)
 }
 
 func waterfallHeader(profile terminal.Profile, entropy string, threshold float64, assessment string, rate float64) string {

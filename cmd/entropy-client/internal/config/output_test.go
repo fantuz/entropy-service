@@ -41,13 +41,6 @@ func TestWindowsCapabilitiesRejectUnsupportedRequests(t *testing.T) {
 		{WriteOut: true},
 		{OutputDevice: "/dev/null"},
 		{OutputPath: "-", Headless: true},
-		{ShowWaterfall: true},
-		{Layout: "waterfall"},
-		{WaterfallColumns: 32},
-		{WaterfallRows: 8},
-		{WaterfallMode: "rgb"},
-		{Layout: "full"},
-		{Color: "truecolor"},
 	} {
 		if err := cfg.validatePlatform("windows"); err == nil {
 			t.Fatalf("unsupported Windows request silently accepted: %+v", cfg)
@@ -64,6 +57,8 @@ func TestWindowsCapabilitiesRejectUnsupportedRequests(t *testing.T) {
 		{Layout: "compact", Color: "never", ShowDashboard: true},
 		{OutputPath: "capture.bin", ReportPath: "report.jsonl", Headless: true},
 		{ReportPath: "-", Headless: true},
+		{ShowWaterfall: true, Layout: "waterfall", Color: "never", WaterfallMode: "gray"},
+		{ShowWaterfall: true, Layout: "full", Color: "truecolor", WaterfallMode: "rgb", WaterfallColumns: 32, WaterfallRows: 8},
 	} {
 		if err := cfg.validatePlatform("windows"); err != nil {
 			t.Fatalf("portable Windows request rejected: %+v, %v", cfg, err)

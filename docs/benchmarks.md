@@ -1,5 +1,10 @@
 # Performance
 
+See the [Linux v2.0.3 assessment](linux-performance-v2.0.3.md) for the controlled
+comparison with the last pre-Windows revision and its raw measurements. The
+[client terminal guide](client-terminal.md#waterfall-rendering-cost) records the
+subsequent waterfall optimization, including varying-input benchmarks.
+
 ## Application payload size
 
 For a **32 MiB generated sample**, current encoder payloads are:
