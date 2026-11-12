@@ -106,6 +106,44 @@ class WindowsSmoke(unittest.TestCase):
             result = invoke(CLIENT, "-headless", option, "-url=http://127.0.0.1:1", code=1, contains=b"Windows")
             self.assertNotIn(b"connection refused", result.stderr.lower())
 
+    def test_missing_tls_startup_guidance(self):
+        with tempfile.TemporaryDirectory(prefix="entropy-missing-tls-") as directory:
+            result = invoke(SERVER, f"-cert-file={Path(directory) / 'missing cert.pem'}",
+                            f"-key-file={Path(directory) / 'missing key.pem'}", code=1,
+                            contains=b"load TLS certificate")
+            for text in [b"generate-cert", b"-enable-https=false -http=127.0.0.1:8080",
+                         b"docs/windows.md#files-logs-and-tls", b"http://127.0.0.1:8080/"]:
+                self.assertIn(text, result.stderr)
+
+    def check_jsonl_stdout(self, port, work):
+        base = [str(CLIENT), "-headless", "-mode=http", "-slice=256", "-refresh=1ms",
+                "-analysis-bytes=64", "-analysis-interval=1ms", "-report=-",
+                f"-url=http://127.0.0.1:{port}/v1/data/random"]
+        complete = invoke(CLIENT, *base[1:], "-duration=150ms")
+        summary = json.loads(complete.stdout.splitlines()[-1])
+        self.assertEqual(summary["termination"], "duration")
+        self.assertFalse(summary["failed"])
+        for stop in ("duration", "interrupt", "broken"):
+            with (work / f"report-{stop}.log").open("wb") as log:
+                process = subprocess.Popen(base + ["-duration=800ms" if stop == "duration" else "-duration=30s"],
+                                           stdout=subprocess.PIPE, stderr=log,
+                                           creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                try:
+                    if stop == "interrupt":
+                        time.sleep(.5)  # Many records fill the unread pipe before the console signal.
+                        process.send_signal(signal.CTRL_BREAK_EVENT)
+                    elif stop == "broken":
+                        process.stdout.close()
+                    process.wait(timeout=5)  # Wait without draining stdout: regression must not hang.
+                    self.assertNotEqual(process.returncode, 0, (work / f"report-{stop}.log").read_bytes())
+                    self.assertIn(b"write report", (work / f"report-{stop}.log").read_bytes())
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+                    if process.stdout and not process.stdout.closed:
+                        process.stdout.close()
+
     def test_real_http_https_ws_files_and_shutdown(self):
         with tempfile.TemporaryDirectory(prefix="entropy-windows-") as directory:
             work = Path(directory)
@@ -163,6 +201,8 @@ class WindowsSmoke(unittest.TestCase):
                         self.assertEqual(summary["output_written_bytes"], 700)
                         self.assertFalse(summary["failed"])
                         self.assertNotIn("\x1b", report.read_text(encoding="utf-8"))
+
+                    self.check_jsonl_stdout(ports["HTTP"], work)
 
                     plain = invoke(CLIENT, "-mode=http", "-shannon-threshold=7.123456",
                                    "-duration=120ms", "-display-interval=50ms", "-slice=256",

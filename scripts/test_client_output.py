@@ -11,6 +11,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import time
 import urllib.parse
 
 
@@ -118,6 +119,30 @@ def run(server):
             if process.poll() is None:
                 process.kill()
                 process.wait()
+
+        # JSONL stdout also uses cancellable writes, including its final summary.
+        report_base = [str(Path("bin/entropy-client").resolve()), "-headless", "-mode=http", "-slice=256",
+                       "-refresh=1ms", "-analysis-bytes=64", "-analysis-interval=1ms", "-report=-",
+                       f"-url=http://127.0.0.1:{server.server_port}/v1/data/random"]
+        for stop in ("duration", "interrupt", "broken"):
+            process = subprocess.Popen(report_base + ["-duration=500ms" if stop == "duration" else "-duration=30s"],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, pipesize=4096)
+            try:
+                if stop == "interrupt":
+                    time.sleep(.25)
+                    process.send_signal(signal.SIGINT)
+                elif stop == "broken":
+                    process.stdout.close()
+                process.wait(timeout=3)  # Do not drain the pipe until the writer has exited.
+                assert process.returncode != 0, "incomplete JSONL report was reported as successful"
+                assert b"write report" in process.stderr.read()
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+                process.stderr.close()
+                if not process.stdout.closed:
+                    process.stdout.close()
 
         broken_report = folder / "broken.jsonl"
         process = subprocess.Popen(base + ["-output=-", f"-report={broken_report}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)

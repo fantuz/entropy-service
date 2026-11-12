@@ -1162,7 +1162,7 @@ func main() {
 	if cfg.EnableHTTPS {
 		tlsCfg, err = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("%v%s", err, tlsStartupHint(cfg.CertFile, cfg.KeyFile, err))
 		}
 	}
 

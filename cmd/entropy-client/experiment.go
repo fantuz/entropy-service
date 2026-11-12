@@ -64,7 +64,18 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 		endpoint = wsURL
 	}
 
-	if err := report.start(cfg, endpoint); err != nil {
+	startCtx := ctx
+
+	startCancel := func() {}
+	if ctx.Err() != nil {
+		startCtx, startCancel = context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+	}
+
+	err = report.start(startCtx, cfg, endpoint)
+
+	startCancel()
+
+	if err != nil {
 		return err
 	}
 
@@ -80,7 +91,14 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 			err = errors.Join(err, closeErr)
 		}
 
-		err = errors.Join(err, report.summary(&m, began, reason, err != nil))
+		// Allow a healthy report to record cancellation, but never wait indefinitely
+		// for a consumer that stopped reading. A failed encoder cannot resume safely.
+		if report != nil && report.failure == nil {
+			summaryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+			err = errors.Join(err, report.summary(summaryCtx, &m, began, reason, err != nil))
+
+			cancel()
+		}
 
 		if !cfg.Headless {
 			log.Printf("stopped: reason=%s failed=%t received_frames=%d received_bytes=%d analysed_samples=%d output_bytes=%d output_frames=%d output_errors=%d",
@@ -110,7 +128,18 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 
 	m.started = time.Now()
 
-	if err := report.write(newReportHeader("measurement_start")); err != nil {
+	measurementCtx, cancel := context.WithCancel(ctx)
+	if cfg.Duration > 0 {
+		cancel()
+		measurementCtx, cancel = context.WithDeadline(ctx, m.started.Add(cfg.Duration))
+	}
+	defer cancel()
+
+	if err := report.write(measurementCtx, newReportHeader("measurement_start")); err != nil {
+		if report != nil && report.failure == nil && contextEnded(measurementCtx) {
+			return finish(stopReason(ctx), nil)
+		}
+
 		return finish(reasonReportError, err)
 	}
 

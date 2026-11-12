@@ -95,6 +95,17 @@ overwrite an existing file; use `-report=run.jsonl` for the client's exclusive
 creation and 0600 permissions instead. Without `-report`, headless mode is a
 quiet load generator and does not save results.
 
+On Linux and Windows, stdout pipe writes stop when the run is canceled or its
+measurement duration expires, including a consumer that stops reading. A broken
+pipe or interrupted JSONL write exits unsuccessfully: the last record can be
+partial and a summary may be absent. No further records are appended after a
+failed write. A healthy consumer still receives a final summary on duration
+expiry or interruption; that final write has a one-second grace period. The
+client closes only its own duplicated stdout handle and restores pipe flags.
+Regular file/console writes and report-file synchronization cannot promise a
+hard interruption deadline for a system call already in progress, including
+slow or failing storage.
+
 ## Compare transport, chunk size and analysis cost
 
 Change one setting at a time. Keep the same server backend/source, host,

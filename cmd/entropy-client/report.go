@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/output"
 	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
@@ -31,6 +33,8 @@ func newReportHeader(kind string) reportHeader {
 type runReport struct {
 	encoder *json.Encoder
 	file    *os.File
+	stdout  *reportStdout
+	failure error
 }
 
 func openReport(path string) (*runReport, error) {
@@ -39,7 +43,14 @@ func openReport(path string) (*runReport, error) {
 	}
 
 	if path == "-" {
-		return &runReport{encoder: json.NewEncoder(os.Stdout)}, nil
+		writer, err := output.OpenTextStdout()
+		if err != nil {
+			return nil, fmt.Errorf("open report stdout: %w", err)
+		}
+
+		stdout := &reportStdout{writer: writer}
+
+		return &runReport{encoder: json.NewEncoder(stdout), stdout: stdout}, nil
 	}
 
 	f, err := privatefile.Create(path)
@@ -50,20 +61,51 @@ func openReport(path string) (*runReport, error) {
 	return &runReport{encoder: json.NewEncoder(f), file: f}, nil
 }
 
-func (r *runReport) write(record any) error {
+type reportStdout struct {
+	ctx    context.Context //nolint:containedctx // Borrowed only during the synchronous Encode call; cleared before returning.
+	writer *output.Writer
+}
+
+func (w *reportStdout) Write(data []byte) (int, error) { return w.writer.WriteContext(w.ctx, data) }
+
+func (r *runReport) write(ctx context.Context, record any) error {
 	if r == nil {
 		return nil
 	}
 
+	// An interrupted record may be partial. Never append more JSON after an I/O
+	// failure; a pre-canceled context does not poison an otherwise healthy encoder.
+	if r.failure != nil {
+		return r.failure
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if r.stdout != nil {
+		r.stdout.ctx = ctx
+		defer func() { r.stdout.ctx = nil }()
+	}
+
 	if err := r.encoder.Encode(record); err != nil {
-		return fmt.Errorf("write report: %w", err)
+		r.failure = fmt.Errorf("write report: %w", err)
+		return r.failure
 	}
 
 	return nil
 }
 
 func (r *runReport) close() error {
-	if r == nil || r.file == nil {
+	if r == nil {
+		return nil
+	}
+
+	if r.stdout != nil {
+		return r.stdout.writer.Close()
+	}
+
+	if r.file == nil {
 		return nil
 	}
 
@@ -108,7 +150,7 @@ type startRecord struct {
 	GOARCH    string         `json:"goarch"`
 }
 
-func (r *runReport) start(cfg *config.Config, endpoint string) error {
+func (r *runReport) start(ctx context.Context, cfg *config.Config, endpoint string) error {
 	if r == nil {
 		return nil
 	}
@@ -118,7 +160,7 @@ func (r *runReport) start(cfg *config.Config, endpoint string) error {
 		return fmt.Errorf("report endpoint: %w", err)
 	}
 
-	return r.write(startRecord{
+	return r.write(ctx, startRecord{
 		reportHeader: newReportHeader("run_start"),
 		Settings: reportSettings{
 			Mode: cfg.Mode, Endpoint: endpoint, PayloadBytes: cfg.Slice,
@@ -179,12 +221,12 @@ type sampleRecord struct {
 	AnalysisMS        float64 `json:"analysis_ms"`
 }
 
-func (r *runReport) sample(m *monitorState) error {
+func (r *runReport) sample(ctx context.Context, m *monitorState) error {
 	if r == nil {
 		return nil
 	}
 
-	return r.write(sampleRecord{
+	return r.write(ctx, sampleRecord{
 		reportHeader: newReportHeader("sample"), reportCounts: m.counts(),
 		ElapsedMS:  time.Since(m.started).Seconds() * 1000,
 		FrameBytes: m.sampleBytes, SampleBytes: m.latest.N,
@@ -208,7 +250,7 @@ type summaryRecord struct {
 	ShannonAssessment string  `json:"last_shannon_assessment"`
 }
 
-func (r *runReport) summary(m *monitorState, began time.Time, reason string, failed bool) error {
+func (r *runReport) summary(ctx context.Context, m *monitorState, began time.Time, reason string, failed bool) error {
 	if r == nil {
 		return nil
 	}
@@ -223,7 +265,7 @@ func (r *runReport) summary(m *monitorState, began time.Time, reason string, fai
 		rate = float64(m.stats.TotalBytes) / (1 << 20) / elapsed.Seconds()
 	}
 
-	return r.write(summaryRecord{
+	return r.write(ctx, summaryRecord{
 		reportHeader: newReportHeader("run_summary"), reportCounts: m.counts(),
 		Termination: reason, Failed: failed, MeasurementBegan: !m.started.IsZero(),
 		ElapsedMS: elapsed.Seconds() * 1000, TotalElapsedMS: time.Since(began).Seconds() * 1000,

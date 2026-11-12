@@ -148,7 +148,10 @@
                 return close;
             }catch(failure){close();throw failure;}
         }
-        if(kind==="microphone") {
+        if(kind==="microphone"||kind==="linein") {
+            if(kind==="linein"&&!options.audioDeviceId)throw new Error("Choose an explicit line-in or external audio input; refresh inputs after allowing microphone permission in your browser");
+            const channel=options.audioChannel||"left";
+            if(!["left","right","mix"].includes(channel))throw new Error("Choose a valid audio channel");
             const Audio=window.AudioContext||window.webkitAudioContext;
             if(!navigator.mediaDevices?.getUserMedia||!Audio)throw new Error("Audio input needs a supported browser, Web Audio and HTTPS or localhost");
             if(signal.aborted)throw aborted();
@@ -162,7 +165,7 @@
             try{
                 await context.resume();
                 if(signal.aborted)throw aborted();
-                const audio={echoCancellation:false,noiseSuppression:false,autoGainControl:false};
+                const audio={echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:{ideal:2}};
                 if(options.audioDeviceId)audio.deviceId={exact:options.audioDeviceId};
                 stream=await navigator.mediaDevices.getUserMedia({audio,video:false});
                 if(signal.aborted)throw aborted();
@@ -171,19 +174,37 @@
                 track.addEventListener("ended",()=>{
                     if(!closed&&!signal.aborted){close();error(new Error("Audio input disconnected; choose an available input and Start again"));}
                 },{once:true});
+                const settings=track.getSettings?.()||{};
+                if(channel==="right"&&settings.channelCount===1)throw new Error("This input is mono; choose First / left channel");
                 const source=context.createMediaStreamSource(stream),analyser=context.createAnalyser(),mute=context.createGain();
                 analyser.fftSize=Math.max(32,2**Math.floor(Math.log2(Math.min(32768,Math.max(32,size/2)))));
-                mute.gain.value=0;source.connect(analyser);analyser.connect(mute);mute.connect(context.destination);
-                info(`Audio input: ${track.label||"system default"}. Choose a different input or use your system sound settings to select the physical line-in port.`);
+                // Explicit channels avoid cancellation when stereo inputs have
+                // opposing polarity. Mixing remains an intentional option.
+                if(channel==="mix")source.connect(analyser);
+                else {const splitter=context.createChannelSplitter(2);source.connect(splitter);splitter.connect(analyser,channel==="right"?1:0);}
+                mute.gain.value=0;analyser.connect(mute);mute.connect(context.destination);
+                const name=track.label||"system default audio input",channelName=channel==="mix"?"mono mix":channel==="right"?"second / right":"first / left";
+                const warmUntil=context.currentTime+analyser.fftSize/context.sampleRate;
+                info(`Audio input: ${name} · ${channelName}. Waiting for the first complete audio window…`);
                 const samples=new Float32Array(analyser.fftSize);ready();
                 cancelTimer=periodic(signal,refresh,()=>{
+                    if(context.state!=="running"){info(`Audio input: ${name}. Audio engine is ${context.state}; check browser audio/autoplay permission and Start again.`);return;}
+                    if(track.muted){info(`Audio input: ${name}. Input is muted or unavailable; check Windows Sound input, privacy permissions and device connection.`);return;}
+                    // Analyser buffers start as zero. In particular, Sample once
+                    // must not stop before a full window has reached the graph.
+                    if(context.currentTime<warmUntil)return;
                     analyser.getFloatTimeDomainData(samples);
                     const length=Math.min(size,samples.length*2),bytes=new Uint8Array(Math.ceil(length/2)*2),view=new DataView(bytes.buffer);
+                    let peak=0,squares=0,nonzero=false;
                     for(let i=0;i<bytes.length/2;i++){
                         const sample=Math.max(-1,Math.min(1,samples[i]));
-                        view.setInt16(i*2,Math.round(sample*(sample<0?32768:32767)),true);
+                        const value=Math.round(sample*(sample<0?32768:32767));
+                        view.setInt16(i*2,value,true);peak=Math.max(peak,Math.abs(sample));squares+=sample*sample;nonzero||=value!==0;
                     }
-                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · ${track.label||"system default audio input"} · latest audio window (may overlap)`);
+                    const level=value=>value>0?(20*Math.log10(value)).toFixed(1):"−∞";
+                    const guidance=nonzero?"":peak===0?" · Silent input: check selected device, input level/mute, cable and channel in Windows Sound or your system settings.":" · Signal is below PCM16 resolution; check input levels.";
+                    info(`Audio input: ${name} · ${channelName} · peak ${level(peak)} dBFS · RMS ${level(Math.sqrt(squares/(bytes.length/2)))} dBFS${guidance}`);
+                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · ${name} · ${channelName} · latest audio window (may overlap)`);
                 },error);
                 return close;
             }catch(failure){

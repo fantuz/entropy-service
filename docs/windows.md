@@ -82,7 +82,11 @@ an interrupted or failed one. Existing output/report files are never replaced.
 The existing non-Linux fallback files have narrow meanings: terminal sizing
 returns “unknown”, selecting scrolling text; device/raw-stdout adapters return
 explicit errors. They do **not** disable normal stdout, stderr, JSONL or file
-exports. Windows capability validation rejects explicit unsupported options
+exports. JSONL stdout pipes use cancellable writes; an unread or broken pipe is a report
+error and can leave an incomplete last record. Healthy consumers receive the
+normal summary. See [report lifecycle](client-experiments.md).
+
+Windows capability validation rejects explicit unsupported options
 before beginning an experiment, even with `-headless`.
 
 OS randomness is read synchronously in bounded chunks. Deadlines/closure are
@@ -124,7 +128,12 @@ private structured records, use `-report=run.jsonl`. A log is not raw entropy.
 Direct `-output=sample.bin` avoids binary-redirection differences between
 PowerShell versions; no Windows raw-stdout adapter is enabled here.
 
-For HTTPS, generate or provision a unique identity in your controlled directory:
+HTTPS is enabled by default. First-run startup fails if its certificate or key
+is missing; the error includes a PowerShell provisioning example and this guide.
+Certificates are created explicitly, never automatically by the server. For
+initial testing, use `-enable-https=false -http=127.0.0.1:8080` and open
+<http://127.0.0.1:8080/>. For HTTPS, generate or provision a unique identity in your
+controlled directory:
 
 ```powershell
 .\bin\entropy-server.exe generate-cert -hosts=localhost,127.0.0.1

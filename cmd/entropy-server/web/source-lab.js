@@ -38,7 +38,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         try{
             const devices=await window.EntropyLabAdapters.audioInputs();
             if(disposed||request!==audioRequest)return;
-            if(devices===null){$("lab-audio-help").textContent="This browser cannot list audio devices. Choose the input in your system sound settings, then use System default. "+audioHelp;return;}
+            if(devices===null){$("lab-audio-help").textContent="This browser cannot list audio devices. Select the physical input in system sound settings, then use Microphone PCM with System default. "+audioHelp;return;}
             const select=$("lab-audio-device"),selected=select.value;
             const option=document.createElement("option");option.value="";option.textContent="System default";select.replaceChildren(option);
             devices.forEach((device,index)=>{
@@ -52,7 +52,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         }catch(_){if(!disposed&&request===audioRequest)$("lab-audio-help").textContent="Could not list audio inputs. Check this site's audio permission or use System default. "+audioHelp;}
         finally{if(!disposed&&request===audioRequest)$("lab-audio-refresh").disabled=false;}
     }
-    const audioDevicesChanged=()=>{if($("lab-kind").value==="microphone")void refreshAudioInputs();};
+    const audioDevicesChanged=()=>{if(["microphone","linein"].includes($("lab-kind").value))void refreshAudioInputs();};
     $("lab-audio-refresh")?.addEventListener("click",()=>void refreshAudioInputs());
     if($("lab-audio-device"))navigator.mediaDevices?.addEventListener?.("devicechange",audioDevicesChanged);
     function status(state,text){$("lab-status").dataset.state=state;if($("lab-status").textContent!==text)$("lab-status").textContent=text;}
@@ -137,10 +137,11 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         const result={kind:selected,selection:selected,size,refresh,maxBytes:Math.min(helpers.MAX_BYTES,catalog.max_bytes),cadenceApplied:!["websocket","serial"].includes(selected),transform:$("lab-transform").value,label:$("lab-kind").selectedOptions[0].textContent,
             value:Number($("lab-constant")?.value||0),pattern:selected==="pattern"?helpers.pattern($("lab-pattern").value):Uint8Array.of(0,255),
             file:$("lab-file")?.files[0],resolution:$("lab-resolution")?.value||"320x240",format:$("lab-format")?.value||"rgb",baud:Number($("lab-baud")?.value||115200)};
-        if(selected==="microphone"){
+        if(["microphone","linein"].includes(selected)){
             const input=$("lab-audio-device");
             if(input.selectedOptions[0]?.dataset.unavailable)throw new Error("Selected audio input is unavailable; refresh inputs and choose another device or System default");
-            result.audioDeviceId=input.value;
+            result.audioDeviceId=input.value;result.audioChannel=$("lab-audio-channel").value;
+            if(selected==="linein"&&!result.audioDeviceId)throw new Error("Choose a line-in / external input; allow microphone permission in your browser and refresh inputs if needed");
         }
         if(selected==="self-ws"||selected==="self-http"||selected==="peer-ws"||selected==="peer-http"){
             const base=selected.startsWith("self")?new URL(location.href):endpoint($("lab-url").value,"http",selected==="peer-ws"?"entropy-ws":"entropy-http");
@@ -187,7 +188,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
             const close=await window.EntropyLabAdapters.start(options,{signal,video:$("lab-video"),
                 info(message){if(token===generation&&!signal.aborted)$("lab-transport-info").textContent=message;},
                 previewEnabled:()=>$("lab-show-preview").checked,previewCanvas:$("lab-network-preview"),
-                ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");if(options.kind==="microphone")void refreshAudioInputs();}},
+                ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");if(["microphone","linein"].includes(options.kind))void refreshAudioInputs();}},
                 emit:(bytes,encoding)=>capture(bytes,encoding,token),
                 end:message=>{if(token===generation&&!signal.aborted)finish(message);},
                 error:error=>{if(token===generation&&!signal.aborted)stop("error",error.message);}
@@ -198,7 +199,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
     function sourceFields(){
         const kind=$("lab-kind").value;
         if(document.body.dataset.lab==="sources")$("lab-catalog-info").hidden=kind!=="rtsp";
-        if(kind==="microphone")void refreshAudioInputs();
+        if(["microphone","linein"].includes(kind))void refreshAudioInputs();
         const serverHTTP=kind==="http"&&$("lab-http-route")?.value==="registered";
         if($("lab-registered")){
             const select=$("lab-registered"),selected=select.value;
