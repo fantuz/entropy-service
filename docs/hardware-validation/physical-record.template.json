@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "record_kind": "physical_device",
+  "record_status": "template",
+  "record_id": null,
+  "observed_at_utc": null,
+  "operator_alias": null,
+  "device": {
+    "family": null,
+    "model": null,
+    "bus": null,
+    "bus_location": null,
+    "vendor_id": null,
+    "product_id": null,
+    "serial_or_alias": null,
+    "firmware_or_core_version": null,
+    "notes": null
+  },
+  "source": {
+    "requested": null,
+    "actual": null,
+    "path": null,
+    "interface": null,
+    "endpoint": null,
+    "output_kind": null,
+    "notes": null
+  },
+  "host": {
+    "os": null,
+    "os_version_or_build": null,
+    "kernel_release": null,
+    "architecture": null,
+    "notes": null
+  },
+  "driver": {
+    "name": null,
+    "version": null,
+    "package": null,
+    "binding": null,
+    "kernel_overlay_ref": null,
+    "relevant_policy": null,
+    "notes": null
+  },
+  "software": {
+    "application_ref": null,
+    "binary_sha256": null,
+    "build_settings": null,
+    "notes": null
+  },
+  "identity_probe": {
+    "result": "not_tested",
+    "command": null,
+    "health_available": null,
+    "notes": null
+  },
+  "throughput": {
+    "result": "not_tested",
+    "measurement_boundary": null,
+    "method": null,
+    "read_chunk_bytes": null,
+    "read_timeout_ms": null,
+    "runs": [],
+    "accepted_bytes_total": null,
+    "elapsed_seconds_total": null,
+    "mib_per_second": null,
+    "timeout_count": null,
+    "error_count": null,
+    "notes": null
+  },
+  "cancellation": {
+    "deadline": {
+      "result": "not_tested",
+      "trials": null,
+      "expected_budget_ms": null,
+      "max_return_latency_ms": null,
+      "returned_within_budget": null,
+      "pending_io_drained": null,
+      "accepted_bytes_after_cancellation": null,
+      "observed_errors": [],
+      "method": null,
+      "notes": null
+    },
+    "context_cancel": {
+      "result": "not_tested",
+      "trials": null,
+      "expected_budget_ms": null,
+      "max_return_latency_ms": null,
+      "returned_within_budget": null,
+      "pending_io_drained": null,
+      "accepted_bytes_after_cancellation": null,
+      "observed_errors": [],
+      "method": null,
+      "notes": null
+    },
+    "close": {
+      "result": "not_tested",
+      "trials": null,
+      "expected_budget_ms": null,
+      "max_return_latency_ms": null,
+      "returned_within_budget": null,
+      "pending_io_drained": null,
+      "accepted_bytes_after_cancellation": null,
+      "observed_errors": [],
+      "method": null,
+      "notes": null
+    },
+    "disconnect": {
+      "result": "not_tested",
+      "trials": null,
+      "expected_budget_ms": null,
+      "max_return_latency_ms": null,
+      "returned_within_budget": null,
+      "pending_io_drained": null,
+      "accepted_bytes_after_cancellation": null,
+      "observed_errors": [],
+      "method": null,
+      "notes": null
+    },
+    "shutdown": {
+      "result": "not_tested",
+      "trials": null,
+      "expected_budget_ms": null,
+      "max_return_latency_ms": null,
+      "returned_within_budget": null,
+      "pending_io_drained": null,
+      "accepted_bytes_after_cancellation": null,
+      "observed_errors": [],
+      "method": null,
+      "notes": null
+    }
+  },
+  "evidence": [],
+  "limitations": []
+}

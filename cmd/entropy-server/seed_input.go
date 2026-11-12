@@ -62,6 +62,12 @@ func (s *seedInput) readSeed(parent context.Context, p []byte) (n int, err error
 			return 0, err
 		}
 
+		// Timer delivery can lag behind the clock, especially on Windows.
+		// Do not start another source read once the absolute budget is spent.
+		if !time.Now().Before(deadline) {
+			return 0, context.DeadlineExceeded
+		}
+
 		n, err := s.reader.Read(p[:min(len(p), 32<<10)])
 		if n == 0 && err == nil && len(p) > 0 {
 			return 0, io.ErrNoProgress

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,5 +200,29 @@ func TestSeedInputReseedFailureRecoveryAndWorkerJoin(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("blocked reseed was not cancelled")
+	}
+}
+
+// Model timer dispatch lag: the absolute deadline has passed, but Err/Done
+// have not been updated yet. This can occur under load on Windows runners.
+type pendingDeadlineContext struct {
+	deadline time.Time
+	done     <-chan struct{}
+}
+
+func (ctx pendingDeadlineContext) Deadline() (time.Time, bool) { return ctx.deadline, true }
+func (ctx pendingDeadlineContext) Done() <-chan struct{}       { return ctx.done }
+func (pendingDeadlineContext) Err() error                      { return nil }
+func (pendingDeadlineContext) Value(any) any                   { return nil }
+
+func TestSeedInputDoesNotReadAfterDeadlineBeforeTimerDispatch(t *testing.T) {
+	source := &probeFixture{reader: strings.NewReader(strings.Repeat("x", 64))}
+	parent := pendingDeadlineContext{deadline: time.Now().Add(-time.Second), done: make(chan struct{})}
+	input := (&seedInput{source: source, reader: source, timeout: time.Hour}).Reader(parent)
+	buffer := bytes.Repeat([]byte{0xff}, 64)
+
+	n, err := input.Read(buffer)
+	if n != 0 || !errors.Is(err, context.DeadlineExceeded) || source.reads.Load() != 0 || !bytes.Equal(buffer, make([]byte, len(buffer))) {
+		t.Fatalf("expired budget attempted source I/O: n=%d reads=%d err=%v", n, source.reads.Load(), err)
 	}
 }
