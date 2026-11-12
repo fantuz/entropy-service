@@ -76,3 +76,10 @@ func TestOSSeedReadinessRefusesBootWaitAndUnsupportedSyscall(t *testing.T) {
 		})
 	}
 }
+
+func TestExplicitChaosKeyNodeNeverFallsBack(t *testing.T) {
+	source, actual, err := openEntropySource("/dev/chaoskey-entropy-test-missing", false)
+	if err == nil || source != nil || actual != "" {
+		t.Fatalf("kernel ChaosKey node fell back: %v %q %v", source, actual, err)
+	}
+}

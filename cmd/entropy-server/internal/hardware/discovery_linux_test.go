@@ -133,3 +133,64 @@ func TestLinuxStatusFailureAndModelSpecificHealth(t *testing.T) {
 		t.Fatalf("status failure swallowed: %v", err)
 	}
 }
+
+func TestLinuxChaosKeyInventorySeparatesKernelAndUSBPaths(t *testing.T) {
+	root := t.TempDir()
+	sysRoot, devRoot := filepath.Join(root, "sys"), filepath.Join(root, "dev")
+	bus := filepath.Join(sysRoot, "bus", "usb", "devices")
+	path := filepath.Join(bus, "1-1")
+	iface := path + ":1.0"
+	physicalIface := filepath.Join(path, "1-1:1.0")
+	driver := filepath.Join(root, "drivers", "chaoskey")
+
+	class := filepath.Join(sysRoot, "class", "usbmisc", "chaoskey0")
+	for _, dir := range []string{path, physicalIface, driver, class, devRoot} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := os.Symlink(physicalIface, iface); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, value := range map[string]string{"idVendor": "1d50", "idProduct": "60c6", "busnum": "1", "devnum": "2"} {
+		if err := os.WriteFile(filepath.Join(path, name), []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for name, target := range map[string]string{filepath.Join(iface, "driver"): driver, filepath.Join(class, "device"): iface, filepath.Join(devRoot, "chaoskey0"): "/dev/null"} {
+		if err := os.Symlink(target, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	inventory, err := discoverLinux(sysRoot, devRoot)
+	if err != nil || len(inventory.Devices) != 1 {
+		t.Fatal(inventory, err)
+	}
+
+	device := inventory.Devices[0]
+	if device.Family != ChaosKey || device.Driver != "chaoskey" || len(device.KernelPaths) != 1 || device.KernelPaths[0] != filepath.Join(devRoot, "chaoskey0") || device.Paths[0] != filepath.Join(devRoot, "bus", "usb", "001", "002") {
+		t.Fatalf("interfaces confused: %+v", device)
+	}
+
+	if quantisusb.Available && device.Source != "chaoskey-usb:0" {
+		t.Fatal(device.Source)
+	}
+
+	devices := []Device{{ID: "b", Family: USB, Paths: []string{"b"}}, {ID: "a", Family: ChaosKey, Paths: []string{"a"}}}
+	assignUSBSelectors(devices, false)
+
+	if quantisusb.Available && (devices[0].Source != "quantis-usb:0" || devices[1].Source != "chaoskey-usb:0") {
+		t.Fatal(devices)
+	}
+}
+
+func TestChaosKeyDoesNotReceiveQuantisIoctls(t *testing.T) {
+	status, err := linuxStatus(7, ChaosKey, func(int, uint) (uint32, error) { t.Fatal("Quantis ioctl issued to ChaosKey"); return 0, nil })
+	if err != nil || len(status) != 0 {
+		t.Fatal(status, err)
+	}
+}

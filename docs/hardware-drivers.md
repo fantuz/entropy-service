@@ -235,19 +235,13 @@ determine pool use; inspect `/sys/class/misc/hw_random/rng_available` and
 therefore do not satisfy this server's generic direct-device contract merely
 by existing. OS-pool use through `/dev/urandom` remains a different path.
 
-A native experimental ChaosKey backend would need its own identity/descriptor
-checks and cooked-endpoint protocol. It could reuse suitable USB transport and
-cancellation mechanics after a deliberate refactor, with native fixtures and
-physical tests. The Quantis USB adapter uses different identity/control requests
-and endpoint semantics, so changing only VID/PID would be incorrect. Kernel
-binding/ownership and permissions on Linux, and an operator-provisioned WinUSB
-binding plus discoverable interface on Windows, need explicit qualification.
-Reading a device through WinUSB does not register it as a Windows CNG entropy
-provider or change `crypto/rand` globally.
-
-There is **no native ChaosKey backend or selector in entropy-service yet**.
-Priorities are: qualify the existing legacy PCI path on the maintainer's host;
-complete modern Linux driver readiness/cancellation work; then add cooked-only
-ChaosKey support in a separate feature PR when its device/transport tests can be
-reviewed. USB is valuable because it avoids a vendor-specific out-of-tree PCI
-module, while still relying on OS USB support and a correctly qualified reader.
+The separate [experimental ChaosKey cooked backend](https://github.com/fantuz/entropy-service/blob/main/docs/chaoskey.md)
+now provides explicit `chaoskey-usb:N` selection on released Linux targets and
+Windows x64. It reuses the native USB cancellation mechanics through a neutral
+transport package, while retaining separate identity/descriptor and cooked-source
+checks. It never reads raw endpoint `0x86` or flash endpoint `0x87`, detaches the
+Linux kernel driver, installs WinUSB or changes OS RNG policy. Existing
+`/dev/chaoskeyN` nodes are reported separately and must meet the actual
+poll/nonblocking deadline contract before direct reads are allowed. Device
+health remains unavailable for the cooked protocol; simulated/native I/O tests
+do not establish physical-device qualification or entropy quality.

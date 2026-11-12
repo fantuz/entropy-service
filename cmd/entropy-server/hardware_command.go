@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -180,7 +181,7 @@ func (command hardwareCommand) probe(parent context.Context, path string, size i
 	} else {
 		report.DiscoveryWarnings = inventory.Warnings
 		for _, device := range inventory.Devices {
-			if device.Source == path {
+			if device.Source == path || slices.Contains(device.Paths, path) || slices.Contains(device.KernelPaths, path) {
 				report.Device = &device
 				break
 			}
@@ -283,6 +284,14 @@ func writeInventory(output io.Writer, inventory hardware.Inventory, jsonOutput b
 
 	for _, device := range inventory.Devices {
 		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", device.Model, device.ID, device.Driver, device.DriverVersion, device.State, device.Source)
+
+		if len(device.KernelPaths) > 0 {
+			fmt.Fprintf(writer, "  Kernel character path(s): %s\n", strings.Join(device.KernelPaths, ", "))
+		}
+
+		for _, note := range device.Notes {
+			fmt.Fprintf(writer, "  Note: %s\n", note)
+		}
 	}
 
 	fmt.Fprintf(writer, "%d matching device(s); OS metadata only; access and hardware operation not tested.\n", len(inventory.Devices))

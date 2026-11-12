@@ -1,6 +1,6 @@
 //go:build linux && (amd64 || arm || arm64)
 
-package quantisusb
+package usbtransport
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 )
 
 type usbfsFixture struct {
+	endpoint  byte
 	mu        sync.Mutex
 	active    *usbURB
 	buffer    []byte
@@ -36,7 +37,12 @@ func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
 		t.Fatal(err)
 	}
 
-	driver := &linuxTransport{fd: 9999, wake: wake}
+	endpoint := fixture.endpoint
+	if endpoint == 0 {
+		endpoint = Quantis.Endpoint()
+	}
+
+	driver := &linuxTransport{fd: 9999, wake: wake, endpoint: endpoint}
 	driver.calls = linuxCalls{
 		ioctl: func(_ int, request uint, pointer unsafe.Pointer) error {
 			fixture.mu.Lock()
@@ -46,7 +52,7 @@ func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
 			switch request & 0xffff {
 			case 0x550a:
 				fixture.active = (*usbURB)(pointer)
-				if fixture.active.Type != 3 || fixture.active.Endpoint != Endpoint || fixture.active.Buffer != uintptr(unsafe.Pointer(&fixture.buffer[0])) || request>>16&0x3fff != uint(unsafe.Sizeof(usbURB{})) {
+				if fixture.active.Type != 3 || fixture.active.Endpoint != driver.endpoint || fixture.active.Buffer != uintptr(unsafe.Pointer(&fixture.buffer[0])) || request>>16&0x3fff != uint(unsafe.Sizeof(usbURB{})) {
 					t.Error("invalid submitted Linux USB ABI")
 				}
 
@@ -121,30 +127,38 @@ func usbfsDriver(t *testing.T, fixture *usbfsFixture) *linuxTransport {
 }
 
 func TestLinuxUSBReapsSuccessAndCancellationBeforeReturning(t *testing.T) {
-	for _, complete := range []bool{false, true} {
-		fixture := &usbfsFixture{buffer: make([]byte, 64), complete: complete}
-		driver := usbfsDriver(t, fixture)
+	for _, profile := range []Profile{Quantis, ChaosKey} {
+		for _, complete := range []bool{false, true} {
+			fixture := &usbfsFixture{buffer: make([]byte, 64), complete: complete, endpoint: profile.Endpoint()}
 
-		budget := 20 * time.Millisecond
-		if complete {
-			budget = time.Second
-		}
-
-		if err := driver.SetReadDeadline(time.Now().Add(budget)); err != nil {
-			t.Fatal(err)
-		}
-
-		n, err := driver.Bulk(fixture.buffer)
-		if complete {
-			if err != nil || n != 64 || !bytes.Equal(fixture.buffer, bytes.Repeat([]byte{0x77}, 64)) {
-				t.Fatalf("successful completion: %d %v", n, err)
+			driver := usbfsDriver(t, fixture)
+			if profile == ChaosKey {
+				if _, err := driver.Control(0x10, make([]byte, 4)); err == nil {
+					t.Fatal("ChaosKey vendor control accepted")
+				}
 			}
-		} else if n != 0 || !errors.Is(err, os.ErrDeadlineExceeded) || !fixture.canceled {
-			t.Fatalf("timeout: %d %v", n, err)
-		}
 
-		if !fixture.reaped || fixture.active != nil {
-			t.Fatal("operation returned before completion was drained")
+			budget := 20 * time.Millisecond
+			if complete {
+				budget = time.Second
+			}
+
+			if err := driver.SetReadDeadline(time.Now().Add(budget)); err != nil {
+				t.Fatal(err)
+			}
+
+			n, err := driver.Bulk(fixture.buffer)
+			if complete {
+				if err != nil || n != 64 || !bytes.Equal(fixture.buffer, bytes.Repeat([]byte{0x77}, 64)) {
+					t.Fatalf("successful completion: %d %v", n, err)
+				}
+			} else if n != 0 || !errors.Is(err, os.ErrDeadlineExceeded) || !fixture.canceled {
+				t.Fatalf("timeout: %d %v", n, err)
+			}
+
+			if !fixture.reaped || fixture.active != nil {
+				t.Fatal("operation returned before completion was drained")
+			}
 		}
 	}
 }
@@ -202,7 +216,7 @@ func TestLinuxUSBRejectsOrdinaryFileAndChecksABILayout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if source, err := Open(path); err == nil || source != nil {
+	if source, _, err := Open(path, Quantis); err == nil || source != nil {
 		t.Fatalf("ordinary file accepted as USB: %v %v", source, err)
 	}
 

@@ -26,3 +26,25 @@ func TestQuantisUSBExplicitPlatformSelection(t *testing.T) {
 		}
 	}
 }
+
+func TestChaosKeyExplicitPlatformSelection(t *testing.T) {
+	for _, require := range []bool{false, true} {
+		cfg := Config{DevicePath: "chaoskey-usb:0", RequireDevice: require}
+		for _, platform := range []string{"linux", "windows"} {
+			if err := cfg.validatePlatform(platform); (err == nil) != quantisusb.Available {
+				t.Fatalf("ChaosKey on %s: %v", platform, err)
+			}
+		}
+
+		if err := cfg.validatePlatform("plan9"); err == nil {
+			t.Fatal("unsupported ChaosKey platform")
+		}
+	}
+
+	for _, selector := range []string{"chaoskey-usb:-1", "chaoskey-usb:127", "chaoskey-usb:00", "chaoskey-usb"} {
+		cfg := Config{DevicePath: selector}
+		if err := cfg.validatePlatform("linux"); err == nil {
+			t.Fatal(selector)
+		}
+	}
+}

@@ -78,18 +78,43 @@ func windowsDevices(bus string) ([]Device, error) {
 			_ = key.Close()
 		}
 
-		guid, err := windows.GUIDFromString(interfaceGUIDs[device.Family])
-		if err != nil {
-			return nil, err
+		guids := []string{interfaceGUIDs[device.Family]}
+		if device.Family == ChaosKey {
+			guids = nil
+
+			if handle, err := set.OpenDevRegKey(info, windows.DICS_FLAG_GLOBAL, 0, windows.DIREG_DEV, windows.KEY_QUERY_VALUE); err == nil {
+				key := registry.Key(handle)
+				guids, _, _ = key.GetStringsValue("DeviceInterfaceGUIDs")
+				_ = key.Close()
+			}
+
+			if len(guids) == 0 {
+				device.Notes = append(device.Notes, "WinUSB needs a registered DeviceInterfaceGUIDs multi-string; see docs/chaoskey.md")
+			}
+
+			if !strings.EqualFold(device.Driver, "WinUSB") {
+				device.Notes = append(device.Notes, "ChaosKey direct USB requires an operator-selected WinUSB binding; no driver is changed automatically")
+			}
 		}
 
-		paths, err := windows.CM_Get_Device_Interface_List(instance, &guid, windows.CM_GET_DEVICE_INTERFACE_LIST_PRESENT)
-		if err == nil {
-			device.Paths = paths
-			device.State = "interface_present"
-		} else if !errors.Is(err, windows.ERROR_NO_SUCH_DEVICE_INTERFACE) {
-			device.Notes = append(device.Notes, fmt.Sprintf("interface lookup: %v", err))
+		for _, text := range guids {
+			guid, err := windows.GUIDFromString(text)
+			if err != nil {
+				device.Notes = append(device.Notes, "invalid USB interface GUID in device registration")
+				continue
+			}
+
+			paths, err := windows.CM_Get_Device_Interface_List(instance, &guid, windows.CM_GET_DEVICE_INTERFACE_LIST_PRESENT)
+			if err == nil {
+				device.Paths = append(device.Paths, paths...)
+				device.State = "interface_present"
+			} else if !errors.Is(err, windows.ERROR_NO_SUCH_DEVICE_INTERFACE) {
+				device.Notes = append(device.Notes, fmt.Sprintf("interface lookup: %v", err))
+			}
 		}
+
+		slices.Sort(device.Paths)
+		device.Paths = slices.Compact(device.Paths)
 
 		if len(device.Paths) == 0 && device.Driver != "" {
 			device.State = "driver_present_interface_missing"
@@ -125,7 +150,7 @@ func windowsIdentity(instance string) (Device, bool) {
 	}
 
 	family, model, known := Identify(vendor, product)
-	if !known || (bus == windowsUSBBus) != (family == USB) {
+	if !known || (bus == windowsUSBBus) != isUSBFamily(family) {
 		return Device{}, false
 	}
 

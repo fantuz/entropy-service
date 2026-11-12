@@ -12,3 +12,14 @@ func TestUSBSourceSelectionRejectsMalformedIndicesWithoutFallback(t *testing.T) 
 		}
 	}
 }
+
+func TestChaosKeySelectionNeverFallsBack(t *testing.T) {
+	for _, require := range []bool{false, true} {
+		for _, selector := range []string{"chaoskey-usb:127", "chaoskey-usb:-1", "chaoskey-usb:0/device"} {
+			opened, actual, err := openEntropySource(selector, require)
+			if err == nil || opened != nil || actual != "" {
+				t.Fatalf("ChaosKey fell back: %s %v %q %v", selector, opened, actual, err)
+			}
+		}
+	}
+}

@@ -10,3 +10,4 @@ go test ./cmd/entropy-client/internal/client -run '^$' -fuzz '^FuzzEntropyFrame$
 go test ./cmd/entropy-server -run '^$' -fuzz '^FuzzGenerationQuery$' -fuzztime="$budget" -parallel=2
 go test ./cmd/entropy-server -run '^$' -fuzz '^FuzzUploadAnalysis$' -fuzztime="$budget" -parallel=2
 go test ./cmd/entropy-server/internal/quantisusb -run '^$' -fuzz '^FuzzUSBDescriptors$' -fuzztime="$usb_budget" -parallel=2
+go test ./cmd/entropy-server/internal/usbtransport -run '^$' -fuzz '^FuzzProfiles$' -fuzztime="$usb_budget" -parallel=2

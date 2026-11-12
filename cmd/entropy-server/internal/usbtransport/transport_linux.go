@@ -1,6 +1,6 @@
 //go:build linux && (amd64 || arm || arm64)
 
-package quantisusb
+package usbtransport
 
 import (
 	"encoding/binary"
@@ -52,6 +52,7 @@ type linuxTransport struct {
 	ioMu     sync.Mutex
 	mu       sync.Mutex
 	fd       int
+	endpoint byte
 	wake     int
 	deadline time.Time
 	closed   bool
@@ -59,21 +60,21 @@ type linuxTransport struct {
 	calls    linuxCalls
 }
 
-func Open(path string) (*Source, error) {
+func Open(path string, profile Profile) (Transport, int, error) {
 	fd, err := unix.Open(path, unix.O_RDWR|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return nil, fmt.Errorf("open Quantis USB device: %w", err)
+		return nil, 0, fmt.Errorf("open native USB device: %w", err)
 	}
 
 	var stat unix.Stat_t
 	if err := unix.Fstat(fd, &stat); err != nil {
 		_ = unix.Close(fd)
-		return nil, err
+		return nil, 0, err
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFCHR || unix.Major(stat.Rdev) != 189 {
 		_ = unix.Close(fd)
-		return nil, errors.New("the Quantis USB transport requires a Linux usbfs character device")
+		return nil, 0, errors.New("the native USB transport requires a Linux usbfs character device")
 	}
 
 	// usbfs read exposes cached descriptors, never randomness. Verify the
@@ -83,35 +84,35 @@ func Open(path string) (*Source, error) {
 	n, err := unix.Read(fd, descriptors)
 	if err != nil {
 		_ = unix.Close(fd)
-		return nil, err
+		return nil, 0, err
 	}
 
-	if err := validateDevice(descriptors[:n]); err != nil {
+	if err := profile.ValidateDevice(descriptors[:n]); err != nil {
 		_ = unix.Close(fd)
-		return nil, err
+		return nil, 0, err
 	}
 
-	packet, err := packetSizeFromConfig(descriptors[18:n])
+	packet, err := profile.PacketSize(descriptors[18:n])
 	if err != nil {
 		_ = unix.Close(fd)
-		return nil, err
+		return nil, 0, err
 	}
 
 	var number uint32 // Claim interface zero; never detach another kernel driver.
 	if err := usbIoctl(fd, 0x8004550f, unsafe.Pointer(&number)); err != nil {
 		_ = unix.Close(fd)
-		return nil, fmt.Errorf("claim Quantis USB interface 0 (check permissions/in-use driver): %w", err)
+		return nil, 0, fmt.Errorf("claim native USB interface 0 (check permissions/in-use driver): %w", err)
 	}
 
 	wake, err := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
 	if err != nil {
 		_ = unix.Close(fd) // Closing usbfs also releases the claim.
-		return nil, err
+		return nil, 0, err
 	}
 
-	device := &linuxTransport{fd: fd, wake: wake, calls: linuxCalls{ioctl: usbIoctl, poll: unix.Poll, close: unix.Close}}
+	device := &linuxTransport{fd: fd, wake: wake, endpoint: profile.Endpoint(), calls: linuxCalls{ioctl: usbIoctl, poll: unix.Poll, close: unix.Close}}
 
-	return newSource(device, packet)
+	return device, packet, nil
 }
 
 func usbIoctl(fd int, request uint, pointer unsafe.Pointer) error {
@@ -199,9 +200,13 @@ func (d *linuxTransport) Close() error {
 }
 
 func (d *linuxTransport) Control(request byte, p []byte) (int, error) {
+	if d.endpoint != Quantis.Endpoint() {
+		return 0, errors.New("vendor control queries are not part of the cooked ChaosKey protocol")
+	}
+
 	// USBDEVFS control URBs contain the eight-byte setup followed by data.
 	buffer := make([]byte, 8+len(p))
-	setup := controlSetup(request, len(p))
+	setup := ControlSetup(request, len(p))
 	copy(buffer, setup[:])
 
 	n, err := d.transfer(2, 0, buffer)
@@ -210,13 +215,13 @@ func (d *linuxTransport) Control(request byte, p []byte) (int, error) {
 	}
 
 	if n > len(p) {
-		return 0, errors.New("invalid Quantis USB control length")
+		return 0, errors.New("invalid native USB control length")
 	}
 
 	return copy(p, buffer[8:8+n]), nil
 }
 
-func (d *linuxTransport) Bulk(p []byte) (int, error) { return d.transfer(3, Endpoint, p) }
+func (d *linuxTransport) Bulk(p []byte) (int, error) { return d.transfer(3, d.endpoint, p) }
 
 func (d *linuxTransport) transfer(kind, endpoint byte, buffer []byte) (int, error) {
 	d.ioMu.Lock()
@@ -225,6 +230,10 @@ func (d *linuxTransport) transfer(kind, endpoint byte, buffer []byte) (int, erro
 	fd, _, err := d.state()
 	if err != nil {
 		return 0, err
+	}
+
+	if len(buffer) == 0 {
+		return 0, nil
 	}
 
 	urb := &usbURB{Type: kind, Endpoint: endpoint, Buffer: uintptr(unsafe.Pointer(&buffer[0])), BufferLength: int32(len(buffer))}
@@ -266,7 +275,7 @@ func (d *linuxTransport) transfer(kind, endpoint byte, buffer []byte) (int, erro
 			}
 
 			if urb.ActualLength < 0 || int(urb.ActualLength) > limit {
-				return 0, errors.New("invalid Quantis USB completion length")
+				return 0, errors.New("invalid native USB completion length")
 			}
 
 			return int(urb.ActualLength), nil
