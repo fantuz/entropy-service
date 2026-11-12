@@ -68,8 +68,16 @@ func TestHardwareCaptureDefaultsCookedAndPreservesExplicitRawBytes(t *testing.T)
 			t.Fatalf("metadata omitted, assurance overstated or sample logged: %+v", report)
 		}
 
-		if report.ReadMiBPerSecond == nil || *report.ReadMiBPerSecond <= 0 || report.ReadElapsedMS == nil || *report.ReadElapsedMS <= 0 || report.ElapsedMS < *report.ReadElapsedMS {
+		if report.ReadElapsedMS == nil || *report.ReadElapsedMS < 0 || report.ElapsedMS < *report.ReadElapsedMS {
 			t.Fatalf("invalid read timing: %+v", report)
+		}
+
+		if *report.ReadElapsedMS == 0 {
+			if report.ReadMiBPerSecond != nil {
+				t.Fatalf("sub-clock-tick read reported unmeasurable throughput: %+v", report)
+			}
+		} else if report.ReadMiBPerSecond == nil || *report.ReadMiBPerSecond <= 0 {
+			t.Fatalf("positive read duration has no valid throughput: %+v", report)
 		}
 
 		if err := privatefile.Check(path); err != nil {

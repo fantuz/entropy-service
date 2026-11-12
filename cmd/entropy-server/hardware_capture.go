@@ -168,8 +168,8 @@ func (command hardwareCommand) capture(parent context.Context, selector, mode, p
 	buffer, elapsed, err := readHardwareCapture(ctx, source, actual, selector, size, timeout)
 	defer clear(buffer)
 
-	if elapsed > 0 {
-		readMS := float64(elapsed) / float64(time.Millisecond)
+	if elapsed != nil {
+		readMS := float64(*elapsed) / float64(time.Millisecond)
 		report.ReadElapsedMS = &readMS
 	}
 
@@ -197,7 +197,7 @@ func (command hardwareCommand) capture(parent context.Context, selector, mode, p
 	report.CaptureOK = true
 	report.CapturedAtUTC = time.Now().UTC().Format(time.RFC3339)
 
-	if elapsed > 0 {
+	if elapsed != nil && *elapsed > 0 {
 		rate := float64(len(buffer)) / elapsed.Seconds() / (1 << 20)
 		report.ReadMiBPerSecond = &rate
 	}
@@ -217,7 +217,7 @@ func captureContextError(ctx context.Context) error {
 	return nil
 }
 
-func readHardwareCapture(ctx context.Context, source io.ReadCloser, actual, requested string, size int, timeout time.Duration) (buffer []byte, elapsed time.Duration, err error) {
+func readHardwareCapture(ctx context.Context, source io.ReadCloser, actual, requested string, size int, timeout time.Duration) (buffer []byte, elapsed *time.Duration, err error) {
 	defer func() {
 		err = errors.Join(err, source.Close())
 		if err != nil {
@@ -227,20 +227,21 @@ func readHardwareCapture(ctx context.Context, source io.ReadCloser, actual, requ
 	}()
 
 	if actual != requested {
-		return nil, 0, errors.New("capture refused source substitution")
+		return nil, nil, errors.New("capture refused source substitution")
 	}
 
 	deadlineSource, ok := source.(seedDeadlineSource)
 	if !ok {
-		return nil, 0, errors.New("capture source has no read-deadline interface")
+		return nil, nil, errors.New("capture source has no read-deadline interface")
 	}
 
 	buffer = make([]byte, size)
 	input := seedInput{source: deadlineSource, reader: source, timeout: timeout}
 	started := time.Now()
 	_, err = input.Reader(ctx).Read(buffer)
+	duration := time.Since(started)
 
-	return buffer, time.Since(started), err
+	return buffer, &duration, err
 }
 
 func writeCaptureFile(path string, buffer []byte) error {

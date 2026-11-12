@@ -203,6 +203,9 @@ architecture, available discovery identity/driver metadata, exact byte count,
 read timing, output filename and SHA-256. `read_mib_per_second` times the complete
 accepted read, including waits/partial reads but excluding discovery, open,
 source close and file writing; `elapsed_ms` covers the whole capture operation.
+If a fast read completes within the clock's resolution, `read_elapsed_ms` can be
+zero and `read_mib_per_second` stays `null`; no rate is invented. A read not
+attempted has a `null` duration.
 Discovery metadata is an OS inventory snapshot, not a firmware attestation.
 `firmware_version` stays `null`: the command sends no flash or undocumented
 health queries. `health_available`, `cancellation_tested` and `quality_assessed`
