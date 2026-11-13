@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <title>Entropy Service — File Analysis</title>
   <script src="/theme.js"></script>
+  <script src="/graph-palette.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-analysis page-analysis-lab page-upload">
@@ -51,6 +52,12 @@
       <p class="note">All plots and Shannon/bit statistics use the same selected local bytes, up to 1 MiB at a time. Changing views does not upload the file again. The waterfall records inspected windows, with file offsets on its left axis.</p>
     </section>
     <!-- BEGIN SHARED ANALYSIS -->
+    <div class="analysis-controls compact-controls">
+      <label class="graph-palette-control" for="graph-palette">Graph colours
+        <select id="graph-palette" data-graph-palette><option value="classic">Classic · green / cyan</option><option value="blue-orange">Blue / orange</option><option value="contrast">High contrast · monochrome</option></select>
+      </label>
+    </div>
+    <p class="note graph-palette-hint">Choose the colours you see most clearly. For the raw byte waterfall, Grayscale and Bit plane offer colour-independent views. RGB and vivid-hue data colours keep their original mapping.</p>
     <div class="analysis-grid">
       <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
         <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>

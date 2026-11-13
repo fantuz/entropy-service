@@ -4,12 +4,14 @@
     let color;
     function updatePalette() {
         const style = getComputedStyle(document.documentElement);
-        const value = name => style.getPropertyValue(name).trim();
-        color = {grid: value("--border"), text: value("--muted"), green: value("--green"),
-            cyan: value("--cyan"), warn: value("--warn"), zero: value("--plot-zero"), one: value("--plot-one")};
+        const value = name => (style.getPropertyValue(name) || "").trim();
+        color = {grid: value("--border"), text: value("--muted"), green: value("--plot-primary") || value("--green"),
+            cyan: value("--plot-secondary") || value("--cyan"), warn: value("--plot-reference") || value("--warn"),
+            zero: value("--plot-zero"), one: value("--plot-one"), outline: value("--plot-outline") || value("--text")};
     }
     updatePalette();
     window.addEventListener("entropythemechange", updatePalette);
+    window.addEventListener("entropygraphpalettechange", updatePalette);
     function prepare(canvas) {
         const rect = canvas.getBoundingClientRect();
         const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
@@ -127,8 +129,20 @@
         if (!total) return;
         const x = width / 2, y = height / 2, radius = Math.min(width, height) / 2 - 8;
         const cut = 2 * Math.PI * zeros / total;
-        for (const [start, end, fill] of [[0, cut, color.zero], [cut, 2 * Math.PI, color.one]]) {
+        const contrast = document.documentElement.dataset.graphPalette === "contrast";
+        for (const [index, start, end, fill] of [[0, 0, cut, color.zero], [1, cut, 2 * Math.PI, color.one]]) {
             ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, radius, start, end); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+            if (contrast) {
+                // A hatched one-bit wedge remains distinguishable without hue.
+                if (index === 1) {
+                    ctx.save(); ctx.clip(); ctx.strokeStyle = color.outline; ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    for (let line = -height; line < width + height; line += 8) { ctx.moveTo(line, 0); ctx.lineTo(line + height, height); }
+                    ctx.stroke(); ctx.restore();
+                }
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, radius, start, end); ctx.closePath();
+                ctx.strokeStyle = color.outline; ctx.lineWidth = 1.5; ctx.stroke();
+            }
         }
     }
     const scratch = document.createElement("canvas");

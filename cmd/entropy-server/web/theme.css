@@ -37,6 +37,51 @@
   --plot-zero: #277a60;
   --plot-one: #b8f4d6;
 }
+/* Graph palettes alter plotted marks only; page chrome and literal byte-colour
+   representations retain their own meanings. Classic follows the page theme. */
+:root {
+  --plot-primary: var(--green);
+  --plot-secondary: var(--cyan);
+  --plot-reference: var(--warn);
+  --plot-outline: var(--text);
+}
+:root[data-graph-palette="blue-orange"] {
+  --plot-primary: #005a9c;
+  --plot-secondary: #9b4400;
+  --plot-reference: #65478f;
+  --plot-zero: #005a9c;
+  --plot-one: #9b4400;
+  --plot-outline: #1d3029;
+}
+:root[data-theme="dark"][data-graph-palette="blue-orange"] {
+  --plot-primary: #67baff;
+  --plot-secondary: #ffb65f;
+  --plot-reference: #d5b8ff;
+  --plot-zero: #67baff;
+  --plot-one: #ffb65f;
+  --plot-outline: #e4eee8;
+}
+:root[data-graph-palette="contrast"] {
+  --plot-primary: #111111;
+  --plot-secondary: #555555;
+  --plot-reference: #111111;
+  --plot-zero: #111111;
+  --plot-one: #777777;
+  --plot-outline: #111111;
+}
+:root[data-theme="dark"][data-graph-palette="contrast"] {
+  --plot-primary: #ffffff;
+  --plot-secondary: #b5b5b5;
+  --plot-reference: #ffffff;
+  --plot-zero: #ffffff;
+  --plot-one: #7d7d7d;
+  --plot-outline: #ffffff;
+}
+:root[data-graph-palette="contrast"] .one-key::before {
+  background: repeating-linear-gradient(45deg, var(--plot-outline) 0 1px, var(--plot-one) 1px 6px);
+  border-color: var(--plot-outline);
+}
+:root[data-graph-palette="contrast"] .zero-key::before { border-color: var(--plot-outline); }
 *, *::before, *::after { box-sizing: border-box; }
 html { font-size: 16px; }
 body {
@@ -644,6 +689,14 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-analysis-lab #marker-reading { display: block; min-height: 2.8em; }
 .page-analysis-lab .form-error { color: var(--warn); }
 .page-analysis-lab .analysis-help { margin-top: 1rem; }
+.page-analysis-lab .graph-palette-control { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: .8rem 0; text-align: left; }
+.page-analysis-lab .graph-palette-control select { max-width: 100%; }
+.page-analysis-lab .graph-palette-hint { margin: .4rem 0 1rem; }
+.page-analysis-lab .bit-meter::after { background: var(--plot-reference); }
+.page-analysis-lab .trace-marker { background: var(--plot-reference); color: var(--plot-reference); }
+.page-analysis-lab .bit-rate-row meter { accent-color: var(--plot-primary); }
+.page-analysis-lab .bit-rate-row meter::-webkit-meter-optimum-value { background: var(--plot-primary); }
+.page-analysis-lab .bit-rate-row meter::-moz-meter-bar { background: var(--plot-primary); }
 .page-analysis-lab .diagnostics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .page-analysis-lab .diagnostics-grid > section { min-width: 0; padding: .5rem; border: 1px solid var(--border); border-radius: 10px; }
 .page-analysis-lab .diagnostics-grid h2 { font-size: 1rem; text-align: left; margin: .3rem 0 .7rem; }
@@ -759,3 +812,21 @@ body.page-home > .site-toolbar { width:min(calc(100% - 2rem),70rem); margin:1rem
 .word-language-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .65rem; }
 .word-language-controls select { max-inline-size: 100%; }
 .wordlist-info { margin: .65rem 0; font-size: .85rem; color: var(--muted); text-align: center; }
+
+/* Desktop workspaces use the screen width; readable text and specialised
+   playback/word widgets retain their own bounds. Phone/tablet layout is unchanged. */
+@media (min-width: 1100px) {
+  :root { --desktop-workspace-width: 144rem; --desktop-gutter: .75rem; }
+  body, body.page-home, body.page-colors, body.page-analysis-lab { padding: .75rem var(--desktop-gutter) 1rem; }
+  .wrap, .page-gallery .wrap { width: 100%; max-width: var(--desktop-workspace-width); padding: 0 0 1.5rem; }
+  .site-toolbar, body.page-home > .site-toolbar { width: min(100%, var(--desktop-workspace-width)); margin: 0 auto .75rem; }
+  .panel, .page-bytes .panel, .page-home .panel, .page-analysis-lab .analysis-panel {
+    width: min(100%, var(--desktop-workspace-width)); max-width: var(--desktop-workspace-width); margin: .75rem auto; padding: 1rem;
+  }
+  .page-analysis-lab .analysis-panel { padding: .9rem; }
+  .page-home header { padding: 1rem 0 1.25rem; }
+  .page-gallery .gallery-header { padding: .75rem 0 1rem; }
+  .page-home .panel p, .page-gallery .lede, .page-gallery .gallery-notes p, .page-status .status-kpi-note { max-width: 78ch; }
+  .page-colors .color-shell { margin: 1rem auto; }
+  .page-words .section, .page-words .word-language-controls { width: 100%; max-width: 70rem; margin-inline: auto; }
+}

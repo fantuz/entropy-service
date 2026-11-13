@@ -93,6 +93,10 @@ jobs:
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_diagnostics_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/diagnostics
+      - name: Test graph palettes, persistence and raw-data invariance
+        env:
+          DEBUG: pw:browser
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_graph_palettes_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/palettes
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
