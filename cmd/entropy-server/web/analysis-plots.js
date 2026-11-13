@@ -1,6 +1,8 @@
 "use strict";
 
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
     let color;
     function updatePalette() {
         const style = getComputedStyle(document.documentElement);
@@ -29,7 +31,7 @@
         p.x = value => left + (value - xmin) / (xmax - xmin || 1) * (right - left);
         p.y = value => bottom - (value - ymin) / (ymax - ymin || 1) * (bottom - top);
         ctx.fillStyle = color.text; ctx.strokeStyle = color.grid; ctx.lineWidth = 1;
-        ctx.textAlign = "left"; ctx.fillText(ylabel, 2, 12);
+        ctx.textAlign = "left"; ctx.fillText(tr(ylabel), 2, 12, width - 4);
         const ticks = width < 400 ? 3 : 4;
         for (let i = 0; i <= ticks; i++) {
             const xvalue = xmin + i / ticks * (xmax - xmin), px = p.x(xvalue);
@@ -39,13 +41,13 @@
             ctx.textAlign = i === 0 ? "left" : i === ticks ? "right" : "center";
             ctx.fillText(xformat(xvalue), px, bottom + 16);
         }
-        ctx.textAlign = "center"; ctx.fillText(xlabel, (left + right) / 2, height - 5);
+        ctx.textAlign = "center"; ctx.fillText(tr(xlabel), (left + right) / 2, height - 5, width - 8);
         return p;
     }
     function empty(canvas, message) {
         const {ctx, width, height} = prepare(canvas);
         ctx.fillStyle = color.text; ctx.textAlign = "center";
-        ctx.fillText(message, width / 2, height / 2);
+        ctx.fillText(tr(message), width / 2, height / 2, Math.max(1, width - 12));
     }
     function histogram(canvas, data, {unit = "percent", scale = "detail"} = {}) {
         const total = data.analyzedBytes;
@@ -72,7 +74,7 @@
         start = Math.max(0, Math.min(start, bytes.length - 1));
         const end = Math.min(bytes.length, start + span), sample = bytes.subarray(start, end);
         const p = axes(canvas, {xmin: offset + start, xmax: offset + Math.max(start + 1, end - 1),
-            ymin: 0, ymax: 255, xlabel: `Byte offset in ${source === "file" ? "file" : "frame"}`, ylabel: "Byte value"});
+            ymin: 0, ymax: 255, xlabel: source === "file" ? "Byte offset in file" : "Byte offset in frame", ylabel: "Byte value"});
         const {ctx, left, right} = p;
         ctx.strokeStyle = color.warn; ctx.setLineDash([3, 4]);
         ctx.beginPath(); ctx.moveTo(left, p.y(127.5)); ctx.lineTo(right, p.y(127.5)); ctx.stroke(); ctx.setLineDash([]);
@@ -106,7 +108,7 @@
         const first = Math.ceil(min * fft.size), last = Math.floor(max * fft.size);
         if (first > last) {
             ctx.fillStyle = color.text; ctx.textAlign = "center";
-            ctx.fillText("No FFT bin in this range", (left + right) / 2, (top + bottom) / 2);
+            ctx.fillText(tr("No FFT bin in this range"), (left + right) / 2, (top + bottom) / 2, Math.max(1, right - left));
             return;
         }
         const columns = Math.max(1, Math.min(last - first + 1, Math.floor(right - left)));

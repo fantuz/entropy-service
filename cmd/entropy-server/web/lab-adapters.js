@@ -3,6 +3,8 @@
 // Producers publish bounded binary samples; Stop/abort owns every timer, socket,
 // reader and media track. Experimental inputs are never sent to DRBG seeding.
 (() => {
+    const t = (message, values = {}) => window.EntropyI18n?.t(message, values) ??
+        message.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
     const helpers=window.EntropyLabSamples;
     const aborted=()=>new DOMException("Source stopped","AbortError");
     function guard(signal,close) {if(signal.aborted){close();throw aborted();} signal.addEventListener("abort",close,{once:true});}
@@ -53,6 +55,10 @@
     }
     async function start(options,{signal,emit,ready,end,error,video,previewEnabled=()=>false,previewCanvas,info=()=>{}}) {
         const {kind,size,refresh}=options;
+        // Keep the rendered first argument for existing adapter consumers, and
+        // provide the key/values so the UI can update an active notice on a
+        // language change without reopening a device or source.
+        const report = (message, values = {}) => info(t(message, values), message, values);
         if(["crypto","counter","constant","pattern"].includes(kind)) {
             let sequence=0;ready();
             return periodic(signal,refresh,()=>{
@@ -91,7 +97,7 @@
                         const value=JSON.parse(event.data),kind=options.registeredKind;
                         if(value.type==="source-ready"&&value.kind===kind&&!sourceReady){
                             sourceReady=true;ready();
-                            info(kind==="udp"?"UDP listener bound on entropy-server · send nonempty datagrams to its registered local address.":kind==="tcp"?"TCP producer connected · waiting for available bytes; no request or handshake is sent.":options.camera?"Camera decoder started · waiting for RGB bytes.":"Registered source opened · waiting for data.");
+                            report(kind==="udp"?"UDP listener bound on entropy-server · send nonempty datagrams to its registered local address.":kind==="tcp"?"TCP producer connected · waiting for available bytes; no request or handshake is sent.":options.camera?"Camera decoder started · waiting for RGB bytes.":"Registered source opened · waiting for data.");
                         }else if(value.type==="http-status"&&sourceReady&&Number.isInteger(value.status)&&value.status>=100&&value.status<=599&&Number.isInteger(value.redirects)&&value.redirects>=0&&value.redirects<=2){
                             info(window.EntropyLabRegistration.httpStatus(value.status,value.redirects));
                         }else throw new Error("Unexpected bridge metadata");
@@ -185,11 +191,11 @@
                 mute.gain.value=0;analyser.connect(mute);mute.connect(context.destination);
                 const name=track.label||"system default audio input",channelName=channel==="mix"?"mono mix":channel==="right"?"second / right":"first / left";
                 const warmUntil=context.currentTime+analyser.fftSize/context.sampleRate;
-                info(`Audio input: ${name} · ${channelName}. Waiting for the first complete audio window…`);
+                report("Audio input: {name} · {channel}. Waiting for the first complete audio window…", {name, channel: channelName});
                 const samples=new Float32Array(analyser.fftSize);ready();
                 cancelTimer=periodic(signal,refresh,()=>{
-                    if(context.state!=="running"){info(`Audio input: ${name}. Audio engine is ${context.state}; check browser audio/autoplay permission and Start again.`);return;}
-                    if(track.muted){info(`Audio input: ${name}. Input is muted or unavailable; check Windows Sound input, privacy permissions and device connection.`);return;}
+                    if(context.state!=="running"){report("Audio input: {name}. Audio engine is {state}; check browser audio/autoplay permission and Start again.", {name, state: context.state});return;}
+                    if(track.muted){report("Audio input: {name}. Input is muted or unavailable; check Windows Sound input, privacy permissions and device connection.", {name});return;}
                     // Analyser buffers start as zero. In particular, Sample once
                     // must not stop before a full window has reached the graph.
                     if(context.currentTime<warmUntil)return;
@@ -202,8 +208,10 @@
                         view.setInt16(i*2,value,true);peak=Math.max(peak,Math.abs(sample));squares+=sample*sample;nonzero||=value!==0;
                     }
                     const level=value=>value>0?(20*Math.log10(value)).toFixed(1):"−∞";
-                    const guidance=nonzero?"":peak===0?" · Silent input: check selected device, input level/mute, cable and channel in Windows Sound or your system settings.":" · Signal is below PCM16 resolution; check input levels.";
-                    info(`Audio input: ${name} · ${channelName} · peak ${level(peak)} dBFS · RMS ${level(Math.sqrt(squares/(bytes.length/2)))} dBFS${guidance}`);
+                    const message=nonzero?"Audio input: {name} · {channel} · peak {peak} dBFS · RMS {rms} dBFS":peak===0?
+                        "Audio input: {name} · {channel} · peak {peak} dBFS · RMS {rms} dBFS · Silent input: check selected device, input level/mute, cable and channel in Windows Sound or your system settings.":
+                        "Audio input: {name} · {channel} · peak {peak} dBFS · RMS {rms} dBFS · Signal is below PCM16 resolution; check input levels.";
+                    report(message,{name,channel:channelName,peak:level(peak),rms:level(Math.sqrt(squares/(bytes.length/2)))});
                     emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · ${name} · ${channelName} · latest audio window (may overlap)`,
                         {format:"pcm16le",sampleRate:context.sampleRate,channels:1});
                 },error);

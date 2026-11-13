@@ -3,6 +3,22 @@
 // Optional views share the existing worker and frozen sample. Display filters
 // never replace the original selected buffer, statistics or export payload.
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
+    function text(element, message, params = {}) {
+        if (globalThis.window?.EntropyI18n) window.EntropyI18n.set(element, message, params);
+        else element.textContent = tr(message, params);
+    }
+    const audioReasons = new Set([
+        "Choose Original bytes for PCM audio interpretation; transformed bytes are not the captured PCM signal.",
+        "Declare a sample rate from 8,000 to 384,000 Hz.",
+        "Choose microphone/line-in with Original bytes, or explicitly declare a PCM16LE mono capture and its sample rate.",
+        "Select an even byte offset and an even window of at least two bytes for PCM16LE.",
+        "Audio analysis needs an even 2–1,048,576 PCM16LE bytes",
+        "Audio analysis needs explicit PCM16LE mono metadata and an 8,000–384,000 Hz sample rate",
+        "Choose Off, 50 Hz or 60 Hz notch comparison",
+        "Notch frequency must be below the sample Nyquist frequency"
+    ]);
     window.EntropyDiagnostics = function createDiagnostics({kind, requestAnalysis, redraw}) {
         const $ = id => document.getElementById(id);
         const structure = $("structure-diagnostics"), audio = $("audio-diagnostics");
@@ -39,37 +55,41 @@
             if (structure.open) {
                 const result = data?.structure;
                 if (!result) {
-                    $("structure-scope").textContent = data ? "Analysing the selected sample…" : "Awaiting selected bytes.";
+                    text($("structure-scope"), data ? "Analysing the selected sample…" : "Awaiting selected bytes.");
                     for (const id of ["structure-correlation", "structure-transitions", "structure-blocks", "spectrogram"]) EntropyStructurePlots.empty($(id), "Awaiting analysis");
-                    for (const id of ["correlation-info", "transition-info", "local-info", "spectrogram-info"]) $(id).textContent = "Awaiting analysis.";
+                    for (const id of ["correlation-info", "transition-info", "local-info", "spectrogram-info"]) text($(id), "Awaiting analysis.");
                 } else {
                     const {correlation, transitions, blocks} = result;
-                    $("structure-scope").textContent = `Selected ${result.inputBytes.toLocaleString()} bytes · structure prefix [${data.offset.toLocaleString()}, ${(data.offset + result.analyzedBytes).toLocaleString()}) · correlation uses first ${correlation.count.toLocaleString()} bytes.`;
+                    text($("structure-scope"), "Selected {input} bytes · structure prefix [{start}, {end}) · correlation uses first {count} bytes.", {input: result.inputBytes.toLocaleString(), start: data.offset.toLocaleString(), end: (data.offset + result.analyzedBytes).toLocaleString(), count: correlation.count.toLocaleString()});
                     EntropyStructurePlots.correlation($("structure-correlation"), correlation);
                     EntropyStructurePlots.transitions($("structure-transitions"), transitions);
                     EntropyStructurePlots.blocks($("structure-blocks"), blocks, {offset: data.offset});
-                    $("correlation-info").textContent = correlation.defined ? `${correlation.maxLag} lags · global-mean autocovariance / full-window variance sum · ${correlation.count.toLocaleString()} bytes.` : "Undefined: the selected prefix is constant. This is not a zero-correlation result.";
-                    $("transition-info").textContent = `${transitions.pairs.toLocaleString()} sliding pairs · ${transitions.bins} × ${transitions.bins} bins · ${transitions.binWidth} byte values/bin · per-capture logarithmic brightness.`;
-                    $("local-info").textContent = `${blocks.count} complete blocks × ${blocks.blockSize.toLocaleString()} bytes · ${blocks.coveredBytes.toLocaleString()} covered bytes · ${blocks.omittedBytes.toLocaleString()} trailing bytes omitted.`;
+                    text($("correlation-info"), correlation.defined ? "{lags} lags · global-mean autocovariance / full-window variance sum · {count} bytes." : "Undefined: the selected prefix is constant. This is not a zero-correlation result.", {lags: correlation.maxLag, count: correlation.count.toLocaleString()});
+                    text($("transition-info"), "{pairs} sliding pairs · {bins} × {bins} bins · {width} byte values/bin · per-capture logarithmic brightness.", {pairs: transitions.pairs.toLocaleString(), bins: transitions.bins, width: transitions.binWidth});
+                    text($("local-info"), "{blocks} complete blocks × {size} bytes · {covered} covered bytes · {omitted} trailing bytes omitted.", {blocks: blocks.count, size: blocks.blockSize.toLocaleString(), covered: blocks.coveredBytes.toLocaleString(), omitted: blocks.omittedBytes.toLocaleString()});
                     const view = EntropyStructurePlots.spectrogram($("spectrogram"), spectral.rows, {kind, floor: fftScale.floor, ceiling: fftScale.ceiling});
-                    $("spectrogram-info").textContent = `${view?.rows || 0} / ${spectral.capacity} sampled rows · newest at top · ${kind === "file" ? "file-window offsets" : "actual capture ages, irregular spacing in time"} · ${fftScale.floor ?? -60}…${fftScale.ceiling ?? 50} dB · cycles/byte.`;
+                    text($("spectrogram-info"), "{rows} / {capacity} sampled rows · newest at top · {scope} · {floor}…{ceiling} dB · cycles/byte.", {rows: view?.rows || 0, capacity: spectral.capacity, scope: tr(kind === "file" ? "file-window offsets" : "actual capture ages, irregular spacing in time"), floor: fftScale.floor ?? -60, ceiling: fftScale.ceiling ?? 50});
                 }
             }
             if (audio.open) {
                 const result = data?.audio;
                 if (!result) {
-                    $("audio-info").textContent = data?.audioReason || (data ? "Analysing PCM interpretation…" : "Choose microphone/line-in or declare a PCM capture to inspect it.");
-                    $("audio-filter-info").textContent = "No PCM comparison available. Byte statistics and exports remain unchanged.";
+                    if (data?.audioReason) text($("audio-info"), audioReasons.has(data.audioReason) ? data.audioReason : "{error}", {error: data.audioReason});
+                    else text($("audio-info"), data ? "Analysing PCM interpretation…" : "Choose microphone/line-in or declare a PCM capture to inspect it.");
+                    text($("audio-filter-info"), "No PCM comparison available. Byte statistics and exports remain unchanged.");
                     EntropyAudioPlots.empty($("audio-wave"), "Awaiting valid PCM input");
                     EntropyAudioPlots.empty($("audio-spectrum"), "Awaiting valid PCM input");
                 } else {
                     EntropyAudioPlots.waveform($("audio-wave"), result);
                     EntropyAudioPlots.spectrum($("audio-spectrum"), result, {maxHz: Math.min(result.sampleRate / 2, $("pcm-zoom").value === "nyquist" ? result.sampleRate / 2 : Number($("pcm-zoom").value))});
                     const raw = result.raw;
-                    const rateKind = data.audioRequest.declared ? "declared" : "captured";
-                    $("audio-info").textContent = `PCM16LE mono · ${result.sampleRate.toLocaleString()} ${rateKind} samples/s · ${result.sampleCount.toLocaleString()} decoded samples (${result.analyzedBytes.toLocaleString()} bytes) · raw RMS ${level(raw.rms)} · peak ${level(raw.peak)} · DC ${raw.dc.toFixed(6)} FS · ${raw.clipped.toLocaleString()} samples at PCM rails.`;
+                    const rateKind = tr(data.audioRequest.declared ? "declared" : "captured");
+                    text($("audio-info"), "PCM16LE mono · {rate} {rateKind} samples/s · {count} decoded samples ({bytes} bytes) · raw RMS {rms} · peak {peak} · DC {dc} FS · {clipped} samples at PCM rails.", {rate: result.sampleRate.toLocaleString(), rateKind, count: result.sampleCount.toLocaleString(), bytes: result.analyzedBytes.toLocaleString(), rms: level(raw.rms), peak: level(raw.peak), dc: raw.dc.toFixed(6), clipped: raw.clipped.toLocaleString()});
                     const fft = raw.spectrum;
-                    $("audio-filter-info").textContent = `${result.filtered ? `Raw (solid) + ${result.filtered.notchHz} Hz notch (dashed), Q=${result.filtered.q}; filter restarts per window, startup transients possible.` : "Raw only (solid)."} ${fft ? `Hann ${fft.size.toLocaleString()} points, Δf ${fft.binWidthHz.toFixed(2)} Hz; FFT uses decoded samples ${fft.startSample}–${fft.startSample + fft.size - 1}.` : "At least 32 decoded samples are needed for the spectrum."} ${result.truncated ? "Prefix capped at 32,768 samples. " : ""}Comparison only; no playback or changes to bytes, statistics or exports.`;
+                    text($("audio-filter-info"), "{filter} {spectrum} {truncation}Comparison only; no playback or changes to bytes, statistics or exports.", {
+                        filter: result.filtered ? tr("Raw (solid) + {notch} Hz notch (dashed), Q={q}; filter restarts per window, startup transients possible.", {notch: result.filtered.notchHz, q: result.filtered.q}) : tr("Raw only (solid)."),
+                        spectrum: fft ? tr("Hann {points} points, Δf {width} Hz; FFT uses decoded samples {start}–{end}.", {points: fft.size.toLocaleString(), width: fft.binWidthHz.toFixed(2), start: fft.startSample, end: fft.startSample + fft.size - 1}) : tr("At least 32 decoded samples are needed for the spectrum."),
+                        truncation: result.truncated ? tr("Prefix capped at 32,768 samples. ") : ""});
                 }
             }
         }

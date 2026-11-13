@@ -2,6 +2,8 @@
 
 // Separate PCM axes: byte plots remain in byte offsets and cycles/byte.
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
     function prepare(canvas) {
         const rect = canvas.getBoundingClientRect(), width = Math.max(1, rect.width), height = Math.max(1, rect.height);
         const ratio = Math.min(3, globalThis.devicePixelRatio || 1);
@@ -15,16 +17,17 @@
     }
     function empty(canvas, message = "Select an original PCM16LE audio sample") {
         const p = prepare(canvas);
-        p.ctx.fillStyle = p.text; p.ctx.textAlign = "center"; p.ctx.fillText(message, p.width / 2, p.height / 2);
+        p.ctx.fillStyle = p.text; p.ctx.textAlign = "center"; p.ctx.fillText(tr(message), p.width / 2, p.height / 2, Math.max(1, p.width - 12));
     }
     function axes(canvas, {xmin, xmax, ymin, ymax, xlabel, ylabel, xformat = n => String(Math.round(n)), yformat = n => n.toFixed(1)}, audio) {
         const p = prepare(canvas), {ctx, width, height, left, right, top, bottom} = p;
         p.x = value => left + (value - xmin) / (xmax - xmin || 1) * (right - left);
         p.y = value => bottom - (value - ymin) / (ymax - ymin || 1) * (bottom - top);
         ctx.fillStyle = p.text; ctx.strokeStyle = p.grid; ctx.lineWidth = 1;
-        ctx.textAlign = "left"; ctx.fillText(ylabel, 2, 12);
-        ctx.fillStyle = p.raw; ctx.fillText("Raw —", left, 25);
-        if (audio.filtered) { ctx.fillStyle = p.filtered; ctx.fillText(`${audio.filtered.notchHz} Hz notch · dashed`, left + 70, 25); }
+        ctx.textAlign = "left"; ctx.fillText(tr(ylabel), 2, 12, width - 4);
+        const rawLabel = tr("Raw —"), legendOffset = Math.max(70, (ctx.measureText?.(rawLabel).width || rawLabel.length * 7) + 10);
+        ctx.fillStyle = p.raw; ctx.fillText(rawLabel, left, 25);
+        if (audio.filtered) { ctx.fillStyle = p.filtered; ctx.fillText(tr("{frequency} Hz notch · dashed", {frequency: audio.filtered.notchHz}), left + legendOffset, 25, Math.max(1, right - left - legendOffset)); }
         const ticks = width < 400 ? 3 : 4;
         for (let i = 0; i <= ticks; i++) {
             const xv = xmin + i / ticks * (xmax - xmin), yv = ymin + i / ticks * (ymax - ymin), px = p.x(xv), py = p.y(yv);
@@ -32,7 +35,7 @@
             ctx.fillStyle = p.text; ctx.textAlign = "right"; ctx.fillText(yformat(yv), left - 7, py + 4);
             ctx.textAlign = i === 0 ? "left" : i === ticks ? "right" : "center"; ctx.fillText(xformat(xv), px, bottom + 16);
         }
-        ctx.fillStyle = p.text; ctx.textAlign = "center"; ctx.fillText(xlabel, (left + right) / 2, height - 5);
+        ctx.fillStyle = p.text; ctx.textAlign = "center"; ctx.fillText(tr(xlabel), (left + right) / 2, height - 5, width - 8);
         return p;
     }
     function series(p, samples, sampleRate, color, dashed) {

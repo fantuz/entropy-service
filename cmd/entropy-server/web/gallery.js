@@ -1,6 +1,12 @@
 "use strict";
 
 (() => {
+    const t = (message, values = {}) => window.EntropyI18n?.t(message, values) ??
+        message.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
+    function setText(node, message, values = {}) {
+        if (window.EntropyI18n) window.EntropyI18n.set(node, message, values);
+        else node.textContent = t(message, values);
+    }
     const sources = [
         { key: "image", path: "/v1/image/random?size=128", kind: "image" },
         { key: "heatmap", path: "/v1/image/heatmap?size=128", kind: "image" },
@@ -18,8 +24,8 @@
     let stopped = false;
     let cycles = 0;
 
-    function announce(message, state = "ready") {
-        status.textContent = message;
+    function announce(message, state = "ready", values = {}) {
+        setText(status, message, values);
         status.dataset.state = state;
     }
 
@@ -125,12 +131,12 @@
                     document.querySelector(`[data-gallery-key="${source.key}"]`).dataset.state = "error";
                     // Preserve previous successful data, if any.
                     const placeholder = document.getElementById(`placeholder-${source.key}`);
-                    if (!placeholder.hidden) placeholder.textContent = "Retrying…";
+                    if (!placeholder.hidden) setText(placeholder, "Retrying…");
                 }
             });
             cycles++;
-            announce(failed ? `BATCH ${cycles} · ${4 - failed}/4 UPDATED · RETRYING` :
-                `BATCH ${cycles} · 4/4 UPDATED`, failed ? "error" : "ready");
+            announce(failed ? "BATCH {cycles} · {updated}/4 UPDATED · RETRYING" :
+                "BATCH {cycles} · 4/4 UPDATED", failed ? "error" : "ready", {cycles, updated: 4 - failed});
         } finally {
             clearTimeout(deadline);
             controller = null;

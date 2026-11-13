@@ -4,239 +4,240 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Entropy Service — Socket Lab</title>
+  <title data-i18n="Entropy Service — Socket Lab">Entropy Service — Socket Lab</title>
+  <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
   <script src="/graph-palette.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-analysis page-analysis-lab page-lab" data-lab="socket">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <main class="panel analysis-panel">
-    <h1>Socket Lab</h1>
-    <p>Experimental tools: connect this server to a peer or itself, inspect binary endpoints, or read an operator-registered socket or device.</p>
-    <nav class="lab-menu" aria-label="Lab tools"><button type="button" id="lab-create-source">Register a source…</button><a href="/api-sources.html">Source lab</a></nav>
+    <h1><span data-i18n="Socket Lab">Socket Lab</span></h1>
+    <p><span data-i18n="Experimental tools: connect this server to a peer or itself, inspect binary endpoints, or read an operator-registered socket or device.">Experimental tools: connect this server to a peer or itself, inspect binary endpoints, or read an operator-registered socket or device.</span></p>
+    <nav class="lab-menu" aria-label="Lab tools" data-i18n-aria-label="Lab tools"><button type="button" id="lab-create-source"><span data-i18n="Register a source…">Register a source…</span></button><a href="/api-sources.html"><span data-i18n="Source lab">Source lab</span></a></nav>
     <section class="analysis-card" aria-labelledby="lab-source-title">
-      <h2 class="analysis-label" id="lab-source-title">Source &amp; sampling</h2>
+      <h2 class="analysis-label" id="lab-source-title"><span data-i18n="Source &amp; sampling">Source &amp; sampling</span></h2>
       <form id="lab-config">
         <div class="analysis-controls">
-          <label>Source <select id="lab-kind"><option value="self-ws">This instance · WebSocket</option><option value="self-http">This instance · HTTP</option><option value="peer-ws">Entropy-server peer · WebSocket</option><option value="peer-http">Entropy-server peer · HTTP</option><option value="websocket">Binary WebSocket URL</option><option value="http">HTTP body prefix</option><option value="bridge">Registered server source</option></select></label>
-          <label>Sample bytes <input id="lab-bytes" type="number" min="1" max="8388608" value="65536" required></label>
-          <label>Cadence (ms) <input id="lab-refresh" type="number" min="20" max="60000" value="500" required></label>
-          <label>Representation <select id="lab-transform"><option value="raw">Original bytes</option><option value="xor">XOR previous sample</option><option value="lsb">LSB → 0/255</option></select></label>
-          <label class="lab-only lab-url" data-modes="peer-ws peer-http websocket http" hidden><span id="lab-url-label">Peer base URL or endpoint</span><input id="lab-url" type="text" inputmode="url" placeholder="http://127.0.0.1:8081" spellcheck="false"></label>
-          <label class="lab-only" data-modes="http" hidden>Fetch route <select id="lab-http-route"><option value="direct">Browser · needs CORS</option><option value="registered">Registered server source</option></select></label>
-          <label class="lab-only" data-modes="http" hidden>Page preset <select id="lab-page-preset"><option value="">Custom address</option></select></label>
-          <label class="lab-only" data-modes="bridge http" hidden>Registered source <select id="lab-registered"><option value="">Loading source catalog…</option></select></label>
+          <label><span data-i18n="Source">Source</span> <select id="lab-kind"><option value="self-ws" data-i18n="This instance · WebSocket">This instance · WebSocket</option><option value="self-http" data-i18n="This instance · HTTP">This instance · HTTP</option><option value="peer-ws" data-i18n="Entropy-server peer · WebSocket">Entropy-server peer · WebSocket</option><option value="peer-http" data-i18n="Entropy-server peer · HTTP">Entropy-server peer · HTTP</option><option value="websocket" data-i18n="Binary WebSocket URL">Binary WebSocket URL</option><option value="http" data-i18n="HTTP body prefix">HTTP body prefix</option><option value="bridge" data-i18n="Registered server source">Registered server source</option></select></label>
+          <label><span data-i18n="Sample bytes">Sample bytes</span> <input id="lab-bytes" type="number" min="1" max="8388608" value="65536" required></label>
+          <label><span data-i18n="Cadence (ms)">Cadence (ms)</span> <input id="lab-refresh" type="number" min="20" max="60000" value="500" required></label>
+          <label><span data-i18n="Representation">Representation</span> <select id="lab-transform"><option value="raw" data-i18n="Original bytes">Original bytes</option><option value="xor" data-i18n="XOR previous sample">XOR previous sample</option><option value="lsb" data-i18n="LSB → 0/255">LSB → 0/255</option></select></label>
+          <label class="lab-only lab-url" data-modes="peer-ws peer-http websocket http" hidden><span id="lab-url-label"><span data-i18n="Peer base URL or endpoint">Peer base URL or endpoint</span></span><input id="lab-url" type="text" inputmode="url" placeholder="http://127.0.0.1:8081" spellcheck="false"></label>
+          <label class="lab-only" data-modes="http" hidden><span data-i18n="Fetch route">Fetch route</span> <select id="lab-http-route"><option value="direct" data-i18n="Browser · needs CORS">Browser · needs CORS</option><option value="registered" data-i18n="Registered server source">Registered server source</option></select></label>
+          <label class="lab-only" data-modes="http" hidden><span data-i18n="Page preset">Page preset</span> <select id="lab-page-preset"><option value="" data-i18n="Custom address">Custom address</option></select></label>
+          <label class="lab-only" data-modes="bridge http" hidden><span data-i18n="Registered source">Registered source</span> <select id="lab-registered"><option value="" data-i18n="Loading source catalog…">Loading source catalog…</option></select></label>
         </div>
-        <div class="lab-actions"><button id="lab-start" type="submit">Start</button><button id="lab-once" type="button">Sample once</button><button id="lab-stop" type="button" disabled>Stop</button></div>
+        <div class="lab-actions"><button id="lab-start" type="submit"><span data-i18n="Start">Start</span></button><button id="lab-once" type="button"><span data-i18n="Sample once">Sample once</span></button><button id="lab-stop" type="button" disabled><span data-i18n="Stop">Stop</span></button></div>
       </form>
-      <p id="lab-status" class="stream-notice" role="status" aria-live="polite" data-state="waiting">Choose a source, then Start or Sample once.</p>
-      <p id="lab-source-info" class="analysis-meta">No source active.</p>
+      <p id="lab-status" class="stream-notice" role="status" aria-live="polite" data-state="waiting"><span data-i18n="Choose a source, then Start or Sample once.">Choose a source, then Start or Sample once.</span></p>
+      <p id="lab-source-info" class="analysis-meta"><span data-i18n="No source active.">No source active.</span></p>
       <p id="lab-transport-info" class="note" role="status" aria-live="polite"></p>
       <p id="lab-catalog-info" class="note"></p>
       <p id="lab-route-help" class="note"></p>
       <!-- BEGIN SHARED LAB HELP -->
-      <div class="lab-help" aria-label="Source help">
-        <details><summary>Connect entropy-server instances</summary>
-          <p class="note">Use the <a href="/api-socket.html">Socket lab</a> for peer and self-links. For a server-side A → B link, register B in A's JSON source file, start A with <code>-lab-sources=lab.json</code>, then choose Registered server source. Set the base URL to A itself for a server-side self-link.</p>
+      <div class="lab-help" aria-label="Source help" data-i18n-aria-label="Source help">
+        <details><summary><span data-i18n="Connect entropy-server instances">Connect entropy-server instances</span></summary>
+          <p class="note"><span data-i18n="Use the">Use the</span> <a href="/api-socket.html"><span data-i18n="Socket lab">Socket lab</span></a> <span data-i18n="for peer and self-links. For a server-side A → B link, register B in A&#x27;s JSON source file, start A with">for peer and self-links. For a server-side A → B link, register B in A&#x27;s JSON source file, start A with</span> <code>-lab-sources=lab.json</code><span data-i18n=", then choose Registered server source. Set the base URL to A itself for a server-side self-link.">, then choose Registered server source. Set the base URL to A itself for a server-side self-link.</span></p>
           <pre>{"sources":[{"id":"peer","kind":"entropy-ws","endpoint":"http://127.0.0.1:8081"}]}</pre>
-          <p class="note">The operator controls registrations and bridge access. Loopback clients are allowed by default; remote access needs <code>-lab-allow-remote</code> and deployment access controls. A peer connection consumes its output without feeding it back into DRBG seeding.</p>
+          <p class="note"><span data-i18n="The operator controls registrations and bridge access. Loopback clients are allowed by default; remote access needs">The operator controls registrations and bridge access. Loopback clients are allowed by default; remote access needs</span> <code>-lab-allow-remote</code> <span data-i18n="and deployment access controls. A peer connection consumes its output without feeding it back into DRBG seeding.">and deployment access controls. A peer connection consumes its output without feeding it back into DRBG seeding.</span></p>
         </details>
-        <details><summary>HTTP body fetch</summary>
-          <p class="note">The <a href="/api-socket.html">Socket lab</a> can fetch a prefix of response-body bytes (HTML, text or binary), not a rendered page. Browser mode follows ordinary redirects but needs the target to allow CORS. Most ordinary sites will block it.</p>
-          <p class="note">For those sites, prepare a <code>webpage</code> registration using Register a source, load it with <code>-lab-sources</code>, then choose Registered server source in the Socket lab. Registrations support bounded prefixes, same-origin redirects, same-host HTTP→HTTPS upgrades and a pool of URLs sampled at random. HTTP 201 Created is a successful response, not a redirect; a Location header there identifies the created resource.</p>
-          <p class="note">Structured web content is useful comparison data, not a cryptographic random source.</p>
+        <details><summary><span data-i18n="HTTP body fetch">HTTP body fetch</span></summary>
+          <p class="note"><span data-i18n="The">The</span> <a href="/api-socket.html"><span data-i18n="Socket lab">Socket lab</span></a> <span data-i18n="can fetch a prefix of response-body bytes (HTML, text or binary), not a rendered page. Browser mode follows ordinary redirects but needs the target to allow CORS. Most ordinary sites will block it.">can fetch a prefix of response-body bytes (HTML, text or binary), not a rendered page. Browser mode follows ordinary redirects but needs the target to allow CORS. Most ordinary sites will block it.</span></p>
+          <p class="note"><span data-i18n="For those sites, prepare a">For those sites, prepare a</span> <code>webpage</code> <span data-i18n="registration using Register a source, load it with">registration using Register a source, load it with</span> <code>-lab-sources</code><span data-i18n=", then choose Registered server source in the Socket lab. Registrations support bounded prefixes, same-origin redirects, same-host HTTP→HTTPS upgrades and a pool of URLs sampled at random. HTTP 201 Created is a successful response, not a redirect; a Location header there identifies the created resource.">, then choose Registered server source in the Socket lab. Registrations support bounded prefixes, same-origin redirects, same-host HTTP→HTTPS upgrades and a pool of URLs sampled at random. HTTP 201 Created is a successful response, not a redirect; a Location header there identifies the created resource.</span></p>
+          <p class="note"><span data-i18n="Structured web content is useful comparison data, not a cryptographic random source.">Structured web content is useful comparison data, not a cryptographic random source.</span></p>
         </details>
-        <details><summary>Source notes</summary>
-          <p class="note">Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the <a href="/api-upload.html">File lab</a> for detailed local-file seeking.</p>
-          <p class="note">Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.</p>
-          <p class="note">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages may contain up to the configured byte limit (at most 8 MiB); analysis uses the selected window. Sample size controls request/read sizes for the other adapters.</p>
-          <p class="note">XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.</p>
+        <details><summary><span data-i18n="Source notes">Source notes</span></summary>
+          <p class="note"><span data-i18n="Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the">Camera and microphone data comes from the computer running your browser and requires permission plus HTTPS or localhost. Camera pixels are browser-processed/resampled; audio is PCM16LE mono from the latest window and may overlap. Use the</span> <a href="/api-upload.html"><span data-i18n="File lab">File lab</span></a> <span data-i18n="for detailed local-file seeking.">for detailed local-file seeking.</span></p>
+          <p class="note"><span data-i18n="Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.">Direct URLs follow browser CORS, Origin and mixed-content rules. Registered sources are read by entropy-server and need operator configuration; only source IDs are submitted. UDP registrations listen for datagrams at the configured address.</span></p>
+          <p class="note"><span data-i18n="Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages may contain up to the configured byte limit (at most 8 MiB); analysis uses the selected window. Sample size controls request/read sizes for the other adapters.">Cadence controls generators, HTTP, files, media, entropy-server links and registered bridges. Arbitrary WebSocket and serial sources arrive on their own clock. Direct WebSocket messages may contain up to the configured byte limit (at most 8 MiB); analysis uses the selected window. Sample size controls request/read sizes for the other adapters.</span></p>
+          <p class="note"><span data-i18n="XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.">XOR needs two equal-length samples; LSB expands each low bit to a full byte. Transformations are labelled. These experimental tools describe the selected representation and do not certify cryptographic entropy.</span></p>
         </details>
       </div>
       <!-- END SHARED LAB HELP -->
     </section>
-    <div class="analysis-stats" aria-label="Sample meters" aria-live="off">
-      <div class="analysis-stat-row"><span class="analysis-stat-title">Input samples</span><span><output id="lab-input-bytes">0</output> bytes · <output id="lab-input-frames">0</output> <span id="lab-input-unit">samples</span></span></div>
-      <div class="analysis-stat-row"><span class="analysis-stat-title">Sampled rate</span><span><output id="lab-rate">—</output> MB/s · mean interval <output id="lab-interval">—</output> ms</span></div>
-      <div class="analysis-stat-row"><span class="analysis-stat-title">Analysed</span><span><output id="lab-analysis-bytes">0</output> bytes · <output id="lab-analysis-frames">0</output> <span id="lab-analysis-unit">windows</span></span></div>
+    <div class="analysis-stats" aria-label="Sample meters" aria-live="off" data-i18n-aria-label="Sample meters">
+      <div class="analysis-stat-row"><span class="analysis-stat-title"><span data-i18n="Input samples">Input samples</span></span><span><output id="lab-input-bytes">0</output> <span data-i18n="bytes ·">bytes ·</span> <output id="lab-input-frames">0</output> <span id="lab-input-unit"><span data-i18n="samples">samples</span></span></span></div>
+      <div class="analysis-stat-row"><span class="analysis-stat-title"><span data-i18n="Sampled rate">Sampled rate</span></span><span><output id="lab-rate">—</output> <span data-i18n="MB/s · mean interval">MB/s · mean interval</span> <output id="lab-interval">—</output> ms</span></div>
+      <div class="analysis-stat-row"><span class="analysis-stat-title"><span data-i18n="Analysed">Analysed</span></span><span><output id="lab-analysis-bytes">0</output> <span data-i18n="bytes ·">bytes ·</span> <output id="lab-analysis-frames">0</output> <span id="lab-analysis-unit"><span data-i18n="windows">windows</span></span></span></div>
     </div>
     <section class="analysis-card shared-controls" aria-labelledby="selection-title">
-      <h2 class="analysis-label" id="selection-title">Analysis window &amp; byte offset</h2>
+      <h2 class="analysis-label" id="selection-title"><span data-i18n="Analysis window &amp; byte offset">Analysis window &amp; byte offset</span></h2>
       <div class="analysis-controls">
-        <label>Window cap <select id="analysis-size"><option value="4096">4 KiB</option><option value="16384">16 KiB</option><option value="65536" selected>64 KiB</option><option value="262144">256 KiB</option><option value="1048576">1 MiB</option></select></label>
-        <label>Start byte in sample <input id="analysis-offset" type="number" min="0" max="1048575" value="0" step="1" required></label>
-        <label>Display limit <select id="display-fps"><option value="1">1 fps</option><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option><option value="20">20 fps</option></select></label>
-        <button id="pause-plots" type="button" disabled>Plots frozen</button>
+        <label><span data-i18n="Window cap">Window cap</span> <select id="analysis-size"><option value="4096" data-i18n="4 KiB">4 KiB</option><option value="16384" data-i18n="16 KiB">16 KiB</option><option value="65536" selected data-i18n="64 KiB">64 KiB</option><option value="262144" data-i18n="256 KiB">256 KiB</option><option value="1048576" data-i18n="1 MiB">1 MiB</option></select></label>
+        <label><span data-i18n="Start byte in sample">Start byte in sample</span> <input id="analysis-offset" type="number" min="0" max="1048575" value="0" step="1" required></label>
+        <label><span data-i18n="Display limit">Display limit</span> <select id="display-fps"><option value="1" data-i18n="1 fps">1 fps</option><option value="2" data-i18n="2 fps">2 fps</option><option value="5" selected data-i18n="5 fps">5 fps</option><option value="10" data-i18n="10 fps">10 fps</option><option value="20" data-i18n="20 fps">20 fps</option></select></label>
+        <button id="pause-plots" type="button" disabled><span data-i18n="Plots frozen">Plots frozen</span></button>
       </div>
-      <p id="sample-info" class="analysis-meta">Awaiting a sample for analysis.</p>
-      <p class="note">Pause freezes analysis while input metering continues. Stop releases the source. Rates count sampled application bytes, excluding protocol overhead, and depend on cadence. FFT units remain cycles/byte for every source.</p>
+      <p id="sample-info" class="analysis-meta"><span data-i18n="Awaiting a sample for analysis.">Awaiting a sample for analysis.</span></p>
+      <p class="note"><span data-i18n="Pause freezes analysis while input metering continues. Stop releases the source. Rates count sampled application bytes, excluding protocol overhead, and depend on cadence. FFT units remain cycles/byte for every source.">Pause freezes analysis while input metering continues. Stop releases the source. Rates count sampled application bytes, excluding protocol overhead, and depend on cadence. FFT units remain cycles/byte for every source.</span></p>
     </section>
     <section class="analysis-card" aria-labelledby="lab-compare-title">
-      <h2 class="analysis-label" id="lab-compare-title">Measurements &amp; output</h2>
-      <div class="lab-actions"><button id="lab-record" type="button" disabled>Record measurement</button><button id="lab-download" type="button" disabled>Download selected bytes</button><button id="lab-export" type="button" disabled>Export measurements</button><button id="lab-clear-records" type="button">Clear measurements</button></div>
-      <p class="note">Record up to 50 measurements across sources. Download contains the selected representation/window. Measurements are kept for this browser tab across both labs; export them to keep a copy.</p>
-      <p class="note">Statistics describe the captured sample. Rate meters cover the source session at recording time, including while plots are paused.</p>
-      <div class="lab-table-wrap"><table id="lab-measurements" role="table"><caption>Recorded source measurements</caption><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Source</th><th role="columnheader" scope="col">Representation</th><th role="columnheader" scope="col">Window bytes</th><th role="columnheader" scope="col">Shannon bits/B</th><th role="columnheader" scope="col">Session sampled MB/s</th></tr></thead><tbody role="rowgroup"></tbody></table></div>
+      <h2 class="analysis-label" id="lab-compare-title"><span data-i18n="Measurements &amp; output">Measurements &amp; output</span></h2>
+      <div class="lab-actions"><button id="lab-record" type="button" disabled><span data-i18n="Record measurement">Record measurement</span></button><button id="lab-download" type="button" disabled><span data-i18n="Download selected bytes">Download selected bytes</span></button><button id="lab-export" type="button" disabled><span data-i18n="Export measurements">Export measurements</span></button><button id="lab-clear-records" type="button"><span data-i18n="Clear measurements">Clear measurements</span></button></div>
+      <p class="note"><span data-i18n="Record up to 50 measurements across sources. Download contains the selected representation/window. Measurements are kept for this browser tab across both labs; export them to keep a copy.">Record up to 50 measurements across sources. Download contains the selected representation/window. Measurements are kept for this browser tab across both labs; export them to keep a copy.</span></p>
+      <p class="note"><span data-i18n="Statistics describe the captured sample. Rate meters cover the source session at recording time, including while plots are paused.">Statistics describe the captured sample. Rate meters cover the source session at recording time, including while plots are paused.</span></p>
+      <div class="lab-table-wrap"><table id="lab-measurements" role="table"><caption><span data-i18n="Recorded source measurements">Recorded source measurements</span></caption><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col"><span data-i18n="Source">Source</span></th><th role="columnheader" scope="col"><span data-i18n="Representation">Representation</span></th><th role="columnheader" scope="col"><span data-i18n="Window bytes">Window bytes</span></th><th role="columnheader" scope="col"><span data-i18n="Shannon bits/B">Shannon bits/B</span></th><th role="columnheader" scope="col"><span data-i18n="Session sampled MB/s">Session sampled MB/s</span></th></tr></thead><tbody role="rowgroup"></tbody></table></div>
     </section>
-    <details class="analysis-card" id="lab-body-card" hidden><summary>HTTP body · text preview</summary><p class="note">First 2,048 sampled bytes as UTF-8 text; markup is displayed literally.</p><pre id="lab-body-preview" class="lab-body-preview"></pre></details>
+    <details class="analysis-card" id="lab-body-card" hidden><summary><span data-i18n="HTTP body · text preview">HTTP body · text preview</span></summary><p class="note"><span data-i18n="First 2,048 sampled bytes as UTF-8 text; markup is displayed literally.">First 2,048 sampled bytes as UTF-8 text; markup is displayed literally.</span></p><pre id="lab-body-preview" class="lab-body-preview"></pre></details>
     <section class="analysis-card lab-preview-card" id="lab-preview-card" aria-labelledby="lab-preview-title" hidden>
-      <h2 class="analysis-label" id="lab-preview-title">Camera preview</h2>
-      <label class="checkbox-label"><input type="checkbox" id="lab-show-preview"> Show preview</label>
-      <p class="note">Off by default. Hiding the preview saves display work; sampling still captures camera pixels until Stop. Network preview changes apply on the next Start.</p>
-      <video id="lab-video" muted playsinline hidden aria-label="Local camera preview"></video>
+      <h2 class="analysis-label" id="lab-preview-title"><span data-i18n="Camera preview">Camera preview</span></h2>
+      <label class="checkbox-label"><input type="checkbox" id="lab-show-preview"> <span data-i18n="Show preview">Show preview</span></label>
+      <p class="note"><span data-i18n="Off by default. Hiding the preview saves display work; sampling still captures camera pixels until Stop. Network preview changes apply on the next Start.">Off by default. Hiding the preview saves display work; sampling still captures camera pixels until Stop. Network preview changes apply on the next Start.</span></p>
+      <video id="lab-video" muted playsinline hidden aria-label="Local camera preview" data-i18n-aria-label="Local camera preview"></video>
       <canvas id="lab-network-preview" hidden role="img" aria-label="Decoded network camera preview"></canvas>
     </section>
     <!-- BEGIN SHARED ANALYSIS -->
     <div class="analysis-controls compact-controls">
-      <label class="graph-palette-control" for="graph-palette">Graph colours
-        <select id="graph-palette" data-graph-palette><option value="classic">Classic · green / cyan</option><option value="blue-orange">Blue / orange</option><option value="contrast">High contrast · monochrome</option></select>
+      <label class="graph-palette-control" for="graph-palette"><span data-i18n="Graph colours">Graph colours</span>
+        <select id="graph-palette" data-graph-palette><option value="classic" data-i18n="Classic · green / cyan">Classic · green / cyan</option><option value="blue-orange" data-i18n="Blue / orange">Blue / orange</option><option value="contrast" data-i18n="High contrast · monochrome">High contrast · monochrome</option></select>
       </label>
     </div>
-    <p class="note graph-palette-hint">Choose the colours you see most clearly. For the raw byte waterfall, Grayscale and Bit plane offer colour-independent views. RGB and vivid-hue data colours keep their original mapping.</p>
+    <p class="note graph-palette-hint"><span data-i18n="Choose the colours you see most clearly. For the raw byte waterfall, Grayscale and Bit plane offer colour-independent views. RGB and vivid-hue data colours keep their original mapping.">Choose the colours you see most clearly. For the raw byte waterfall, Grayscale and Bit plane offer colour-independent views. RGB and vivid-hue data colours keep their original mapping.</span></p>
     <div class="analysis-grid">
       <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
-        <h2 class="analysis-label" id="entropy-alert-title">Shannon entropy</h2>
-        <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span>bits/byte</span></p>
-        <label class="entropy-threshold-control" for="entropy-threshold">Red alert below
-          <input id="entropy-threshold" type="number" min="1" max="8" step="0.000001" value="7.999900" inputmode="decimal"> <span>bits/byte</span>
+        <h2 class="analysis-label" id="entropy-alert-title"><span data-i18n="Shannon entropy">Shannon entropy</span></h2>
+        <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span><span data-i18n="bits/byte">bits/byte</span></span></p>
+        <label class="entropy-threshold-control" for="entropy-threshold"><span data-i18n="Red alert below">Red alert below</span>
+          <input id="entropy-threshold" type="number" min="1" max="8" step="0.000001" value="7.999900" inputmode="decimal"> <span><span data-i18n="bits/byte">bits/byte</span></span>
         </label>
-        <p class="entropy-alert-message" id="entropy-alert-message" role="status" aria-live="polite">AWAITING FIRST ANALYSIS SAMPLE</p>
-        <p class="entropy-alert-hint">Finite-sample estimate. High thresholds can trigger on healthy samples.</p>
-        <p id="byte-statistics" class="analysis-meta">Mean / standard deviation / range: —</p>
+        <p class="entropy-alert-message" id="entropy-alert-message" role="status" aria-live="polite"><span data-i18n="AWAITING FIRST ANALYSIS SAMPLE">AWAITING FIRST ANALYSIS SAMPLE</span></p>
+        <p class="entropy-alert-hint"><span data-i18n="Finite-sample estimate. High thresholds can trigger on healthy samples.">Finite-sample estimate. High thresholds can trigger on healthy samples.</span></p>
+        <p id="byte-statistics" class="analysis-meta"><span data-i18n="Mean / standard deviation / range: —">Mean / standard deviation / range: —</span></p>
       </section>
       <section class="analysis-card balance-card" aria-labelledby="balance-title">
-        <h2 class="analysis-label" id="balance-title">Bit balance · Yin/Yang</h2>
+        <h2 class="analysis-label" id="balance-title"><span data-i18n="Bit balance · Yin/Yang">Bit balance · Yin/Yang</span></h2>
         <div class="balance-layout"><canvas id="pie" width="180" height="180" role="img" aria-label="Zero and one bit proportions"></canvas>
-          <div class="balance-legend"><p class="zero-key" id="zero-count">Zeros: —</p><p class="one-key" id="one-count">Ones: —</p><p class="note">50% reference per position</p></div>
+          <div class="balance-legend"><p class="zero-key" id="zero-count"><span data-i18n="Zeros: —">Zeros: —</span></p><p class="one-key" id="one-count"><span data-i18n="Ones: —">Ones: —</span></p><p class="note"><span data-i18n="50% reference per position">50% reference per position</span></p></div>
         </div>
-        <details id="bit-rates"><summary>Eight bit-position rates</summary><div class="bit-rate-grid" id="bit-rate-grid"></div><p class="note">Fraction of ones, MSB (7) to LSB (0). Each uses the same selected bytes.</p></details>
+        <details id="bit-rates"><summary><span data-i18n="Eight bit-position rates">Eight bit-position rates</span></summary><div class="bit-rate-grid" id="bit-rate-grid"></div><p class="note"><span data-i18n="Fraction of ones, MSB (7) to LSB (0). Each uses the same selected bytes.">Fraction of ones, MSB (7) to LSB (0). Each uses the same selected bytes.</span></p></details>
       </section>
       <section class="analysis-card plot-card trace-card" aria-labelledby="trace-title">
-        <h2 class="analysis-label" id="trace-title">Byte trace</h2>
+        <h2 class="analysis-label" id="trace-title"><span data-i18n="Byte trace">Byte trace</span></h2>
         <div class="analysis-controls compact-controls">
-          <label>Visible bytes <select id="trace-span"><option value="128">128</option><option value="512">512</option><option value="1024" selected>1,024</option><option value="8192">8,192</option><option value="all">Whole window</option></select></label>
-          <label>Draw <select id="trace-style"><option value="line">Line</option><option value="steps">Steps</option><option value="dots">Dots</option></select></label>
-          <label>Pan (window offset) <input id="trace-start" type="range" min="0" max="0" value="0" step="1"><output id="trace-start-value">0</output></label>
+          <label><span data-i18n="Visible bytes">Visible bytes</span> <select id="trace-span"><option value="128">128</option><option value="512">512</option><option value="1024" selected>1,024</option><option value="8192">8,192</option><option value="all" data-i18n="Whole window">Whole window</option></select></label>
+          <label><span data-i18n="Draw">Draw</span> <select id="trace-style"><option value="line" data-i18n="Line">Line</option><option value="steps" data-i18n="Steps">Steps</option><option value="dots" data-i18n="Dots">Dots</option></select></label>
+          <label><span data-i18n="Pan (window offset)">Pan (window offset)</span> <input id="trace-start" type="range" min="0" max="0" value="0" step="1"><output id="trace-start-value">0</output></label>
         </div>
         <div class="trace-wrap" id="trace-wrap"><canvas id="wave" class="diagnostic-plot" width="800" height="240" role="img" aria-describedby="trace-info" aria-label="Byte trace, values 0 to 255 against byte offset"></canvas><span class="trace-marker" id="marker-a" hidden>A</span><span class="trace-marker" id="marker-b" hidden>B</span></div>
         <div class="plot-readouts">
-          <p class="analysis-meta" id="trace-info">Zoom out preserves min/max per display column.</p>
-          <label class="cursor-control">Inspect byte <input id="trace-cursor" type="range" min="0" max="0" value="0" step="1"></label>
-          <output id="trace-reading" class="analysis-meta">Byte: —</output>
-          <p class="note">Hover or use the slider. Freeze the plots, then click two bytes for A/B measurements.</p>
-          <button id="clear-markers" type="button">Clear A/B</button><output id="marker-reading" class="analysis-meta"></output>
+          <p class="analysis-meta" id="trace-info"><span data-i18n="Zoom out preserves min/max per display column.">Zoom out preserves min/max per display column.</span></p>
+          <label class="cursor-control"><span data-i18n="Inspect byte">Inspect byte</span> <input id="trace-cursor" type="range" min="0" max="0" value="0" step="1"></label>
+          <output id="trace-reading" class="analysis-meta"><span data-i18n="Byte: —">Byte: —</span></output>
+          <p class="note"><span data-i18n="Hover or use the slider. Freeze the plots, then click two bytes for A/B measurements.">Hover or use the slider. Freeze the plots, then click two bytes for A/B measurements.</span></p>
+          <button id="clear-markers" type="button"><span data-i18n="Clear A/B">Clear A/B</span></button><output id="marker-reading" class="analysis-meta"></output>
         </div>
       </section>
       <section class="analysis-card plot-card histogram-card" aria-labelledby="histogram-title">
-        <h2 class="analysis-label" id="histogram-title">Byte histogram · all 256 values</h2>
+        <h2 class="analysis-label" id="histogram-title"><span data-i18n="Byte histogram · all 256 values">Byte histogram · all 256 values</span></h2>
         <div class="analysis-controls compact-controls">
-          <label>Units <select id="histogram-unit"><option value="percent">Percent</option><option value="count">Count</option></select></label>
-          <label>Scale <select id="histogram-scale"><option value="detail">Fixed · 0–1%</option><option value="full">Fixed · 0–100%</option><option value="auto">Auto · labelled</option></select></label>
+          <label><span data-i18n="Units">Units</span> <select id="histogram-unit"><option value="percent" data-i18n="Percent">Percent</option><option value="count" data-i18n="Count">Count</option></select></label>
+          <label><span data-i18n="Scale">Scale</span> <select id="histogram-scale"><option value="detail" data-i18n="Fixed · 0–1%">Fixed · 0–1%</option><option value="full" data-i18n="Fixed · 0–100%">Fixed · 0–100%</option><option value="auto" data-i18n="Auto · labelled">Auto · labelled</option></select></label>
         </div>
         <canvas id="histogram" class="diagnostic-plot" width="800" height="240" role="img" aria-label="Byte-frequency histogram with uniform reference"></canvas>
         <div class="plot-readouts">
-          <p class="analysis-meta" id="histogram-info">Dashed line: uniform reference, 100/256 = 0.390625%.</p>
-          <p class="note">Yellow caps mark clipped bars; use full scale to see concentrated distributions. A flat histogram alone does not imply unpredictability.</p>
+          <p class="analysis-meta" id="histogram-info"><span data-i18n="Dashed line: uniform reference, 100/256 = 0.390625%.">Dashed line: uniform reference, 100/256 = 0.390625%.</span></p>
+          <p class="note"><span data-i18n="Yellow caps mark clipped bars; use full scale to see concentrated distributions. A flat histogram alone does not imply unpredictability.">Yellow caps mark clipped bars; use full scale to see concentrated distributions. A flat histogram alone does not imply unpredictability.</span></p>
         </div>
       </section>
       <section class="analysis-card plot-card spectrum-card" aria-labelledby="spectrum-title">
-        <h2 class="analysis-label" id="spectrum-title">Power spectrum</h2>
+        <h2 class="analysis-label" id="spectrum-title"><span data-i18n="Power spectrum">Power spectrum</span></h2>
         <div class="plot-controls">
           <div class="analysis-controls compact-controls">
-            <label>FFT points <select id="fft-size"><option value="auto">Auto · up to 8,192</option><option value="512">512</option><option value="2048">2,048</option><option value="8192">8,192</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
-            <label>Window <select id="fft-window"><option value="hann">Hann</option><option value="rectangular">Rectangular</option></select></label>
-            <label>Average power <select id="fft-average"><option value="1">1 sample</option><option value="4">4 samples</option><option value="16">16 samples</option></select></label>
-            <label class="checkbox-label"><input id="fft-demean" type="checkbox" checked>Remove mean</label>
+            <label><span data-i18n="FFT points">FFT points</span> <select id="fft-size"><option value="auto" data-i18n="Auto · up to 8,192">Auto · up to 8,192</option><option value="512">512</option><option value="2048">2,048</option><option value="8192">8,192</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
+            <label><span data-i18n="Window">Window</span> <select id="fft-window"><option value="hann" data-i18n="Hann">Hann</option><option value="rectangular" data-i18n="Rectangular">Rectangular</option></select></label>
+            <label><span data-i18n="Average power">Average power</span> <select id="fft-average"><option value="1" data-i18n="1 sample">1 sample</option><option value="4" data-i18n="4 samples">4 samples</option><option value="16" data-i18n="16 samples">16 samples</option></select></label>
+            <label class="checkbox-label"><input id="fft-demean" type="checkbox" checked><span data-i18n="Remove mean">Remove mean</span></label>
           </div>
-          <details><summary>Frequency zoom &amp; fixed dB scale</summary><div class="analysis-controls compact-controls">
-            <label>Min (cycles/byte) <input id="fft-min" type="number" min="0" max="0.49999" step="0.001" value="0"></label>
-            <label>Max (cycles/byte) <input id="fft-max" type="number" min="0.00001" max="0.5" step="0.001" value="0.5"></label>
-            <label>Floor (dB) <input id="fft-floor" type="number" min="-160" max="40" value="-60"></label>
-            <label>Ceiling (dB) <input id="fft-ceiling" type="number" min="-150" max="100" value="50"></label>
+          <details><summary><span data-i18n="Frequency zoom &amp; fixed dB scale">Frequency zoom &amp; fixed dB scale</span></summary><div class="analysis-controls compact-controls">
+            <label><span data-i18n="Min (cycles/byte)">Min (cycles/byte)</span> <input id="fft-min" type="number" min="0" max="0.49999" step="0.001" value="0"></label>
+            <label><span data-i18n="Max (cycles/byte)">Max (cycles/byte)</span> <input id="fft-max" type="number" min="0.00001" max="0.5" step="0.001" value="0.5"></label>
+            <label><span data-i18n="Floor (dB)">Floor (dB)</span> <input id="fft-floor" type="number" min="-160" max="40" value="-60"></label>
+            <label><span data-i18n="Ceiling (dB)">Ceiling (dB)</span> <input id="fft-ceiling" type="number" min="-150" max="100" value="50"></label>
           </div><p id="fft-scale-error" class="form-error" role="status"></p></details>
         </div>
         <canvas id="fft" class="diagnostic-plot" width="800" height="240" role="img" aria-label="One-sided power spectral density in cycles per byte"></canvas>
         <div class="plot-readouts">
-          <p id="fftvalue" class="analysis-meta">Awaiting FFT input.</p>
-          <p class="note">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.</p>
+          <p id="fftvalue" class="analysis-meta"><span data-i18n="Awaiting FFT input.">Awaiting FFT input.</span></p>
+          <p class="note"><span data-i18n="Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.">Includes DC and Nyquist. Peak per screen column preserves narrow lines; scale stays fixed between samples.</span></p>
         </div>
       </section>
       <section class="analysis-card plot-card waterfall-card" aria-labelledby="waterfall-title">
-        <h2 class="analysis-label" id="waterfall-title">Socket waterfall · sample history</h2>
+        <h2 class="analysis-label" id="waterfall-title"><span data-i18n="Socket waterfall · sample history">Socket waterfall · sample history</span></h2>
         <div class="analysis-controls compact-controls">
-          <label>Colour mode <select id="waterfall-mode"><option value="rgb">RGB</option><option value="vivid">Vivid hue</option><option value="gray">Grayscale</option><option value="bit">Bit plane</option></select></label>
-          <label>Bit plane <select id="waterfall-bit" aria-describedby="waterfall-help"><option value="7">7 · MSB</option><option value="6">6</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option><option value="0">0 · LSB</option></select></label>
-          <label>Bytes/row <select id="waterfall-bytes"><option value="auto" selected>Auto · large</option><option value="128">128</option><option value="256">256</option><option value="512">512</option><option value="1024">1,024</option></select></label>
-          <label>History rows <select id="waterfall-rows"><option value="16" selected>16 · large</option><option value="32">32 rows</option><option value="64">64 rows</option><option value="240">All (240 max)</option></select></label>
-          <button id="clear-history" type="button">Clear history</button>
+          <label><span data-i18n="Colour mode">Colour mode</span> <select id="waterfall-mode"><option value="rgb">RGB</option><option value="vivid" data-i18n="Vivid hue">Vivid hue</option><option value="gray" data-i18n="Grayscale">Grayscale</option><option value="bit" data-i18n="Bit plane">Bit plane</option></select></label>
+          <label><span data-i18n="Bit plane">Bit plane</span> <select id="waterfall-bit" aria-describedby="waterfall-help"><option value="7" data-i18n="7 · MSB">7 · MSB</option><option value="6">6</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option><option value="0" data-i18n="0 · LSB">0 · LSB</option></select></label>
+          <label><span data-i18n="Bytes/row">Bytes/row</span> <select id="waterfall-bytes"><option value="auto" selected data-i18n="Auto · large">Auto · large</option><option value="128">128</option><option value="256">256</option><option value="512">512</option><option value="1024">1,024</option></select></label>
+          <label><span data-i18n="History rows">History rows</span> <select id="waterfall-rows"><option value="16" selected data-i18n="16 · large">16 · large</option><option value="32" data-i18n="32 rows">32 rows</option><option value="64" data-i18n="64 rows">64 rows</option><option value="240" data-i18n="All (240 max)">All (240 max)</option></select></label>
+          <button id="clear-history" type="button"><span data-i18n="Clear history">Clear history</span></button>
         </div>
         <canvas id="mosaic" class="diagnostic-plot waterfall-plot" width="800" height="240" role="img" aria-label="Historical byte colours, newest sample at top"></canvas>
         <div class="plot-readouts">
-          <p id="waterfall-info" class="analysis-meta">0 / 240 samples</p>
-          <p class="note" id="waterfall-help">Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.</p>
+          <p id="waterfall-info" class="analysis-meta"><span data-i18n="0 / 240 samples">0 / 240 samples</span></p>
+          <p class="note" id="waterfall-help"><span data-i18n="Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.">Picking a bit selects its black/white view. Auto fits larger cells to the screen. The latest 16 rows are shown by default; choose All to see retained history. Vivid hue maps one byte per bright colour; RGB uses raw triplets. Missing bytes stay blank.</span></p>
         </div>
       </section>
     </div>
     <details class="analysis-card optional-diagnostics" id="structure-diagnostics">
-      <summary>Structure &amp; dependence · correlation, transitions, local statistics and spectral history</summary>
-      <p class="note">Explore relationships within the selected bytes. Patterns and chance excursions are diagnostic clues, not a cryptographic pass/fail result. Extra analysis runs only while this section is open.</p>
+      <summary><span data-i18n="Structure &amp; dependence · correlation, transitions, local statistics and spectral history">Structure &amp; dependence · correlation, transitions, local statistics and spectral history</span></summary>
+      <p class="note"><span data-i18n="Explore relationships within the selected bytes. Patterns and chance excursions are diagnostic clues, not a cryptographic pass/fail result. Extra analysis runs only while this section is open.">Explore relationships within the selected bytes. Patterns and chance excursions are diagnostic clues, not a cryptographic pass/fail result. Extra analysis runs only while this section is open.</span></p>
       <div class="analysis-controls compact-controls">
-        <label>Correlation lags <select id="correlation-lags"><option value="32">32</option><option value="64" selected>64</option><option value="128">128</option></select></label>
-        <label>Pair bins <select id="transition-bins"><option value="16">16 × 16</option><option value="32">32 × 32</option></select></label>
-        <label>Local block (bytes) <select id="local-block-size"><option value="256">256</option><option value="1024" selected>1,024</option><option value="4096">4,096</option></select></label>
-        <button id="clear-spectral-history" type="button">Clear spectral history</button>
+        <label><span data-i18n="Correlation lags">Correlation lags</span> <select id="correlation-lags"><option value="32">32</option><option value="64" selected>64</option><option value="128">128</option></select></label>
+        <label><span data-i18n="Pair bins">Pair bins</span> <select id="transition-bins"><option value="16">16 × 16</option><option value="32">32 × 32</option></select></label>
+        <label><span data-i18n="Local block (bytes)">Local block (bytes)</span> <select id="local-block-size"><option value="256">256</option><option value="1024" selected>1,024</option><option value="4096">4,096</option></select></label>
+        <button id="clear-spectral-history" type="button"><span data-i18n="Clear spectral history">Clear spectral history</span></button>
       </div>
-      <p class="analysis-meta" id="structure-scope">Open this section to analyse a bounded prefix of the selected window.</p>
+      <p class="analysis-meta" id="structure-scope"><span data-i18n="Open this section to analyse a bounded prefix of the selected window.">Open this section to analyse a bounded prefix of the selected window.</span></p>
       <div class="diagnostics-grid">
         <section aria-labelledby="correlation-title">
-          <h2 id="correlation-title">Autocorrelation</h2>
+          <h2 id="correlation-title"><span data-i18n="Autocorrelation">Autocorrelation</span></h2>
           <canvas id="structure-correlation" class="optional-plot" role="img" aria-label="Byte autocorrelation by lag, minus one to plus one" aria-describedby="correlation-info"></canvas>
-          <p class="analysis-meta" id="correlation-info">Awaiting selected bytes.</p>
-          <p class="note">The dashed reference is approximately ±1.96/√N under an independent uniform-source model, per lag. Multiple lags can cross it by chance. Constant input has undefined correlation.</p>
+          <p class="analysis-meta" id="correlation-info"><span data-i18n="Awaiting selected bytes.">Awaiting selected bytes.</span></p>
+          <p class="note"><span data-i18n="The dashed reference is approximately ±1.96/√N under an independent uniform-source model, per lag. Multiple lags can cross it by chance. Constant input has undefined correlation.">The dashed reference is approximately ±1.96/√N under an independent uniform-source model, per lag. Multiple lags can cross it by chance. Constant input has undefined correlation.</span></p>
         </section>
         <section aria-labelledby="transition-title">
-          <h2 id="transition-title">Adjacent-byte transitions</h2>
+          <h2 id="transition-title"><span data-i18n="Adjacent-byte transitions">Adjacent-byte transitions</span></h2>
           <canvas id="structure-transitions" class="optional-plot" role="img" aria-label="Heatmap of previous-byte and next-byte value groups" aria-describedby="transition-info"></canvas>
-          <p class="analysis-meta" id="transition-info">Awaiting byte pairs.</p>
-          <p class="note">Sliding adjacent pairs, grouped into labelled byte ranges. Brightness uses log(count + 1), relative to the current maximum. A flat histogram can still hide a predictable transition pattern.</p>
+          <p class="analysis-meta" id="transition-info"><span data-i18n="Awaiting byte pairs.">Awaiting byte pairs.</span></p>
+          <p class="note"><span data-i18n="Sliding adjacent pairs, grouped into labelled byte ranges. Brightness uses log(count + 1), relative to the current maximum. A flat histogram can still hide a predictable transition pattern.">Sliding adjacent pairs, grouped into labelled byte ranges. Brightness uses log(count + 1), relative to the current maximum. A flat histogram can still hide a predictable transition pattern.</span></p>
         </section>
         <section aria-labelledby="local-title">
-          <h2 id="local-title">Local entropy &amp; bit balance</h2>
+          <h2 id="local-title"><span data-i18n="Local entropy &amp; bit balance">Local entropy &amp; bit balance</span></h2>
           <canvas id="structure-blocks" class="optional-plot" role="img" aria-label="Shannon entropy and fraction of one bits in equal-sized byte blocks" aria-describedby="local-info"></canvas>
-          <p class="analysis-meta" id="local-info">Awaiting complete blocks.</p>
-          <p class="note">Two separate scales: bits/byte and fraction of one bits. Small random blocks normally estimate below eight bits/byte; the whole-sample alert threshold is not applied here.</p>
+          <p class="analysis-meta" id="local-info"><span data-i18n="Awaiting complete blocks.">Awaiting complete blocks.</span></p>
+          <p class="note"><span data-i18n="Two separate scales: bits/byte and fraction of one bits. Small random blocks normally estimate below eight bits/byte; the whole-sample alert threshold is not applied here.">Two separate scales: bits/byte and fraction of one bits. Small random blocks normally estimate below eight bits/byte; the whole-sample alert threshold is not applied here.</span></p>
         </section>
         <section aria-labelledby="spectrogram-title">
-          <h2 id="spectrogram-title">Spectral history</h2>
+          <h2 id="spectrogram-title"><span data-i18n="Spectral history">Spectral history</span></h2>
           <canvas id="spectrogram" class="optional-plot" role="img" aria-label="Power spectral density history in cycles per byte, newest sample at the top" aria-describedby="spectrogram-info"></canvas>
-          <p class="analysis-meta" id="spectrogram-info">Awaiting spectral history.</p>
-          <p class="note">Uses the existing FFT window and fixed dB scale, before frame averaging. At most 120 sampled rows and 256 peak-preserving frequency groups. Rows have equal height; age labels show actual capture gaps. File rows show window offsets.</p>
+          <p class="analysis-meta" id="spectrogram-info"><span data-i18n="Awaiting spectral history.">Awaiting spectral history.</span></p>
+          <p class="note"><span data-i18n="Uses the existing FFT window and fixed dB scale, before frame averaging. At most 120 sampled rows and 256 peak-preserving frequency groups. Rows have equal height; age labels show actual capture gaps. File rows show window offsets.">Uses the existing FFT window and fixed dB scale, before frame averaging. At most 120 sampled rows and 256 peak-preserving frequency groups. Rows have equal height; age labels show actual capture gaps. File rows show window offsets.</span></p>
         </section>
       </div>
     </details>
     <details class="analysis-card optional-diagnostics" id="audio-diagnostics">
-      <summary>PCM audio · waveform, levels and frequency spectrum</summary>
-      <p class="note">Microphone/line-in supplies the browser audio sample rate; browser or driver resampling may apply. For a raw PCM capture, explicitly declare PCM16LE mono and its rate. This interpretation never changes byte statistics or downloaded bytes.</p>
+      <summary><span data-i18n="PCM audio · waveform, levels and frequency spectrum">PCM audio · waveform, levels and frequency spectrum</span></summary>
+      <p class="note"><span data-i18n="Microphone/line-in supplies the browser audio sample rate; browser or driver resampling may apply. For a raw PCM capture, explicitly declare PCM16LE mono and its rate. This interpretation never changes byte statistics or downloaded bytes.">Microphone/line-in supplies the browser audio sample rate; browser or driver resampling may apply. For a raw PCM capture, explicitly declare PCM16LE mono and its rate. This interpretation never changes byte statistics or downloaded bytes.</span></p>
       <div class="analysis-controls compact-controls">
-        <label>Interpretation <select id="pcm-mode"><option value="auto">Automatic · microphone / line-in</option><option value="manual">Declared PCM16LE mono</option></select></label>
-        <label>Declared rate (Hz) <input id="pcm-rate" type="number" min="8000" max="384000" step="1" value="48000" disabled></label>
-        <label>Comparison filter <select id="pcm-notch"><option value="off">Off · raw only</option><option value="50">50 Hz notch</option><option value="60">60 Hz notch</option></select></label>
-        <label>Audio frequency range <select id="pcm-zoom"><option value="1000">0–1,000 Hz</option><option value="4000" selected>0–4,000 Hz</option><option value="nyquist">0–Nyquist</option></select></label>
+        <label><span data-i18n="Interpretation">Interpretation</span> <select id="pcm-mode"><option value="auto" data-i18n="Automatic · microphone / line-in">Automatic · microphone / line-in</option><option value="manual" data-i18n="Declared PCM16LE mono">Declared PCM16LE mono</option></select></label>
+        <label><span data-i18n="Declared rate (Hz)">Declared rate (Hz)</span> <input id="pcm-rate" type="number" min="8000" max="384000" step="1" value="48000" disabled></label>
+        <label><span data-i18n="Comparison filter">Comparison filter</span> <select id="pcm-notch"><option value="off" data-i18n="Off · raw only">Off · raw only</option><option value="50" data-i18n="50 Hz notch">50 Hz notch</option><option value="60" data-i18n="60 Hz notch">60 Hz notch</option></select></label>
+        <label><span data-i18n="Audio frequency range">Audio frequency range</span> <select id="pcm-zoom"><option value="1000">0–1,000 Hz</option><option value="4000" selected>0–4,000 Hz</option><option value="nyquist" data-i18n="0–Nyquist">0–Nyquist</option></select></label>
       </div>
-      <p class="analysis-meta" id="audio-info">Choose microphone/line-in or declare a PCM capture to inspect it.</p>
+      <p class="analysis-meta" id="audio-info"><span data-i18n="Choose microphone/line-in or declare a PCM capture to inspect it.">Choose microphone/line-in or declare a PCM capture to inspect it.</span></p>
       <div class="diagnostics-grid">
-        <section aria-labelledby="audio-wave-title"><h2 id="audio-wave-title">Audio waveform</h2><canvas id="audio-wave" class="optional-plot" role="img" aria-label="Raw and optional notch-filtered normalized PCM amplitude versus time"></canvas></section>
-        <section aria-labelledby="audio-spectrum-title"><h2 id="audio-spectrum-title">Audio spectrum · Hz</h2><canvas id="audio-spectrum" class="optional-plot" role="img" aria-label="Raw and optional notch-filtered PCM power spectral density in hertz"></canvas></section>
+        <section aria-labelledby="audio-wave-title"><h2 id="audio-wave-title"><span data-i18n="Audio waveform">Audio waveform</span></h2><canvas id="audio-wave" class="optional-plot" role="img" aria-label="Raw and optional notch-filtered normalized PCM amplitude versus time"></canvas></section>
+        <section aria-labelledby="audio-spectrum-title"><h2 id="audio-spectrum-title"><span data-i18n="Audio spectrum · Hz">Audio spectrum · Hz</span></h2><canvas id="audio-spectrum" class="optional-plot" role="img" aria-label="Raw and optional notch-filtered PCM power spectral density in hertz"></canvas></section>
       </div>
-      <p class="analysis-meta" id="audio-filter-info">Raw only. No audio playback.</p>
-      <p class="note">The notch comparison restarts per inspected window, so startup transients can occur. It does not add entropy or improve a cryptographic randomness assessment. Levels describe decoded PCM; they are not calibrated microphone or voltage measurements.</p>
+      <p class="analysis-meta" id="audio-filter-info"><span data-i18n="Raw only. No audio playback.">Raw only. No audio playback.</span></p>
+      <p class="note"><span data-i18n="The notch comparison restarts per inspected window, so startup transients can occur. It does not add entropy or improve a cryptographic randomness assessment. Levels describe decoded PCM; they are not calibrated microphone or voltage measurements.">The notch comparison restarts per inspected window, so startup transients can occur. It does not add entropy or improve a cryptographic randomness assessment. Levels describe decoded PCM; they are not calibrated microphone or voltage measurements.</span></p>
     </details>
     <!-- END SHARED ANALYSIS -->
-    <p><a href="/api-sources.html">Source lab</a> · <a href="/api-socket.html">Socket lab</a> · <a href="/api-upload.html">File lab</a> · <a href="/">All endpoints</a></p>
+    <p><a href="/api-sources.html"><span data-i18n="Source lab">Source lab</span></a> · <a href="/api-socket.html"><span data-i18n="Socket lab">Socket lab</span></a> · <a href="/api-upload.html"><span data-i18n="File lab">File lab</span></a> · <a href="/"><span data-i18n="All endpoints">All endpoints</span></a></p>
   </main>
   <script src="/analysis-math.js" defer></script>
   <script src="/analysis-plots.js" defer></script>

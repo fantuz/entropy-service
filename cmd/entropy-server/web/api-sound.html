@@ -4,34 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-<title>Entropy Service — Harmonic Sounds</title>
+<title data-i18n="Entropy Service — Harmonic Sounds">Entropy Service — Harmonic Sounds</title>
 
-<script src="/theme.js"></script>
+<script src="/i18n.js"></script>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-sound">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <main class="sound-shell">
-  <h1>Harmonic Sounds</h1>
-  <p>Random pitch, overtones and decay. A short sound with no melody or beat.</p>
+  <h1><span data-i18n="Harmonic Sounds">Harmonic Sounds</span></h1>
+  <p><span data-i18n="Random pitch, overtones and decay. A short sound with no melody or beat.">Random pitch, overtones and decay. A short sound with no melody or beat.</span></p>
   <form id="controls">
-    <label>Texture
-      <select name="style"><option value="bloom">Soft bloom</option><option value="chime">Bright chime</option></select>
+    <label><span data-i18n="Texture">Texture</span>
+      <select name="style"><option value="bloom" data-i18n="Soft bloom">Soft bloom</option><option value="chime" data-i18n="Bright chime">Bright chime</option></select>
     </label>
-    <label>Duration (ms)
+    <label><span data-i18n="Duration (ms)">Duration (ms)</span>
       <input name="duration_ms" type="number" min="250" max="5000" step="1" value="2500" required>
     </label>
-    <button type="submit">Generate sound</button>
+    <button type="submit"><span data-i18n="Generate sound">Generate sound</span></button>
   </form>
-  <p id="status" role="status" aria-live="polite" data-state="ready">READY TO GENERATE</p>
-  <p>Press play once a clip is ready. Download saves the same WAV file.</p>
+  <p id="status" role="status" aria-live="polite" data-state="ready"><span data-i18n="READY TO GENERATE">READY TO GENERATE</span></p>
+  <p><span data-i18n="Press play once a clip is ready. Download saves the same WAV file.">Press play once a clip is ready. Download saves the same WAV file.</span></p>
   <audio id="player" controls preload="metadata"></audio>
-  <a id="download" hidden>Download this WAV</a>
-  <p>48 kHz · mono · 16-bit PCM. Sound parameters come from the service DRBG.
-     These sounds are a creative demonstration, not an entropy-quality test.</p>
+  <a id="download" hidden><span data-i18n="Download this WAV">Download this WAV</span></a>
+  <p><span data-i18n="48 kHz · mono · 16-bit PCM. Sound parameters come from the service DRBG. These sounds are a creative demonstration, not an entropy-quality test.">48 kHz · mono · 16-bit PCM. Sound parameters come from the service DRBG. These sounds are a creative demonstration, not an entropy-quality test.</span></p>
   <script>
     const form = document.getElementById('controls');
     const player = document.getElementById('player');

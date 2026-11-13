@@ -5,85 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Synchronized previews of Entropy Service HTTP responses.">
-  <title>Entropy Service — HTTP Endpoint Gallery</title>
+  <title data-i18n="Entropy Service — HTTP Endpoint Gallery">Entropy Service — HTTP Endpoint Gallery</title>
+  <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-home page-gallery">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <div class="wrap">
     <header class="gallery-header">
       <div class="gallery-intro">
         <div class="eyebrow">Entropy Service</div>
-        <h1>HTTP endpoint gallery</h1>
-        <p class="lede">Four previews. One refresh clock.</p>
+        <h1><span data-i18n="HTTP endpoint gallery">HTTP endpoint gallery</span></h1>
+        <p class="lede"><span data-i18n="Four previews. One refresh clock.">Four previews. One refresh clock.</span></p>
       </div>
-      <a href="/">← All endpoints</a>
+      <a href="/"><span data-i18n="← All endpoints">← All endpoints</span></a>
     </header>
     <main>
-      <section aria-label="Gallery refresh controls" class="gallery-controls panel">
-        <label for="gallery-interval">Every</label>
-        <input id="gallery-interval" type="number" min="0.05" max="120" step="0.05" value="2" inputmode="decimal" aria-label="Refresh interval in seconds">
+      <section aria-label="Gallery refresh controls" class="gallery-controls panel" data-i18n-aria-label="Gallery refresh controls">
+        <label for="gallery-interval"><span data-i18n="Every">Every</span></label>
+        <input id="gallery-interval" type="number" min="0.05" max="120" step="0.05" value="2" inputmode="decimal" aria-label="Refresh interval in seconds" data-i18n-aria-label="Refresh interval in seconds">
         <span>s</span>
-        <button id="gallery-refresh" type="button">Refresh</button>
-        <span id="gallery-status" role="status" aria-live="polite">Waiting for samples</span>
+        <button id="gallery-refresh" type="button"><span data-i18n="Refresh">Refresh</span></button>
+        <span id="gallery-status" role="status" aria-live="polite"><span data-i18n="Waiting for samples">Waiting for samples</span></span>
       </section>
 
-      <section class="gallery-grid" aria-label="Live HTTP API previews">
+      <section class="gallery-grid" aria-label="Live HTTP API previews" data-i18n-aria-label="Live HTTP API previews">
         <article class="gallery-card" id="image" data-gallery-key="image">
-          <h2>RGB mosaic</h2>
-          <p class="gallery-caption">128 × 128 · RGB bytes</p>
+          <h2><span data-i18n="RGB mosaic">RGB mosaic</span></h2>
+          <p class="gallery-caption"><span data-i18n="128 × 128 · RGB bytes">128 × 128 · RGB bytes</span></p>
           <div class="gallery-preview">
-            <span class="gallery-placeholder" id="placeholder-image">AWAITING SAMPLE</span>
-            <img id="preview-image" alt="A crisp mosaic of raw RGB sample pixels" hidden>
+            <span class="gallery-placeholder" id="placeholder-image"><span data-i18n="AWAITING SAMPLE">AWAITING SAMPLE</span></span>
+            <img id="preview-image" alt="A crisp mosaic of raw RGB sample pixels" hidden data-i18n-alt="A crisp mosaic of raw RGB sample pixels">
           </div>
-          <a class="gallery-route" href="/v1/image/random?size=128" target="_blank" rel="noopener noreferrer" aria-label="Open the RGB PNG response">/v1/image/random?size=128 ↗</a>
+          <a class="gallery-route" href="/v1/image/random?size=128" target="_blank" rel="noopener noreferrer" aria-label="Open the RGB PNG response" data-i18n-aria-label="Open the RGB PNG response">/v1/image/random?size=128 ↗</a>
         </article>
         <article class="gallery-card" id="heatmap" data-gallery-key="heatmap">
-          <h2>Bit heatmap</h2>
-          <p class="gallery-caption">One-bits per byte · 0–8</p>
+          <h2><span data-i18n="Bit heatmap">Bit heatmap</span></h2>
+          <p class="gallery-caption"><span data-i18n="One-bits per byte · 0–8">One-bits per byte · 0–8</span></p>
           <div class="gallery-preview">
-            <span class="gallery-placeholder" id="placeholder-heatmap">AWAITING SAMPLE</span>
-            <img id="preview-heatmap" alt="Byte bit counts, from near black at zero to pale yellow at eight" hidden>
+            <span class="gallery-placeholder" id="placeholder-heatmap"><span data-i18n="AWAITING SAMPLE">AWAITING SAMPLE</span></span>
+            <img id="preview-heatmap" alt="Byte bit counts, from near black at zero to pale yellow at eight" hidden data-i18n-alt="Byte bit counts, from near black at zero to pale yellow at eight">
           </div>
-          <div class="gallery-scale" role="img" aria-label="Bit-count colour scale: zero is near black; eight is pale yellow">
+          <div class="gallery-scale" role="img" aria-label="Bit-count colour scale: zero is near black; eight is pale yellow" data-i18n-aria-label="Bit-count colour scale: zero is near black; eight is pale yellow">
             <span style="--swatch: #000004">0</span><span style="--swatch: #1f0c48">1</span><span style="--swatch: #550f6d">2</span><span style="--swatch: #88226a">3</span><span style="--swatch: #bc3754">4</span><span style="--swatch: #e35933">5</span><span style="--swatch: #f98e09">6</span><span style="--swatch: #f9c932">7</span><span style="--swatch: #fcffa4">8</span>
           </div>
-          <a class="gallery-route" href="/v1/image/heatmap?size=128" target="_blank" rel="noopener noreferrer" aria-label="Open the bit-count PNG response">/v1/image/heatmap?size=128 ↗</a>
+          <a class="gallery-route" href="/v1/image/heatmap?size=128" target="_blank" rel="noopener noreferrer" aria-label="Open the bit-count PNG response" data-i18n-aria-label="Open the bit-count PNG response">/v1/image/heatmap?size=128 ↗</a>
         </article>
         <article class="gallery-card" data-gallery-key="qr">
-          <h2>Random QR</h2>
-          <p class="gallery-caption">64-byte hex sample</p>
+          <h2><span data-i18n="Random QR">Random QR</span></h2>
+          <p class="gallery-caption"><span data-i18n="64-byte hex sample">64-byte hex sample</span></p>
           <div class="gallery-preview">
-            <span class="gallery-placeholder" id="placeholder-qr">AWAITING SAMPLE</span>
-            <img id="preview-qr" alt="QR code encoding a server-generated hexadecimal sample" hidden>
+            <span class="gallery-placeholder" id="placeholder-qr"><span data-i18n="AWAITING SAMPLE">AWAITING SAMPLE</span></span>
+            <img id="preview-qr" alt="QR code encoding a server-generated hexadecimal sample" hidden data-i18n-alt="QR code encoding a server-generated hexadecimal sample">
           </div>
-          <a class="gallery-route" href="/v1/qr/random" target="_blank" rel="noopener noreferrer" aria-label="Open the QR PNG response">/v1/qr/random ↗</a>
+          <a class="gallery-route" href="/v1/qr/random" target="_blank" rel="noopener noreferrer" aria-label="Open the QR PNG response" data-i18n-aria-label="Open the QR PNG response">/v1/qr/random ↗</a>
         </article>
         <article class="gallery-card gallery-card--words" data-gallery-key="words">
-          <h2>Words + SHA-256</h2>
-          <p class="gallery-caption">8 words · one digest</p>
+          <h2><span data-i18n="Words + SHA-256">Words + SHA-256</span></h2>
+          <p class="gallery-caption"><span data-i18n="8 words · one digest">8 words · one digest</span></p>
           <div class="gallery-preview">
-            <span class="gallery-placeholder" id="placeholder-words">AWAITING SAMPLE</span>
+            <span class="gallery-placeholder" id="placeholder-words"><span data-i18n="AWAITING SAMPLE">AWAITING SAMPLE</span></span>
             <div class="gallery-words" id="preview-words" hidden>
               <p id="gallery-word-text"></p>
               <code id="gallery-word-hash" title="SHA-256"></code>
             </div>
           </div>
-          <a class="gallery-route" href="/v1/meta/random?words=8" target="_blank" rel="noopener noreferrer" aria-label="Open the word-page response">/v1/meta/random?words=8 ↗</a>
+          <a class="gallery-route" href="/v1/meta/random?words=8" target="_blank" rel="noopener noreferrer" aria-label="Open the word-page response" data-i18n-aria-label="Open the word-page response">/v1/meta/random?words=8 ↗</a>
         </article>
       </section>
       <details class="gallery-notes">
-        <summary>About these previews</summary>
-        <p>All four requests start together; previews update after the batch finishes. Failed sources keep their last sample. Hidden tabs pause refreshes.</p>
-        <p>The 128 × 128 image samples use crisp scaling. The heatmap shows one-bit counts, not entropy quality. QR quiet zones and the full word digest are preserved. These are visual demonstrations, not cryptographic tests.</p>
-        <p>Want live words? Open <a href="/api-words.html">WebSocket words</a>.</p>
+        <summary><span data-i18n="About these previews">About these previews</span></summary>
+        <p><span data-i18n="All four requests start together; previews update after the batch finishes. Failed sources keep their last sample. Hidden tabs pause refreshes.">All four requests start together; previews update after the batch finishes. Failed sources keep their last sample. Hidden tabs pause refreshes.</span></p>
+        <p><span data-i18n="The 128 × 128 image samples use crisp scaling. The heatmap shows one-bit counts, not entropy quality. QR quiet zones and the full word digest are preserved. These are visual demonstrations, not cryptographic tests.">The 128 × 128 image samples use crisp scaling. The heatmap shows one-bit counts, not entropy quality. QR quiet zones and the full word digest are preserved. These are visual demonstrations, not cryptographic tests.</span></p>
+        <p><span data-i18n="Want live words? Open">Want live words? Open</span> <a href="/api-words.html"><span data-i18n="WebSocket words">WebSocket words</span></a>.</p>
       </details>
     </main>
-    <footer><a href="/">All endpoints</a> · <a href="/api-status.html">Service status</a> · <a href="https://github.com/fantuz/entropy-service">Documentation</a></footer>
+    <footer><a href="/"><span data-i18n="All endpoints">All endpoints</span></a> · <a href="/api-status.html"><span data-i18n="Service status">Service status</span></a> · <a href="https://github.com/fantuz/entropy-service"><span data-i18n="Documentation">Documentation</span></a></footer>
   </div>
   <script src="/gallery.js" defer></script>
 </body>

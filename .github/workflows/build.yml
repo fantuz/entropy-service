@@ -122,6 +122,11 @@ jobs:
           node scripts/test-lab-audio.mjs
       - name: Test assisted source configuration
         run: node scripts/test-lab-registration.mjs
+      - name: Test interface translations, preference isolation and safe text bindings
+        run: |
+          python3 scripts/mark-ui-text.py --check
+          python3 -m unittest discover -s scripts -p 'test_mark_ui_text.py'
+          node scripts/test-ui-i18n.mjs
       - name: Check shared analysis markup
         run: node scripts/render-analysis-pages.mjs --check
       - name: Test browser layout and digest formatting

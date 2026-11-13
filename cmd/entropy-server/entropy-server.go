@@ -499,15 +499,16 @@ func randomWordsHandler(source io.Reader, quantity int, refreshMs int, maxBytes 
 <meta http-equiv="refresh" content="{{.Refresh}}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Entropy Service — Random Words</title>
+<title data-i18n="Entropy Service — Random Words">Entropy Service — Random Words</title>
+<script src="/i18n.js"></script>
 <script src="/theme.js"></script>
 <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-word-response">
-<nav class="site-toolbar" aria-label="Site and appearance"><a href="/">Entropy Service</a><button type="button" data-theme-toggle hidden>Dark mode</button></nav>
+<nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance"><a href="/">Entropy Service</a><button type="button" data-theme-toggle hidden>Dark mode</button></nav>
 <main class="panel">
-<h1>Random Words</h1>
-<p>{{.LanguageName}} · {{.ListSize}} entries · {{.Bits}} bits/word of uniform selection</p>
+<h1 data-i18n="Random Words">Random Words</h1>
+<p data-i18n="{list} · {size} entries · {bits} bits/word of uniform selection" data-i18n-param-list="{{.LanguageName}}" data-i18n-param-size="{{.ListSize}}" data-i18n-param-bits="{{.Bits}}">{{.LanguageName}} · {{.ListSize}} entries · {{.Bits}} bits/word of uniform selection</p>
 <div class="words" lang="{{.Language}}" dir="auto">{{.Words}}</div>
 <div class="hash">{{.Hash}}</div>
 </main>

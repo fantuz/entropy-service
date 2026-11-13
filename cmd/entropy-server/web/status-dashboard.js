@@ -1,6 +1,12 @@
 "use strict";
 
 (() => {
+    const t = (message, values = {}) => window.EntropyI18n?.t(message, values) ??
+        message.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
+    function setText(node, message, values = {}) {
+        if (window.EntropyI18n) window.EntropyI18n.set(node, message, values);
+        else node.textContent = t(message, values);
+    }
     const refresh = document.getElementById("status-refresh");
     const intervalInput = document.getElementById("status-interval");
     let intervalMs = 5000;
@@ -10,7 +16,7 @@
 
     function setStatus(name, state, value) {
         document.getElementById(name + "-card").dataset.state = state;
-        document.getElementById(name + "-value").textContent = value;
+        setText(document.getElementById(name + "-value"), value);
     }
 
     function setValue(id, value) {
@@ -87,7 +93,7 @@
             setValue("active-websockets", "—");
         }
 
-        setValue("status-updated", `Last checked ${new Date().toLocaleTimeString()}`);
+        setText(document.getElementById("status-updated"), "Last checked {time}", {time: new Date().toLocaleTimeString()});
         } finally {
             running = false;
             refresh.disabled = false;

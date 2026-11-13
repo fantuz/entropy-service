@@ -3,6 +3,12 @@
 // Browser-only threshold for Shannon entropy calculated from the bounded
 // sample in stream-analysis.js. It is a diagnostic, not an RNG health test.
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
+    function text(element, message, params = {}) {
+        if (globalThis.window?.EntropyI18n) window.EntropyI18n.set(element, message, params);
+        else element.textContent = tr(message, params);
+    }
     const storageKey = "entropy-service:stream:shannon-threshold:v1";
     const defaultThreshold = 7.999900;
     const card = document.getElementById("entropy-alert-card");
@@ -25,16 +31,15 @@
         if (latest === null) {
             card.dataset.state = "waiting";
             reading.textContent = "—";
-            message.textContent = "AWAITING FIRST ANALYSIS SAMPLE";
+            text(message, "AWAITING FIRST ANALYSIS SAMPLE");
             return;
         }
         // Compare full-precision source data; only the visual value is rounded.
         const alert = latest < threshold;
         card.dataset.state = alert ? "alert" : "normal";
         reading.textContent = latest.toFixed(6);
-        message.textContent = alert ?
-            `BELOW THRESHOLD · ${threshold.toFixed(6)} BITS/BYTE` :
-            `WITHIN SELECTED THRESHOLD · ${threshold.toFixed(6)} BITS/BYTE`;
+        text(message, alert ? "BELOW THRESHOLD · {threshold} BITS/BYTE" :
+            "WITHIN SELECTED THRESHOLD · {threshold} BITS/BYTE", {threshold: threshold.toFixed(6)});
     }
 
     function update(value) {
