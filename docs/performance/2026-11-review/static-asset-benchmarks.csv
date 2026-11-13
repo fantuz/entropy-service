@@ -1,0 +1,7 @@
+benchmark,iterations,ns/op,retained-body-B,B/op,allocs/op
+BenchmarkStaticAssetStartup,12,18801687.0,557848.0,3669762.0,808.0
+BenchmarkStaticAssetStartup,13,19208442.0,557848.0,3669747.0,808.0
+BenchmarkStaticAssetStartup,13,19023003.0,557848.0,3669753.0,808.0
+BenchmarkStaticAssetConditional,158434,1665.0,,1128.0,15.0
+BenchmarkStaticAssetConditional,151416,1672.0,,1128.0,15.0
+BenchmarkStaticAssetConditional,151588,1751.0,,1128.0,15.0

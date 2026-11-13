@@ -1,0 +1,370 @@
+{
+  "browser": "firefox",
+  "browserVersion": "153.0",
+  "historicalBaselineNavigations": [
+    {
+      "url": "http://127.0.0.1:50701/locales/fr.json",
+      "encodedBodySize": 118762,
+      "decodedBodySize": 118762,
+      "transferSize": 119062,
+      "duration": 19,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:50701/locales/fr.json",
+          "status": 200,
+          "headers": {
+            "content-length": "118762",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "cold",
+      "page": "/"
+    },
+    {
+      "url": "http://127.0.0.1:50701/locales/fr.json",
+      "encodedBodySize": 118762,
+      "decodedBodySize": 118762,
+      "transferSize": 119062,
+      "duration": 15,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:50701/locales/fr.json",
+          "status": 200,
+          "headers": {
+            "content-length": "118762",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "cross-page",
+      "page": "/api-upload.html"
+    },
+    {
+      "url": "http://127.0.0.1:50701/locales/fr.json",
+      "encodedBodySize": 118762,
+      "decodedBodySize": 118762,
+      "transferSize": 119062,
+      "duration": 3,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:50701/locales/fr.json",
+          "status": 200,
+          "headers": {
+            "content-length": "118762",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "return",
+      "page": "/"
+    },
+    {
+      "url": "http://127.0.0.1:50701/locales/fr.json",
+      "encodedBodySize": 118762,
+      "decodedBodySize": 118762,
+      "transferSize": 119062,
+      "duration": 3,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:50701/locales/fr.json",
+          "status": 200,
+          "headers": {
+            "content-length": "118762",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "reload",
+      "page": "/"
+    }
+  ],
+  "optimizedNavigations": [
+    {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "encodedBodySize": 43678,
+      "decodedBodySize": 118762,
+      "transferSize": 43978,
+      "duration": 6,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+          "status": 200,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "content-encoding": "gzip",
+            "content-length": "43678",
+            "content-type": "application/json",
+            "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+            "vary": "Accept-Encoding"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "cold",
+      "page": "/"
+    },
+    {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "encodedBodySize": 43678,
+      "decodedBodySize": 118762,
+      "transferSize": 0,
+      "duration": 4,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+          "status": 200,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "content-encoding": "gzip",
+            "content-length": "43678",
+            "content-type": "application/json",
+            "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+            "vary": "Accept-Encoding"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "cross-page",
+      "page": "/api-upload.html"
+    },
+    {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "encodedBodySize": 43678,
+      "decodedBodySize": 118762,
+      "transferSize": 0,
+      "duration": 3,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+          "status": 200,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "content-encoding": "gzip",
+            "content-length": "43678",
+            "content-type": "application/json",
+            "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+            "vary": "Accept-Encoding"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "return",
+      "page": "/"
+    },
+    {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "encodedBodySize": 43678,
+      "decodedBodySize": 118762,
+      "transferSize": 0,
+      "duration": 3,
+      "responses": [
+        {
+          "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+          "status": 200,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "content-encoding": "gzip",
+            "content-length": "43678",
+            "content-type": "application/json",
+            "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+            "vary": "Accept-Encoding"
+          }
+        }
+      ],
+      "network": [],
+      "mode": "reload",
+      "page": "/"
+    }
+  ],
+  "representationContracts": {
+    "identity": {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "status": 200,
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "118762",
+        "content-type": "application/json",
+        "etag": "\"a641b7997ffc20b57daf118f10a5c5b90778f12a8fe753203896ee37f27ec2ee\"",
+        "vary": "Accept-Encoding"
+      }
+    },
+    "gzip": {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "status": 200,
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "content-length": "43678",
+        "content-type": "application/json",
+        "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+        "vary": "Accept-Encoding"
+      }
+    },
+    "uncompressedReferenceBodyBytes": 118762,
+    "gzipBodyBytes": 43678,
+    "conditionals": [
+      {
+        "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+        "status": 304,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "etag": "\"a641b7997ffc20b57daf118f10a5c5b90778f12a8fe753203896ee37f27ec2ee\"",
+          "vary": "Accept-Encoding"
+        }
+      },
+      {
+        "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+        "status": 304,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+          "vary": "Accept-Encoding"
+        }
+      }
+    ],
+    "staleValidator": {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "status": 200,
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "content-length": "43678",
+        "content-type": "application/json",
+        "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+        "vary": "Accept-Encoding"
+      }
+    },
+    "wrongRepresentationValidator": {
+      "url": "http://127.0.0.1:40067/locales/fr.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "status": 200,
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "content-length": "43678",
+        "content-type": "application/json",
+        "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+        "vary": "Accept-Encoding"
+      }
+    },
+    "unversionedOrWrongVersion": [
+      {
+        "url": "http://127.0.0.1:40067/locales/fr.json",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-cache",
+          "content-encoding": "gzip",
+          "content-length": "43678",
+          "content-type": "application/json",
+          "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+          "vary": "Accept-Encoding"
+        }
+      },
+      {
+        "url": "http://127.0.0.1:40067/locales/fr.json?v=not-the-current-version",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-cache",
+          "content-encoding": "gzip",
+          "content-length": "43678",
+          "content-type": "application/json",
+          "etag": "\"077d5046a1ae49a5a66701d464d13c8ca5048e96e507c8cd605851c5d5b64219\"",
+          "vary": "Accept-Encoding"
+        }
+      }
+    ]
+  },
+  "greekRepresentation": {
+    "url": "http://127.0.0.1:40067/locales/el.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+    "identityBodyBytes": 156511,
+    "gzipBodyBytes": 57081,
+    "identity": {
+      "url": "http://127.0.0.1:40067/locales/el.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "status": 200,
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "156511",
+        "content-type": "application/json",
+        "etag": "\"8f64b997b641b5aac7b7d746c361c4187d1b646265261646623692a85a39f8a0\"",
+        "vary": "Accept-Encoding"
+      }
+    },
+    "gzip": {
+      "url": "http://127.0.0.1:40067/locales/el.json?v=583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad",
+      "status": 200,
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "content-length": "57081",
+        "content-type": "application/json",
+        "etag": "\"a875eef63a96d32f8d661a1def70d2df63c06d1876e9b5b8e9efdcaadb44f4eb\"",
+        "vary": "Accept-Encoding"
+      }
+    }
+  },
+  "dynamicRoutes": {
+    "generation": [
+      {
+        "url": "http://127.0.0.1:40067/v1/data/random?bytes=4096",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-store",
+          "content-length": "4096",
+          "content-type": "application/octet-stream"
+        },
+        "decodedBytes": 4096
+      },
+      {
+        "url": "http://127.0.0.1:40067/v1/data/test?bytes=4096",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-store",
+          "content-length": "4096",
+          "content-type": "application/octet-stream"
+        },
+        "decodedBytes": 4096
+      },
+      {
+        "url": "http://127.0.0.1:40067/v1/meta/random?words=3",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "text/html; charset=utf-8",
+          "content-length": "1159"
+        },
+        "decodedBytes": 1159
+      }
+    ],
+    "publicWordlistMetadata": {
+      "url": "http://127.0.0.1:40067/wordlists.json",
+      "status": 200,
+      "headers": {
+        "cache-control": "no-cache",
+        "content-length": "12127",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "\"adb71484f2ecfd1d059cf227008207f01b543cdd625721fcd3c9fbb82b890f4e\""
+      }
+    }
+  },
+  "frozenData": {
+    "englishCatalogRequests": 0,
+    "sha256": "dc404a613fedaeb54034514bc6505f56b933caa5250299ba7d094377a51caa46",
+    "workerJobs": 1,
+    "frame": 1,
+    "languageSwitches": 4
+  },
+  "comparison": {
+    "reference": "Uncompressed identity catalog; optional historical binary when supplied",
+    "uncompressedCatalogBodyBytes": 118762,
+    "coldGzipCatalogBodyBytes": 43678,
+    "repeatTransferSizes": [
+      0,
+      0,
+      0
+    ]
+  }
+}

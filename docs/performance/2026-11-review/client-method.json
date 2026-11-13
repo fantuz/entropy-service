@@ -1,0 +1,120 @@
+{
+  "cpu": 0,
+  "toolchain": "go version go1.26.11 linux/amd64",
+  "env": {
+    "CGO_ENABLED": "0",
+    "GOAMD64": "v1",
+    "GOMAXPROCS": "1",
+    "GOGC": "100"
+  },
+  "benchtime": "300ms",
+  "rounds": 5,
+  "order": [
+    {
+      "round": 0,
+      "label": "prewindows",
+      "elapsed_seconds": 2.4425695499958238
+    },
+    {
+      "round": 0,
+      "label": "v203",
+      "elapsed_seconds": 2.5343222320007044
+    },
+    {
+      "round": 0,
+      "label": "prei18n",
+      "elapsed_seconds": 2.276549996997346
+    },
+    {
+      "round": 0,
+      "label": "current",
+      "elapsed_seconds": 2.1549636499985354
+    },
+    {
+      "round": 1,
+      "label": "prewindows",
+      "elapsed_seconds": 2.482062996001332
+    },
+    {
+      "round": 1,
+      "label": "current",
+      "elapsed_seconds": 2.214168200000131
+    },
+    {
+      "round": 1,
+      "label": "prei18n",
+      "elapsed_seconds": 2.359812866001448
+    },
+    {
+      "round": 1,
+      "label": "v203",
+      "elapsed_seconds": 2.5435091000035754
+    },
+    {
+      "round": 2,
+      "label": "prei18n",
+      "elapsed_seconds": 2.176958759999252
+    },
+    {
+      "round": 2,
+      "label": "current",
+      "elapsed_seconds": 2.164953865998541
+    },
+    {
+      "round": 2,
+      "label": "prewindows",
+      "elapsed_seconds": 2.6321869820021675
+    },
+    {
+      "round": 2,
+      "label": "v203",
+      "elapsed_seconds": 2.4515821280001546
+    },
+    {
+      "round": 3,
+      "label": "prei18n",
+      "elapsed_seconds": 2.1961154569944483
+    },
+    {
+      "round": 3,
+      "label": "v203",
+      "elapsed_seconds": 2.610707366002316
+    },
+    {
+      "round": 3,
+      "label": "prewindows",
+      "elapsed_seconds": 2.437231438998424
+    },
+    {
+      "round": 3,
+      "label": "current",
+      "elapsed_seconds": 2.1431774700031383
+    },
+    {
+      "round": 4,
+      "label": "prewindows",
+      "elapsed_seconds": 2.5788242260023253
+    },
+    {
+      "round": 4,
+      "label": "v203",
+      "elapsed_seconds": 2.40406264399644
+    },
+    {
+      "round": 4,
+      "label": "prei18n",
+      "elapsed_seconds": 2.174251650001679
+    },
+    {
+      "round": 4,
+      "label": "current",
+      "elapsed_seconds": 2.215001739001309
+    }
+  ],
+  "revisions": {
+    "prewindows": "64a8d61437d2494414c30debbaf296538f17a31b",
+    "v203": "e7df8569bca23ca04996d8c725d0e883f5979f32",
+    "prei18n": "42b7d8b219795cd922e71e6e52fda7c05e81bc1f",
+    "current": "4561cf2bc037f10edfc61ed8a048a858c9ec746d"
+  }
+}

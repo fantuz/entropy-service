@@ -101,6 +101,10 @@ jobs:
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_ui_languages_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/languages
+      - name: Test compressed static assets and versioned catalog cache reuse
+        env:
+          DEBUG: pw:browser
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_static_assets_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/static-assets
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

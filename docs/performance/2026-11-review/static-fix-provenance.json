@@ -1,0 +1,43 @@
+{
+  "base_commit": "4561cf2bc037f10edfc61ed8a048a858c9ec746d",
+  "fixed_source_files_sha256": {
+    "cmd/entropy-server/static_assets.go": "42df92f3e61bfc12d43ed8214d42f4d0bcd8d5cc8890642f54a3416d550c559d",
+    "cmd/entropy-server/entropy-server.go": "36a57fb2db2f30e628e54a25794bdedc439c06b3a0bad53618519289602b255b",
+    "cmd/entropy-server/http_stream.go": "a2c90766e949094659a2f1dbe243a4a3feb6e7e850ace28692d8242a98049891",
+    "cmd/entropy-server/web/i18n.js": "5d0fb688123b044c798eb66e2dbe7ee02734c1d034d26bcc697017ff7a95c770"
+  },
+  "binary_sha256": {
+    "current": "ff04bca80b18f7ffbcb83ef72f17ffe9b1881d8afc47a6a5f7e48d539539704c",
+    "fixed": "d9a73d44f50e9b6b22f558e55ac5a1494b77e02683fc93bec1ce0c24a5c817dd"
+  },
+  "binary_bytes": {
+    "current": 13680802,
+    "fixed": 13713570
+  },
+  "build_flags": {
+    "toolchain": "go1.26.11",
+    "cgo": 0,
+    "goamd64": "v1",
+    "trimpath": true,
+    "ldflags": "-s -w",
+    "buildvcs": false
+  },
+  "startup_probe": {
+    "rounds": 6,
+    "order": "alternating",
+    "gomaxprocs": 1,
+    "gogc": 100,
+    "server_cpu": 1,
+    "https": false,
+    "readiness_poll_seconds": 0.002,
+    "rss_delay_after_ready_seconds": 0.15
+  },
+  "microbench": {
+    "cpu": 0,
+    "gomaxprocs": 1,
+    "gogc": 100,
+    "benchtime": "200ms",
+    "count": 3
+  },
+  "catalog_version": "583e8fb320dd47d9e83c1c6be958594f31c4dcdfd10ddecfffbc174a461c40ad"
+}

@@ -1,0 +1,548 @@
+{
+  "engine": "firefox",
+  "navigation": [
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/",
+      "mode": "cold",
+      "samples": 2,
+      "loadMs": 230.0,
+      "fcpMs": 233.0,
+      "languageReadyMs": null,
+      "documentBytes": 13430.0,
+      "mainResourceBodyBytes": 46413.0,
+      "mainResourceTransferBytes": 47313.0,
+      "mainResourceRequests": 3.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 217.0
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 2,
+      "loadMs": 48.5,
+      "fcpMs": 55.0,
+      "languageReadyMs": null,
+      "documentBytes": 13430.0,
+      "mainResourceBodyBytes": 46413.0,
+      "mainResourceTransferBytes": 46994.0,
+      "mainResourceRequests": 3.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 217.0
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 2,
+      "loadMs": 92.5,
+      "fcpMs": 99.0,
+      "languageReadyMs": null,
+      "documentBytes": 20858.0,
+      "mainResourceBodyBytes": 137541.0,
+      "mainResourceTransferBytes": 141722.0,
+      "mainResourceRequests": 15.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 340.0
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 2,
+      "loadMs": 92.0,
+      "fcpMs": 98.5,
+      "languageReadyMs": null,
+      "documentBytes": 20858.0,
+      "mainResourceBodyBytes": 137541.0,
+      "mainResourceTransferBytes": 142041.0,
+      "mainResourceRequests": 15.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 340.0
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 2,
+      "loadMs": 70.5,
+      "fcpMs": 76.5,
+      "languageReadyMs": null,
+      "documentBytes": 20858.0,
+      "mainResourceBodyBytes": 137541.0,
+      "mainResourceTransferBytes": 141722.0,
+      "mainResourceRequests": 15.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 340.0
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 2,
+      "loadMs": 51.5,
+      "fcpMs": 57.5,
+      "languageReadyMs": null,
+      "documentBytes": 13430.0,
+      "mainResourceBodyBytes": 46413.0,
+      "mainResourceTransferBytes": 46994.0,
+      "mainResourceRequests": 3.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 217.0
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/",
+      "mode": "cold",
+      "samples": 2,
+      "loadMs": 60.0,
+      "fcpMs": 62.0,
+      "languageReadyMs": 50.0,
+      "documentBytes": 21671.0,
+      "mainResourceBodyBytes": 55797.0,
+      "mainResourceTransferBytes": 56997.0,
+      "mainResourceRequests": 4.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 343.0
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 2,
+      "loadMs": 42.5,
+      "fcpMs": 47.0,
+      "languageReadyMs": 35.0,
+      "documentBytes": 21671.0,
+      "mainResourceBodyBytes": 55797.0,
+      "mainResourceTransferBytes": 56678.0,
+      "mainResourceRequests": 4.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 343.0
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 2,
+      "loadMs": 78.5,
+      "fcpMs": 75.0,
+      "languageReadyMs": 67.5,
+      "documentBytes": 30172.0,
+      "mainResourceBodyBytes": 152303.0,
+      "mainResourceTransferBytes": 156784.0,
+      "mainResourceRequests": 16.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 457.0
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 2,
+      "loadMs": 82.5,
+      "fcpMs": 77.5,
+      "languageReadyMs": 75.0,
+      "documentBytes": 30172.0,
+      "mainResourceBodyBytes": 152303.0,
+      "mainResourceTransferBytes": 157103.0,
+      "mainResourceRequests": 16.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 457.0
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 2,
+      "loadMs": 80.0,
+      "fcpMs": 80.5,
+      "languageReadyMs": 73.0,
+      "documentBytes": 30172.0,
+      "mainResourceBodyBytes": 152303.0,
+      "mainResourceTransferBytes": 156784.0,
+      "mainResourceRequests": 16.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 457.0
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 2,
+      "loadMs": 55.5,
+      "fcpMs": 59.0,
+      "languageReadyMs": 47.0,
+      "documentBytes": 21671.0,
+      "mainResourceBodyBytes": 55797.0,
+      "mainResourceTransferBytes": 56678.0,
+      "mainResourceRequests": 4.0,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 343.0
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/",
+      "mode": "cold",
+      "samples": 2,
+      "loadMs": 52.0,
+      "fcpMs": 55.5,
+      "languageReadyMs": 71.5,
+      "documentBytes": 21671.0,
+      "mainResourceBodyBytes": 174559.0,
+      "mainResourceTransferBytes": 176059.0,
+      "mainResourceRequests": 5.0,
+      "localeBodyBytes": 118762.0,
+      "localeTransferBytes": 119062.0,
+      "localeDurationMs": 5.0,
+      "domNodes": 343.0
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 2,
+      "loadMs": 49.0,
+      "fcpMs": 56.0,
+      "languageReadyMs": 55.0,
+      "documentBytes": 21671.0,
+      "mainResourceBodyBytes": 174559.0,
+      "mainResourceTransferBytes": 175740.0,
+      "mainResourceRequests": 5.0,
+      "localeBodyBytes": 118762.0,
+      "localeTransferBytes": 119062.0,
+      "localeDurationMs": 1.5,
+      "domNodes": 343.0
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 2,
+      "loadMs": 68.5,
+      "fcpMs": 80.5,
+      "languageReadyMs": 89.0,
+      "documentBytes": 30172.0,
+      "mainResourceBodyBytes": 271065.0,
+      "mainResourceTransferBytes": 275846.0,
+      "mainResourceRequests": 17.0,
+      "localeBodyBytes": 118762.0,
+      "localeTransferBytes": 119062.0,
+      "localeDurationMs": 2.5,
+      "domNodes": 457.0
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 2,
+      "loadMs": 84.5,
+      "fcpMs": 78.5,
+      "languageReadyMs": 88.5,
+      "documentBytes": 30172.0,
+      "mainResourceBodyBytes": 271065.0,
+      "mainResourceTransferBytes": 276165.0,
+      "mainResourceRequests": 17.0,
+      "localeBodyBytes": 118762.0,
+      "localeTransferBytes": 119062.0,
+      "localeDurationMs": 5.0,
+      "domNodes": 457.0
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 2,
+      "loadMs": 88.0,
+      "fcpMs": 94.5,
+      "languageReadyMs": 92.0,
+      "documentBytes": 30172.0,
+      "mainResourceBodyBytes": 271065.0,
+      "mainResourceTransferBytes": 275846.0,
+      "mainResourceRequests": 17.0,
+      "localeBodyBytes": 118762.0,
+      "localeTransferBytes": 119062.0,
+      "localeDurationMs": 4.0,
+      "domNodes": 457.0
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 2,
+      "loadMs": 57.0,
+      "fcpMs": 59.0,
+      "languageReadyMs": 62.5,
+      "documentBytes": 21671.0,
+      "mainResourceBodyBytes": 174559.0,
+      "mainResourceTransferBytes": 175740.0,
+      "mainResourceRequests": 5.0,
+      "localeBodyBytes": 118762.0,
+      "localeTransferBytes": 119062.0,
+      "localeDurationMs": 2.5,
+      "domNodes": 343.0
+    }
+  ],
+  "render": [
+    {
+      "label": "prei18n",
+      "language": "en",
+      "optional": false,
+      "samples": 2,
+      "scheduledPerRun": [
+        30,
+        30
+      ],
+      "jobsPerRun": [
+        30,
+        30
+      ],
+      "analyzedPerRun": [
+        30,
+        30
+      ],
+      "renderedPerRun": [
+        30,
+        30
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 11.5,
+      "rafMaxMs": 13,
+      "rafCpuMsPerFrame": 8.5,
+      "workerAnalysisMs": 1.0,
+      "latencyMs": 10.0,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": null
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "optional": true,
+      "samples": 2,
+      "scheduledPerRun": [
+        30,
+        30
+      ],
+      "jobsPerRun": [
+        30,
+        30
+      ],
+      "analyzedPerRun": [
+        30,
+        30
+      ],
+      "renderedPerRun": [
+        30,
+        30
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 43.0,
+      "rafMaxMs": 47,
+      "rafCpuMsPerFrame": 39.9,
+      "workerAnalysisMs": 4.5,
+      "latencyMs": 47.0,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": null
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "optional": false,
+      "samples": 2,
+      "scheduledPerRun": [
+        30,
+        30
+      ],
+      "jobsPerRun": [
+        30,
+        30
+      ],
+      "analyzedPerRun": [
+        30,
+        30
+      ],
+      "renderedPerRun": [
+        30,
+        30
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 10.0,
+      "rafMaxMs": 10,
+      "rafCpuMsPerFrame": 8.116666666666667,
+      "workerAnalysisMs": 1.0,
+      "latencyMs": 9.75,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": null
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "optional": true,
+      "samples": 2,
+      "scheduledPerRun": [
+        30,
+        30
+      ],
+      "jobsPerRun": [
+        30,
+        30
+      ],
+      "analyzedPerRun": [
+        30,
+        30
+      ],
+      "renderedPerRun": [
+        30,
+        30
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 47.5,
+      "rafMaxMs": 72,
+      "rafCpuMsPerFrame": 40.86666666666667,
+      "workerAnalysisMs": 5.0,
+      "latencyMs": 50.5,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": null
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "optional": false,
+      "samples": 2,
+      "scheduledPerRun": [
+        30,
+        30
+      ],
+      "jobsPerRun": [
+        30,
+        30
+      ],
+      "analyzedPerRun": [
+        30,
+        30
+      ],
+      "renderedPerRun": [
+        30,
+        30
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 10.0,
+      "rafMaxMs": 16,
+      "rafCpuMsPerFrame": 8.149999999999999,
+      "workerAnalysisMs": 1.0,
+      "latencyMs": 9.5,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": null
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "optional": true,
+      "samples": 2,
+      "scheduledPerRun": [
+        30,
+        30
+      ],
+      "jobsPerRun": [
+        30,
+        30
+      ],
+      "analyzedPerRun": [
+        30,
+        30
+      ],
+      "renderedPerRun": [
+        30,
+        30
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 48.0,
+      "rafMaxMs": 81,
+      "rafCpuMsPerFrame": 40.56666666666666,
+      "workerAnalysisMs": 5.0,
+      "latencyMs": 49.0,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": null
+    }
+  ],
+  "switches": [
+    {
+      "language": "fr",
+      "samples": 3,
+      "cachedBindingMs": 1,
+      "cachedPaintWallMs": 45,
+      "cachedRafMs": 41,
+      "workerJobs": 0
+    },
+    {
+      "language": "el",
+      "samples": 3,
+      "cachedBindingMs": 1,
+      "cachedPaintWallMs": 46,
+      "cachedRafMs": 43,
+      "workerJobs": 0
+    },
+    {
+      "language": "en",
+      "samples": 3,
+      "cachedBindingMs": 2,
+      "cachedPaintWallMs": 46,
+      "cachedRafMs": 42,
+      "workerJobs": 0
+    }
+  ],
+  "geometry": [],
+  "metadata": {
+    "timeUtc": "2026-11-13T05:33:11.484789+00:00",
+    "browserVersion": "153.0",
+    "fixtureBytes": 65536,
+    "fixtureSha256": "bd6fa06bafb90b1b1ef680e410dfc173743c4ff85567357bc07855cd6b74f5a7",
+    "renderCorpus": "16 deterministic xorshift32 64KiB frames, seed 0x12345678 XOR imul(index+1,0x9e3779b9), high byte; consecutive frames differ",
+    "rounds": 2,
+    "frames": 30,
+    "notes": [
+      "Headless software rendering on shared Linux VM",
+      "RAF callback durations measure browser main-thread callback wall time, not real-terminal/GPU or OS process CPU",
+      "ResourceTiming totals omit worker import resources; full CDP network rows retained for Chromium",
+      "20Hz direct submissions use the production file workspace/worker/draw pipeline; no server entropy or network benchmark",
+      "CDP rendererMetricsDelta includes ten warmup frames plus measured frames; normalized field divides by all submitted frames, primary RAF/worker samples exclude warmup."
+    ]
+  }
+}

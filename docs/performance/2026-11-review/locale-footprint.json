@@ -1,0 +1,51 @@
+{
+  "catalogs": [
+    {
+      "language": "cs",
+      "bytes": 113320,
+      "gzip_bytes": 36475
+    },
+    {
+      "language": "de",
+      "bytes": 113859,
+      "gzip_bytes": 35933
+    },
+    {
+      "language": "el",
+      "bytes": 156511,
+      "gzip_bytes": 42332
+    },
+    {
+      "language": "en",
+      "bytes": 103759,
+      "gzip_bytes": 20630
+    },
+    {
+      "language": "es",
+      "bytes": 114795,
+      "gzip_bytes": 35042
+    },
+    {
+      "language": "fr",
+      "bytes": 118762,
+      "gzip_bytes": 35755
+    },
+    {
+      "language": "it",
+      "bytes": 114091,
+      "gzip_bytes": 34776
+    },
+    {
+      "language": "pl",
+      "bytes": 113740,
+      "gzip_bytes": 36582
+    },
+    {
+      "language": "ru",
+      "bytes": 152420,
+      "gzip_bytes": 42082
+    }
+  ],
+  "total_bytes": 1101257,
+  "runtime_bytes": 8681
+}

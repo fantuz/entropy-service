@@ -1,0 +1,855 @@
+{
+  "engine": "chromium",
+  "navigation": [
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 32.70000000298023,
+      "fcpMs": 48,
+      "languageReadyMs": null,
+      "documentBytes": 13430,
+      "mainResourceBodyBytes": 46394,
+      "mainResourceTransferBytes": 46994,
+      "mainResourceRequests": 2,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 217
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 21,
+      "fcpMs": 52,
+      "languageReadyMs": null,
+      "documentBytes": 13430,
+      "mainResourceBodyBytes": 46394,
+      "mainResourceTransferBytes": 46994,
+      "mainResourceRequests": 2,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 217
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 41.599999994039536,
+      "fcpMs": 56,
+      "languageReadyMs": null,
+      "documentBytes": 20858,
+      "mainResourceBodyBytes": 137522,
+      "mainResourceTransferBytes": 141722,
+      "mainResourceRequests": 14,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 340
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 48.600000001490116,
+      "fcpMs": 72,
+      "languageReadyMs": null,
+      "documentBytes": 20858,
+      "mainResourceBodyBytes": 137522,
+      "mainResourceTransferBytes": 141722,
+      "mainResourceRequests": 14,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 340
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 50.400000005960464,
+      "fcpMs": 52,
+      "languageReadyMs": null,
+      "documentBytes": 20858,
+      "mainResourceBodyBytes": 137522,
+      "mainResourceTransferBytes": 141722,
+      "mainResourceRequests": 14,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 340
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 21.399999998509884,
+      "fcpMs": 40,
+      "languageReadyMs": null,
+      "documentBytes": 13430,
+      "mainResourceBodyBytes": 46394,
+      "mainResourceTransferBytes": 46994,
+      "mainResourceRequests": 2,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 217
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 41.399999998509884,
+      "fcpMs": 60,
+      "languageReadyMs": 24.600000001490116,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 55778,
+      "mainResourceTransferBytes": 56678,
+      "mainResourceRequests": 3,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 27,
+      "fcpMs": 36,
+      "languageReadyMs": 26,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 55778,
+      "mainResourceTransferBytes": 56678,
+      "mainResourceRequests": 3,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 42.399999998509884,
+      "fcpMs": 48,
+      "languageReadyMs": 38.899999998509884,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 152284,
+      "mainResourceTransferBytes": 156784,
+      "mainResourceRequests": 15,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 59.399999998509884,
+      "fcpMs": 68,
+      "languageReadyMs": 49.899999998509884,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 152284,
+      "mainResourceTransferBytes": 156784,
+      "mainResourceRequests": 15,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 45.19999999552965,
+      "fcpMs": 52,
+      "languageReadyMs": 40.899999998509884,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 152284,
+      "mainResourceTransferBytes": 156784,
+      "mainResourceRequests": 15,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 28.399999998509884,
+      "fcpMs": 44,
+      "languageReadyMs": 25.099999994039536,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 55778,
+      "mainResourceTransferBytes": 56678,
+      "mainResourceRequests": 3,
+      "localeBodyBytes": null,
+      "localeTransferBytes": null,
+      "localeDurationMs": null,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 37.600000001490116,
+      "fcpMs": 56,
+      "languageReadyMs": 48.70000000298023,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 174540,
+      "mainResourceTransferBytes": 175740,
+      "mainResourceRequests": 4,
+      "localeBodyBytes": 118762,
+      "localeTransferBytes": 119062,
+      "localeDurationMs": 2.1999999955296516,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 19.69999999552965,
+      "fcpMs": 44,
+      "languageReadyMs": 27.19999999552965,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 174540,
+      "mainResourceTransferBytes": 175740,
+      "mainResourceRequests": 4,
+      "localeBodyBytes": 118762,
+      "localeTransferBytes": 119062,
+      "localeDurationMs": 5.300000004470348,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 46.400000005960464,
+      "fcpMs": 56,
+      "languageReadyMs": 82,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 271046,
+      "mainResourceTransferBytes": 275846,
+      "mainResourceRequests": 16,
+      "localeBodyBytes": 118762,
+      "localeTransferBytes": 119062,
+      "localeDurationMs": 2.399999998509884,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 57.100000001490116,
+      "fcpMs": 68,
+      "languageReadyMs": 111.30000000447035,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 271046,
+      "mainResourceTransferBytes": 275846,
+      "mainResourceRequests": 16,
+      "localeBodyBytes": 118762,
+      "localeTransferBytes": 119062,
+      "localeDurationMs": 7.299999997019768,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 37.899999998509884,
+      "fcpMs": 48,
+      "languageReadyMs": 69.10000000149012,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 271046,
+      "mainResourceTransferBytes": 275846,
+      "mainResourceRequests": 16,
+      "localeBodyBytes": 118762,
+      "localeTransferBytes": 119062,
+      "localeDurationMs": 5.200000002980232,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 33.099999994039536,
+      "fcpMs": 48,
+      "languageReadyMs": 39.29999999701977,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 174540,
+      "mainResourceTransferBytes": 175740,
+      "mainResourceRequests": 4,
+      "localeBodyBytes": 118762,
+      "localeTransferBytes": 119062,
+      "localeDurationMs": 2.5,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "path": "/",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 36.29999999701977,
+      "fcpMs": 60,
+      "languageReadyMs": 47.100000001490116,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 212289,
+      "mainResourceTransferBytes": 213489,
+      "mainResourceRequests": 4,
+      "localeBodyBytes": 156511,
+      "localeTransferBytes": 156811,
+      "localeDurationMs": 2.7000000029802322,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "path": "/",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 22.200000002980232,
+      "fcpMs": 32,
+      "languageReadyMs": 26.899999998509884,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 212289,
+      "mainResourceTransferBytes": 213489,
+      "mainResourceRequests": 4,
+      "localeBodyBytes": 156511,
+      "localeTransferBytes": 156811,
+      "localeDurationMs": 2,
+      "domNodes": 343
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "path": "/api-upload.html",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 39.30000000447035,
+      "fcpMs": 52,
+      "languageReadyMs": 81.5,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 308795,
+      "mainResourceTransferBytes": 313595,
+      "mainResourceRequests": 16,
+      "localeBodyBytes": 156511,
+      "localeTransferBytes": 156811,
+      "localeDurationMs": 7,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "path": "/api-upload.html",
+      "mode": "cold",
+      "samples": 3,
+      "loadMs": 56.399999998509884,
+      "fcpMs": 72,
+      "languageReadyMs": 99.89999999850988,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 308795,
+      "mainResourceTransferBytes": 313595,
+      "mainResourceRequests": 16,
+      "localeBodyBytes": 156511,
+      "localeTransferBytes": 156811,
+      "localeDurationMs": 4,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "path": "/api-upload.html",
+      "mode": "repeat",
+      "samples": 3,
+      "loadMs": 40.099999994039536,
+      "fcpMs": 52,
+      "languageReadyMs": 63.19999999552965,
+      "documentBytes": 30172,
+      "mainResourceBodyBytes": 308795,
+      "mainResourceTransferBytes": 313595,
+      "mainResourceRequests": 16,
+      "localeBodyBytes": 156511,
+      "localeTransferBytes": 156811,
+      "localeDurationMs": 2.8000000044703484,
+      "domNodes": 457
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "path": "/",
+      "mode": "cross-page",
+      "samples": 3,
+      "loadMs": 51.69999999552965,
+      "fcpMs": 80,
+      "languageReadyMs": 59,
+      "documentBytes": 21671,
+      "mainResourceBodyBytes": 212289,
+      "mainResourceTransferBytes": 213489,
+      "mainResourceRequests": 4,
+      "localeBodyBytes": 156511,
+      "localeTransferBytes": 156811,
+      "localeDurationMs": 5.799999997019768,
+      "domNodes": 343
+    }
+  ],
+  "render": [
+    {
+      "label": "prei18n",
+      "language": "en",
+      "optional": false,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 2.9000000059604645,
+      "rafMaxMs": 5.799999997019768,
+      "rafCpuMsPerFrame": 2.252000000178814,
+      "workerAnalysisMs": 0.6000000014901161,
+      "latencyMs": 16.649999998509884,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 9.024850000000002
+    },
+    {
+      "label": "prei18n",
+      "language": "en",
+      "optional": true,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        50,
+        49,
+        49
+      ],
+      "allFramesCompleted": false,
+      "rafP95Ms": 9.300000004470348,
+      "rafMaxMs": 16.5,
+      "rafCpuMsPerFrame": 6.2469387756926675,
+      "workerAnalysisMs": 3.600000001490116,
+      "latencyMs": 16.599999994039536,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 41.570166666666665
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "optional": false,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 2.600000001490116,
+      "rafMaxMs": 7.199999995529652,
+      "rafCpuMsPerFrame": 2.2400000014901162,
+      "workerAnalysisMs": 0.6999999955296516,
+      "latencyMs": 14.900000002235174,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 9.1844
+    },
+    {
+      "label": "current",
+      "language": "en",
+      "optional": true,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        50,
+        49,
+        50
+      ],
+      "allFramesCompleted": false,
+      "rafP95Ms": 9,
+      "rafMaxMs": 48,
+      "rafCpuMsPerFrame": 6.429999999850988,
+      "workerAnalysisMs": 3.3000000044703484,
+      "latencyMs": 17.700000002980232,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 39.76325
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "optional": false,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        49,
+        50,
+        50
+      ],
+      "allFramesCompleted": false,
+      "rafP95Ms": 5.100000001490116,
+      "rafMaxMs": 16.80000000447035,
+      "rafCpuMsPerFrame": 2.6612244908298766,
+      "workerAnalysisMs": 0.6000000014901161,
+      "latencyMs": 4.350000001490116,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 10.35655
+    },
+    {
+      "label": "current",
+      "language": "fr",
+      "optional": true,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        49,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        49,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        47,
+        50,
+        50
+      ],
+      "allFramesCompleted": false,
+      "rafP95Ms": 9.199999995529652,
+      "rafMaxMs": 61.5,
+      "rafCpuMsPerFrame": 6.702127659098899,
+      "workerAnalysisMs": 3.5,
+      "latencyMs": 18.449999999254942,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 39.394549999999995
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "optional": false,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "allFramesCompleted": true,
+      "rafP95Ms": 4.300000004470348,
+      "rafMaxMs": 21.30000000447035,
+      "rafCpuMsPerFrame": 2.735999998599291,
+      "workerAnalysisMs": 0.6000000014901161,
+      "latencyMs": 12.100000001490116,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 9.595633333333332
+    },
+    {
+      "label": "current",
+      "language": "el",
+      "optional": true,
+      "samples": 3,
+      "scheduledPerRun": [
+        50,
+        50,
+        50
+      ],
+      "jobsPerRun": [
+        50,
+        50,
+        50
+      ],
+      "analyzedPerRun": [
+        50,
+        50,
+        50
+      ],
+      "renderedPerRun": [
+        49,
+        48,
+        50
+      ],
+      "allFramesCompleted": false,
+      "rafP95Ms": 9.199999995529652,
+      "rafMaxMs": 27.5,
+      "rafCpuMsPerFrame": 6.279591836339357,
+      "workerAnalysisMs": 3.5,
+      "latencyMs": 17.849999997764826,
+      "rendererTaskMsPerSubmittedFrameIncludingWarmup": 40.344950000000004
+    }
+  ],
+  "switches": [
+    {
+      "language": "fr",
+      "samples": 3,
+      "cachedBindingMs": 4.600000001490116,
+      "cachedPaintWallMs": 43.30000000447035,
+      "cachedRafMs": 2.8000000044703484,
+      "workerJobs": 0
+    },
+    {
+      "language": "el",
+      "samples": 3,
+      "cachedBindingMs": 4.4000000059604645,
+      "cachedPaintWallMs": 44.400000005960464,
+      "cachedRafMs": 2.899999998509884,
+      "workerJobs": 0
+    },
+    {
+      "language": "en",
+      "samples": 3,
+      "cachedBindingMs": 4,
+      "cachedPaintWallMs": 44.100000001490116,
+      "cachedRafMs": 2.7999999970197678,
+      "workerJobs": 0
+    }
+  ],
+  "geometry": [
+    {
+      "viewport": [
+        1440,
+        1000
+      ],
+      "dpr": 1,
+      "optional": false,
+      "rafCpuMsPerFrame": 2.3219999988377094,
+      "workerAnalysisMs": 0.6000000014901161,
+      "scheduled": 50,
+      "jobs": 50,
+      "analyzed": 50,
+      "rendered": 50,
+      "allFramesCompleted": true,
+      "rafP95Ms": 3.2999999970197678,
+      "rafMaxMs": 5.600000001490116,
+      "canvasBackingPixels": 919744
+    },
+    {
+      "viewport": [
+        1440,
+        1000
+      ],
+      "dpr": 1,
+      "optional": true,
+      "rafCpuMsPerFrame": 5.704000000953674,
+      "workerAnalysisMs": 3.5,
+      "scheduled": 50,
+      "jobs": 50,
+      "analyzed": 50,
+      "rendered": 50,
+      "allFramesCompleted": true,
+      "rafP95Ms": 9,
+      "rafMaxMs": 9.400000005960464,
+      "canvasBackingPixels": 1665304
+    },
+    {
+      "viewport": [
+        2560,
+        1440
+      ],
+      "dpr": 1,
+      "optional": false,
+      "rafCpuMsPerFrame": 2.330000000447035,
+      "workerAnalysisMs": 0.6000000014901161,
+      "scheduled": 50,
+      "jobs": 50,
+      "analyzed": 50,
+      "rendered": 50,
+      "allFramesCompleted": true,
+      "rafP95Ms": 3,
+      "rafMaxMs": 4.200000002980232,
+      "canvasBackingPixels": 1345984
+    },
+    {
+      "viewport": [
+        2560,
+        1440
+      ],
+      "dpr": 1,
+      "optional": true,
+      "rafCpuMsPerFrame": 6.059259259038502,
+      "workerAnalysisMs": 5.300000004470348,
+      "scheduled": 50,
+      "jobs": 29,
+      "analyzed": 29,
+      "rendered": 27,
+      "allFramesCompleted": false,
+      "rafP95Ms": 8.100000001490116,
+      "rafMaxMs": 9,
+      "canvasBackingPixels": 2784184
+    },
+    {
+      "viewport": [
+        2560,
+        1440
+      ],
+      "dpr": 2,
+      "optional": false,
+      "rafCpuMsPerFrame": 2.5952380950607004,
+      "workerAnalysisMs": 0.6999999955296516,
+      "scheduled": 50,
+      "jobs": 48,
+      "analyzed": 48,
+      "rendered": 42,
+      "allFramesCompleted": false,
+      "rafP95Ms": 4.5,
+      "rafMaxMs": 6.399999998509884,
+      "canvasBackingPixels": 4573936
+    },
+    {
+      "viewport": [
+        2560,
+        1440
+      ],
+      "dpr": 2,
+      "optional": true,
+      "rafCpuMsPerFrame": 6.060869565476542,
+      "workerAnalysisMs": 3.5,
+      "scheduled": 50,
+      "jobs": 25,
+      "analyzed": 25,
+      "rendered": 23,
+      "allFramesCompleted": false,
+      "rafP95Ms": 7.5,
+      "rafMaxMs": 9.800000004470348,
+      "canvasBackingPixels": 11136736
+    }
+  ],
+  "metadata": {
+    "timeUtc": "2026-11-13T05:30:16.513039+00:00",
+    "browserVersion": "151.0.7922.34",
+    "fixtureBytes": 65536,
+    "fixtureSha256": "bd6fa06bafb90b1b1ef680e410dfc173743c4ff85567357bc07855cd6b74f5a7",
+    "renderCorpus": "16 deterministic xorshift32 64KiB frames, seed 0x12345678 XOR imul(index+1,0x9e3779b9), high byte; consecutive frames differ",
+    "rounds": 3,
+    "frames": 50,
+    "notes": [
+      "Headless software rendering on shared Linux VM",
+      "RAF callback durations measure browser main-thread callback wall time, not real-terminal/GPU or OS process CPU",
+      "ResourceTiming totals omit worker import resources; full CDP network rows retained for Chromium",
+      "20Hz direct submissions use the production file workspace/worker/draw pipeline; no server entropy or network benchmark",
+      "CDP rendererMetricsDelta includes ten warmup frames plus measured frames; normalized field divides by all submitted frames, primary RAF/worker samples exclude warmup."
+    ]
+  }
+}

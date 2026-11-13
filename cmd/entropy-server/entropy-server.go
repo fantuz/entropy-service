@@ -1262,7 +1262,12 @@ func main() {
 		log.Fatalf("open embedded web assets: %v", err)
 	}
 
-	mux.Handle("/", http.FileServer(http.FS(webRoot)))
+	staticAssets, err := newStaticAssetHandler(webRoot)
+	if err != nil {
+		log.Fatalf("prepare embedded web assets: %v", err)
+	}
+
+	mux.Handle("/", staticAssets)
 	registerWordUI(mux, cfg.WantsCookie)
 
 	mux.HandleFunc("/live", livenessHandler)
