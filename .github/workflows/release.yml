@@ -66,6 +66,8 @@ jobs:
       - name: Vet all Go packages
         run: go vet ./...
       - name: Exercise bounded parser and protocol fuzz targets
+        env:
+          GENERATION_FUZZTIME: 500000x
         run: bash scripts/test-fuzz.sh
       - name: Test actual executable startup failures and clean exits
         run: |

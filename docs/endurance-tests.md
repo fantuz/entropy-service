@@ -100,9 +100,18 @@ Linux with race detection and native Windows without it for relevant code
 changes. JSON/log artifacts, including failures, are retained for 14 days.
 Normal full regression, lint, browser and packaged Windows workflows remain.
 
+Build/release CI runs the generation-query fuzz target for **500,000 executions**
+with `GENERATION_FUZZTIME=500000x`. This avoids a Go 1.26 coordinator race that
+can report its own duration expiry as `context deadline exceeded` before child
+cancellation propagates. Input assertions and the other target budgets remain.
+Locally that target follows `FUZZTIME` unless `GENERATION_FUZZTIME` is set;
+the endurance runner has its own duration and watchdog controls.
+
 After merge to the default branch, use GitHub Actions → **Endurance and fault
 tests** → **Run workflow** for 1m/10m/30m/1h per scenario and 2/4/8 workers.
 The maximum uses roughly three hours of each runner's 240-minute budget.
+Manual runs have independent concurrency groups so later pushes do not cancel
+an ongoing longer experiment. Automatic PR runs supersede older runs of that PR.
 These runs use fixtures. Record physical throughput/disconnect/cancellation
 separately in [hardware qualification records](hardware-qualification.md).
 
