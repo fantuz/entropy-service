@@ -15,19 +15,14 @@ import (
 )
 
 type Config struct {
-	// ReseedMs         int
-	// ReseedSize       int
-	// MaxBytes         int
-	MaxWords    int
-	RefreshRate int
-	// BytesFingerprint int
+	MaxWords         int
+	RefreshRate      int
 	Refresh          time.Duration
 	HTTPUrl          string
 	WSUrl            string
 	Mode             string
 	CertFile         string
 	KeyFile          string
-	LogLevel         string
 	WriteOut         bool
 	OutputPath       string
 	OutputDevice     string

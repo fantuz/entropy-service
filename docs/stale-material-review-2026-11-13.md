@@ -1,23 +1,44 @@
 # Stale material review, 13 November 2026
 
 Baseline: main [`de5e28e`](https://github.com/fantuz/entropy-service/commit/de5e28e85ef3696aeec02e54962f335c24984cad),
-after PR #80. **This is a proposed cleanup list. All listed material remains
-unchanged in this PR.** The graph-palette/layout changes are separate from this
-audit; no stale file, function, field or prototype comment was removed.
+after PR #80. The original review in PR #81 was read-only: its graph-palette
+changes removed no stale material. The findings below retain that dated scope;
+the later, explicitly approved cleanup is recorded separately here.
 
 Evidence comprises tracked path/symbol searches, file contents/sizes,
 build/packaging inputs and read-only Go executable metadata. The old binaries
 were not executed. Absence of an in-tree caller does not establish absence of
 unpublished branches, external bookmarks or downstream consumers.
 
-## What I would retire in a later cleanup
+## Approved cleanup after PR #81
+
+The selected cleanup starts from main
+[`5c8df83`](https://github.com/fantuz/entropy-service/commit/5c8df83222a0b935372c5e7fe7f1465646fb8330).
+It removes only the approved subset of the original inventory:
+
+| Removed material | Scope and replacement |
+| --- | --- |
+| Two checked-in `cmd/entropy-client/entropy-client` and `cmd/entropy-server/entropy-server` executables | Removed the stale generated files and ignored these nested build-output paths. Source builds and release packaging remain authoritative; historical objects remain in Git. |
+| `FetchEntropySimple` and the `internal/tests.RunAll` wrapper | Removed the unused wrappers only. Active context-aware HTTP fetching, writer-aware diagnostics and their tests remain. |
+| Client/server `Config.LogLevel` fields | Removed the unbound, unread fields only; no parsed CLI option or active logging behavior is removed. |
+| Commented HTTP/cookie predecessor sketches in `internal/client/http_client.go` | Removed inactive alternative bodies while retaining active behavior and rationale comments. |
+| Commented client-config field stubs | Removed the old `ReseedMs`, `ReseedSize`, `MaxBytes` and `BytesFingerprint` sketches; retained all active configuration fields. |
+| Duplicated `docs/source-lab-proposal.md` | Retired the outdated proposal. Its adapter-extension rationale is preserved in [the implemented source guide](source-labs.md#extending-a-source-adapter); the original text remains linked in the dated inventory below. |
+
+The five batch-statistics files and their predecessor comments remain deferred
+and unchanged: that candidate was not selected. The stale-wording recommendations,
+historical gallery, compatibility pages, licensing notices and measurement records
+also remain unchanged. These removals are maintenance, not new coverage or
+cryptographic-assurance evidence.
+
+## Original candidate inventory
 
 | Priority | Candidate | Why it can go | Safe scope / replacement |
 | --- | --- | --- | --- |
-| First | [Client executable](../cmd/entropy-client/entropy-client), [server executable](../cmd/entropy-server/entropy-server) | Frozen Linux amd64 build products, **23,633,142 bytes combined**. Both record Go 1.26.10, `v1.7.1+dirty`, source revision `6cd908df` dated 8 November. The server still records the retired Diceware dependency. Running these from `cmd/` can give behavior unrelated to current source. | Remove these generated files from tracking and ignore the nested output paths. `make build` already writes fresh binaries to `bin/`; GoReleaser builds release archives from source. Removing HEAD copies would not erase Git history or automatically shrink historical clones. |
+| First | [Client executable at review baseline](https://github.com/fantuz/entropy-service/blob/de5e28e85ef3696aeec02e54962f335c24984cad/cmd/entropy-client/entropy-client), [server executable at review baseline](https://github.com/fantuz/entropy-service/blob/de5e28e85ef3696aeec02e54962f335c24984cad/cmd/entropy-server/entropy-server) | Frozen Linux amd64 build products, **23,633,142 bytes combined**. Both record Go 1.26.10, `v1.7.1+dirty`, source revision `6cd908df` dated 8 November. The server still records the retired Diceware dependency. Running these from `cmd/` can give behavior unrelated to current source. | Remove these generated files from tracking and ignore the nested output paths. `make build` already writes fresh binaries to `bin/`; GoReleaser builds release archives from source. Removing HEAD copies would not erase Git history or automatically shrink historical clones. |
 | Next | Client batch-statistics [chi.go](../cmd/entropy-client/internal/stats/chi.go), [monobit.go](../cmd/entropy-client/internal/stats/monobit.go), [serial.go](../cmd/entropy-client/internal/stats/serial.go), [runner.go](../cmd/entropy-client/internal/stats/runner.go), [result.go](../cmd/entropy-client/internal/stats/result.go) | A self-contained, unused 3,171-byte chain: its `RunAll` calls these batch tests, with no caller found outside the chain. Its old approximations can confuse readers about the running diagnostics. | Remove the five together after a fresh caller/compile check. Keep `stats/stream.go`, stream tests and active `internal/diag`. This concerns inactive maintenance code, not a flaw in running generation. |
 | Next | `FetchEntropySimple` in [http_client.go](../cmd/entropy-client/internal/client/http_client.go) | Only the declaration was found. The active `FetchEntropy(ctx, ...)` path already supplies caller-controlled cancellation and bounded network reads. | Remove the function only; retain the file's active HTTP/TLS/redirect/payload handling. |
-| Next | [source-lab-proposal.md](source-lab-proposal.md) | A 4,342-byte, previously unlinked proposal that largely duplicates [source-labs.md](source-labs.md). It describes decoded audio/Hz analysis as future work, although PR #80 implemented it, and loopback deployment as a first prototype. | Preserve any unique adapter-design rationale in the implemented guides, then retire the duplicate or explicitly archive/date it. External documentation bookmarks may still exist. |
+| Next | [source-lab-proposal.md at review baseline](https://github.com/fantuz/entropy-service/blob/de5e28e85ef3696aeec02e54962f335c24984cad/docs/source-lab-proposal.md) | A 4,342-byte, previously unlinked proposal that largely duplicates [source-labs.md](source-labs.md). It describes decoded audio/Hz analysis as future work, although PR #80 implemented it, and loopback deployment as a first prototype. | Preserve any unique adapter-design rationale in the implemented guides, then retire the duplicate or explicitly archive/date it. External documentation bookmarks may still exist. |
 | Low | `RunAll` wrapper in [internal/tests/tests.go](../cmd/entropy-client/internal/tests/tests.go) | No callers found; the wrapper directly chooses stdout while active rendering uses writer-aware diagnostics. | Remove this function only; retain the writer-aware printing functions and tests. |
 | Low | Client/server `Config.LogLevel` fields | No parser binding or consumer found; the server already labels its field unused. | Remove only these fields after checking pending branches; keep both active config files. |
 | Low | Commented HTTP/cookie prototypes in [http_client.go](../cmd/entropy-client/internal/client/http_client.go), predecessor bodies in the batch statistic files | Inactive `http.Get`, cookie-file, query-mutation and alternative-statistic sketches add reading/search noise. | Remove prototype comments when touching those areas; retain current rationale and security-boundary comments. Git history preserves the old sketches. |
@@ -66,8 +87,10 @@ baseline.
 - Ignored legacy buffer flags are deliberate, tested CLI compatibility. Review
   deprecation before removing accepted inputs.
 
-I would start a later cleanup with the two checked-in build products, then the
-isolated batch-statistics chain and duplicated proposal. Keep cleanup separate
-and reviewable, with focused local checks and full Linux/Windows CI. Removing
+The original review proposed starting with checked-in build products, the
+isolated batch-statistics chain and duplicated proposal. Only the selected
+subset in the cleanup ledger above has now been removed; the batch chain and
+other recommendations remain deferred. Keep further cleanup separately
+reviewable, with focused local checks and full Linux/Windows CI. Removing
 unexecuted statements may change a coverage ratio without testing more behavior;
 report that distinction explicitly.

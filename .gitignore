@@ -31,6 +31,8 @@ vendor/
 # Project binaries
 /entropy-server
 /entropy-client
+/cmd/entropy-server/entropy-server
+/cmd/entropy-client/entropy-client
 
 # Runtime-generated files
 cookies.json

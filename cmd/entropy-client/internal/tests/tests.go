@@ -3,7 +3,6 @@ package tests
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
 )
@@ -13,11 +12,6 @@ const (
 	Red   = "\033[31m"
 	Green = "\033[32m"
 )
-
-func RunAll(data []byte) {
-	result := diag.RunDiagnostics(data)
-	PrintDiagnostics(os.Stdout, &result, diag.DefaultShannonThreshold)
-}
 
 // PrintDiagnostics prints one raw Shannon estimate and one threshold assessment.
 // The other statistics remain independent reference measurements.

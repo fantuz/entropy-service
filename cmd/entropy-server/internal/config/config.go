@@ -63,7 +63,6 @@ type Config struct {
 	HTTPSAddr         string
 	CertFile          string
 	KeyFile           string
-	LogLevel          string // Legacy field: unused.
 	DevicePath        string
 	DRBG              string
 	OnReseedFailure   drbg.ReseedFailurePolicy
