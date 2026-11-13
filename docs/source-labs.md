@@ -501,8 +501,9 @@ verification. Camera frames remain processed video, not raw quantum entropy.
 
 ## Extending a source adapter
 
-New adapters should submit bounded byte buffers and explicit metadata through
-the shared `EntropyWorkspace.submit(buffer, metadata)` interface in
+New adapters should use the workspace returned by `EntropyWorkspace(...)` to
+submit bounded byte buffers and explicit metadata with
+`workspace.submit(buffer, metadata)` in
 [`analysis-workspace.js`](../cmd/entropy-server/web/analysis-workspace.js).
 Preserve source identity, byte range, frame number and monotonic capture time;
 describe the encoding and supply PCM metadata only when the format is known.
