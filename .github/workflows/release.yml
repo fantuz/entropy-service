@@ -36,6 +36,10 @@ jobs:
         uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
+      - name: Validate latest download links and alias configuration
+        run: |
+          python3 scripts/check_release_downloads.py
+          python3 -m unittest discover -s scripts -p 'test_check_release_downloads.py'
       - name: Reject tracked TLS identities and private keys
         run: |
           python3 scripts/check_credential_files.py
@@ -153,6 +157,8 @@ jobs:
         with:
           version: v2.17.0
           args: release --snapshot --skip=publish --clean
+      - name: Verify download aliases and checksum coverage against actual archives
+        run: python3 scripts/check_release_downloads.py --dist dist
       - name: Test real packaged systemd HTTP and HTTPS lifecycle
         run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh dist/*_amd64.deb
       - name: Verify Windows release ZIP layout, notices and executable architecture
@@ -188,10 +194,21 @@ jobs:
         uses: actions/setup-go@v6.5.0
         with:
           go-version-file: go.mod
+      - name: Select curated release notes when available
+        id: release-notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            release_notes_path="docs/releases/$RELEASE_TAG.md"
+            if [[ -f "$release_notes_path" ]]; then
+              printf 'args=--release-notes=%s\n' "$release_notes_path" >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: GoReleaser
         uses: goreleaser/goreleaser-action@v7.2.3
         with:
           version: v2.17.0
-          args: release --clean
+          args: release --clean ${{ steps.release-notes.outputs.args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,22 +1,48 @@
 # entropy-service
 
-[![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go)](https://golangci-lint.run/)
-[![build](https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/fantuz/entropy-service/actions/workflows/build.yml?query=branch%3Amain)
-[![Go version](https://img.shields.io/github/go-mod/go-version/fantuz/entropy-service?logo=go)](go.mod)
-[![CodeQL](https://github.com/fantuz/entropy-service/actions/workflows/github-code-scanning/codeql/badge.svg?branch=main)](https://github.com/fantuz/entropy-service/actions/workflows/github-code-scanning/codeql?query=branch%3Amain)
-[![release workflow](https://github.com/fantuz/entropy-service/actions/workflows/release.yml/badge.svg)](https://github.com/fantuz/entropy-service/actions/workflows/release.yml)
-
-[![Latest GitHub release](https://img.shields.io/github/release/fantuz/entropy-service.svg)](https://github.com/fantuz/entropy-service/releases/latest)
-[![GitHub license](https://img.shields.io/github/license/fantuz/entropy-service)](LICENSE)
-[![GitHub all releases](https://img.shields.io/github/downloads/fantuz/entropy-service/total)](https://github.com/fantuz/entropy-service/releases)
-[![Last commit](https://img.shields.io/github/last-commit/fantuz/entropy-service/main)](https://github.com/fantuz/entropy-service/commits/main)
-
-[![GitHub stars](https://img.shields.io/github/stars/fantuz/entropy-service?style=flat&logo=github)](https://github.com/fantuz/entropy-service/stargazers)
-[![Open issues](https://img.shields.io/github/issues/fantuz/entropy-service?logo=github)](https://github.com/fantuz/entropy-service/issues)
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/build.yml?query=branch%3Amain"><img src="https://github.com/fantuz/entropy-service/actions/workflows/build.yml/badge.svg?branch=main" alt="Tests and packages" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/github-code-scanning/codeql?query=branch%3Amain"><img src="https://github.com/fantuz/entropy-service/actions/workflows/github-code-scanning/codeql/badge.svg?branch=main" alt="CodeQL" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/releases/latest"><img src="https://img.shields.io/github/v/release/fantuz/entropy-service?label=release" alt="Latest stable release" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/releases"><img src="https://img.shields.io/github/downloads/fantuz/entropy-service/total?label=downloads" alt="Downloads" height="20"></a>
+  <br>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/fantuz/entropy-service" alt="MIT license" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/stargazers"><img src="https://img.shields.io/github/stars/fantuz/entropy-service?style=flat" alt="GitHub stars" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/issues"><img src="https://img.shields.io/github/issues/fantuz/entropy-service" alt="Open issues" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/commits/main"><img src="https://img.shields.io/github/last-commit/fantuz/entropy-service/main" alt="Last commit on main" height="20"></a>
+  <br>
+  <a href="docs/windows.md"><img src="https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20x64-507269" alt="Platforms: Linux and Windows x64" height="20"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/fantuz/entropy-service?logo=go" alt="Go version" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/releases/latest"><img src="https://img.shields.io/badge/Install-DEB%2FRPM%20%C2%B7%20amd64%2Farm64%2Farmv7-2e7d32" alt="Linux DEB and RPM packages for amd64, arm64 and ARMv7" height="20"></a>
+  <br>
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/release.yml"><img src="https://github.com/fantuz/entropy-service/actions/workflows/release.yml/badge.svg" alt="Release workflow" height="20"></a>
+  <a href="https://golangci-lint.run/"><img src="https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go" alt="golangci-lint" height="20"></a>
+  <a href="SECURITY.md"><img src="https://img.shields.io/badge/security-private%20reporting-507269" alt="Security policy and private vulnerability reporting" height="20"></a>
+</p>
 
 **Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
 Entropy Service is a Go server and command-line client for generating, distributing, and inspecting pseudorandom data from a cryptographic deterministic random bit generator (DRBG). It supports hardware or operating-system seed sources; ChaCha20 and AES-256-CTR backends; bounded HTTP and WebSocket delivery; and a browser-based showcase for experiments and diagnostics.
+
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_linux_amd64.tar.gz"><img src="https://img.shields.io/badge/Download%20for%20Linux-x86--64%20(amd64)%20TAR.GZ-2e7d32?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download for Linux — x86-64 (amd64) (tar.gz)" height="28"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_linux_arm64.tar.gz"><img src="https://img.shields.io/badge/Download%20for%20Linux-ARM64%20TAR.GZ-2e7d32?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download for Linux — ARM64 (tar.gz)" height="28"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_linux_armv7.tar.gz"><img src="https://img.shields.io/badge/Download%20for%20Linux-ARMv7%20TAR.GZ-2e7d32?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download for Linux — ARMv7 (tar.gz)" height="28"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_windows_amd64.zip"><img src="https://img.shields.io/badge/Download%20for%20Windows-64--bit%20portable%20ZIP-0078D4?style=for-the-badge" alt="Download for Windows — x86-64 (amd64) (zip)" height="28"></a>
+</p>
+
+Each archive contains both `entropy-server` and `entropy-client`.
+[Linux DEB / RPM packages](https://github.com/fantuz/entropy-service/releases/latest) · [SHA-256 checksums](https://github.com/fantuz/entropy-service/releases/latest/download/checksums.txt) · [Windows setup](docs/windows.md).
+The buttons track the latest stable release automatically.
 
 **From photons to bytes** describes the project's hardware-origin story: an ID Quantique Quantis PCI card inspired the first demonstration. The same architecture can also be seeded from the operating system CSPRNG. DRBG output is generated from seed material, **not a claim that each output byte is an independent hardware-entropy measurement**.
 
