@@ -1,0 +1,84 @@
+name: Endurance and fault tests
+
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "scripts/run_endurance.py"
+      - "scripts/test_run_endurance.py"
+      - ".github/workflows/endurance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "scripts/run_endurance.py"
+      - "scripts/test_run_endurance.py"
+      - ".github/workflows/endurance.yml"
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: Duration per scenario (three scenarios plus build/cleanup)
+        type: choice
+        options: [1m, 10m, 30m, 1h]
+        default: 10m
+      workers:
+        description: Concurrent mixed HTTP/WebSocket workers per backend
+        type: choice
+        options: ["2", "4", "8"]
+        default: "4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: endurance-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
+  cancel-in-progress: true
+
+jobs:
+  endurance:
+    name: Endurance (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            race: "true"
+          - os: windows-2025
+            race: "false"
+    env:
+      DURATION: ${{ inputs.duration || '5s' }}
+      WORKERS: ${{ inputs.workers || '2' }}
+      RUN_RACE: ${{ matrix.race }}
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Check evidence completeness rules
+        run: python -m unittest discover -s scripts -p 'test_run_endurance.py'
+      - name: Run mixed traffic, source faults and joined cleanup
+        shell: bash
+        run: |
+          race_args=()
+          if [[ "$RUN_RACE" == "true" ]]; then race_args+=(--race); fi
+          python scripts/run_endurance.py --duration "$DURATION" --workers "$WORKERS" \
+            --artifacts endurance-artifacts "${race_args[@]}"
+      - name: Preserve results and failure logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: endurance-${{ matrix.os }}
+          path: |
+            endurance-artifacts/*.json
+            endurance-artifacts/*.log
+          if-no-files-found: error
+          retention-days: 14
