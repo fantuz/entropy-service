@@ -21,7 +21,7 @@ Inventory reads Linux sysfs or Windows Plug and Play/registry metadata. It does
 not open a hardware handle, read random data, reset a board or enable modules.
 The allowlist identifies the legacy Quantis PCI interface (`179a:0001`),
 PCIe-40M/240M (`1e89:0002`/`0003`) and the referenced Quantis USB protocol
-(`0aba:0102`). It does not enumerate every RNG or certify unlisted models.
+(`0aba:0102`) and ChaosKey (`1d50:60c6`). It does not enumerate every RNG or certify unlisted models.
 
 The report separates a matching device, driver metadata and an available device
 node/interface. On Windows, a card without the expected interface is still
@@ -32,9 +32,10 @@ nor a present node proves access, cancellation support or entropy quality.
 Linux PCI sources are mapped to existing `qrandomN` character nodes through
 sysfs. Windows legacy PCI selectors match the adapter's sorted interface-path
 numbering (`quantis-pci:0` through `:9`). These numbers can change after hardware
-changes and are not serial-number bindings. USB paths in this first inventory
-are metadata, not byte-stream sources. The experimental [USB transport](quantis-usb.md)
-uses `quantis-usb:N` on supported Linux/Windows builds; Windows PCIe remains
+changes and are not serial-number bindings. USB paths are metadata, not raw
+entropy byte streams. The experimental [Quantis USB](quantis-usb.md) and
+[ChaosKey](chaoskey.md) transports use `quantis-usb:N` and `chaoskey-usb:N`
+on supported Linux/Windows builds; Windows PCIe remains
 outside the seed adapters. `probe_adapter` describes software availability,
 not verified physical operation.
 
@@ -60,6 +61,9 @@ In PowerShell, prefix the executable with `.\`:
 .\entropy-server.exe hardware probe -device=quantis-pci:0 -bytes=64 -timeout=3s -json
 .\entropy-server.exe hardware probe -device=windows-csprng -json
 ```
+
+For USB source probes, server startup, TLS and cooked/raw capture commands on
+both operating systems, see [hardware examples](hardware-examples.md).
 
 Probe always requires a nonempty explicit source. Hardware/device paths use
 strict selection and never substitute an OS RNG. Explicit OS controls are

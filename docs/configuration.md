@@ -4,14 +4,15 @@ Run either binary with `-help` for its complete flag list. Boolean values use `-
 
 ## Server
 
-All server timing flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=15000`, not `15s`. Sizes below are bytes unless explicitly labelled MiB.
+Server millisecond flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=15000`, not `15s`. The `-source-timeout` flag instead accepts a **Go duration**, such as `3s`; hardware subcommand `-timeout` flags also use durations. Sizes below are bytes unless explicitly labelled MiB.
 
 ### Source and reseeding
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `-device` | Linux `/dev/qrandom0`; Windows `windows-csprng` | Linux device path with optional OS fallback; Windows OS source or experimental `quantis-pci:0` (no hardware fallback). See [Quantis PCI](quantis.md). |
+| `-device` | Linux `/dev/qrandom0`; Windows `windows-csprng` | Linux character-device path, Windows OS source or Windows `quantis-pci:N`; Linux/Windows `quantis-usb:N` or `chaoskey-usb:N`. Explicit USB/Windows hardware selectors never fall back. See [hardware examples](hardware-examples.md). |
 | `-require-device` | `false` | Fail startup if the requested device is unavailable. |
+| `-source-timeout` | `3s` | Complete startup/reseed read budget: Go duration from `1ms` to `5m`. Native OS/driver calls still require a conforming implementation; see [source I/O](source-io.md). |
 | `-drbg` | `aes-256-ctr` on non-ARM/non-RISC-V; `chacha20` on ARM/RISC-V | Backend: `chacha20` or `aes-256-ctr`. An explicit flag always overrides the platform default. |
 | `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |
 | `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |

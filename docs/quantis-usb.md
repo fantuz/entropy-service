@@ -1,5 +1,8 @@
 # Experimental Quantis USB transport
 
+See [hardware command examples](hardware-examples.md) for Linux/Windows probing,
+strict startup, TLS and client commands alongside ChaosKey examples.
+
 Linux amd64/armv7/arm64 and Windows x64 builds can use the **referenced legacy
 Quantis USB protocol**, vendor/product `0aba:0102`. This does not advertise every
 USB model sold under the Quantis name. No physical USB QRNG has been tested for

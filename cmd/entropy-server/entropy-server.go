@@ -77,24 +77,6 @@ const (
 	White   = "\033[97m"
 )
 
-// var qrngBuffer QRNGBuffer
-
-// var entropyPool EntropyPool
-
-/*
-var bufPool = sync.Pool{
-	New: func() any {
-		return make([]byte, 1<<25) // 32 MB
-	},
-}
-*/
-
-/*
-func ActiveInstances() int64 {
-	return activeDRBG.Load()
-}
-*/
-
 const preferenceCookieName = "entropy_prefs"
 
 func setPrefsCookie(w http.ResponseWriter, prefs ClientPrefs) error {

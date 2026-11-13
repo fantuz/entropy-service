@@ -57,6 +57,11 @@ adapter](quantis.md) uses a separately installed legacy driver and overlapped
 I/O, with cancellation/completion dependent on that driver. Linux device I/O is
 unchanged by the Windows adapter.
 
+Explicit [Quantis USB](quantis-usb.md) and [ChaosKey USB](chaoskey.md) selectors
+use native usbfs/WinUSB adapters rather than character-device reads. Their
+deadline/cancel/drain mechanics are shared, with separate identity/protocol
+checks. See [hardware command examples](hardware-examples.md) for both OSes.
+
 Focused tests use real OS pipes to verify interrupted waits, partial-read
 discard, deadline reset/recovery, total read budget and joined reseed shutdown.
 They also check rejection of unsupported character devices and real urandom/

@@ -2,10 +2,11 @@
 
 > **Status:** first-pass, code-informed threat model; **not** an independent
 > cryptographic audit, penetration test, FIPS validation, or deployment approval.
-> Reviewed against GitHub `main` commit
-> [`3e4dfbe71a86708b20ecfa3123b026fd71fe476a`](https://github.com/fantuz/entropy-service/commit/3e4dfbe71a86708b20ecfa3123b026fd71fe476a)
-> on 2026-11-04. See [architecture review](architecture-review.md) for evidence
-> and an actionable remediation plan.
+> Originally reviewed on 2026-11-04; implementation claims refreshed against
+> `main` [`dcc01a8`](https://github.com/fantuz/entropy-service/commit/dcc01a87aa2d517371f5262dfa95d2eb6e9f9f8d)
+> on 2026-11-13. See [architecture review](architecture-review.md) for current
+> evidence and the [maintenance report](maintenance-review-2026-11-13.md) for
+> corrected claims. This refresh is not a new independent security audit.
 
 ## 1. Purpose and security claims
 
@@ -26,11 +27,14 @@ interfaces distribute generated data; browser graphs are diagnostic views.
 - Output-size ceilings and HTTP/WebSocket admission budgets bound **admitted
   work**, not total RSS, bandwidth, clients per identity, or overall DoS exposure.
 - Reseed age, last failure, counters, and admission pressure are observable.
+- Serving-root generation defaults to fail closed on failed/stale reseeds,
+  including private children. Explicit `continue` permits existing-state output;
+  delivered or already buffered data cannot be recalled.
 
 **Not claimed:** independently reviewed cryptographic security; SP 800-90A
 CTR_DRBG conformance; SP 800-90B entropy-source validation; FIPS 140
 certification; information-theoretic independence; guaranteed fresh entropy per
-output byte; automatic fail-closed behavior after source loss; authentication,
+output byte; immediate revocation of buffered output after source loss; authentication,
 tenant isolation, secure key storage, or immunity from denial of service.
 
 The design's use of established primitives is promising, but **the composed
@@ -43,7 +47,7 @@ use a validated solution rather than interpreting this document as assurance.
 | Asset / principal | Security interest | Relevant trust assumption |
 | --- | --- | --- |
 | Hardware entropy device and its kernel driver | Seed quality, availability, integrity | Device, firmware, driver and host are trusted and assessed separately. |
-| OS CSPRNG (`/dev/urandom` or nonblocking Linux `getrandom`) | Startup/reseed confidentiality and strength | Host kernel and operating system are uncompromised. |
+| OS CSPRNG (Linux `/dev/urandom`/nonblocking `getrandom`, Windows `crypto/rand`) | Startup/reseed confidentiality and strength | Host kernel and operating system are uncompromised. |
 | CPU RDSEED/RDRAND mixing | Supplemental seed material | CPU instructions are optional, not the sole trusted source. |
 | Root DRBG key, nonce and cipher position | Unpredictability of later derivations | Process memory and OS isolation are trusted. |
 | Request/connection child generators | Computational stream separation | Derived seeds and internal state remain private. |
@@ -82,7 +86,7 @@ flowchart TD
     NET --> PROXY["Operator TLS, access control, network policy"]
     NET --> BROWSER["Browser diagnostics / client"]
     NET --> UPLOAD["/files: incoming untrusted payload"]
-    ROOT --> OBS["/ready, /metrics-2, logs"]
+    ROOT --> OBS["/ready, /metrics, logs"]
     OBS --> NET
 ```
 
@@ -93,7 +97,7 @@ unless the operator installs an external proxy. HTTP and HTTPS expose the
 
 | Boundary | Crossing and current guard | Residual exposure |
 | --- | --- | --- |
-| **B1 — Source to process** | Configured character device is opened; startup and reseeds use full reads. | Device quality is not measured; a stalled device read may not cancel; root trusts supplied bytes. |
+| **B1 — Source to process** | Selected OS/device/USB reader supplies complete startup/reseed reads under a shared deadline; supported reads are cancelled and joined. | Native calls require a conforming OS/driver; source min-entropy is not measured. |
 | **B2 — Source mixing** | Optional RDSEED/RDRAND bytes are XORed after the configured source read. | No additive certified entropy claim; CPU-mixing failure logs once and continues with source-only bytes. |
 | **B3 — Source to root** | SHA-512 derives initial key/nonce; reseed hashes old key plus new seed while locking root state. | Custom construction, unknown input min-entropy, no proven compromise-recovery guarantee. |
 | **B4 — Root to child** | Fresh 64-byte root output seeds a per-request/per-WS private cipher stream. | All clients ultimately trust the same parent and host. Some endpoints expose root output directly. |
@@ -103,18 +107,21 @@ unless the operator installs an external proxy. HTTP and HTTPS expose the
 | **B8 — Monitoring and debugging** | Readiness indicates seed freshness; pprof binds to loopback if enabled. | Public metrics reveal operational data; loopback profiling is sensitive to local users/tunnels. |
 | **B9 — Packaging/deployment** | Packaged unit defaults to a restricted unprivileged identity, loopback-only HTTP and explicit service activation; release CI runs Go/race/lint/snapshot checks. | Upgrading an already-enabled service preserves its running process until restart; operator must authorize QRNG permissions, certificate/access policy and wider exposure. |
 
-> **Historical baseline note:** This review captures the implementation as of
-> `3e4dfbe`. A subsequent change consolidated source selection and
-> corrected strict empty-path handling and actual-source labeling. Consult
-> [current configuration](configuration.md) for implementation behavior.
->
 ## 4. Entropy-source behavior: exact failure policy
 
 ### 4.1 Startup
 
-The standalone binary's configured path defaults to `/dev/qrandom0` (the packaged unit explicitly selects `/dev/urandom`). Startup opens with `O_NONBLOCK`, validates the opened character device and
-its deadline support, and requires a complete 64-byte read within
-`-source-timeout` before initializing the root generator.
+On Linux the standalone path defaults to `/dev/qrandom0` (the packaged unit
+selects `/dev/urandom`). The character-device path opens with `O_NONBLOCK` and
+checks deadline support, with the documented initialized-urandom exception.
+Windows defaults to `windows-csprng`. Explicit USB selectors use their native
+protocol adapters. All paths require a complete 64-byte startup seed under
+`-source-timeout` before initializing the root generator; synchronous native
+calls remain subject to the [source I/O boundary](source-io.md).
+
+The following fallback table describes **Linux character-device selection**.
+Explicit `quantis-usb:N`, `chaoskey-usb:N` and Windows `quantis-pci:N` never
+substitute an OS source. See [hardware examples](hardware-examples.md).
 
 | Condition | With `-require-device=false` (default) | With `-require-device=true` |
 | --- | --- | --- |
@@ -169,10 +176,11 @@ recalled. See [policy rationale, exact boundaries and migration](reseed-failure-
 
 ### 4.3 What the hardware source is *not* validated for
 
-Startup/device checks prove that a node exists, can be opened, and emits enough
-bytes. They do not test **min-entropy**, device provenance, hardware failure
-modes, repetition/stuck-bit faults, hostile-driver output, or statistical
-independence of samples. The dashboard's Shannon entropy, histograms, and
+Startup/device checks validate source identity/read contracts and complete reads;
+the Quantis adapters also check the available module status. These checks do not
+measure **min-entropy**, establish physical provenance, detect every hardware
+failure, test repetition/stuck-bit faults, or defeat a hostile driver. ChaosKey
+does not expose a documented per-read health query. The dashboard's Shannon entropy, histograms, and
 Dieharder/`rngtest` workflows operate on **DRBG output** and are not SP
 800-90B source health tests.
 
@@ -240,10 +248,6 @@ collector may copy objects, so clearing one buffer is not a comprehensive
 zeroization guarantee. Treat process memory, crash dumps and backup snapshots
 as sensitive.
 
-**API review note:** generator APIs outside normal serving routes should be
-checked against the same closed-state and derivation bounds as `Read`; do not
-assume auxiliary helper methods have identical security guarantees.
-
 ## 6. Network, API and privacy boundaries
 
 ### Public-facing distribution
@@ -254,8 +258,10 @@ assume auxiliary helper methods have identical security guarantees.
   it may start HTTPS on `:8443` concurrently. It does not force HTTP
   clients to switch to HTTPS.
 - HTTPS is TLS 1.3 with server certificates but **no client certificate
-  authentication**. The repository distributes a publicly known development
-  private key; **do not reuse it in a deployment**.
+  authentication**. Current code bundles no certificate/private key, rejects
+  the retired public key and supports explicit per-installation provisioning.
+  Operators who deployed the historical shared identity must rotate it; see
+  [TLS certificates](tls-certificates.md).
 - Gorilla's default browser Origin check protects against a subset of
   cross-origin browser upgrades, not unauthenticated non-browser clients
   which can omit `Origin`.
@@ -272,7 +278,7 @@ assume auxiliary helper methods have identical security guarantees.
 
 Per-request/connection admissions cap configured concurrency and
 **estimated** working-memory reservations. Payload bounds constrain
-normal generation to at most 32 MiB per response/message; WebSocket inbound
+normal generation to the configured `-max-bytes` (default 32 MiB) per response/message; WebSocket inbound
 messages are limited to 1 KiB. The 32 MiB JSON format may expand output to
 roughly 106.7 MiB of application data. CPU, TLS, transport buffers, network
 bandwidth, allocations retained by Go's GC, generic HTTP requests and static
@@ -316,9 +322,9 @@ exposes the relevant capability. No exploit or penetration test is claimed.
 | --- | --- | --- | --- | --- |
 | T01 | Internet client consumes or floods unauthenticated endpoints | **High** | Global payload and admission budgets | Private bind, authenticated proxy, per-client quotas and rate limits. |
 | T02 | Packaged daemon compromise / privilege escape | **High** | Restricted systemd user, capabilities and filesystem/device access | Verify sandbox effectiveness on the target distribution and review optional device overrides. |
-| T03 | Public demo TLS key deployed as real server identity | **High** | Documentation warning | Unique private key, trusted certificate, rotation and restricted permissions. |
+| T03 | Historical public TLS key deployed as real server identity | **High** | No bundled identity, retired-key rejection, explicit provisioning and CI credential guards | Rotate old deployments; maintain trust, expiry monitoring and restricted key permissions. |
 | T04 | Faulty/malicious entropy device emits predictable seed | **High** for security-sensitive output | Complete source read, optional mixing | Hardware/driver evaluation and source health tests; no automatic entropy claims. |
-| T05 | Device disappears or blocks after startup | **Medium–High** availability/freshness | Failure counters, `/ready`, per-key ceiling | Validate nonblocking/deadline behavior on the real driver; startup/reseed deadlines and fail-closed generation are implemented. |
+| T05 | Device disappears or blocks after startup | **Medium–High** availability/freshness | Complete-read deadlines, joined cancellation, default fail-closed generation, readiness/metrics | Validate cancellation and removal on the physical OS/driver combination. |
 | T06 | Attacker reads process memory or crash dumps | **High** | OS process boundaries | Restrict privileges, diagnostics, dumps; review key lifecycle. |
 | T07 | One client attempts to predict another stream | **Medium** assurance question | Separate derived streams, stream ciphers | External cryptographic review, explicit domain separation and threat-model tests. |
 | T08 | Untrusted clients exhaust CPU, memory or bandwidth | **High** when exposed | Admission reservations and message limits | Rate limits and observed RSS/heap/load tests; distinguish rejection vs capacity. |
@@ -326,7 +332,6 @@ exposes the relevant capability. No exploit or penetration test is claimed.
 | T10 | Browser embeds dashboard / probes sensitive status | **Medium** | Default WS origin check; no-store on health | Authentication and access policy for metrics/status; avoid treating Origin as credentials. |
 | T11 | Release validation bypass or packaging mismatch | **Medium** supply-chain/process | Tag workflow runs Go/race/lint/browser/snapshot checks before release | Review job permissions, verify signed artifacts as appropriate and test packages on target distributions. |
 | T12 | Users mistake statistical entropy display for device assurance | **Medium** interpretation | Documentation disclaimers | Keep diagnostic/cryptographic assurances explicitly separate. |
-| T13 | `DRBG.Write` / `ReadInto` invoked outside normal route | **Low–Medium** latent | Not identified as normal serving path | Add API test, remove stale helper or make it use guarded `Read`. |
 
 ## 8. Operational security profiles
 

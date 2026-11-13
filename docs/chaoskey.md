@@ -1,5 +1,8 @@
 # Experimental ChaosKey cooked USB source
 
+See [hardware command examples](hardware-examples.md) for Linux/Windows probing,
+strict startup, TLS and separate diagnostic capture commands.
+
 ChaosKey is a **hardware-noise TRNG**, not an ID Quantique QRNG. This optional
 backend targets USB **1d50:60c6**, interface **0**, alternate **0**, cooked
 bulk-IN endpoint **0x85**, with the referenced full-speed 64-byte packets.

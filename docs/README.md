@@ -9,13 +9,16 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Process-memory hardening](process-memory-hardening.md) | Opt-in systemd protection, core-dump caveats and host security checklist. |
 | [DRBG lifecycle benchmarks](drbg-lifecycle-benchmarks.md) | Reproducible microbenchmark suite, before/after comparison, and interpretation. |
 | [Linux v2.0.3 performance assessment](linux-performance-v2.0.3.md) | Pre-Windows comparison, generator/HTTP/client measurements, source inspection, raw samples and limitations. |
-| [Full architecture review](architecture-review.md) | Five-question assurance assessment, component map, findings and remediation roadmap. |
+| [Architecture and assurance status](architecture-review.md) | Current controls, resolved historical findings, remaining assurance gaps and original review archive. |
+| [Coverage review, November 13](coverage-review-2026-11-13.md) | Exact-main CI baseline, weighted package counts, meaningful gaps and platform-test boundaries. |
+| [Maintenance change report, November 13](maintenance-review-2026-11-13.md) | Removed/rephrased claims, implementation evidence and unused-source cleanup inventory. |
 | [Security boundaries & threat model](security-boundaries.md) | Trust boundaries, seed failure modes, adversaries, explicit non-guarantees and prioritized threat register. |
 | [Configuration](configuration.md) | Server and client flags, timing semantics, source selection and client analysis settings. |
 | [Optional Windows port](windows.md) | Native x64 builds, OS randomness, capability limits, private ACL files, console output and validation. |
 | [Experimental Quantis PCI adapter](quantis.md) | Windows legacy PCI driver interface, explicit hardware seeding, validation limits and Linux device integration. |
 | [Hardware discovery and probe](hardware-probe.md) | Read-only inventory, driver binding, explicit source checks, JSON reports and limits of hardware assurance. |
-| [Hardware drivers and source layers](hardware-drivers.md) | Legacy card evidence, kernel patch history, pinned Linux source backup, offline Windows package audit and ChaosKey plan. |
+| [Hardware drivers and source layers](hardware-drivers.md) | Legacy card evidence, bounded Linux overlay, Windows package audit and native USB/ChaosKey source layers. |
+| [Hardware command examples](hardware-examples.md) | Linux/Windows Quantis and ChaosKey probes, strict startup, TLS and separate cooked/raw captures. |
 | [Hardware qualification records](hardware-qualification.md) | Build/simulation/physical evidence matrix, physical-result template, throughput boundaries and cancellation measurements. |
 | [Experimental Quantis USB](quantis-usb.md) | Native WinUSB and Linux usbfs seeding, model/driver prerequisites, deadlines and physical-test limits. |
 | [Experimental ChaosKey USB](chaoskey.md) | Cooked seeding, explicit raw diagnostic capture, Linux/Windows access, sample interpretation and qualification limits. |
