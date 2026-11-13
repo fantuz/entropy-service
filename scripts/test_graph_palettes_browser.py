@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Focused Chromium/Firefox checks for graph palette rendering and persistence."""
 import argparse
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import signal
 import subprocess
+import traceback
 
 from test_diagnostics_browser import OBSERVE_WORKSPACE, change_and_wait, open_details, selected_hash, upload, wait_result
 from test_sources_browser import free_port, serve_process
@@ -38,6 +40,15 @@ def choose_palette(page, palette):
     wait_paint(page)
 
 
+def checkpoint(artifacts, phase, **details):
+    entry = {"time_utc": datetime.now(timezone.utc).isoformat(), "phase": phase, **details}
+    line = json.dumps(entry)
+    (artifacts / "progress.json").write_text(line + "\n")
+    with (artifacts / "progress.jsonl").open("a") as log:
+        log.write(line + "\n")
+    print(line, flush=True)
+
+
 def snapshot(page):
     return page.evaluate("""()=>{
       const sample=__diagnosticWorkspace.sample;
@@ -52,15 +63,25 @@ def snapshot(page):
 
 
 def fingerprints(page):
-    return page.evaluate("""ids=>Object.fromEntries(ids.map(id=>{
+    return page.evaluate("""ids=>{
+      // The assertion compares palette colours, not full-resolution raster
+      // identity. Bound readback to 32 KiB per chart instead of allocating a
+      // multi-MiB ImageData for every DPR-scaled source canvas in every state.
+      const probe=document.createElement('canvas');probe.width=128;probe.height=64;
+      const ctx=probe.getContext('2d',{willReadFrequently:true});
+      const result=Object.fromEntries(ids.map(id=>{
       const canvas=document.getElementById(id);
-      const bytes=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+      ctx.clearRect(0,0,probe.width,probe.height);
+      ctx.drawImage(canvas,0,0,probe.width,probe.height);
+      const bytes=ctx.getImageData(0,0,probe.width,probe.height).data;
       let hash=2166136261;for(let i=0;i<bytes.length;i+=4){
         hash=Math.imul(hash^bytes[i],16777619);hash=Math.imul(hash^bytes[i+1],16777619);
         hash=Math.imul(hash^bytes[i+2],16777619);hash=Math.imul(hash^bytes[i+3],16777619);
       }
       return [id,hash>>>0];
-    }))""", PLOT_IDS)
+      }));
+      probe.width=probe.height=0;return result;
+    }""", PLOT_IDS)
 
 
 def palette_rendering(page, base, artifacts):
@@ -84,12 +105,14 @@ def palette_rendering(page, base, artifacts):
     colors = {}
     literal = None
     for theme in ("light", "dark"):
+        checkpoint(artifacts, "render-theme", theme=theme)
         if page.locator("html").get_attribute("data-theme") != theme:
             page.locator("[data-theme-toggle]").click()
         expect(page.locator("html")).to_have_attribute("data-theme", theme)
         wait_paint(page)
         colors[theme] = {}
         for palette in PALETTES:
+            checkpoint(artifacts, "render-palette", theme=theme, palette=palette)
             choose_palette(page, palette)
             assert snapshot(page) == baseline, (theme, palette, "Palette changed analysis, counters or history")
             assert selected_hash(page) == raw_hash
@@ -104,6 +127,7 @@ def palette_rendering(page, base, artifacts):
                 assert any(s["id"] == identifier and not s["dash"] for s in strokes)
                 assert any(s["id"] == identifier and s["dash"] == [5, 3] for s in strokes)
             if palette == "contrast":
+                checkpoint(artifacts, "render-audio-screenshot", theme=theme)
                 page.locator("#audio-diagnostics").screenshot(path=str(artifacts / f"audio-{theme}-contrast.png"))
         for identifier in PLOT_IDS:
             assert len({colors[theme][palette][identifier] for palette in PALETTES}) == 3, (theme, identifier, colors[theme])
@@ -114,6 +138,7 @@ def palette_rendering(page, base, artifacts):
         control.focus()
         assert control.evaluate("e=>e===document.activeElement")
         page.screenshot(path=str(artifacts / f"palette-{theme}-mobile.png"))
+        checkpoint(artifacts, "render-mobile-complete", theme=theme)
         page.set_viewport_size({"width": 1440, "height": 1000})
         wait_paint(page)
     return {"canvas_fingerprints": colors, "literal_waterfall_colors": literal, "unchanged_sha256": raw_hash,
@@ -155,13 +180,14 @@ def prose_measure(page, selector):
     return result
 
 
-def desktop_width_checks(page, base):
+def desktop_width_checks(page, base, artifacts):
     # The file workspace is still frozen with structure/audio sections open.
     # The compact balance circle keeps its explicit size; rectangular graphs
     # gain horizontal detail without increasing their fixed heights.
     widths = {}
     rectangular = [identifier for identifier in PLOT_IDS if identifier != "pie"]
     for viewport in (1440, 1920, 2560):
+        checkpoint(artifacts, "desktop-analysis-resize", viewport=viewport)
         page.set_viewport_size({"width": viewport, "height": 1000})
         wait_paint(page)
         result = page.evaluate("""ids=>{
@@ -187,15 +213,18 @@ def desktop_width_checks(page, base):
         assert max(plot["height"] for plot in actual) - min(plot["height"] for plot in actual) <= 1, (identifier, actual)
     page.locator("details.analysis-help").evaluate("e=>e.open=true")
     prose = {"analysis_help": prose_measure(page, "details.analysis-help p")}
+    checkpoint(artifacts, "desktop-analysis-complete")
     containers = {}
     for path, old_cap, blurb in (("/", 75*16, "header .lede"),
                                  ("/api-gallery.html", 88*16, ".gallery-notes p"),
                                  ("/api-status.html", 75*16, "header .lede")):
+        checkpoint(artifacts, "desktop-page-navigation", path=path)
         page.goto(base + path)
         if path == "/api-gallery.html":
             page.locator(".gallery-notes").evaluate("e=>e.open=true")
         measurements = {}
         for viewport in (1440, 1920, 2560):
+            checkpoint(artifacts, "desktop-page-resize", path=path, viewport=viewport)
             page.set_viewport_size({"width": viewport, "height": 1000})
             wait_paint(page)
             data = page.evaluate("""()=>({width:document.querySelector('.wrap > main').getBoundingClientRect().width,
@@ -208,6 +237,7 @@ def desktop_width_checks(page, base):
         prose[path] = prose_measure(page, blurb)
     # A regular data endpoint uses the widened common panel independently of
     # the analysis/homepage layouts. Specialized playback widgets stay bounded.
+    checkpoint(artifacts, "desktop-data-navigation")
     page.goto(base + "/api-bytes.html?bytes=256&refresh=1000")
     wait_paint(page)
     data_panel = page.locator("main.panel").bounding_box()
@@ -314,18 +344,47 @@ def run_browser(base, artifacts, engine, chromium):
         errors = []
         context.on("page", lambda new_page: new_page.on("pageerror", lambda error: errors.append(str(error))))
         page.on("pageerror", lambda error: errors.append(str(error)))
+        failure = None
+        def phase(name, action):
+            checkpoint(artifacts, name, status="started")
+            result = action()
+            checkpoint(artifacts, name, status="passed")
+            return result
         try:
-            results = {"rendering": palette_rendering(page, base, artifacts), "desktop_width": desktop_width_checks(page, base),
-                       "source_exports": source_export_checks(page, base),
-                       "preferences": preference_checks(context, page, base), "storage_disabled": storage_disabled_checks(browser, base)}
+            results = {"rendering": phase("palette-rendering", lambda: palette_rendering(page, base, artifacts)),
+                       "desktop_width": phase("desktop-width", lambda: desktop_width_checks(page, base, artifacts)),
+                       "source_exports": phase("source-exports", lambda: source_export_checks(page, base)),
+                       "preferences": phase("preferences", lambda: preference_checks(context, page, base)),
+                       "storage_disabled": phase("storage-disabled", lambda: storage_disabled_checks(browser, base))}
             assert not errors, errors
             return {"browser": engine, **results, "browser_errors": errors}
-        except Exception:
-            page.screenshot(path=str(artifacts / "failure.png"), full_page=True)
+        except Exception as error:
+            failure = error
+            traceback.print_exc()
+            report = {"type": type(error).__name__, "exception": str(error), "page_closed": page.is_closed(),
+                      "browser_connected": browser.is_connected(), "last_checkpoint": json.loads((artifacts / "progress.json").read_text())}
+            # Failure evidence must not replace the original test exception,
+            # especially when a crashed content process cannot take a picture.
+            try:
+                if not page.is_closed() and browser.is_connected():
+                    page.screenshot(path=str(artifacts / "failure.png"), full_page=False, timeout=3000)
+                else:
+                    report["screenshot"] = "Page/browser already closed"
+            except Exception as screenshot_error:
+                report["screenshot_error"] = str(screenshot_error)
+            (artifacts / "failure.json").write_text(json.dumps(report, indent=2) + "\n")
             raise
         finally:
-            context.close()
-            browser.close()
+            cleanup_errors = []
+            for close in (context.close, browser.close):
+                try:
+                    close()
+                except Exception as error:
+                    cleanup_errors.append(error)
+            if cleanup_errors:
+                (artifacts / "cleanup-errors.json").write_text(json.dumps([str(error) for error in cleanup_errors], indent=2) + "\n")
+                if failure is None:
+                    raise cleanup_errors[0]
 
 
 def main():
