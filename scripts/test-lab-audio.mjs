@@ -33,7 +33,7 @@ function harness({devices = [], permission, resume, failure, silent = false, cha
         performance: {now: () => 0}, setTimeout: callback => {const id = ++nextTimer; timers.set(id, callback); return id;},
         clearTimeout: id => timers.delete(id)});
     const controller = new AbortController();
-    const callbacks = {signal: controller.signal, ready: () => {ready++;}, emit: (bytes, encoding) => samples.push({bytes, encoding}),
+    const callbacks = {signal: controller.signal, ready: () => {ready++;}, emit: (bytes, encoding, audio) => samples.push({bytes, encoding, audio}),
         error: error => errors.push(error), info: message => notices.push(message)};
     return {api: window.EntropyLabAdapters, controller, navigator, requests, contexts, samples, errors, notices, track, stream, timers,
         async tick(seconds = 1) {contexts.forEach(context => {context.currentTime += seconds;}); const callbacks = [...timers.values()]; timers.clear(); for (const callback of callbacks) await callback(); await flush();},
@@ -65,6 +65,9 @@ for (const flag of ["echoCancellation", "noiseSuppression", "autoGainControl"]) 
 assert.equal(selected.ready, 1); assert.equal(selected.contexts[0].gain.gain.value, 0, "captured input must not play through speakers");
 assert.deepEqual(Array.from(selected.samples[0].bytes), [0,128,0,192,0,0,0,64,255,127,255,127,0,128]);
 assert.match(selected.samples[0].encoding, /PCM16LE mono.*48000.*USB Line In.*may overlap/);
+assert.equal(selected.samples[0].audio.format, "pcm16le");
+assert.equal(selected.samples[0].audio.sampleRate, 48000);
+assert.equal(selected.samples[0].audio.channels, 1);
 assert.match(selected.notices[0], /USB Line In/);
 selected.controller.abort(); close();
 assert.equal(selected.contexts[0].closed, 1); assert.equal(selected.track.readyState, "ended"); assert.equal(selected.timers.size, 0);

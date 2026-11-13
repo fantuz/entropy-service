@@ -8,10 +8,11 @@
         const analysis = window.EntropyAnalysis, plots = window.EntropyPlots;
         const history = new analysis.WaterfallHistory(), average = new analysis.PowerAverage();
         const worker = new Worker("/worker.js");
-        let busy = false, queued = null, pending = null, scheduled = false;
+        let busy = false, queued = null, pending = null, scheduled = false, needsReanalysis = false;
         let epoch = 0, paused = kind === "file", last = null, displayFFT = null, traceGeometry = null;
         let markers = [], cursor = 0;
         let fftScale = {min: 0, max: .5, floor: -60, ceiling: 50};
+        const diagnostics = window.EntropyDiagnostics({kind, requestAnalysis: reanalyze, redraw});
         function fftOptions() {
             return {size: $("fft-size").value === "auto" ? "auto" : Number($("fft-size").value),
                 window: $("fft-window").value, removeMean: $("fft-demean").checked};
@@ -31,6 +32,7 @@
                 if (pending && pending.epoch === epoch && (kind === "file" || !paused || pending.reanalysis)) {
                     if (kind === "file" && last?.offset !== pending.offset) clearMarkers();
                     last = pending;
+                    diagnostics.accept(last);
                     const bytes = new Uint8Array(last.buffer);
                     if (!last.reanalysis) history.add(bytes, last.captureTime, last.frame, last.offset);
                     if (last.fft) {
@@ -47,6 +49,9 @@
                 pending = null;
                 draw();
                 if (rendered) onRender(rendered);
+                // Drain a pending one-shot/EOF frame before changing analysis
+                // options. Its onRender callback may freeze the workspace.
+                if (needsReanalysis) reanalyze();
             });
         }
         function traceSettings() {
@@ -89,6 +94,7 @@
                 $("bit-rates").dataset.state = "waiting";
                 for (let bit = 0; bit < 8; bit++) $("rate-" + bit).textContent = "—";
                 for (const id of ["histogram", "wave", "fft", "mosaic", "pie"]) plots.empty($(id), "Awaiting selected bytes");
+                diagnostics.draw(null, fftScale);
                 return;
             }
             const bytes = new Uint8Array(last.buffer);
@@ -119,13 +125,17 @@
                 rowBytes: requestedBytes === "auto" ? "auto" : Number(requestedBytes),
                 historyRows: Number($("waterfall-rows").value), offset: last.offset, source: kind});
             $("waterfall-info").textContent = `${history.rows.length} / ${history.capacity} ${kind === "file" ? "file windows" : "selected frames"} · showing latest ${view?.shownRows || 0} · ${view?.rowBytes || 0} bytes/row · newest at top · ${mode === "rgb" ? "RGB triplets" : mode === "vivid" ? "hue 0–255: red → green → blue → red" : mode === "gray" ? "0 = black, 255 = white" : "bit " + $("waterfall-bit").value + ": 0 = black, 1 = white"}`;
+            diagnostics.draw(last, fftScale);
         }
         function invalidate(resetAverage = true) { epoch++; queued = null; pending = null; if (resetAverage) average.reset(); }
         function reanalyze() {
+            if (busy || queued || pending) { needsReanalysis = true; return; }
+            needsReanalysis = false;
             invalidate();
             if (onSampleNeeded(last) || !last) return;
             queued = {buffer: last.buffer.slice(0), totalBytes: last.totalBytes, offset: last.offset,
-                frame: last.frame, time: last.time, captureTime: last.captureTime, sourceId: last.sourceId, sourceName: last.sourceName, representation: last.representation, encoding: last.encoding, epoch, reanalysis: true, fftOptions: fftOptions()};
+                frame: last.frame, time: last.time, captureTime: last.captureTime, sourceId: last.sourceId, sourceName: last.sourceName, representation: last.representation, encoding: last.encoding, audioMetadata: last.audioMetadata,
+                ...diagnostics.options(last), epoch, reanalysis: true, fftOptions: fftOptions()};
             pump();
         }
         function clearMarkers() { markers = []; drawMarkers(); }
@@ -181,16 +191,19 @@
                 if (data.epoch === epoch && (kind === "file" || !paused || data.reanalysis) && (kind === "file" || !document.hidden)) { pending = data; redraw(); }
             }
             pump();
+            // A paused/invalidated in-flight result may be discarded without
+            // scheduling a paint. Drain deferred settings once the worker is idle.
+            if (needsReanalysis && !busy && !pending) reanalyze();
         };
         function clear(message = "Awaiting selected bytes.") {
-            invalidate(); history.clear(); last = null; displayFFT = null; traceGeometry = null;
+            invalidate(); needsReanalysis = false; history.clear(); diagnostics.clear(); last = null; displayFFT = null; traceGeometry = null;
             clearMarkers();
             $("sample-info").textContent = message;
             redraw();
         }
         const api = {
             submit(buffer, metadata) {
-                queued = {...metadata, buffer, epoch, reanalysis: false, fftOptions: fftOptions()};
+                queued = {...metadata, ...diagnostics.options(metadata), buffer, epoch, reanalysis: false, fftOptions: fftOptions()};
                 pump();
             },
             clear, invalidate, redraw,
