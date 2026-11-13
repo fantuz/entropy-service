@@ -16,6 +16,27 @@ PAGES = ["/", "/api-bytes.html", "/api-colors.html", "/api-words.html", "/api-so
          "/api-gallery.html", "/api-status.html", "/v1/meta/random?words=3"]
 
 
+def assert_desktop_spacing(page, path, width):
+    """Keep useful canvas space while restoring a visible outer page gutter."""
+    metrics = page.locator(".site-toolbar").evaluate("""node=>{
+        const rect=node.getBoundingClientRect();
+        return {left:rect.left,right:rect.right,viewport:document.documentElement.clientWidth};
+    }""")
+    assert width * .049 <= metrics["left"] <= width * .06, (path, metrics)
+    assert width * .049 <= metrics["viewport"] - metrics["right"] <= width * .065, (path, metrics)
+    if path == "/":
+        # These were capped at 70/78 characters despite a full-width panel.
+        # Compare block widths, without forcing text justification or font size.
+        prose = page.locator("header .lede, main section > .sub, section[aria-labelledby='scope-title'] > .panel > p, main section > h2")
+        bounds = prose.evaluate_all("""nodes=>nodes.map(node=>{
+            const parent=node.parentElement,style=getComputedStyle(parent);
+            return {width:node.getBoundingClientRect().width,
+                available:parent.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)};
+        })""")
+        assert len(bounds) >= 12, bounds
+        assert all(abs(box["width"] - box["available"]) < 1 for box in bounds), bounds
+
+
 def main():
     from playwright.sync_api import sync_playwright, expect
 
@@ -54,6 +75,8 @@ def main():
                             expect(toggle).to_have_text("Light mode" if theme == "dark" else "Dark mode")
                             expect(toggle).to_have_attribute("title", f"Switch to {'light' if theme == 'dark' else 'dark'} mode")
                             assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), (path, width)
+                            if width == 1440:
+                                assert_desktop_spacing(page, path, width)
                             if path == "/":
                                 rows = page.locator(".websocket-grid > .card").evaluate_all(
                                     "cards => cards.map(card => Math.round(card.getBoundingClientRect().top))")

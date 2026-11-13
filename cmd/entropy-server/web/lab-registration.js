@@ -160,6 +160,8 @@
     window.EntropyI18n?.translate(dialog);
     dialog.querySelectorAll("#registration-page-example option").forEach((option,index)=>{if(index)setText(option,pagePresets[index-1].label);});
     const form=dialog.querySelector("form"),field=name=>form.elements.namedItem(name),status=(text,values={})=>{setText(dialog.querySelector("#registration-status"),text,values);};
+    const pageExample=dialog.querySelector("#registration-page-example");
+    const selectedPageExample=()=>["webpage","http"].includes(field("kind").value)?pagePresets.find(p=>p.url===pageExample.value):undefined;
     const json=()=>JSON.stringify(registry,null,2);
     let registry={sources:[]},saved=json(),formDirty=false,editing=null,revision=0,leavingGuard=false;
     let previousKind=field("kind").value,previousBytes=field("max_bytes").value;
@@ -226,6 +228,9 @@
         for(const [selector,shown] of [[".registration-camera",camera],[".registration-onvif",kind==="onvif"],[".registration-pool",kind==="webpage"],[".registration-pages",["webpage","http"].includes(kind)]])dialog.querySelectorAll(selector).forEach(node=>{node.hidden=!shown;node.querySelectorAll("input,select,textarea").forEach(control=>{control.disabled=!shown;});});
         const wasCamera=["rtsp","onvif"].includes(previousKind);
         if(kind!==previousKind){
+            // A preset belongs to the source kind where it was selected. Keep
+            // user-entered endpoints, but do not silently reuse an old preset.
+            pageExample.value="";
             if(!wasCamera)previousBytes=field("max_bytes").value;
             if(!preserve&&field("timeout_ms").value===(wasCamera?"10000":"5000"))field("timeout_ms").value=camera?"10000":"5000";
             if(!preserve&&wasCamera&&!camera)field("max_bytes").value=previousBytes;
@@ -234,13 +239,20 @@
         previousKind=kind;
         const schema=schemaFor(kind);field("endpoint").placeholder=schema.example;
         setText(dialog.querySelector("#registration-endpoint-label"),schema.label);
-        setText(dialog.querySelector("#registration-example"),"Example: {example}",{example:schema.example});
+        setText(dialog.querySelector("#registration-example"),"Example: {example}",{example:selectedPageExample()?.url||schema.example});
         setText(dialog.querySelector("#registration-help"),schema.help);
         dialog.querySelector("#registration-camera-note").hidden=!camera;
     }
     function changed(){revision++;formDirty=true;clearErrors();draftState();}
-    dialog.querySelector("#registration-use-example").addEventListener("click",()=>{field("endpoint").value=schemaFor(field("kind").value).example;changed();status("Example filled; adjust the host/port/path for your source.");});
-    dialog.querySelector("#registration-page-example").addEventListener("change",event=>{if(event.target.value){field("endpoint").value=event.target.value;status(pagePresets.find(p=>p.url===event.target.value).hint);}});
+    dialog.querySelector("#registration-use-example").addEventListener("click",()=>{
+        const preset=selectedPageExample();
+        field("endpoint").value=preset?.url||schemaFor(field("kind").value).example;
+        changed();status(preset?.hint||"Example filled; adjust the host/port/path for your source.");
+    });
+    pageExample.addEventListener("change",()=>{
+        const preset=selectedPageExample();
+        if(preset){field("endpoint").value=preset.url;status(preset.hint);}
+    });
     trigger.addEventListener("click",()=>{fields();render();dialog.showModal();});dialog.querySelector("#registration-close").addEventListener("click",()=>dialog.close());
     form.addEventListener("input",changed);form.addEventListener("change",()=>{fields();changed();});
     form.addEventListener("invalid",event=>showError({field:event.target.name,message:event.target.validationMessage}),true);

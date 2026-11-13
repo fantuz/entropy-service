@@ -33,6 +33,12 @@ three-column sections, a lone final card is centered; two final cards use the
 left and right columns. Tablet and phone layouts retain their responsive
 two-column and single-column arrangements.
 
+Desktop pages leave about 5% of the viewport on each side as a visible background
+frame, while workspaces can still grow to 144 rem. The homepage introduction,
+section descriptions and help text use their container's full available width
+and wrap naturally. Playback controls, word panels and sample fields retain
+their own size limits; phones and tablets keep their compact layout.
+
 Plot labels, guides and bit-balance colors follow the theme, including frozen
 samples. Raw RGB, grayscale, bit views, histogram values and statistical
 results stay unchanged. The Colours demo keeps its sampled color inside the

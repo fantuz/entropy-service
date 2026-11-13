@@ -73,11 +73,85 @@ class FixtureTCP(socketserver.ThreadingTCPServer):
     allow_reuse_address=True
 
 
+def registration_example_checks(page, dialog):
+    """Preparing examples stays local and never silently substitutes a URL."""
+    from playwright.sync_api import expect
+
+    field = lambda name: dialog.locator(f'[name="{name}"]')
+    choices = dialog.locator("#registration-page-example")
+    button = dialog.locator("#registration-use-example")
+    caption = dialog.locator("#registration-example")
+    presets = choices.locator("option").evaluate_all("options=>options.map(option=>option.value).filter(Boolean)")
+    assert len(presets) == 7 and "https://httpbin.org/bytes/4096" in presets, presets
+    fetched = []
+    def observe_request(request):
+        if request.url in presets:
+            fetched.append(request.url)
+    page.on("request", observe_request)
+    try:
+        # Exercise every choice in both HTTP forms, then inspect the actual
+        # exported draft rather than relying only on the input's display.
+        for kind in ("webpage", "http"):
+            for index, endpoint in enumerate(presets):
+                field("kind").select_option(kind)
+                source_id = f"example-{kind}-{index}"
+                field("id").fill(source_id)
+                choices.select_option(endpoint)
+                expect(field("endpoint")).to_have_value(endpoint)
+                expect(caption).to_contain_text(endpoint)
+                button.click()
+                expect(field("endpoint")).to_have_value(endpoint)
+                dialog.locator("#registration-submit").click()
+                sources = json.loads(dialog.locator("#registration-json").input_value())["sources"]
+                assert len(sources) == 1 and sources[0]["endpoint"] == endpoint and sources[0]["kind"] == kind, sources
+                expect(choices).to_have_value("")
+                dialog.get_by_role("button", name=f"Remove {source_id}", exact=True).click()
+
+        field("kind").select_option("webpage")
+        choices.select_option("https://httpbin.org/json")
+        field("kind").select_option("websocket")
+        expect(choices).to_have_value("")
+        expect(choices).to_be_disabled()
+        button.click()
+        expect(field("endpoint")).to_have_value("ws://127.0.0.1:8081/stream?bytes=4096&refresh=500")
+        field("kind").select_option("webpage")
+        button.click()
+        expect(field("endpoint")).to_have_value("https://example.org/")
+        choices.select_option("https://httpbin.org/json")
+        dialog.locator("#registration-cancel-edit").click()
+        expect(choices).to_have_value("")
+        expect(field("endpoint")).to_have_value("")
+
+        # Translate while the form is closed, then reopen the same unfinished
+        # form. Translation must not modify option values or selected data.
+        choices.select_option("https://httpbin.org/json")
+        dialog.locator("#registration-close").click()
+        page.locator("select[data-ui-language]").select_option("fr")
+        expect(page.locator("html")).to_have_attribute("lang", "fr")
+        page.locator("#lab-create-source").click()
+        french = json.loads((Path(__file__).resolve().parents[1] / "cmd/entropy-server/web/locales/fr.json").read_text())
+        expect(button).to_have_text(french["Use example"])
+        expect(choices).to_have_value("https://httpbin.org/json")
+        expect(caption).to_contain_text("https://httpbin.org/json")
+        button.click()
+        expect(field("endpoint")).to_have_value("https://httpbin.org/json")
+        dialog.locator("#registration-close").click()
+        page.locator("select[data-ui-language]").select_option("en")
+        expect(page.locator("html")).to_have_attribute("lang", "en")
+        page.locator("#lab-create-source").click()
+        expect(button).to_have_text("Use example")
+        dialog.locator("#registration-cancel-edit").click()
+        assert not fetched, fetched
+    finally:
+        page.remove_listener("request", observe_request)
+
+
 def registration_checks(page, artifacts):
     from playwright.sync_api import expect
 
     page.set_viewport_size({"width":1440,"height":1000})
     page.locator("#lab-create-source").click();dialog=page.locator("#lab-registration")
+    registration_example_checks(page, dialog)
     field=lambda name:dialog.locator(f'[name="{name}"]')
     draft=lambda:json.loads(dialog.locator("#registration-json").input_value())["sources"]
     field("id").fill("ws-draft");field("kind").select_option("websocket")
