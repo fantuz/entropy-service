@@ -181,12 +181,71 @@
         </div>
       </section>
     </div>
+    <details class="analysis-card optional-diagnostics" id="structure-diagnostics">
+      <summary>Structure &amp; dependence · correlation, transitions, local statistics and spectral history</summary>
+      <p class="note">Explore relationships within the selected bytes. Patterns and chance excursions are diagnostic clues, not a cryptographic pass/fail result. Extra analysis runs only while this section is open.</p>
+      <div class="analysis-controls compact-controls">
+        <label>Correlation lags <select id="correlation-lags"><option value="32">32</option><option value="64" selected>64</option><option value="128">128</option></select></label>
+        <label>Pair bins <select id="transition-bins"><option value="16">16 × 16</option><option value="32">32 × 32</option></select></label>
+        <label>Local block (bytes) <select id="local-block-size"><option value="256">256</option><option value="1024" selected>1,024</option><option value="4096">4,096</option></select></label>
+        <button id="clear-spectral-history" type="button">Clear spectral history</button>
+      </div>
+      <p class="analysis-meta" id="structure-scope">Open this section to analyse a bounded prefix of the selected window.</p>
+      <div class="diagnostics-grid">
+        <section aria-labelledby="correlation-title">
+          <h2 id="correlation-title">Autocorrelation</h2>
+          <canvas id="structure-correlation" class="optional-plot" role="img" aria-label="Byte autocorrelation by lag, minus one to plus one" aria-describedby="correlation-info"></canvas>
+          <p class="analysis-meta" id="correlation-info">Awaiting selected bytes.</p>
+          <p class="note">The dashed reference is approximately ±1.96/√N under an independent uniform-source model, per lag. Multiple lags can cross it by chance. Constant input has undefined correlation.</p>
+        </section>
+        <section aria-labelledby="transition-title">
+          <h2 id="transition-title">Adjacent-byte transitions</h2>
+          <canvas id="structure-transitions" class="optional-plot" role="img" aria-label="Heatmap of previous-byte and next-byte value groups" aria-describedby="transition-info"></canvas>
+          <p class="analysis-meta" id="transition-info">Awaiting byte pairs.</p>
+          <p class="note">Sliding adjacent pairs, grouped into labelled byte ranges. Brightness uses log(count + 1), relative to the current maximum. A flat histogram can still hide a predictable transition pattern.</p>
+        </section>
+        <section aria-labelledby="local-title">
+          <h2 id="local-title">Local entropy &amp; bit balance</h2>
+          <canvas id="structure-blocks" class="optional-plot" role="img" aria-label="Shannon entropy and fraction of one bits in equal-sized byte blocks" aria-describedby="local-info"></canvas>
+          <p class="analysis-meta" id="local-info">Awaiting complete blocks.</p>
+          <p class="note">Two separate scales: bits/byte and fraction of one bits. Small random blocks normally estimate below eight bits/byte; the whole-sample alert threshold is not applied here.</p>
+        </section>
+        <section aria-labelledby="spectrogram-title">
+          <h2 id="spectrogram-title">Spectral history</h2>
+          <canvas id="spectrogram" class="optional-plot" role="img" aria-label="Power spectral density history in cycles per byte, newest sample at the top" aria-describedby="spectrogram-info"></canvas>
+          <p class="analysis-meta" id="spectrogram-info">Awaiting spectral history.</p>
+          <p class="note">Uses the existing FFT window and fixed dB scale, before frame averaging. At most 120 sampled rows and 256 peak-preserving frequency groups. Rows have equal height; age labels show actual capture gaps. File rows show window offsets.</p>
+        </section>
+      </div>
+    </details>
+    <details class="analysis-card optional-diagnostics" id="audio-diagnostics">
+      <summary>PCM audio · waveform, levels and frequency spectrum</summary>
+      <p class="note">Microphone/line-in supplies the browser audio sample rate; browser or driver resampling may apply. For a raw PCM capture, explicitly declare PCM16LE mono and its rate. This interpretation never changes byte statistics or downloaded bytes.</p>
+      <div class="analysis-controls compact-controls">
+        <label>Interpretation <select id="pcm-mode"><option value="auto">Automatic · microphone / line-in</option><option value="manual">Declared PCM16LE mono</option></select></label>
+        <label>Declared rate (Hz) <input id="pcm-rate" type="number" min="8000" max="384000" step="1" value="48000" disabled></label>
+        <label>Comparison filter <select id="pcm-notch"><option value="off">Off · raw only</option><option value="50">50 Hz notch</option><option value="60">60 Hz notch</option></select></label>
+        <label>Audio frequency range <select id="pcm-zoom"><option value="1000">0–1,000 Hz</option><option value="4000" selected>0–4,000 Hz</option><option value="nyquist">0–Nyquist</option></select></label>
+      </div>
+      <p class="analysis-meta" id="audio-info">Choose microphone/line-in or declare a PCM capture to inspect it.</p>
+      <div class="diagnostics-grid">
+        <section aria-labelledby="audio-wave-title"><h2 id="audio-wave-title">Audio waveform</h2><canvas id="audio-wave" class="optional-plot" role="img" aria-label="Raw and optional notch-filtered normalized PCM amplitude versus time"></canvas></section>
+        <section aria-labelledby="audio-spectrum-title"><h2 id="audio-spectrum-title">Audio spectrum · Hz</h2><canvas id="audio-spectrum" class="optional-plot" role="img" aria-label="Raw and optional notch-filtered PCM power spectral density in hertz"></canvas></section>
+      </div>
+      <p class="analysis-meta" id="audio-filter-info">Raw only. No audio playback.</p>
+      <p class="note">The notch comparison restarts per inspected window, so startup transients can occur. It does not add entropy or improve a cryptographic randomness assessment. Levels describe decoded PCM; they are not calibrated microphone or voltage measurements.</p>
+    </details>
     <!-- END SHARED ANALYSIS -->
     <p><a href="/api-sources.html">Source lab</a> · <a href="/api-socket.html">Socket lab</a> · <a href="/api-upload.html">File lab</a> · <a href="/">All endpoints</a></p>
   </main>
   <script src="/analysis-math.js" defer></script>
   <script src="/analysis-plots.js" defer></script>
   <script src="/stream-entropy-alert.js" defer></script>
+  <script src="/structure-math.js" defer></script>
+  <script src="/structure-plots.js" defer></script>
+  <script src="/audio-analysis.js" defer></script>
+  <script src="/audio-plots.js" defer></script>
+  <script src="/diagnostic-workspace.js" defer></script>
   <script src="/analysis-workspace.js" defer></script>
   <script src="/lab-samples.js" defer></script>
   <script src="/lab-adapters.js" defer></script>

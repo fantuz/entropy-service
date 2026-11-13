@@ -204,7 +204,8 @@
                     const level=value=>value>0?(20*Math.log10(value)).toFixed(1):"−∞";
                     const guidance=nonzero?"":peak===0?" · Silent input: check selected device, input level/mute, cable and channel in Windows Sound or your system settings.":" · Signal is below PCM16 resolution; check input levels.";
                     info(`Audio input: ${name} · ${channelName} · peak ${level(peak)} dBFS · RMS ${level(Math.sqrt(squares/(bytes.length/2)))} dBFS${guidance}`);
-                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · ${name} · ${channelName} · latest audio window (may overlap)`);
+                    emit(bytes.subarray(0,length),`PCM16LE mono · ${context.sampleRate} samples/s · ${name} · ${channelName} · latest audio window (may overlap)`,
+                        {format:"pcm16le",sampleRate:context.sampleRate,channels:1});
                 },error);
                 return close;
             }catch(failure){

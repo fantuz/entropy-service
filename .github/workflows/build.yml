@@ -106,6 +106,14 @@ jobs:
         run: node scripts/test-display-clock.mjs
       - name: Test shared analysis mathematics and worker
         run: node scripts/test-analysis-math.mjs
+      - name: Test optional structure and PCM diagnostics
+        run: |
+          node scripts/test-structure-math.mjs
+          node scripts/test-structure-plots.mjs
+          node scripts/test-audio-analysis.mjs
+          node scripts/test-audio-plots.mjs
+          node scripts/test-diagnostic-worker.mjs
+          node scripts/test-workspace-reanalysis.mjs
       - name: Test stream Shannon entropy alerts
         run: node scripts/test-stream-entropy-alert.mjs
       - name: Test experimental lab generators and meters

@@ -114,9 +114,9 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         lastAccepted=now;lastSubmittedFrame=sample.frame;
         workspace.submit(sample.bytes.buffer.slice(sample.bytes.byteOffset+offset,sample.bytes.byteOffset+Math.min(sample.bytes.length,offset+Number($("analysis-size").value))),
             {totalBytes:sample.bytes.length,offset,sourceId:generation,frame:sample.frame,time:sample.time,captureTime:sample.captureTime,
-                sourceName:options.label,representation:options.transform,encoding:sample.encoding});
+                sourceName:options.label,representation:options.transform,encoding:sample.encoding,audioMetadata:sample.audioMetadata});
     }
-    function capture(bytes,encoding,token){
+    function capture(bytes,encoding,token,audioMetadata){
         if(token!==generation||!controller||controller.signal.aborted)return;
         if(!(bytes instanceof Uint8Array)||!bytes.length||bytes.length>Math.min(helpers.MAX_BYTES,catalog.max_bytes)){stop("error","Source sample exceeds the configured lab byte limit (at most 8 MiB)");return;}
         const now=performance.now();meter.add(bytes.length,now);frame++;
@@ -126,7 +126,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         if($("lab-body-preview")&&(options.selection==="http"||options.registeredKind==="webpage"))$("lab-body-preview").textContent=new TextDecoder().decode(bytes.subarray(0,2048));
         updateMeters();
         if(!output){status("waiting","XOR warming up · needs two equal-length samples");return;}
-        lastInput={bytes:output,encoding,frame,time:Date.now(),captureTime:now};
+        lastInput={bytes:output,encoding,frame,time:Date.now(),captureTime:now,audioMetadata:options.transform==="raw"?audioMetadata:undefined};
         status("ready",paused?"Receiving · plots paused":"Source active");
         if(once){finish("One sample collected");return;}
         submit(lastInput);
@@ -189,7 +189,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
                 info(message){if(token===generation&&!signal.aborted)$("lab-transport-info").textContent=message;},
                 previewEnabled:()=>$("lab-show-preview").checked,previewCanvas:$("lab-network-preview"),
                 ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");if(["microphone","linein"].includes(options.kind))void refreshAudioInputs();}},
-                emit:(bytes,encoding)=>capture(bytes,encoding,token),
+                emit:(bytes,encoding,audioMetadata)=>capture(bytes,encoding,token,audioMetadata),
                 end:message=>{if(token===generation&&!signal.aborted)finish(message);},
                 error:error=>{if(token===generation&&!signal.aborted)stop("error",error.message);}
             });

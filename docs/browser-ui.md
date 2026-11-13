@@ -212,6 +212,12 @@ shared window, independently of trace zoom and FFT size.
 
 ### Shared FFT mathematics
 
+The optional [structure, spectral history and PCM audio views](visual-diagnostics.md)
+add lag correlation, byte-pair transitions, equal-block diagnostics and a
+frequency waterfall. PCM audio has separate Hz/time axes and an optional
+display-only mains-notch comparison. These sections start closed and share the
+existing bounded worker pipeline.
+
 Stream and uploaded-file windows use the same `analysis-workspace.js` controls,
 `analysis-math.js` calculations and `analysis-plots.js` renderers. Both offer **512, 2,048,
 8,192, 32,768 and 65,536 points**; Auto chooses the largest power of two fitting

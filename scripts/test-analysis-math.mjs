@@ -87,7 +87,7 @@ history.clear(); assert.equal(history.rows.length, 0);
 // The actual worker must use that same implementation, transfer bounded results,
 // reject malformed messages and not silently expand short inputs.
 let posted;
-context.importScripts = path => vm.runInContext(readFileSync(new URL(path.slice(1), root), "utf8"), context);
+context.importScripts = (...paths) => paths.forEach(path => vm.runInContext(readFileSync(new URL(path.slice(1), root), "utf8"), context));
 context.self = {postMessage(data, transfer) {posted = {data, transfer};}};
 vm.runInContext(readFileSync(new URL("worker.js", root), "utf8"), context);
 context.self.onmessage({data: {type: "analyze", buffer: alternating.buffer, totalBytes: 4096, offset: 123, fftOptions: {size: 2048, window: "rectangular"}}});

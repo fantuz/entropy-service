@@ -6,6 +6,11 @@ server-side adapters. Both reuse the stream/file workspace: histogram, trace,
 PSD, Shannon watchpoint, Yin/Yang, bit-position rates and waterfall, with aligned
 desktop/mobile layouts.
 
+Optional [structure and PCM audio diagnostics](visual-diagnostics.md) add
+autocorrelation, byte-pair transitions, local entropy/bit balance and spectral
+history. Microphone/line-in provides explicit PCM metadata for audio waveform,
+levels and Hz spectrum, with a display-only 50/60 Hz notch comparison.
+
 ## Browser sources
 
 | Source | Bytes shown | Access and interpretation |
