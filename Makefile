@@ -1,7 +1,10 @@
 BIN_DIR := ./bin
 COVERAGE_DIR := ./coverage
+ENDURANCE_DURATION ?= 10s
+ENDURANCE_WORKERS ?= 4
+ENDURANCE_DIR ?= endurance-artifacts
 
-.PHONY: build build-server build-client test test-race coverage lint fmt clean release-snapshot
+.PHONY: build build-server build-client test test-race coverage endurance lint fmt clean release-snapshot
 
 build: build-server build-client
 
@@ -16,6 +19,9 @@ test:
 
 test-race:
 	go test -race -count=1 -timeout=10m ./...
+
+endurance:
+	python3 scripts/run_endurance.py --duration "$(ENDURANCE_DURATION)" --workers "$(ENDURANCE_WORKERS)" --artifacts "$(ENDURANCE_DIR)"
 
 coverage:
 	mkdir -p $(COVERAGE_DIR)

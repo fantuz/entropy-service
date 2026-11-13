@@ -31,6 +31,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [API reference](api.md) | HTTP/WebSocket routes, parameters, formats, browser pages, upload protocol and health checks. |
 | [Operational monitoring](monitoring.md) | Loaded TLS expiry, Prometheus alerts and external HTTPS probes. |
 | [Operations](operations.md) | Memory and concurrency budgets, readiness, shutdown behavior, profiling and diagnostics. |
+| [Endurance and fault tests](endurance-tests.md) | Repeatable mixed HTTP/TLS/WS, source faults, cancellation, resource evidence and longer Linux/Windows CI runs. |
 | [Benchmarks](benchmarks.md) | Measured encoding cost and HTTP throughput, original `wrk` output and reproducibility guidance. |
 | [Root reseeding review](root-reseeding.md) | Seed input-size hardening, failure semantics, state-transition diagram and tests. |
 | [Reseed failure policy](reseed-failure-policy.md) | Default fail-closed serving, explicit continue mode, recovery, reasoning, migration and blocked-read boundaries. |
