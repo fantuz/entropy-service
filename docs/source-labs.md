@@ -499,6 +499,18 @@ the certificate-verification control needed here. Use a verified external relay
 for cameras requiring RTSPS. HTTPS ONVIF service requests retain normal TLS
 verification. Camera frames remain processed video, not raw quantum entropy.
 
+## Extending a source adapter
+
+New adapters should submit bounded byte buffers and explicit metadata through
+the shared `EntropyWorkspace.submit(buffer, metadata)` interface in
+[`analysis-workspace.js`](../cmd/entropy-server/web/analysis-workspace.js).
+Preserve source identity, byte range, frame number and monotonic capture time;
+describe the encoding and supply PCM metadata only when the format is known.
+Reuse the shared panel template and CSS so source additions keep one analysis
+and plotting workspace. Invalidate obsolete asynchronous results when changing
+source; retain the [bounded worker queue](browser-ui.md#capture-and-analysis)
+rather than adding a separate accumulating analysis loop.
+
 ## Verification
 
 ```sh
