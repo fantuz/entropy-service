@@ -1,0 +1,62 @@
+[
+  {
+    "path": "cmd/entropy-server/observability.go",
+    "identical": true,
+    "sha256": "e456bfcab279a5fcb1f1e59a90ad3d9926f92174593741af01edcca65416cc57"
+  },
+  {
+    "path": "cmd/entropy-server/request_logging.go",
+    "identical": true,
+    "sha256": "eaa58fb18d2bb581133c58ddc4107d5ca8baced55ec7586c1214e4d8a22aa673"
+  },
+  {
+    "path": "cmd/entropy-server/activity_peaks.go",
+    "identical": true,
+    "sha256": "faa91dbcdcae8e593d46a5e6350083cdb5154ebbd5f6d7802d419f8f2039468c"
+  },
+  {
+    "path": "cmd/entropy-server/generation_policy.go",
+    "identical": true,
+    "sha256": "c1fea433137338080dd5a7603501c67bd0d760f11b65f57164f5485764c9df8b"
+  },
+  {
+    "path": "cmd/entropy-server/http_budget.go",
+    "identical": true,
+    "sha256": "5caa8e5d96d161e9e379cae6e36c39e3ba813279223867be3856823686455652"
+  },
+  {
+    "path": "cmd/entropy-server/http_stream.go",
+    "identical": true,
+    "sha256": "228d3e1474b46b19209f66b859be67255ef740450196e58dd1ee88ee0e20375a"
+  },
+  {
+    "path": "cmd/entropy-server/word_languages.go",
+    "identical": true,
+    "sha256": "8570486b796fa1ba08fcf0daf80bfd25840e72c029211f81b66cc0e7c2172b74"
+  },
+  {
+    "path": "cmd/entropy-server/internal/config/config.go",
+    "identical": true,
+    "sha256": "eec68e1269491452b5da748f4d1ee311296e45851db9515eabba3f929a9b339e"
+  },
+  {
+    "function": "main",
+    "identical": true,
+    "sha256": "b4f386c28811a2c7eaf796f1a60f5882464fe1fe8cfb834b7e9f866ee44baa96"
+  },
+  {
+    "function": "startHTTP",
+    "identical": true,
+    "sha256": "21782f55efc8daf0ce0eaa450a3e9112fcbc9d9e506e31dbf879563846e37044"
+  },
+  {
+    "function": "startHTTPS",
+    "identical": true,
+    "sha256": "ba453c6507d99aef7388df3be27c937e6c7358a6d65ee75044c66b1a05811132"
+  },
+  {
+    "function": "randomBytesHandler",
+    "identical": true,
+    "sha256": "7d1e65bdec4cc0f40f75cb6a81b215ab8250e3dcbf90db03cc2e2854009cee8f"
+  }
+]

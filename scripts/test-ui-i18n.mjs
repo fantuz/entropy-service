@@ -5,6 +5,8 @@ import vm from "node:vm";
 const web = new URL("../cmd/entropy-server/web/", import.meta.url);
 const source = readFileSync(new URL("i18n.js", web), "utf8");
 const preferenceKey = "entropy-ui-language";
+const catalogVersionToken = "__ENTROPY_UI_CATALOG_VERSION__", catalogVersion = "a".repeat(64);
+assert.equal(source.split(catalogVersionToken).length, 2, "The server must have exactly one catalog-version token to replace");
 const languages = ["en", "fr", "de", "es", "cs", "ru", "pl", "el", "it"];
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const response = value => ({ok: true, text: async () => JSON.stringify(value)});
@@ -140,9 +142,9 @@ function harness(options = {}) {
         clearTimeout(id) { timers.delete(id); },
         fetch(url, init) {
             requests.push({url, ...init});
-            return options.fetch ? options.fetch(url, init) : Promise.resolve(response(fixtures[url.slice(9, -5)] || {}));
+            return options.fetch ? options.fetch(url, init) : Promise.resolve(response(fixtures[new URL(url, "https://entropy.test").pathname.slice(9, -5)] || {}));
         }});
-    vm.runInContext(source, context, {filename: "i18n.js"});
+    vm.runInContext(source.replace(catalogVersionToken, options.catalogVersion || catalogVersion), context, {filename: "i18n.js"});
     const api = window.EntropyI18n;
     return {api, saved, writes, requests, root, document, window, body, toolbar, node, timers,
         heading, live, title, placeholder, image, rawWords, rawHash, field, template, brand, themeButton,
@@ -180,6 +182,15 @@ assert.equal(view.document.querySelectorAll("select[data-ui-language]").length, 
 const reload = harness({saved, navigator: {languages: ["el-GR"]}});
 await reload.start(); assert.equal(reload.api.language, "it");
 
+// Catalog bytes belong to a content-versioned HTTP namespace across documents.
+// A deployment changes that namespace without changing the user's saved choice.
+const upgraded = harness({saved, catalogVersion: "b".repeat(64)});
+await upgraded.start();
+assert.equal(upgraded.api.language, "it");
+assert.equal(new URL(reload.requests[0].url, "https://entropy.test").searchParams.get("v"), catalogVersion);
+assert.equal(new URL(upgraded.requests[0].url, "https://entropy.test").searchParams.get("v"), "b".repeat(64));
+assert.deepEqual([...upgraded.saved], [...saved], "No catalog bytes or cache metadata should be stored as user preferences");
+
 // Browser language matching uses supported primary tags; invalid stored values
 // safely fall back to English instead of becoming a URL or a selector value.
 for (const [options, expected] of [
@@ -192,7 +203,10 @@ for (const [options, expected] of [
     const test = harness(options); await test.start();
     assert.equal(test.api.language, expected);
     assert.equal(test.picker().value, expected);
-    assert.ok(test.requests.every(request => /^\/locales\/(?:fr|de|es|cs|ru|pl|el|it)\.json$/.test(request.url)));
+    assert.ok(test.requests.every(request => {
+        const url = new URL(request.url, "https://entropy.test");
+        return /^\/locales\/(?:fr|de|es|cs|ru|pl|el|it)\.json$/.test(url.pathname) && url.search === "?v=" + catalogVersion;
+    }));
 }
 
 // A local choice remains useful when reads and writes are blocked. Restoring
@@ -313,7 +327,7 @@ assert.equal(view.timers.size, 1);
 const timer = [...view.timers.values()][0]; assert.equal(timer.delay, 8000); timer.callback();
 assert.equal(await timedOut, "en"); assert.equal(view.requests[0].signal.aborted, true);
 assert.equal(await view.api.useLanguage("fr", true), "fr"); assert.equal(view.timers.size, 0);
-assert.ok(view.requests.every(request => request.credentials === "omit" && request.cache === "no-cache"));
+assert.ok(view.requests.every(request => request.credentials === "omit" && request.cache === "default"));
 assert.equal(await view.api.useLanguage("../../private", true), "en");
 assert.equal(view.saved.get(preferenceKey), "en");
 console.log("UI language: persistence, detection, lifecycle sync, safe bindings, isolated payloads, async races, retry and timeout passed");

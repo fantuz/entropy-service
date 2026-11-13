@@ -2,6 +2,8 @@
 
 Date: 2026-11-12T18:59:09.379152+01:00 (Europe/Zurich).
 
+Later follow-up: [2026-11-13 Linux and browser performance review](linux-performance-2026-11-13.md) compares newer main revisions, translations and the optimized renderer. The measurements below remain the original v2.0.3 snapshot.
+
 ## Finding
 
 No major Linux performance regression attributable to Windows support was found in the inspected code and measured workloads. v2.0.3 remains in the same performance range as the immediately preceding Linux-only revision. This is an estimate on a shared VM, not a precise zero-overhead guarantee or a production capacity rating.

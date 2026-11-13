@@ -4,6 +4,9 @@
 // are never scanned or translated. English messages are the fallback keys.
 (() => {
     const root = document.documentElement, storageKey = "entropy-ui-language";
+    // The static handler replaces this token with the catalog content digest.
+    // A changed deployment gets a new URL; unchanged catalogs reuse HTTP cache.
+    const catalogVersion = "__ENTROPY_UI_CATALOG_VERSION__";
     const languages = {en: "English", fr: "Français", de: "Deutsch", es: "Español", cs: "Čeština",
         ru: "Русский", pl: "Polski", el: "Ελληνικά", it: "Italiano"};
     const supported = value => typeof value === "string" && Object.hasOwn(languages, value);
@@ -101,7 +104,7 @@
                     const pending = new AbortController(); controller = pending;
                     const timer = setTimeout(() => pending.abort(), 8000);
                     try {
-                        const response = await fetch(`/locales/${next}.json`, {signal: pending.signal, cache: "no-cache", credentials: "omit"});
+                        const response = await fetch(`/locales/${next}.json?v=${catalogVersion}`, {signal: pending.signal, cache: "default", credentials: "omit"});
                         if (!response.ok) throw new Error("Translation unavailable");
                         const source = await response.text();
                         if (source.length > 2 * 1024 * 1024) throw new Error("Translation too large");

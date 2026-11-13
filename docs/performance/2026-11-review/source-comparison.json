@@ -1,0 +1,17 @@
+{
+  "randomHandler": {
+    "byte_identical": true,
+    "sha256_current": "bbc6f0e1b17703afd77b8ac6cc45b731d473c01a36e7af2c6555f51d4a433fad"
+  },
+  "randomBytesHandler": {
+    "byte_identical": true,
+    "sha256_current": "7d1e65bdec4cc0f40f75cb6a81b215ab8250e3dcbf90db03cc2e2854009cee8f"
+  },
+  "wsBinaryHandler": {
+    "byte_identical": true,
+    "sha256_current": "07ae932d2cf2297f5b0efdd633585ab64ba09892a6d7c214858484a2e52f6d05"
+  },
+  "cmd/entropy-client/internal/client/stream_buffer.go": {
+    "byte_identical": true
+  }
+}

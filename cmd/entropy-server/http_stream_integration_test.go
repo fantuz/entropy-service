@@ -36,7 +36,8 @@ func TestStreamingRoutesAndBudgetRelease(t *testing.T) {
 				w := httptest.NewRecorder()
 				handler(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, endpoint+"?bytes="+strconv.Itoa(count), nil))
 
-				if w.Code != http.StatusOK || w.Body.Len() != count || w.Header().Get("Content-Length") != strconv.Itoa(count) {
+				if w.Code != http.StatusOK || w.Body.Len() != count || w.Header().Get("Content-Length") != strconv.Itoa(count) ||
+					w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Content-Encoding") != "" {
 					t.Fatalf("status=%d len=%d headers=%v", w.Code, w.Body.Len(), w.Header())
 				}
 

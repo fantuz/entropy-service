@@ -1,0 +1,88 @@
+package main
+
+import (
+    "bytes"
+    "io"
+    "math/rand/v2"
+    "strings"
+    "testing"
+    "time"
+
+    "github.com/fantuz/entropy-service/cmd/entropy-client/internal/client"
+    "github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
+    "github.com/fantuz/entropy-service/cmd/entropy-client/internal/diag"
+    "github.com/fantuz/entropy-service/cmd/entropy-client/internal/terminal"
+)
+
+var reviewAnalysisSink int
+
+type reviewCountingWriter struct { total int64 }
+func (w *reviewCountingWriter) Write(p []byte) (int, error) { w.total += int64(len(p)); return len(p), nil }
+
+func BenchmarkReviewAnalysisDefault1MiB(b *testing.B) {
+    data := make([]byte, 16<<20)
+    rng := rand.New(rand.NewPCG(1, 2))
+    for i := range data { data[i] = byte(rng.Uint64()) }
+    cfg := &config.Config{AnalysisBytes: 1<<20}
+    b.ReportAllocs()
+    b.SetBytes(1<<20)
+    for b.Loop() { reviewAnalysisSink = analysePayload(data, cfg).N }
+}
+
+func BenchmarkReviewFullMonitor240x60(b *testing.B) {
+    cfg := &config.Config{Layout: "full", ShowWaterfall: true}
+    m := monitorState{cfg: cfg, started: time.Now().Add(-time.Second), dashboard: diag.NewDashboard(256), waterfall: diag.NewWaterfall(256, 64, diag.WaterfallRGB)}
+    data := bytes.Repeat([]byte{2, 50, 200}, 4096)
+    for range 256 { m.observe(client.StreamFrame{Data: data}, time.Now()) }
+    profile := terminal.Profile{Columns: 240, Rows:60, Interactive:true, Color:terminal.TrueColor}
+    m.renderTo(io.Discard, profile)
+    var written int64
+    b.ReportAllocs()
+    for b.Loop() {
+        var out strings.Builder
+        m.renderTo(&out, profile)
+        written += int64(out.Len())
+    }
+    b.ReportMetric(float64(written)/float64(b.N), "output-B/op")
+}
+
+func BenchmarkReviewWaterfallLive900x180(b *testing.B) {
+    for _, content := range []string{"repeat", "random"} {
+        for _, sink := range []string{"builder", "discard"} {
+            b.Run(content+"/"+sink,func(b *testing.B) {
+                cfg := &config.Config{Layout: terminal.LayoutWaterfall, ShannonThreshold: 7.99}
+                m := monitorState{cfg:cfg, started: time.Now(), hasSample: true, waterfall:diag.NewWaterfall(512,512,diag.WaterfallRGB)}
+                var corpus [256][1536]byte
+                rng := rand.New(rand.NewPCG(1,2))
+                for i := range corpus {
+                    for j := range corpus[i] {
+                        if content=="random" { corpus[i][j] = byte(rng.Uint64()) } else { corpus[i][j] = []byte{2,50,200}[j%3] }
+                    }
+                }
+                m.latest = analysePayload(corpus[0][:], cfg)
+                profile := terminal.Profile{Columns:900,Rows:180,Interactive:true,Color:terminal.TrueColor}
+                for i := range 512 { m.waterfall.Add(corpus[i%256][:],uint64(i)) }
+                // Populate all bounded row caches before timed steady-state.
+                prime:=profile;prime.Rows=512
+                var warm strings.Builder
+                m.waterfall.RenderCanvas(&warm,prime,512)
+                m.renderTo(io.Discard,profile)
+                frame:=uint64(512)
+                var written int64
+                counter:=&reviewCountingWriter{}
+                b.ReportAllocs()
+                for b.Loop() {
+                    m.waterfall.Add(corpus[frame%256][:],frame)
+                    frame++
+                    if sink=="builder" {
+                        var out strings.Builder
+                        m.renderTo(&out,profile)
+                        written+=int64(out.Len())
+                    } else { m.renderTo(counter,profile) }
+                }
+                if sink=="discard" { written=counter.total }
+                b.ReportMetric(float64(written)/float64(b.N),"output-B/op")
+            })
+        }
+    }
+}

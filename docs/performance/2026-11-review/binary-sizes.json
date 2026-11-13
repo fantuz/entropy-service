@@ -1,0 +1,52 @@
+[
+  {
+    "revision": "prewindows",
+    "program": "server",
+    "bytes": 12124322
+  },
+  {
+    "revision": "prewindows",
+    "program": "client",
+    "bytes": 6795426
+  },
+  {
+    "revision": "windowsport",
+    "program": "server",
+    "bytes": 12128418
+  },
+  {
+    "revision": "windowsport",
+    "program": "client",
+    "bytes": 6795426
+  },
+  {
+    "revision": "v203",
+    "program": "server",
+    "bytes": 12402850
+  },
+  {
+    "revision": "v203",
+    "program": "client",
+    "bytes": 6807714
+  },
+  {
+    "revision": "prei18n",
+    "program": "server",
+    "bytes": 12492962
+  },
+  {
+    "revision": "prei18n",
+    "program": "client",
+    "bytes": 6807714
+  },
+  {
+    "revision": "current",
+    "program": "server",
+    "bytes": 13680802
+  },
+  {
+    "revision": "current",
+    "program": "client",
+    "bytes": 6807714
+  }
+]
