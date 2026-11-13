@@ -130,9 +130,31 @@ nfpms:
         # Probably won't be implemented: https://github.com/goreleaser/nfpm/issues/15#issuecomment-830816661
         - maintainer-script-calls-systemctl
 
+# Publish stable latest-download names in addition to the canonical versioned
+# archives. Both names checksum the same bytes; no duplicate dist files are made.
+release:
+  extra_files:
+    - glob: ./dist/entropy-service_{{ .Version }}_linux_amd64.tar.gz
+      name_template: entropy-service_linux_amd64.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_linux_arm64.tar.gz
+      name_template: entropy-service_linux_arm64.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_linux_armv7.tar.gz
+      name_template: entropy-service_linux_armv7.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_windows_amd64.zip
+      name_template: entropy-service_windows_amd64.zip
+
 checksum:
   name_template: checksums.txt
   algorithm: sha256
+  extra_files:
+    - glob: ./dist/entropy-service_{{ .Version }}_linux_amd64.tar.gz
+      name_template: entropy-service_linux_amd64.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_linux_arm64.tar.gz
+      name_template: entropy-service_linux_arm64.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_linux_armv7.tar.gz
+      name_template: entropy-service_linux_armv7.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_windows_amd64.zip
+      name_template: entropy-service_windows_amd64.zip
 
 changelog:
   sort: asc
