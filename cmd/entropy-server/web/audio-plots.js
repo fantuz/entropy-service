@@ -8,10 +8,10 @@
         const w = Math.round(width * ratio), h = Math.round(height * ratio);
         if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
         const ctx = canvas.getContext("2d"), style = getComputedStyle(document.documentElement);
-        const color = name => style.getPropertyValue(name).trim();
+        const color = name => (style.getPropertyValue(name) || "").trim();
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.clearRect(0, 0, width, height); ctx.font = "11px monospace";
         return {ctx, width, height, left: 53, top: 31, right: width - 14, bottom: height - 43,
-            text: color("--muted"), grid: color("--border"), raw: color("--green"), filtered: color("--cyan")};
+            text: color("--muted"), grid: color("--border"), raw: color("--plot-primary") || color("--green"), filtered: color("--plot-secondary") || color("--cyan")};
     }
     function empty(canvas, message = "Select an original PCM16LE audio sample") {
         const p = prepare(canvas);

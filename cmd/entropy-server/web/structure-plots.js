@@ -6,12 +6,13 @@
     let color;
     function updatePalette() {
         const style = getComputedStyle(document.documentElement);
-        const value = name => style.getPropertyValue(name).trim();
-        color = {grid: value("--border"), text: value("--muted"), green: value("--green"),
-            cyan: value("--cyan"), warn: value("--warn"), surface: value("--surface")};
+        const value = name => (style.getPropertyValue(name) || "").trim();
+        color = {grid: value("--border"), text: value("--muted"), green: value("--plot-primary") || value("--green"),
+            cyan: value("--plot-secondary") || value("--cyan"), warn: value("--plot-reference") || value("--warn"), surface: value("--surface")};
     }
     updatePalette();
     window.addEventListener("entropythemechange", updatePalette);
+    window.addEventListener("entropygraphpalettechange", updatePalette);
 
     function prepare(canvas, rightSpace = 15) {
         const rect = canvas.getBoundingClientRect();

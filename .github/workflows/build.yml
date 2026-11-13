@@ -128,6 +128,8 @@ jobs:
         run: node scripts/test-web-layout.mjs
       - name: Test shared appearance and lab help
         run: node scripts/test-theme.mjs
+      - name: Test graph palette preference and contrast
+        run: node scripts/test-graph-palette.mjs
       - name: Test synchronized HTTP gallery
         run: node scripts/test_gallery.mjs
       - name: Test statistical capture and report contracts
