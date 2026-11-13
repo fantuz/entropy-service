@@ -171,12 +171,12 @@ def source_export_checks(page, base):
 
 def prose_measure(page, selector):
     result = page.locator(selector).first.evaluate("""p=>{
-      const style=getComputedStyle(p),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
-      ctx.font=style.font;
-      return {width:p.getBoundingClientRect().width,ch:ctx.measureText('0').width,text:p.textContent.trim()};
+      const parent=p.parentElement,style=getComputedStyle(parent);
+      return {width:p.getBoundingClientRect().width,text:p.textContent.trim(),
+        available:parent.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)};
     }""")
-    assert result["text"] and result["width"] > 0 and result["ch"] > 0, result
-    assert result["width"] <= result["ch"] * 80 + 4, (selector, result)
+    assert result["text"] and result["width"] > 0, result
+    assert abs(result["width"] - result["available"]) <= 2, (selector, result)
     return result
 
 
@@ -192,7 +192,8 @@ def desktop_width_checks(page, base, artifacts):
         wait_paint(page)
         result = page.evaluate("""ids=>{
           const main=document.querySelector('main.analysis-panel'),r=main.getBoundingClientRect();
-          return {viewport:innerWidth,width:r.width,gutter:r.left+innerWidth-r.right,
+          return {viewport:innerWidth,available:document.documentElement.clientWidth,
+            width:r.width,gutter:r.left+document.documentElement.clientWidth-r.right,
             overflow:document.documentElement.scrollWidth>innerWidth,
             plots:Object.fromEntries(ids.map(id=>{
               const box=document.getElementById(id).getBoundingClientRect();
@@ -200,12 +201,8 @@ def desktop_width_checks(page, base, artifacts):
             }))};
         }""", rectangular)
         assert not result["overflow"], result
-        if viewport <= 1920:
-            assert result["width"] >= viewport - 72, result
-        else:
-            assert result["width"] > 2200, result
-        if viewport == 1920:
-            assert 20 <= result["gutter"] <= 68, result
+        assert abs(result["width"] - (result["available"] - viewport * .1)) <= 2, result
+        assert abs(result["gutter"] - viewport * .1) <= 2, result
         widths[viewport] = result
     for identifier in rectangular:
         actual = [widths[viewport]["plots"][identifier] for viewport in (1440, 1920, 2560)]
@@ -228,11 +225,13 @@ def desktop_width_checks(page, base, artifacts):
             page.set_viewport_size({"width": viewport, "height": 1000})
             wait_paint(page)
             data = page.evaluate("""()=>({width:document.querySelector('.wrap > main').getBoundingClientRect().width,
+              available:document.documentElement.clientWidth,
               overflow:document.documentElement.scrollWidth>innerWidth})""")
             assert not data["overflow"], (path, viewport, data)
+            assert abs(data["width"] - (data["available"] - viewport * .1)) <= 2, (path, viewport, data)
             measurements[viewport] = data["width"]
         assert measurements[1440] < measurements[1920] < measurements[2560], (path, measurements)
-        assert measurements[1920] > old_cap and measurements[1920] >= 1920-80, (path, measurements)
+        assert measurements[1920] > old_cap, (path, measurements)
         containers[path] = measurements
         prose[path] = prose_measure(page, blurb)
     # A regular data endpoint uses the widened common panel independently of
@@ -246,7 +245,7 @@ def desktop_width_checks(page, base, artifacts):
     for worker in page.workers:
         worker.evaluate("new Promise(resolve=>setTimeout(resolve,0))")
     page.set_viewport_size({"width": 1440, "height": 1000})
-    return {"analysis": widths, "containers": containers, "readable_prose": prose,
+    return {"analysis": widths, "containers": containers, "full_width_prose": prose,
             "ordinary_panel_width_at_2560": data_panel["width"]}
 
 
