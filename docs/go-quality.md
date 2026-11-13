@@ -117,12 +117,21 @@ The packages highlighted by this label have different situations:
 | --- | --- |
 | Client `internal/metrics` | HTTP and WebSocket integration tests verify actual byte/message accounting, including rejected bodies/messages and control traffic, through its public counter accessors. |
 | Server `internal/metrics` | Public HTTP/WS counters and serving snapshots are exercised by handler and lifecycle tests. Unused buffer/test counters remain maintenance candidates. |
-| Client `internal/pipe` | Its old `WriteStdout` helper has no callers; active raw exports use `internal/output`. Tests of the export path protect shipped behavior. |
-| Client `internal/protocol` | Contains an unused response structure with no executable statements, so there is no statement coverage percentage to improve. |
+| Former client `internal/pipe` / `internal/protocol` | Removed in the [November 13 maintenance refresh](maintenance-review-2026-11-13.md): the stdout helper and response structure had no callers. Active exports remain in `internal/output`. |
 
-The unused client `metrics.CountWrite` wrapper likewise has no current caller.
-These helpers/types can be reviewed for removal separately; adding tests solely
-to remove a status label would not improve coverage of active behavior.
+The unused client `metrics.CountWrite` pass-through was also removed. Removing
+unused statements changes the coverage denominator; it is maintenance, not
+new evidence about active paths.
+
+### Current-main snapshot, 2026-11-13
+
+The successful [main build](https://github.com/fantuz/entropy-service/actions/runs/43300419200)
+at `dcc01a8` reports **82.8%** combined coverage: 4,360 of 5,267 Go statements.
+The [coverage review](coverage-review-2026-11-13.md) includes package counts,
+specific gaps, evidence from other CI jobs, and prioritized follow-up. It uses
+that exact-main artifact; the historical tables below are not current totals.
+
+### Historical measurements
 
 The baseline on `main` commit `4c94a08`, measured on 2026-11-08 with
 Go 1.26.10, Linux amd64 and `GOMAXPROCS=4`, was:
@@ -137,8 +146,8 @@ Go 1.26.10, Linux amd64 and `GOMAXPROCS=4`, was:
 | Server DRBG | 95.4% |
 | TLS configuration / tuned listener | 0% / 0% |
 
-With the new regression tests, the same combined measurement is **72.0%**.
-TLS configuration is 100% exercised, the listener is 83.3%, and the random
+At that change, the same combined measurement reached **72.0%**.
+TLS configuration was 100% exercised, the listener 83.3%, and the random
 image / heatmap / QR handlers are 100% / 100% / 83.3%. The remaining QR
 encoder-error path and low-level socket-control failures are not forced
 solely to increase that percentage.
@@ -213,13 +222,16 @@ before entropy access, verified HTTPS/HTTP sampling and SIGTERM cleanup.
 Temporary identities are generated at runtime and never committed. These
 checks complement handler tests and the actual systemd package lifecycle test.
 
-`bash scripts/test-fuzz.sh` runs four native Go fuzz targets for ten seconds
-each with at most two workers: isolated CLI arguments, actual WebSocket frame
-size/type handling, bounded generation queries and upload prefix analysis.
+`bash scripts/test-fuzz.sh` runs six native Go fuzz targets with at most two
+workers each. CLI arguments, WebSocket frames, generation queries and upload
+analysis use `FUZZTIME` (default ten seconds each). Quantis USB descriptors and
+shared USB profiles use `USB_FUZZTIME` (default 500,000 executions each), avoiding
+the descriptor target's duration-coordinator race. Both overrides accept Go's
+duration/count syntax.
 Inputs are capped to keep allocations, network fixtures and work bounded.
 Upload assertions compare full-body SHA-256 and independently counted prefix
 histograms; frame assertions reject text and incorrect fixed lengths.
-For a focused local run, use `FUZZTIME=2s bash scripts/test-fuzz.sh`.
+For a short local run, use `FUZZTIME=2s USB_FUZZTIME=1000x bash scripts/test-fuzz.sh`.
 Build and release validation run the complete fixed-budget checks in CI.
 Fuzz discoveries that fail are written to Go's `testdata/fuzz` corpus; retain
 and review them with the fix, rather than merely reducing the fuzz budget.
@@ -228,7 +240,7 @@ and review them with the fix, rather than merely reducing the fuzz budget.
 
 | Priority | Follow-up | Why |
 | --- | --- | --- |
-| Medium | Extend the bounded fuzz corpus when failures are found, including additional media/source-registration parsers. | Four native targets now exercise client arguments, entropy frames, generation queries and upload analysis; preserve any discovered failures as regressions. |
+| Medium | Extend the bounded fuzz corpus when failures are found, including additional media/source-registration parsers. | Six native targets cover CLI/frame/query/upload/USB descriptor/profile inputs; preserve discovered failures as regressions. |
 | Medium | Exercise real browser disconnect/reconnect and mobile layouts with browser automation. | Node regression scripts cover calculations/scheduling/layout contracts, not every interactive network/UI path. |
 | Deployment | Test real QRNG startup/failure, blocking driver reads and supported non-amd64 systems. | OS-backed local tests and cross-compilation do not validate physical hardware or driver behavior. |
 | Maintenance | Remove unused prototypes/helpers and stale comments in small reviewed changes; prefer initialisms in new code. | Tests of unused code can inflate coverage while leaving shipped behavior untouched. |

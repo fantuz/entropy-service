@@ -42,7 +42,7 @@ type DRBG struct {
 	cipher          cipher.Stream
 	algorithm       Algorithm
 	closed          bool
-	counted         bool // True until Close releases the constructor\'s instance count.
+	counted         bool // True until Close releases the constructor's instance count.
 	generated       uint64
 	Reseeded        time.Time
 	reseeds         uint64
@@ -55,7 +55,6 @@ type DRBG struct {
 	source         string
 	algo           string
 	reseedInterval time.Duration
-	// reseedInterval int64
 	reseedSizeBits int
 
 	// counter for number of DRBG instances
@@ -298,8 +297,6 @@ func (d *DRBG) Close() error {
 
 // Read fills p with pseudo-random bytes.
 func (d *DRBG) Read(p []byte) (int, error) {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
 	if root := d.freshnessRoot; root != nil {
 		root.policyMu.RLock()
 		defer root.policyMu.RUnlock()
@@ -331,30 +328,12 @@ func (d *DRBG) readLocked(p []byte) (int, error) {
 	d.cipher.XORKeyStream(p, p)
 	d.generated += uint64(len(p))
 	metrics.AddBytesGenerated(len(p))
-	// d.cipher.XORKeyStream(p.CH, p.CH)
-	// d.CH <- generateEntropyChunk()
 
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
-
-	// Fill p with pseudorandom data
-	// err := d.cipher.XORKeyStream(p, p)
-	// err := d.generate(p)
-	/*
-		if err != nil {
-		    return 0, err
-		}
-	*/
-
-	// return d.cipher.XORKeyStream(p, p), nil
 	return len(p), nil
-	// return int(p), nil
 }
 
 // ReseedAge returns how long since last reseed.
 func (d *DRBG) ReseedAge() time.Duration {
-	// d.Mu.Lock()
-	// defer d.Mu.Unlock()
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
