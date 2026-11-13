@@ -51,7 +51,9 @@ func TestLabEightMiBSampleAndConfiguredLimits(t *testing.T) {
 	waitBudgetActive(t, budget, 0)
 
 	response := httptest.NewRecorder()
-	labCatalogHandler(registry, budget, 256<<10, false)(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/sources", nil))
+	catalogRequest := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/sources", nil)
+	catalogRequest.Host = "localhost"
+	labCatalogHandler(registry, budget, 256<<10, false)(response, catalogRequest)
 
 	var catalog struct {
 		MaxBytes int              `json:"max_bytes"`
@@ -88,6 +90,7 @@ func TestLabAccessCatalogAndValidation(t *testing.T) {
 	budget := newWebSocketBudget(1, 4<<20)
 	catalog := labCatalogHandler(registry, budget, lab.MaxBytes, false)
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/sources", nil)
+	request.Host = "localhost"
 	request.RemoteAddr = "203.0.113.1:1234"
 	recorder := httptest.NewRecorder()
 	catalog(recorder, request)
@@ -115,6 +118,7 @@ func TestLabAccessCatalogAndValidation(t *testing.T) {
 
 	for _, query := range []string{"source=missing", "source=private&source=private", "source=private&bytes=33554433", "source=private&refresh=0", "source=private&refresh=20&refresh=21", "source=private&bytes=8&bytes=9", "source=private&refesh=20", "source=private&bytes=%zz", "source=private&bytes=8;refresh=20", "source=private&preview=1"} {
 		request = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/lab/stream?"+query, nil)
+		request.Host = "localhost"
 		request.RemoteAddr = "127.0.0.1:1234"
 		recorder = httptest.NewRecorder()
 		labStreamHandler(registry, budget, lab.MaxBytes, false)(recorder, request)

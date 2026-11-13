@@ -21,6 +21,10 @@ permissions:
   contents: read
 
 jobs:
+  endurance:
+    name: Endurance and fault tests
+    uses: ./.github/workflows/endurance.yml
+
   windows:
     name: Optional Windows port
     uses: ./.github/workflows/windows.yml

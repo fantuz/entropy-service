@@ -12,6 +12,10 @@ permissions:
   contents: read
 
 jobs:
+  endurance:
+    name: Validate endurance before publishing
+    uses: ./.github/workflows/endurance.yml
+
   windows:
     name: Validate Windows before publishing
     uses: ./.github/workflows/windows.yml
@@ -154,7 +158,7 @@ jobs:
 
   release:
     name: Publish only after full tag validation
-    needs: [validate, browser, windows, windows-package]
+    needs: [validate, browser, windows, windows-package, endurance]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

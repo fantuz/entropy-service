@@ -30,6 +30,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Adaptive client terminal](client-terminal.md) | Compact/full layouts, sizing, bounded history, screenshots and display-cost trade-offs. |
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
 | [Experimental source/socket labs](source-labs.md) | Generate, meter and compare sources; browser media and registered peer/device/socket connections. |
+| [LAB access and device-read safety](lab-safety.md) | DNS-rebinding Host checks, custom local names, cancellation ownership, native-call limits and regression coverage. |
 | [Word languages](word-languages.md) | 18 pinned dictionary choices, language preferences, selection-space differences, provenance and translation guidance. |
 | [API reference](api.md) | HTTP/WebSocket routes, parameters, formats, browser pages, upload protocol and health checks. |
 | [Operational monitoring](monitoring.md) | Loaded TLS expiry, Prometheus alerts and external HTTPS probes. |

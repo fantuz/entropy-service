@@ -57,6 +57,7 @@ See [construction, provenance and patent limitations](experimental-barzakh.md).
 | `-fingerprint` | `2097152` | Upload prefix analysed statistically; full-upload SHA-256 is unaffected. |
 | `-lab-sources` | empty | Strict JSON registry of experimental peers/devices/sockets; opens sources on demand. |
 | `-lab-allow-remote` | `false` | Permit non-loopback clients to use registered lab bridges. |
+| `-lab-allowed-hosts` | empty | Additional exact inbound Host names/IPs for default loopback-only LAB access; comma-separated, no URLs, ports or wildcards. Does not authorize remote peers. `localhost` and literal loopback IPs are already trusted. |
 | `-lab-max-connections` | `8` | Separate simultaneous bridge limit. |
 | `-lab-memory-mib` | `32` | Separate estimated bridge working-memory budget; not RSS. |
 | `-cookie` | `false` | Remember byte/word preferences and word language in Secure, HttpOnly cookies; use HTTPS for browser persistence. |
@@ -435,6 +436,11 @@ runs, payload comparisons and a report-analysis example.
 See [experimental source/socket labs](source-labs.md) and the
 [registry example](../resources/lab-sources.example.json) for peer/self links,
 protocols, deadlines and exposure rules.
+
+Default LAB access requires both a loopback TCP peer and a trusted inbound Host.
+Custom local names need `-lab-allowed-hosts=lab.example.test`; this does not
+resolve DNS or enable remote clients. See [LAB access and device-read safety](lab-safety.md)
+for the DNS-rebinding rationale, reverse-proxy boundary and migration examples.
 
 The registry also supports `webpage` body prefixes/URL pools and `rtsp`/`onvif`
 cameras. Cameras optionally set `width`, `height` and `profile_token` and need

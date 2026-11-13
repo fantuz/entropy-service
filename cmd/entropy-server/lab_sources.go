@@ -26,17 +26,17 @@ const (
 	labHTTPStatusEvent = "http-status"
 )
 
-func labAllowed(r *http.Request, allowRemote bool) bool {
+func labAllowed(r *http.Request, allowRemote bool, allowedHosts ...string) bool {
 	if allowRemote {
 		return true
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 
-	return err == nil && net.ParseIP(host).IsLoopback()
+	return err == nil && net.ParseIP(host).IsLoopback() && lab.TrustedLocalHost(r.Host, allowedHosts)
 }
 
-func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes int, allowRemote bool) http.HandlerFunc {
+func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes int, allowRemote bool, allowedHosts ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 
@@ -44,6 +44,11 @@ func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes
 			w.Header().Set("Allow", "GET")
 			http.Error(w, "use GET", http.StatusMethodNotAllowed)
 
+			return
+		}
+
+		if !allowRemote && !lab.TrustedLocalHost(r.Host, allowedHosts) {
+			http.Error(w, "untrusted LAB Host; use localhost/loopback or configure -lab-allowed-hosts", http.StatusForbidden)
 			return
 		}
 
@@ -61,16 +66,16 @@ func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes
 			MaxBytes       int              `json:"max_bytes"`
 			MaxConnections int              `json:"max_connections"`
 			Active         int              `json:"active"`
-		}{Sources: sources, Allowed: labAllowed(r, allowRemote), MaxBytes: maxBytes, MaxConnections: usage.MaxConnections, Active: usage.Active})
+		}{Sources: sources, Allowed: labAllowed(r, allowRemote, allowedHosts...), MaxBytes: maxBytes, MaxConnections: usage.MaxConnections, Active: usage.Active})
 	}
 }
 
-func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes int, allowRemote bool) http.HandlerFunc {
+func labStreamHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes int, allowRemote bool, allowedHosts ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 
-		if !labAllowed(r, allowRemote) {
-			http.Error(w, "lab bridge requires a loopback client or -lab-allow-remote", http.StatusForbidden)
+		if !labAllowed(r, allowRemote, allowedHosts...) {
+			http.Error(w, "LAB requires a loopback peer and trusted Host (see -lab-allowed-hosts), or explicit -lab-allow-remote", http.StatusForbidden)
 			return
 		}
 

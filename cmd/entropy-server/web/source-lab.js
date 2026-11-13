@@ -288,7 +288,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
     $("lab-export").addEventListener("click",()=>download(new Blob([JSON.stringify({format:"entropy-lab-measurements-v1",rateUnit:"sampled bytes/second",records},null,2)],{type:"application/json"}),"entropy-lab-measurements.json"));
     if($("lab-registered"))void(async()=>{
         try{
-            const response=await fetch("/lab/sources",{cache:"no-store"});if(!response.ok)throw new Error("Source catalog unavailable");catalog=await response.json();
+            const response=await fetch("/lab/sources",{cache:"no-store"});if(!response.ok)throw new Error(response.status===403?"Registered sources are restricted. Use this instance's localhost address or ask its operator to configure LAB access.":"Source catalog unavailable");catalog=await response.json();
             if(!Array.isArray(catalog.sources))throw new Error("Invalid source catalog");
             $("lab-registered").replaceChildren();
             const available=catalog.sources.filter(source=>document.body.dataset.lab==="sources"?source.width>0:!source.width);
