@@ -1278,8 +1278,8 @@ func main() {
 
 	registerGenerationRoutes(mux, &root, cfg, wsBudget, httpBudget)
 	labBudget := newWebSocketBudget(cfg.LabMaxConnections, cfg.LabMemoryMiB*(1<<20))
-	mux.HandleFunc("/lab/sources", labCatalogHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote))
-	mux.HandleFunc("/lab/stream", labStreamHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote))
+	mux.HandleFunc("/lab/sources", labCatalogHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote, cfg.LabAllowedHosts...))
+	mux.HandleFunc("/lab/stream", labStreamHandler(labRegistry, labBudget, min(lab.MaxBytes, cfg.MaxBytes), cfg.LabAllowRemote, cfg.LabAllowedHosts...))
 	mux.HandleFunc("/files", uploadHandler(cfg.BytesFingerprint, httpBudget))
 
 	// placeholder for public/private key generation

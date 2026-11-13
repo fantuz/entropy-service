@@ -57,12 +57,29 @@ func (s *Stream) Read(ctx context.Context, count int) ([]byte, error) {
 	bounded, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
+	if err := readContextError(bounded); err != nil {
+		return nil, err
+	}
+
 	data, err := s.read(bounded, count)
-	if err != nil && bounded.Err() != nil {
-		err = bounded.Err()
+	if contextErr := readContextError(bounded); contextErr != nil {
+		clear(data)
+		return nil, contextErr
 	}
 
 	return data, err
+}
+
+func readContextError(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+		return context.DeadlineExceeded
+	}
+
+	return nil
 }
 
 func (s *Stream) Close() error {

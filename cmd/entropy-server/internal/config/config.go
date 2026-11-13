@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/chaoskey"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/lab"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/quantisusb"
 )
 
@@ -42,6 +44,7 @@ func defaultDRBGForArch(goarch string) string {
 type Config struct {
 	LabSources        string
 	LabAllowRemote    bool
+	LabAllowedHosts   []string
 	LabMaxConnections int
 	LabMemoryMiB      int64
 	ReseedMs          int
@@ -96,6 +99,13 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 
 	flags.StringVar(&cfg.LabSources, "lab-sources", "", "Experimental source registry JSON file (device/socket/peer endpoints are configured by the operator)")
 	flags.BoolVar(&cfg.LabAllowRemote, "lab-allow-remote", false, "Allow non-loopback clients to use registered experimental source bridges")
+	flags.Func("lab-allowed-hosts", "Additional trusted Host names/IPs for loopback-only LAB access (comma-separated, exact hosts, no ports/wildcards; does not enable remote peers)", func(value string) error {
+		var err error
+
+		cfg.LabAllowedHosts, err = lab.ParseAllowedHosts(value)
+
+		return err
+	})
 	flags.IntVar(&cfg.LabMaxConnections, "lab-max-connections", 8, "Maximum simultaneous experimental source bridges")
 	flags.Int64Var(&cfg.LabMemoryMiB, "lab-memory-mib", 32, "Experimental bridge working-memory budget in MiB")
 	flags.StringVar(&cfg.HTTPAddr, "http", ":8080", "HTTP listen address")
@@ -295,6 +305,13 @@ func (cfg *Config) Validate() error {
 	if cfg.LabMaxConnections < 1 || cfg.LabMemoryMiB < 1 || cfg.LabMemoryMiB > (1<<63-1)/(1<<20) {
 		return errors.New("lab-max-connections and lab-memory-mib must be positive; memory budget must fit in int64 bytes")
 	}
+
+	hosts, err := lab.ParseAllowedHosts(strings.Join(cfg.LabAllowedHosts, ","))
+	if err != nil {
+		return err
+	}
+
+	cfg.LabAllowedHosts = hosts
 
 	if cfg.WSMaxConnections < 1 || cfg.WSMemoryMiB < 1 || cfg.WSMemoryMiB > (1<<63-1)/(1<<20) {
 		return errors.New("ws-max-connections and ws-memory-mib must be positive; memory budget must fit in int64 bytes")

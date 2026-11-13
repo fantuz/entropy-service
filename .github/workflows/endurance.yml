@@ -1,23 +1,7 @@
 name: Endurance and fault tests
 
 on:
-  pull_request:
-    paths:
-      - "**.go"
-      - "go.mod"
-      - "go.sum"
-      - "scripts/run_endurance.py"
-      - "scripts/test_run_endurance.py"
-      - ".github/workflows/endurance.yml"
-  push:
-    branches: [main]
-    paths:
-      - "**.go"
-      - "go.mod"
-      - "go.sum"
-      - "scripts/run_endurance.py"
-      - "scripts/test_run_endurance.py"
-      - ".github/workflows/endurance.yml"
+  workflow_call:
   workflow_dispatch:
     inputs:
       duration:
@@ -35,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: endurance-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
+  group: endurance-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
   cancel-in-progress: true
 
 jobs:

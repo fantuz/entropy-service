@@ -95,10 +95,14 @@ A short CI pass does not establish 24-hour stability or physical entropy quality
 
 ## GitHub CI and longer runs
 
-The `Endurance and fault tests` workflow runs **5 seconds per scenario** on
-Linux with race detection and native Windows without it for relevant code
-changes. JSON/log artifacts, including failures, are retained for 14 days.
-Normal full regression, lint, browser and packaged Windows workflows remain.
+The reusable `Endurance and fault tests` workflow runs **5 seconds per scenario**
+on Linux with race detection and native Windows without it. Both the normal
+build and release workflows call it on their exact checked-out commit. The
+release publishing job requires both endurance jobs to pass alongside full
+regression, lint, browser and packaged Windows checks. A tag is therefore tested
+again rather than relying on results from an earlier PR or branch. This does
+not publish anything during ordinary PR validation. JSON/log artifacts,
+including failures, are retained for 14 days.
 
 Build/release CI runs the generation-query fuzz target for **500,000 executions**
 with `GENERATION_FUZZTIME=500000x`. This avoids a Go 1.26 coordinator race that
