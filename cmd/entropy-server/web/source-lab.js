@@ -10,11 +10,17 @@ window.addEventListener("pageshow", () => {
 window.addEventListener("pageshow", event => { if(event.persisted)location.reload(); });
 
 (() => {
+    const t = (message, values = {}) => window.EntropyI18n?.t(message, values) ??
+        message.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
+    function setText(node, message, values = {}) {
+        if (window.EntropyI18n) window.EntropyI18n.set(node, message, values);
+        else node.textContent = t(message, values);
+    }
     const $=id=>document.getElementById(id), helpers=window.EntropyLabSamples;
     const guidance=window.EntropyLabRegistration;
     function browserExample(kind){const example=guidance.schemaFor(kind).example;return location.protocol==="https:"?example.replace(/^http:/,"https:").replace(/^ws:/,"wss:"):example;}
     function endpoint(raw,protocol,kind){try{return helpers.endpoint(raw,protocol);}catch(error){throw new Error(`${error.message}. Example: ${browserExample(kind)}`);}}
-    if($("lab-page-preset"))for(const preset of guidance.pagePresets){const option=document.createElement("option");option.value=preset.url;option.textContent=preset.label;$("lab-page-preset").append(option);}
+    if($("lab-page-preset"))for(const preset of guidance.pagePresets){const option=document.createElement("option");option.value=preset.url;setText(option,preset.label);$("lab-page-preset").append(option);}
     const meter=new helpers.Meter(), storageKey="entropy-service:lab:measurements:v1", records=[];
     try {
         const raw=sessionStorage.getItem(storageKey);
@@ -30,7 +36,9 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
     let options=null,lastInput=null,previous=null,lastAccepted=-Infinity,finalFrame=0,frame=0,analysedBytes=0,analysedFrames=0;
     let lastSubmittedFrame=0,catalog={sources:[],allowed:false,max_bytes:helpers.MAX_BYTES};
     let audioRequest=0,disposed=false;
-    const audioHelp=$("lab-audio-help")?.textContent;
+    const audioHelp=$("lab-audio-help")?.dataset.i18n||$("lab-audio-help")?.querySelector("[data-i18n]")?.dataset.i18n||$("lab-audio-help")?.textContent;
+    let audioNotice="";
+    function updateAudioHelp(){if($("lab-audio-help"))setText($("lab-audio-help"),audioNotice?audioNotice+" "+audioHelp:audioHelp);}
     async function refreshAudioInputs(){
         if(!$("lab-audio-device")||disposed)return;
         const request=++audioRequest;
@@ -38,29 +46,29 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         try{
             const devices=await window.EntropyLabAdapters.audioInputs();
             if(disposed||request!==audioRequest)return;
-            if(devices===null){$("lab-audio-help").textContent="This browser cannot list audio devices. Select the physical input in system sound settings, then use Microphone PCM with System default. "+audioHelp;return;}
+            if(devices===null){audioNotice="This browser cannot list audio devices. Select the physical input in system sound settings, then use Microphone PCM with System default.";updateAudioHelp();return;}
             const select=$("lab-audio-device"),selected=select.value;
-            const option=document.createElement("option");option.value="";option.textContent="System default";select.replaceChildren(option);
+            const option=document.createElement("option");option.value="";setText(option,"System default");select.replaceChildren(option);
             devices.forEach((device,index)=>{
-                const option=document.createElement("option");option.value=device.id;option.textContent=device.label||`Audio input ${index+1}`;select.append(option);
+                const option=document.createElement("option");option.value=device.id;if(device.label)option.textContent=device.label;else setText(option,"Audio input {number}",{number:index+1});select.append(option);
             });
             if(selected&&!devices.some(device=>device.id===selected)){
-                const missing=document.createElement("option");missing.value=selected;missing.textContent="Selected input unavailable";missing.dataset.unavailable="true";select.append(missing);
+                const missing=document.createElement("option");missing.value=selected;setText(missing,"Selected input unavailable");missing.dataset.unavailable="true";select.append(missing);
             }
             select.value=selected;
-            $("lab-audio-help").textContent=audioHelp;
-        }catch(_){if(!disposed&&request===audioRequest)$("lab-audio-help").textContent="Could not list audio inputs. Check this site's audio permission or use System default. "+audioHelp;}
+            audioNotice="";updateAudioHelp();
+        }catch(_){if(!disposed&&request===audioRequest){audioNotice="Could not list audio inputs. Check this site's audio permission or use System default.";updateAudioHelp();}}
         finally{if(!disposed&&request===audioRequest)$("lab-audio-refresh").disabled=false;}
     }
     const audioDevicesChanged=()=>{if(["microphone","linein"].includes($("lab-kind").value))void refreshAudioInputs();};
     $("lab-audio-refresh")?.addEventListener("click",()=>void refreshAudioInputs());
     if($("lab-audio-device"))navigator.mediaDevices?.addEventListener?.("devicechange",audioDevicesChanged);
-    function status(state,text){$("lab-status").dataset.state=state;if($("lab-status").textContent!==text)$("lab-status").textContent=text;}
+    function status(state,text,values={}){$("lab-status").dataset.state=state;setText($("lab-status"),text,values);}
     function buttons(){
         $("lab-start").disabled=$("lab-once").disabled=running;
         $("lab-stop").disabled=!running;
         $("pause-plots").disabled=!running||once;
-        $("pause-plots").textContent=!running?"Plots frozen":paused?"Resume plots":"Pause plots";
+        setText($("pause-plots"),!running?"Plots frozen":paused?"Resume plots":"Pause plots");
         $("pause-plots").setAttribute("aria-pressed",String(paused||!running));
         $("analysis-size").disabled=$("analysis-offset").disabled=running&&paused;
         const have=workspace.sample?.sourceId===generation;
@@ -70,15 +78,15 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
     const meterClock=window.EntropyDisplayClock.create(()=>{
         const data=meter.snapshot(performance.now());
         $("lab-input-bytes").textContent=data.bytes.toLocaleString();$("lab-input-frames").textContent=data.frames.toLocaleString();
-        $("lab-input-unit").textContent=data.frames===1?"sample":"samples";
+        setText($("lab-input-unit"),data.frames===1?"sample":"samples");
         $("lab-rate").textContent=data.bytesPerSecond===null?"—":(data.bytesPerSecond/1e6).toFixed(4);
         $("lab-interval").textContent=data.meanIntervalMs===null?"—":data.meanIntervalMs.toFixed(2);
         $("lab-analysis-bytes").textContent=analysedBytes.toLocaleString();$("lab-analysis-frames").textContent=analysedFrames.toLocaleString();
-        $("lab-analysis-unit").textContent=analysedFrames===1?"window":"windows";
+        setText($("lab-analysis-unit"),analysedFrames===1?"window":"windows");
     });
     function updateMeters(){meterClock.submit(true);}
     const workspace=window.EntropyWorkspace({kind:"stream",
-        describe:data=>`${data.sourceName} · ${data.representation} · sample #${data.frame.toLocaleString()} · [${data.offset.toLocaleString()}, ${(data.offset+data.analyzedBytes).toLocaleString()}) of ${data.totalBytes.toLocaleString()} bytes · worker ${data.analysisMs.toFixed(1)} ms`,
+        describe:data=>t("{source} · {representation} · sample #{frame} · [{start}, {end}) of {total} bytes · worker {milliseconds} ms",{source:data.sourceName,representation:data.representation,frame:data.frame.toLocaleString(),start:data.offset.toLocaleString(),end:(data.offset+data.analyzedBytes).toLocaleString(),total:data.totalBytes.toLocaleString(),milliseconds:data.analysisMs.toFixed(1)}),
         onAnalyzed(data){if(data.sourceId===generation){analysedFrames++;analysedBytes+=data.analyzedBytes;updateMeters();}},
         onRender(data){
             if(data.sourceId!==generation)return;
@@ -122,7 +130,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         const now=performance.now();meter.add(bytes.length,now);frame++;
         const output=helpers.transform(bytes,options.transform,previous);
         previous=options.transform==="xor"?bytes.slice():null;
-        $("lab-source-info").textContent=`${options.label} · ${encoding} · representation: ${options.transform}`;
+        setText($("lab-source-info"),"{source} · {encoding} · representation: {representation}",{source:options.label,encoding,representation:options.transform});
         if($("lab-body-preview")&&(options.selection==="http"||options.registeredKind==="webpage"))$("lab-body-preview").textContent=new TextDecoder().decode(bytes.subarray(0,2048));
         updateMeters();
         if(!output){status("waiting","XOR warming up · needs two equal-length samples");return;}
@@ -178,7 +186,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         let requested;try{requested=readOptions();}catch(error){status("error",error.message);return;}
         if(!requested)return;
         stopTransport();generation++;options=requested;once=single;finishing=false;paused=false;running=true;
-        $("lab-transport-info").textContent="";
+        setText($("lab-transport-info"),"");
         if($("lab-body-preview"))$("lab-body-preview").textContent="";
         lastInput=null;previous=null;frame=0;analysedBytes=0;analysedFrames=0;lastAccepted=-Infinity;lastSubmittedFrame=0;
         meter.reset(performance.now());workspace.clear();workspace.setFrozen(false);controller=new AbortController();
@@ -186,7 +194,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         status("waiting","Connecting or awaiting source permission…");buttons();updateMeters();
         try{
             const close=await window.EntropyLabAdapters.start(options,{signal,video:$("lab-video"),
-                info(message){if(token===generation&&!signal.aborted)$("lab-transport-info").textContent=message;},
+                info(message,key=message,values={}){if(token===generation&&!signal.aborted)setText($("lab-transport-info"),key,values);},
                 previewEnabled:()=>$("lab-show-preview").checked,previewCanvas:$("lab-network-preview"),
                 ready(){if(token===generation&&!signal.aborted){meter.reset(performance.now());status("waiting","Source ready · awaiting sample");if(["microphone","linein"].includes(options.kind))void refreshAudioInputs();}},
                 emit:(bytes,encoding,audioMetadata)=>capture(bytes,encoding,token,audioMetadata),
@@ -196,10 +204,10 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
             if(token!==generation||signal.aborted)close?.();else cleanup=close;
         }catch(error){if(token===generation&&!signal.aborted)stop("error",error.message);}
     }
-    function sourceFields(){
+    function sourceFields(refreshDevices=true){
         const kind=$("lab-kind").value;
         if(document.body.dataset.lab==="sources")$("lab-catalog-info").hidden=kind!=="rtsp";
-        if(["microphone","linein"].includes(kind))void refreshAudioInputs();
+        if(refreshDevices&&["microphone","linein"].includes(kind))void refreshAudioInputs();
         const serverHTTP=kind==="http"&&$("lab-http-route")?.value==="registered";
         if($("lab-registered")){
             const select=$("lab-registered"),selected=select.value;
@@ -207,7 +215,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
             if(select.dataset.ids!==available.map(source=>source.id).join("|")){
                 select.replaceChildren();
                 for(const source of available){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;select.append(option);}
-                if(!available.length){const option=document.createElement("option");option.value="";option.textContent="No matching registrations";select.append(option);}
+                if(!available.length){const option=document.createElement("option");option.value="";setText(option,"No matching registrations");select.append(option);}
                 if(available.some(source=>source.id===selected))select.value=selected;
                 select.dataset.ids=available.map(source=>source.id).join("|");
             }
@@ -222,7 +230,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         if($("lab-url"))$("lab-url").required=["peer-ws","peer-http","http","websocket"].includes(kind)&&!serverHTTP;
         if($("lab-url-label")){
             const sourceKind=kind==="websocket"?"websocket":kind==="peer-ws"?"entropy-ws":kind==="peer-http"?"entropy-http":"webpage",schema=guidance.schemaFor(sourceKind);
-            $("lab-url-label").textContent=schema.label;$("lab-url").placeholder=browserExample(sourceKind);
+            setText($("lab-url-label"),schema.label);$("lab-url").placeholder=browserExample(sourceKind);
         }
         if($("lab-file"))$("lab-file").required=kind==="file";
         $("lab-preview-card").hidden=!["camera","rtsp"].includes(kind);
@@ -235,7 +243,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
                 if(!serverHTTP){const preset=guidance.pagePresets.find(p=>p.url===$("lab-page-preset").value);if(preset)hint=preset.hint+" "+hint;}
             }else if(kind==="bridge"&&source)hint=guidance.schemaFor(source.kind).help;
             else if(["websocket","peer-ws","peer-http"].includes(kind))hint=guidance.schemaFor(kind==="websocket"?kind:kind==="peer-ws"?"entropy-ws":"entropy-http").help;
-            $("lab-route-help").textContent=hint;
+            setText($("lab-route-help"),hint);
         }
         if($("lab-body-card"))$("lab-body-card").hidden=kind!=="http"&&!(kind==="bridge"&&source?.kind==="webpage");
         const limit=Math.min(helpers.MAX_BYTES,catalog.max_bytes,kind==="bridge"||kind==="rtsp"||serverHTTP?source?.max_bytes||helpers.MAX_BYTES:helpers.MAX_BYTES);
@@ -249,7 +257,7 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
     });
     $("lab-page-preset")?.addEventListener("change",()=>{if($("lab-page-preset").value)$("lab-url").value=$("lab-page-preset").value;});
     $("lab-once").addEventListener("click",()=>void start(true));$("lab-stop").addEventListener("click",()=>stop());
-    $("lab-config").addEventListener("change",()=>{stop();workspace.clear();lastInput=null;$("lab-transport-info").textContent="";if($("lab-body-preview"))$("lab-body-preview").textContent="";$("lab-source-info").textContent="No source active.";sourceFields();status("waiting","Settings changed · Start or Sample once to apply");buttons();});
+    $("lab-config").addEventListener("change",()=>{stop();workspace.clear();lastInput=null;setText($("lab-transport-info"),"");if($("lab-body-preview"))$("lab-body-preview").textContent="";setText($("lab-source-info"),"No source active.");sourceFields();status("waiting","Settings changed · Start or Sample once to apply");buttons();});
     $("pause-plots").addEventListener("click",()=>{paused=!paused;workspace.setFrozen(paused);lastAccepted=-Infinity;buttons();status("ready",paused?"Receiving · plots paused":"Source active");});
     document.addEventListener("visibilitychange",()=>{if(document.hidden&&running)stop("disconnected","Hidden tab · source stopped");});
     function download(blob,name){
@@ -263,11 +271,11 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
             const row=document.createElement("tr");row.setAttribute("role","row");
             const values=[record.source,record.representation,record.window.bytes.toLocaleString(),record.statistics.entropy.toFixed(6),record.meter.bytesPerSecond===null?"—":(record.meter.bytesPerSecond/1e6).toFixed(4)];
             values.forEach((value,index)=>{
-                const cell=document.createElement("td"),content=document.createElement("span");cell.setAttribute("role","cell");cell.dataset.label=labels[index];content.textContent=value;cell.append(content);
+                const cell=document.createElement("td"),content=document.createElement("span");cell.setAttribute("role","cell");cell.dataset.label=t(labels[index]);content.textContent=value;cell.append(content);
                 if(index===0){
                     const note=document.createElement("small");note.className="lab-record-note";
-                    note.textContent=`${record.frozen?"Frozen":"Live"} sample #${record.window.frame} · ${record.capturedAt?new Date(record.capturedAt).toLocaleTimeString():"capture time unavailable"}`;
-                    content.append(note);cell.title=`Captured: ${record.capturedAt||"unavailable (older record)"}\nRecorded: ${record.recordedAt||record.timestamp}\nMeters describe the source session at recording time.`;
+                    setText(note,record.capturedAt?(record.frozen?"Frozen sample #{frame} · {time}":"Live sample #{frame} · {time}"):(record.frozen?"Frozen sample #{frame} · capture time unavailable":"Live sample #{frame} · capture time unavailable"),{frame:record.window.frame,time:record.capturedAt?new Date(record.capturedAt).toLocaleTimeString():""});
+                    content.append(note);cell.title=t(record.capturedAt?"Captured: {captured}\nRecorded: {recorded}\nMeters describe the source session at recording time.":"Captured: unavailable (older record)\nRecorded: {recorded}\nMeters describe the source session at recording time.",{captured:record.capturedAt,recorded:record.recordedAt||record.timestamp});
                 }
                 row.append(cell);
             });body.append(row);
@@ -293,11 +301,12 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
             $("lab-registered").replaceChildren();
             const available=catalog.sources.filter(source=>document.body.dataset.lab==="sources"?source.width>0:!source.width);
             for(const source of available){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;$("lab-registered").append(option);}
-            if(!available.length){const option=document.createElement("option");option.value="";option.textContent="No sources registered";$("lab-registered").append(option);}
-            $("lab-catalog-info").textContent=catalog.sources.length?`${catalog.sources.length} registered source(s) · bridge ${catalog.allowed?"available":"restricted to loopback clients"} · operator setup: -lab-sources=FILE`:document.body.dataset.lab==="sources"?"No network-camera registrations are active. Local browser sources work without a registry. Install the prepared JSON and restart with -lab-sources=lab-sources.json to add network cameras.":"No registered sources are active. Preparing JSON here does not load it: save it on the server and restart with -lab-sources=lab-sources.json. Browser HTTP still needs target-site CORS permission.";
+            if(!available.length){const option=document.createElement("option");option.value="";setText(option,"No sources registered");$("lab-registered").append(option);}
+            setText($("lab-catalog-info"),catalog.sources.length?(catalog.allowed?"{count} registered source(s) · bridge available · operator setup: -lab-sources=FILE":"{count} registered source(s) · bridge restricted to loopback clients · operator setup: -lab-sources=FILE"):document.body.dataset.lab==="sources"?"No network-camera registrations are active. Local browser sources work without a registry. Install the prepared JSON and restart with -lab-sources=lab-sources.json to add network cameras.":"No registered sources are active. Preparing JSON here does not load it: save it on the server and restart with -lab-sources=lab-sources.json. Browser HTTP still needs target-site CORS permission.",{count:catalog.sources.length});
             sourceFields();
-        }catch(error){$("lab-catalog-info").textContent=error.message;}
+        }catch(error){setText($("lab-catalog-info"),error.message);}
     })();
     window.addEventListener("pagehide",()=>{disposed=true;audioRequest++;navigator.mediaDevices?.removeEventListener?.("devicechange",audioDevicesChanged);stopTransport();generation++;meterClock.cancel();workspace.destroy();});
+    window.addEventListener("entropylanguagechange",()=>{sourceFields(false);renderRecords();buttons();updateAudioHelp();updateMeters();});
     sourceFields();renderRecords();buttons();
 })();

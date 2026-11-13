@@ -4,20 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Entropy Service — Colours</title>
+  <title data-i18n="Entropy Service — Colours">Entropy Service — Colours</title>
+  <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-colors" data-entropy-view="colors">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <main class="color-shell">
-    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
+    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting"><span data-i18n="AWAITING FIRST SAMPLE">AWAITING FIRST SAMPLE</span></p>
     <p id="sample-info"></p>
     <div id="hash" class="hash color-hash">—</div>
-    <p><a href="/">← Back to all endpoints</a></p>
+    <p><a href="/"><span data-i18n="← Back to all endpoints">← Back to all endpoints</span></a></p>
   </main>
   <script src="/display-clock.js" defer></script>
   <script src="/entropy-display.js" defer></script>

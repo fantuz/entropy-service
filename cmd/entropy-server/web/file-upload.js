@@ -1,16 +1,27 @@
 "use strict";
 
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
+    function text(element, message, params = {}) {
+        if (globalThis.window?.EntropyI18n) window.EntropyI18n.set(element, message, params);
+        else element.textContent = tr(message, params);
+    }
+    function uiError(message, params = {}) {
+        return Object.assign(new Error(tr(message, params)), {uiMessage: message, uiParams: params});
+    }
     const $ = id => document.getElementById(id);
     const form = $("uploadForm"), input = $("fileInput"), submit = $("submit-upload"), cancel = $("cancel-upload");
     let controller = null, file = null, sourceId = 0, seekVersion = 0, windowNumber = 0;
     let readBusy = false, queuedRead = null, playing = false, timer = null;
-    function setStatus(state, message) {
+    function setStatus(state, message, params = {}) {
         $("upload-status").dataset.state = state;
-        if ($("upload-status").textContent !== message) $("upload-status").textContent = message;
+        text($("upload-status"), message, params);
     }
     const workspace = window.EntropyWorkspace({kind: "file",
-        describe: data => `FILE WINDOW #${data.frame.toLocaleString()} · [${data.offset.toLocaleString()}, ${(data.offset + data.analyzedBytes).toLocaleString()}) of ${data.totalBytes.toLocaleString()} bytes · worker ${data.analysisMs.toFixed(1)} ms`,
+        describe: data => tr("FILE WINDOW #{frame} · [{start}, {end}) of {total} bytes · worker {duration} ms", {
+            frame: data.frame.toLocaleString(), start: data.offset.toLocaleString(), end: (data.offset + data.analyzedBytes).toLocaleString(),
+            total: data.totalBytes.toLocaleString(), duration: data.analysisMs.toFixed(1)}),
         onRender(data) {
             if (data.sourceId !== sourceId) return;
             if (document.activeElement !== $("analysis-offset")) $("analysis-offset").value = data.offset;
@@ -18,7 +29,7 @@
             setStatus("ready", playing ? "Playing file windows" : "Analysis complete");
             if (playing) scheduleNext(data);
         },
-        onError(message) { stopPlayback(); setStatus("error", message); },
+        onError(message) { stopPlayback(); setStatus("error", message === "ANALYSIS WORKER FAILED" ? message : "{error}", {error: message}); },
         onSampleNeeded(sample) {
             const offset = Number($("analysis-offset").value);
             if (file && (!sample || sample.offset !== offset || readBusy || queuedRead)) {
@@ -45,7 +56,7 @@
         $("file-controls").disabled = !file;
         $("previous-window").disabled = !file || offset <= 0;
         $("next-window").disabled = !file || offset + size >= file.size;
-        $("play-file").textContent = playing ? "Pause playback" : file && offset + size >= file.size ? "Play from start" : "Play windows";
+        text($("play-file"), playing ? "Pause playback" : file && offset + size >= file.size ? "Play from start" : "Play windows");
         $("play-file").setAttribute("aria-pressed", String(playing));
     }
     function stopPlayback() {
@@ -56,8 +67,8 @@
             workspace.setFrozen(true);
             if (file && workspace.sample) setStatus("ready", "Analysis complete");
         }
-        $("capture-state").textContent = file ? "Paused · inspect bytes or click A/B. Next/Previous advances one window; playback stops at EOF." :
-            "Upload a file, then inspect a window or play successive windows.";
+        text($("capture-state"), file ? "Paused · inspect bytes or click A/B. Next/Previous advances one window; playback stops at EOF." :
+            "Upload a file, then inspect a window or play successive windows.");
         updateControls();
     }
     function scheduleNext(data) {
@@ -87,7 +98,7 @@
             workspace.submit(buffer, {totalBytes: job.file.size, offset: job.offset, sourceId: job.sourceId,
                 frame: ++windowNumber, time: Date.now(), captureTime: performance.now()});
         } catch (error) {
-            if (job.sourceId === sourceId && job.version === seekVersion) { stopPlayback(); setStatus("error", "File read failed: " + error.message); }
+            if (job.sourceId === sourceId && job.version === seekVersion) { stopPlayback(); setStatus("error", "File read failed: {error}", {error: error.message}); }
         } finally { readBusy = false; pumpRead(); }
     }
     function step(direction) {
@@ -103,7 +114,7 @@
         if (!file) return;
         if (playing) { stopPlayback(); return; }
         playing = true; workspace.setFrozen(false);
-        $("capture-state").textContent = "Playing · each row is one inspected file window. Pause to freeze and mark A/B.";
+        text($("capture-state"), "Playing · each row is one inspected file window. Pause to freeze and mark A/B.");
         updateControls();
         const sample = workspace.sample;
         if (!sample || sample.offset + sample.analyzedBytes >= file.size) requestWindow(0);
@@ -125,33 +136,33 @@
         controller = new AbortController();
         submit.disabled = true; input.disabled = true; cancel.disabled = false;
         setStatus("connecting", "Uploading and analyzing");
-        $("file-entropy").textContent = `${selected.name} (${selected.size.toLocaleString()} bytes)`;
+        text($("file-entropy"), "{name} ({bytes} bytes)", {name: selected.name, bytes: selected.size.toLocaleString()});
         $("file-sha256").textContent = "—";
-        $("server-analysis").textContent = "Awaiting the server report.";
+        text($("server-analysis"), "Awaiting the server report.");
         $("server-report-content").textContent = "";
         try {
             // The server keeps the existing bounded /files contract and hashes
             // the complete upload. Interactive windows use local File slices.
             const response = await fetch("/files", {method: "POST", headers: {"Content-Type": "application/octet-stream"},
                 body: selected, signal: controller.signal});
-            if (!response.ok) throw new Error(`HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
+            if (!response.ok) throw uiError("HTTP {status}: {detail}", {status: response.status, detail: (await response.text()).slice(0, 300)});
             const result = await response.json();
             if (result.total_bytes !== selected.size || !Number.isSafeInteger(result.analyzed_bytes) ||
                 result.analyzed_bytes < 1 || result.analyzed_bytes > selected.size || !/^[0-9a-f]{64}$/.test(result.sha256)) {
-                throw new Error("Invalid file analysis response");
+                throw uiError("Invalid file analysis response");
             }
             file = selected;
             $("analysis-offset").max = file.size - 1;
             $("analysis-offset").value = 0;
             $("file-sha256").textContent = result.sha256;
-            $("server-analysis").textContent = `Server report: first ${result.analyzed_bytes.toLocaleString()} of ${result.total_bytes.toLocaleString()} uploaded bytes. Plots below use their own selected window.`;
+            text($("server-analysis"), "Server report: first {analyzed} of {total} uploaded bytes. Plots below use their own selected window.", {analyzed: result.analyzed_bytes.toLocaleString(), total: result.total_bytes.toLocaleString()});
             $("server-report-content").textContent = JSON.stringify(result, null, 2);
             setStatus("connecting", "Reading the selected file window");
             updateControls();
             requestWindow(0);
         } catch (error) {
-            setStatus(error.name === "AbortError" ? "disconnected" : "error", error.name === "AbortError" ? "Upload canceled" : error.message);
-            $("sample-info").textContent = "Upload a file to begin analysis.";
+            setStatus(error.name === "AbortError" ? "disconnected" : "error", error.name === "AbortError" ? "Upload canceled" : error.uiMessage || "{error}", error.uiParams || {error: error.message});
+            text($("sample-info"), "Upload a file to begin analysis.");
         } finally {
             controller = null;
             submit.disabled = false; input.disabled = false; cancel.disabled = true;

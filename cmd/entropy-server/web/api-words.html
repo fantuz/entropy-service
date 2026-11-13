@@ -4,28 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Entropy Stream Service - Random Words</title>
+<title data-i18n="Entropy Stream Service - Random Words">Entropy Stream Service - Random Words</title>
 
-<script src="/theme.js"></script>
+<script src="/i18n.js"></script>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-words">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
 
 <div class="panel">
     <form id="word-language-form" class="word-language-controls">
-        <label for="word-language">Word language</label>
-        <select id="word-language" name="lang" disabled><option value="en">Loading languages…</option></select>
-        <button type="submit" id="word-language-apply" disabled>Apply</button>
+        <label for="word-language"><span data-i18n="Word language">Word language</span></label>
+        <select id="word-language" name="lang" disabled><option value="en" data-i18n="Loading languages…">Loading languages…</option></select>
+        <button type="submit" id="word-language-apply" disabled><span data-i18n="Apply">Apply</span></button>
     </form>
     <p id="wordlist-info" class="wordlist-info"></p>
-    <p class="wordlist-info"><a href="/wordlist-notices.txt">Wordlist sources and licenses</a></p>
-    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting">AWAITING FIRST SAMPLE</p>
+    <p class="wordlist-info"><a href="/wordlist-notices.txt"><span data-i18n="Wordlist sources and licenses">Wordlist sources and licenses</span></a></p>
+    <p id="stream-notice" class="stream-notice" role="status" aria-live="polite" data-state="waiting"><span data-i18n="AWAITING FIRST SAMPLE">AWAITING FIRST SAMPLE</span></p>
     <div class="section">
-        <h3>Words</h3>
+        <h3><span data-i18n="Words">Words</span></h3>
         <div id="words" class="words"><div id="words-content" class="words-content">—</div></div>
     </div>
     <div class="section">

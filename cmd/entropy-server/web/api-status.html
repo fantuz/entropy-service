@@ -4,204 +4,205 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Entropy Service — Service Status</title>
+  <title data-i18n="Entropy Service — Service Status">Entropy Service — Service Status</title>
   <meta name="description" content="Unified operational view of Entropy Service liveness, readiness, and metrics endpoints.">
+  <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-home page-status">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <div class="wrap">
     <header>
-      <div class="eyebrow">Entropy Service / Operations</div>
-      <h1>Service Status</h1>
-      <p class="lede">A single browser view of the existing liveness, readiness, and Prometheus metrics endpoints. The underlying APIs remain unchanged.</p>
-      <p><a href="/">← Back to all endpoints</a></p>
+      <div class="eyebrow"><span data-i18n="Entropy Service / Operations">Entropy Service / Operations</span></div>
+      <h1><span data-i18n="Service Status">Service Status</span></h1>
+      <p class="lede"><span data-i18n="A single browser view of the existing liveness, readiness, and Prometheus metrics endpoints. The underlying APIs remain unchanged.">A single browser view of the existing liveness, readiness, and Prometheus metrics endpoints. The underlying APIs remain unchanged.</span></p>
+      <p><a href="/"><span data-i18n="← Back to all endpoints">← Back to all endpoints</span></a></p>
     </header>
     <main>
-      <div class="status-grid" aria-label="Service health">
+      <div class="status-grid" aria-label="Service health" data-i18n-aria-label="Service health">
         <section class="status-card" id="live-card" data-state="waiting">
-          <h2>HTTP liveness</h2>
-          <div class="status-value" id="live-value" role="status">Checking…</div>
+          <h2><span data-i18n="HTTP liveness">HTTP liveness</span></h2>
+          <div class="status-value" id="live-value" role="status"><span data-i18n="Checking…">Checking…</span></div>
           <div class="status-detail"><a href="/live">GET /live</a></div>
         </section>
         <section class="status-card" id="ready-card" data-state="waiting">
-          <h2>Entropy readiness</h2>
-          <div class="status-value" id="ready-value" role="status">Checking…</div>
+          <h2><span data-i18n="Entropy readiness">Entropy readiness</span></h2>
+          <div class="status-value" id="ready-value" role="status"><span data-i18n="Checking…">Checking…</span></div>
           <div class="status-detail"><a href="/ready">GET /ready</a></div>
         </section>
         <section class="status-card" id="metrics-card" data-state="waiting">
-          <h2>Prometheus metrics</h2>
-          <div class="status-value" id="metrics-value" role="status">Checking…</div>
+          <h2><span data-i18n="Prometheus metrics">Prometheus metrics</span></h2>
+          <div class="status-value" id="metrics-value" role="status"><span data-i18n="Checking…">Checking…</span></div>
           <div class="status-detail"><a href="/metrics">GET /metrics</a></div>
         </section>
       </div>
       <section aria-labelledby="capacity-title" class="status-kpis">
-        <h2 id="capacity-title">Admission capacity &amp; pressure</h2>
-        <p class="sub">Live admission pressure (bright) and server-lifetime high-water marks (dim shadow), not actual RAM usage or QRNG buffer fill.</p>
+        <h2 id="capacity-title"><span data-i18n="Admission capacity &amp; pressure">Admission capacity &amp; pressure</span></h2>
+        <p class="sub"><span data-i18n="Live admission pressure (bright) and server-lifetime high-water marks (dim shadow), not actual RAM usage or QRNG buffer fill.">Live admission pressure (bright) and server-lifetime high-water marks (dim shadow), not actual RAM usage or QRNG buffer fill.</span></p>
         <div class="status-pressure-grid">
           <article class="status-pressure-card" id="kpi-httpMemory" data-state="unknown">
-            <h3>HTTP memory budget</h3>
+            <h3><span data-i18n="HTTP memory budget">HTTP memory budget</span></h3>
             <output id="kpi-httpMemory-value">—</output>
             <div class="status-meter-track">
               <span class="status-peak-shadow" id="kpi-httpMemory-peak-shadow" aria-hidden="true"></span>
-            <progress id="kpi-httpMemory-meter" value="0" max="100" aria-label="HTTP memory budget utilization"></progress>
+            <progress id="kpi-httpMemory-meter" value="0" max="100" aria-label="HTTP memory budget utilization" data-i18n-aria-label="HTTP memory budget utilization"></progress>
             </div>
-            <p class="status-peak-detail" id="kpi-httpMemory-peak-detail">PEAK —</p>
-            <p id="kpi-httpMemory-detail" class="status-pressure-detail">Estimated HTTP working-memory reservations</p>
+            <p class="status-peak-detail" id="kpi-httpMemory-peak-detail"><span data-i18n="PEAK —">PEAK —</span></p>
+            <p id="kpi-httpMemory-detail" class="status-pressure-detail"><span data-i18n="Estimated HTTP working-memory reservations">Estimated HTTP working-memory reservations</span></p>
           </article>
           <article class="status-pressure-card" id="kpi-wsMemory" data-state="unknown">
-            <h3>WebSocket memory budget</h3>
+            <h3><span data-i18n="WebSocket memory budget">WebSocket memory budget</span></h3>
             <output id="kpi-wsMemory-value">—</output>
             <div class="status-meter-track">
               <span class="status-peak-shadow" id="kpi-wsMemory-peak-shadow" aria-hidden="true"></span>
-            <progress id="kpi-wsMemory-meter" value="0" max="100" aria-label="WebSocket memory budget utilization"></progress>
+            <progress id="kpi-wsMemory-meter" value="0" max="100" aria-label="WebSocket memory budget utilization" data-i18n-aria-label="WebSocket memory budget utilization"></progress>
             </div>
-            <p class="status-peak-detail" id="kpi-wsMemory-peak-detail">PEAK —</p>
-            <p id="kpi-wsMemory-detail" class="status-pressure-detail">Estimated WebSocket working-memory reservations</p>
+            <p class="status-peak-detail" id="kpi-wsMemory-peak-detail"><span data-i18n="PEAK —">PEAK —</span></p>
+            <p id="kpi-wsMemory-detail" class="status-pressure-detail"><span data-i18n="Estimated WebSocket working-memory reservations">Estimated WebSocket working-memory reservations</span></p>
           </article>
           <article class="status-pressure-card" id="kpi-httpSlots" data-state="unknown">
-            <h3>Active HTTP slots</h3>
+            <h3><span data-i18n="Active HTTP slots">Active HTTP slots</span></h3>
             <output id="kpi-httpSlots-value">—</output>
             <div class="status-meter-track">
               <span class="status-peak-shadow" id="kpi-httpSlots-peak-shadow" aria-hidden="true"></span>
-            <progress id="kpi-httpSlots-meter" value="0" max="100" aria-label="Active HTTP slots utilization"></progress>
+            <progress id="kpi-httpSlots-meter" value="0" max="100" aria-label="Active HTTP slots utilization" data-i18n-aria-label="Active HTTP slots utilization"></progress>
             </div>
-            <p class="status-peak-detail" id="kpi-httpSlots-peak-detail">PEAK —</p>
-            <p id="kpi-httpSlots-detail" class="status-pressure-detail">Currently admitted generation requests</p>
+            <p class="status-peak-detail" id="kpi-httpSlots-peak-detail"><span data-i18n="PEAK —">PEAK —</span></p>
+            <p id="kpi-httpSlots-detail" class="status-pressure-detail"><span data-i18n="Currently admitted generation requests">Currently admitted generation requests</span></p>
           </article>
           <article class="status-pressure-card" id="kpi-wsSlots" data-state="unknown">
-            <h3>Active WebSocket slots</h3>
+            <h3><span data-i18n="Active WebSocket slots">Active WebSocket slots</span></h3>
             <output id="kpi-wsSlots-value">—</output>
             <div class="status-meter-track">
               <span class="status-peak-shadow" id="kpi-wsSlots-peak-shadow" aria-hidden="true"></span>
-            <progress id="kpi-wsSlots-meter" value="0" max="100" aria-label="Active WebSocket slots utilization"></progress>
+            <progress id="kpi-wsSlots-meter" value="0" max="100" aria-label="Active WebSocket slots utilization" data-i18n-aria-label="Active WebSocket slots utilization"></progress>
             </div>
-            <p class="status-peak-detail" id="kpi-wsSlots-peak-detail">PEAK —</p>
-            <p id="kpi-wsSlots-detail" class="status-pressure-detail">Currently admitted WebSocket connections</p>
+            <p class="status-peak-detail" id="kpi-wsSlots-peak-detail"><span data-i18n="PEAK —">PEAK —</span></p>
+            <p id="kpi-wsSlots-detail" class="status-pressure-detail"><span data-i18n="Currently admitted WebSocket connections">Currently admitted WebSocket connections</span></p>
           </article>
         </div>
-        <p class="status-kpi-note">The dim overlay records the highest simultaneous admission since the current server process started. Budget pressure = estimated memory reserved / configured admission budget. It is not Go heap or process RSS. The legacy software QRNG ring buffer is disabled; the historical 0% fill statistic is not an actual measurement.</p>
+        <p class="status-kpi-note"><span data-i18n="The dim overlay records the highest simultaneous admission since the current server process started. Budget pressure = estimated memory reserved / configured admission budget. It is not Go heap or process RSS. The legacy software QRNG ring buffer is disabled; the historical 0% fill statistic is not an actual measurement.">The dim overlay records the highest simultaneous admission since the current server process started. Budget pressure = estimated memory reserved / configured admission budget. It is not Go heap or process RSS. The legacy software QRNG ring buffer is disabled; the historical 0% fill statistic is not an actual measurement.</span></p>
       </section>
       <section aria-labelledby="activity-title" class="status-kpis">
-        <h2 id="activity-title">Activity &amp; exhaustion signals</h2>
-        <p class="sub">Rates use recent Prometheus counter snapshots (up to five seconds of history). Short polling intervals may show sampling noise; counter resets restart rate calculation. Dim tracks show process-lifetime peak observed 1-second rates; bright fill shows the current browser-observed rate relative to that peak.</p>
+        <h2 id="activity-title"><span data-i18n="Activity &amp; exhaustion signals">Activity &amp; exhaustion signals</span></h2>
+        <p class="sub"><span data-i18n="Rates use recent Prometheus counter snapshots (up to five seconds of history). Short polling intervals may show sampling noise; counter resets restart rate calculation. Dim tracks show process-lifetime peak observed 1-second rates; bright fill shows the current browser-observed rate relative to that peak.">Rates use recent Prometheus counter snapshots (up to five seconds of history). Short polling intervals may show sampling noise; counter resets restart rate calculation. Dim tracks show process-lifetime peak observed 1-second rates; bright fill shows the current browser-observed rate relative to that peak.</span></p>
         <div class="status-activity-grid">
           <article class="status-activity-card">
-            <h3>DRBG generation rate</h3>
+            <h3><span data-i18n="DRBG generation rate">DRBG generation rate</span></h3>
             <output id="kpi-generation-rate">—</output>
-            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
-              <progress id="kpi-generation-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
-              <small id="kpi-generation-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak" data-i18n-aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-generation-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak" data-i18n-aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-generation-rate-peak-label" class="activity-peak-label"><span data-i18n="PEAK —">PEAK —</span></small>
             </div>
-            <p>Includes internal seed derivation; not network throughput</p>
+            <p><span data-i18n="Includes internal seed derivation; not network throughput">Includes internal seed derivation; not network throughput</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>WebSocket messages</h3>
+            <h3><span data-i18n="WebSocket messages">WebSocket messages</span></h3>
             <output id="kpi-ws-payload-rate">—</output>
-            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
-              <progress id="kpi-ws-payload-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
-              <small id="kpi-ws-payload-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak" data-i18n-aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-ws-payload-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak" data-i18n-aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-ws-payload-rate-peak-label" class="activity-peak-label"><span data-i18n="PEAK —">PEAK —</span></small>
             </div>
-            <p>Successfully sent WS/WSS messages per second</p>
+            <p><span data-i18n="Successfully sent WS/WSS messages per second">Successfully sent WS/WSS messages per second</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>HTTP requests</h3>
+            <h3><span data-i18n="HTTP requests">HTTP requests</span></h3>
             <output id="kpi-http-request-rate">—</output>
-            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
-              <progress id="kpi-http-request-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
-              <small id="kpi-http-request-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak" data-i18n-aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-http-request-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak" data-i18n-aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-http-request-rate-peak-label" class="activity-peak-label"><span data-i18n="PEAK —">PEAK —</span></small>
             </div>
-            <p>All HTTP requests, including dashboard polling</p>
+            <p><span data-i18n="All HTTP requests, including dashboard polling">All HTTP requests, including dashboard polling</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>WebSocket rejection pace</h3>
+            <h3><span data-i18n="WebSocket rejection pace">WebSocket rejection pace</span></h3>
             <output id="kpi-ws-reject-rate">—</output>
-            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
-              <progress id="kpi-ws-reject-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
-              <small id="kpi-ws-reject-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak" data-i18n-aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-ws-reject-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak" data-i18n-aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-ws-reject-rate-peak-label" class="activity-peak-label"><span data-i18n="PEAK —">PEAK —</span></small>
             </div>
-            <p>Recent admission rejects, expressed per minute</p>
+            <p><span data-i18n="Recent admission rejects, expressed per minute">Recent admission rejects, expressed per minute</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>HTTP rejection pace</h3>
+            <h3><span data-i18n="HTTP rejection pace">HTTP rejection pace</span></h3>
             <output id="kpi-http-reject-rate">—</output>
-            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
-              <progress id="kpi-http-reject-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
-              <small id="kpi-http-reject-rate-peak-label" class="activity-peak-label">PEAK —</small>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak" data-i18n-aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-http-reject-rate-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak" data-i18n-aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-http-reject-rate-peak-label" class="activity-peak-label"><span data-i18n="PEAK —">PEAK —</span></small>
             </div>
-            <p>Recent admission rejects, expressed per minute</p>
+            <p><span data-i18n="Recent admission rejects, expressed per minute">Recent admission rejects, expressed per minute</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>Live DRBG instances</h3>
+            <h3><span data-i18n="Live DRBG instances">Live DRBG instances</span></h3>
             <output id="kpi-drbg-instances">—</output>
-            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak">
-              <progress id="kpi-drbg-instances-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak"></progress>
-              <small id="kpi-drbg-instances-peak-label" class="activity-peak-label">PEAK —</small>
+            <div class="activity-peak" role="group" aria-label="Current relative to server lifetime peak" data-i18n-aria-label="Current relative to server lifetime peak">
+              <progress id="kpi-drbg-instances-peak-meter" max="100" value="0" aria-label="Current activity relative to historical peak" data-i18n-aria-label="Current activity relative to historical peak"></progress>
+              <small id="kpi-drbg-instances-peak-label" class="activity-peak-label"><span data-i18n="PEAK —">PEAK —</span></small>
             </div>
-            <p>Root and active child generators</p>
+            <p><span data-i18n="Root and active child generators">Root and active child generators</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>Successful reseeds</h3>
+            <h3><span data-i18n="Successful reseeds">Successful reseeds</span></h3>
             <output id="kpi-reseed-successes">—</output>
-            <p>Cumulative successful root reseeds</p>
+            <p><span data-i18n="Cumulative successful root reseeds">Cumulative successful root reseeds</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>WebSocket rejections</h3>
+            <h3><span data-i18n="WebSocket rejections">WebSocket rejections</span></h3>
             <output id="kpi-ws-rejections">—</output>
-            <p>Cumulative: slots, memory and oversized requests</p>
+            <p><span data-i18n="Cumulative: slots, memory and oversized requests">Cumulative: slots, memory and oversized requests</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>HTTP admission rejections</h3>
+            <h3><span data-i18n="HTTP admission rejections">HTTP admission rejections</span></h3>
             <output id="kpi-http-rejections">—</output>
-            <p>Cumulative: slots, memory and oversized requests</p>
+            <p><span data-i18n="Cumulative: slots, memory and oversized requests">Cumulative: slots, memory and oversized requests</span></p>
           </article>
           <article class="status-activity-card" id="kpi-reseed-headroom-card">
-            <h3>Seed freshness headroom</h3>
+            <h3><span data-i18n="Seed freshness headroom">Seed freshness headroom</span></h3>
             <output id="kpi-reseed-headroom">—</output>
-            <p>Time remaining before the configured readiness age limit</p>
+            <p><span data-i18n="Time remaining before the configured readiness age limit">Time remaining before the configured readiness age limit</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>Successful reseed pace</h3>
+            <h3><span data-i18n="Successful reseed pace">Successful reseed pace</span></h3>
             <output id="kpi-reseed-rate">—</output>
-            <p>Successful root reseeds per minute (rolling sample window)</p>
+            <p><span data-i18n="Successful root reseeds per minute (rolling sample window)">Successful root reseeds per minute (rolling sample window)</span></p>
           </article>
           <article class="status-activity-card">
-            <h3>Failed reseed pace</h3>
+            <h3><span data-i18n="Failed reseed pace">Failed reseed pace</span></h3>
             <output id="kpi-reseed-failure-rate">—</output>
-            <p>Failed or skipped root reseeds per minute (rolling sample window)</p>
+            <p><span data-i18n="Failed or skipped root reseeds per minute (rolling sample window)">Failed or skipped root reseeds per minute (rolling sample window)</span></p>
           </article>
         </div>
-        <p class="status-kpi-note">Rejection pace is an interval estimate, not a percentage of all requests. Counters restart with the server. None of these figures represents physical entropy-buffer fullness or measured RAM pressure.</p>
+        <p class="status-kpi-note"><span data-i18n="Rejection pace is an interval estimate, not a percentage of all requests. Counters restart with the server. None of these figures represents physical entropy-buffer fullness or measured RAM pressure.">Rejection pace is an interval estimate, not a percentage of all requests. Counters restart with the server. None of these figures represents physical entropy-buffer fullness or measured RAM pressure.</span></p>
       </section>
-      <h2>Operational snapshot</h2>
+      <h2><span data-i18n="Operational snapshot">Operational snapshot</span></h2>
       <dl class="status-summary">
-        <div><dt>Entropy source</dt><dd id="rng-source">—</dd></div>
-        <div><dt>DRBG backend</dt><dd id="rng-drbg">—</dd></div>
-        <div><dt>Reseed age</dt><dd id="reseed-age">—</dd></div>
-        <div><dt>Reseed failures</dt><dd id="reseed-failures">—</dd></div>
-        <div><dt>DRBG bytes generated*</dt><dd id="bytes-generated">—</dd></div>
-        <div><dt>Active WebSockets</dt><dd id="active-websockets">—</dd></div>
+        <div><dt><span data-i18n="Entropy source">Entropy source</span></dt><dd id="rng-source">—</dd></div>
+        <div><dt><span data-i18n="DRBG backend">DRBG backend</span></dt><dd id="rng-drbg">—</dd></div>
+        <div><dt><span data-i18n="Reseed age">Reseed age</span></dt><dd id="reseed-age">—</dd></div>
+        <div><dt><span data-i18n="Reseed failures">Reseed failures</span></dt><dd id="reseed-failures">—</dd></div>
+        <div><dt><span data-i18n="DRBG bytes generated*">DRBG bytes generated*</span></dt><dd id="bytes-generated">—</dd></div>
+        <div><dt><span data-i18n="Active WebSockets">Active WebSockets</span></dt><dd id="active-websockets">—</dd></div>
       </dl>
-      <p class="note">*Generated-byte count includes internal DRBG seed derivation; it is not a network-throughput counter. Choose an interval from 0.05 to 60 seconds; the next check starts after the previous check finishes. HTTP request totals include this dashboard’s polling. A liveness response does not imply that reseeding is healthy.</p>
+      <p class="note"><span data-i18n="*Generated-byte count includes internal DRBG seed derivation; it is not a network-throughput counter. Choose an interval from 0.05 to 60 seconds; the next check starts after the previous check finishes. HTTP request totals include this dashboard’s polling. A liveness response does not imply that reseeding is healthy.">*Generated-byte count includes internal DRBG seed derivation; it is not a network-throughput counter. Choose an interval from 0.05 to 60 seconds; the next check starts after the previous check finishes. HTTP request totals include this dashboard’s polling. A liveness response does not imply that reseeding is healthy.</span></p>
       <div class="status-links status-refresh-controls">
-        <label for="status-interval">Auto-refresh (seconds)</label>
+        <label for="status-interval"><span data-i18n="Auto-refresh (seconds)">Auto-refresh (seconds)</span></label>
         <input type="number" id="status-interval" min="0.05" max="60" step="any" value="5" inputmode="decimal" aria-describedby="status-refresh-help">
-        <button type="button" id="status-refresh">Refresh now</button>
-        <span id="status-updated" class="analysis-meta" aria-live="off">Not checked yet</span>
-        <p id="status-refresh-help" class="status-kpi-note">Minimum 0.05 s; maximum 60 s. No overlapping checks. The next refresh is scheduled after the current check completes.</p>
+        <button type="button" id="status-refresh"><span data-i18n="Refresh now">Refresh now</span></button>
+        <span id="status-updated" class="analysis-meta" aria-live="off"><span data-i18n="Not checked yet">Not checked yet</span></span>
+        <p id="status-refresh-help" class="status-kpi-note"><span data-i18n="Minimum 0.05 s; maximum 60 s. No overlapping checks. The next refresh is scheduled after the current check completes.">Minimum 0.05 s; maximum 60 s. No overlapping checks. The next refresh is scheduled after the current check completes.</span></p>
       </div>
       <details class="panel">
-        <summary>Compatible legacy endpoints</summary>
-        <p>The aliases below remain registered for existing clients. They do not represent separate DRBG instances or independent health checks. Scrape only one metrics endpoint.</p>
+        <summary><span data-i18n="Compatible legacy endpoints">Compatible legacy endpoints</span></summary>
+        <p><span data-i18n="The aliases below remain registered for existing clients. They do not represent separate DRBG instances or independent health checks. Scrape only one metrics endpoint.">The aliases below remain registered for existing clients. They do not represent separate DRBG instances or independent health checks. Scrape only one metrics endpoint.</span></p>
         <p><a href="/health-1">/health-1</a> · <a href="/health-2">/health-2</a> · <a href="/metrics-1">/metrics-1</a></p>
       </details>
-      <div class="panel"><p>The browser dashboard is informational. Monitoring systems should continue to query the underlying JSON and Prometheus routes directly.</p></div>
+      <div class="panel"><p><span data-i18n="The browser dashboard is informational. Monitoring systems should continue to query the underlying JSON and Prometheus routes directly.">The browser dashboard is informational. Monitoring systems should continue to query the underlying JSON and Prometheus routes directly.</span></p></div>
     </main>
-    <footer><a href="/">All endpoints</a> · <a href="/api-gallery.html">Endpoint gallery</a> · <a href="https://github.com/fantuz/entropy-service">Documentation</a></footer>
+    <footer><a href="/"><span data-i18n="All endpoints">All endpoints</span></a> · <a href="/api-gallery.html"><span data-i18n="Endpoint gallery">Endpoint gallery</span></a> · <a href="https://github.com/fantuz/entropy-service"><span data-i18n="Documentation">Documentation</span></a></footer>
   </div>
   <script src="/status-kpis.js" defer></script>
   <script src="/status-dashboard.js" defer></script>

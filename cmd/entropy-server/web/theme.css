@@ -794,7 +794,7 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 @media(max-width:420px){.page-lab .analysis-controls input[type="text"],.page-lab .analysis-controls input[type="password"]{width:100%;}}
 
 /* Shared appearance control and compact, initially closed lab help. */
-.site-toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; width:min(100%,92rem); margin:0 auto 1rem; text-align:left; font-size:.82rem; }
+.site-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; width:min(100%,92rem); margin:0 auto 1rem; text-align:left; font-size:.82rem; }
 .site-toolbar > a { color:var(--text); text-decoration:none; font-weight:600; }
 .site-toolbar button { padding:.4rem .7rem; white-space:nowrap; }
 .site-toolbar button[aria-pressed="true"] { border-color:var(--green); }
@@ -829,4 +829,11 @@ body.page-home > .site-toolbar { width:min(calc(100% - 2rem),70rem); margin:1rem
   .page-home .panel p, .page-gallery .lede, .page-gallery .gallery-notes p, .page-status .status-kpi-note { max-width: 78ch; }
   .page-colors .color-shell { margin: 1rem auto; }
   .page-words .section, .page-words .word-language-controls { width: 100%; max-width: 70rem; margin-inline: auto; }
+}
+
+/* The interface choice is independent from the generated word-list language. */
+.ui-language-control { display:flex; margin-left:auto; align-items:center; flex-wrap:wrap; gap:.35rem .6rem; font-size:.82rem; min-width:0; }
+.ui-language-control select { width:auto; max-width:100%; padding:.35rem .5rem; }
+@media (max-width:36rem) {
+  .ui-language-control { flex-basis:100%; justify-content:space-between; }
 }

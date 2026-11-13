@@ -3,6 +3,8 @@
 // Optional diagnostic views. All coordinates are CSS pixels; backing canvases
 // follow the same capped pixel ratio as the ordinary analysis plots.
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
     let color;
     function updatePalette() {
         const style = getComputedStyle(document.documentElement);
@@ -36,7 +38,7 @@
         if (!p) return;
         p.ctx.fillStyle = color.text; p.ctx.textAlign = "center";
         // Fit long explanations on narrow canvases without overflowing labels.
-        p.ctx.fillText(message, p.width / 2, p.height / 2, p.width - 12);
+        p.ctx.fillText(tr(message), p.width / 2, p.height / 2, p.width - 12);
     }
 
     function grid(p, {xmin, xmax, ymin, ymax, xlabel, ylabel, xformat = n => String(Math.round(n)),
@@ -45,7 +47,7 @@
         p.x = value => left + (value - xmin) / (xmax - xmin || 1) * (right - left);
         p.y = value => bottom - (value - ymin) / (ymax - ymin || 1) * (bottom - top);
         ctx.fillStyle = color.text; ctx.strokeStyle = color.grid; ctx.lineWidth = 1;
-        ctx.textAlign = "left"; ctx.fillText(ylabel, 2, top - 10, width - 4);
+        ctx.textAlign = "left"; ctx.fillText(tr(ylabel), 2, top - 10, width - 4);
         for (let i = 0; i <= ticks; i++) {
             const yvalue = ymin + i / ticks * (ymax - ymin), py = p.y(yvalue);
             ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(right, py); ctx.stroke();
@@ -56,7 +58,7 @@
                 ctx.fillText(xformat(xvalue), px, bottom + 16);
             }
         }
-        if (xlabels) { ctx.textAlign = "center"; ctx.fillText(xlabel, (left + right) / 2, height - 5, width - 8); }
+        if (xlabels) { ctx.textAlign = "center"; ctx.fillText(tr(xlabel), (left + right) / 2, height - 5, width - 8); }
         return p;
     }
 
@@ -194,7 +196,7 @@
             }
         });
         ctx.globalAlpha = 1; ctx.fillStyle = color.text; ctx.textAlign = "left";
-        ctx.fillText(kind === "file" ? "Window start (bytes)" : "Capture age (seconds)", 2, 12, width - 4);
+        ctx.fillText(tr(kind === "file" ? "Window start (bytes)" : "Capture age (seconds)"), 2, 12, width - 4);
         const ticks = width < 360 ? 2 : 4;
         for (let i = 0; i <= ticks; i++) {
             const x = left + i / ticks * (right - left);
@@ -208,7 +210,7 @@
             const label = kind === "file" ? compactOffset(row.offset) : Math.max(0, (latest - row.time) / 1000).toFixed(1);
             ctx.fillText(label, left - 6, Math.max(top + 8, Math.min(bottom, top + (index + .5) * rowHeight + 3)));
         }
-        ctx.textAlign = "center"; ctx.fillText("Frequency (cycles/byte)", (left + right) / 2, height - 5, width - 8);
+        ctx.textAlign = "center"; ctx.fillText(tr("Frequency (cycles/byte)"), (left + right) / 2, height - 5, width - 8);
         return {rows: rows.length, latest, oldest};
     }
 

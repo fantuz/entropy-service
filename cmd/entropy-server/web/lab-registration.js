@@ -117,36 +117,49 @@
     globalThis.EntropyLabRegistration=Object.freeze({build,configuration,schemaFor,pagePresets,httpStatus});
     if(typeof document==="undefined")return;
     const trigger=document.getElementById("lab-create-source");if(!trigger)return;
+    const t = (message, values = {}) => window.EntropyI18n?.t(message, values) ??
+        message.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
+    function setText(node, message, values = {}) {
+        if (window.EntropyI18n) window.EntropyI18n.set(node, message, values);
+        else node.textContent = t(message, values);
+    }
+    function setAttribute(node, name, message, values = {}) {
+        if (window.EntropyI18n) window.EntropyI18n.attr(node, name, message, values);
+        else node.setAttribute(name, t(message, values));
+    }
+
     const dialog=document.createElement("dialog");dialog.className="lab-registration";dialog.id="lab-registration";
-    dialog.innerHTML=`<header class="registration-header"><div><h2 id="registration-title" class="analysis-label">Prepare source registry</h2><p id="registration-draft-state" class="note"></p></div><button type="button" id="registration-close">Close</button></header>
+    dialog.innerHTML=`<header class="registration-header"><div><h2 id="registration-title" class="analysis-label" data-i18n="Prepare source registry">Prepare source registry</h2><p id="registration-draft-state" class="note"></p></div><button type="button" id="registration-close" data-i18n="Close">Close</button></header>
     <div class="registration-body">
-      <p class="note">Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server. Capture also obeys the server’s -max-bytes and lab memory limits; browser samples are capped at 8 MiB.</p>
-      <section aria-labelledby="registration-list-title"><h3 id="registration-list-title" class="analysis-label">Draft sources</h3><ul id="registration-list" class="registration-list"></ul></section>
+      <p class="note" data-i18n="Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server. Capture also obeys the server’s -max-bytes and lab memory limits; browser samples are capped at 8 MiB.">Prepare a server configuration locally. Import an existing registry to append to it. This tool does not activate sources or write files on the server. Capture also obeys the server’s -max-bytes and lab memory limits; browser samples are capped at 8 MiB.</p>
+      <section aria-labelledby="registration-list-title"><h3 id="registration-list-title" class="analysis-label" data-i18n="Draft sources">Draft sources</h3><ul id="registration-list" class="registration-list"></ul></section>
       <p id="registration-status" role="status" class="note"></p>
       <form id="lab-registration-form">
       <div class="analysis-controls">
-        <label>Source kind<select name="kind">${kinds.map(kind=>`<option>${kind}</option>`).join("")}</select></label>
-        <label>ID<input name="id" required pattern="[a-z][a-z0-9_-]{0,31}" placeholder="lab-camera"></label>
-        <label>Display name<input name="name" maxlength="80" placeholder="Optional friendly name"></label>
-        <label class="registration-wide"><span id="registration-endpoint-label">Endpoint</span><input name="endpoint" required aria-describedby="registration-example registration-help" placeholder="https://example.org/"></label>
-        <div class="registration-wide"><p id="registration-example" class="note"></p><button type="button" id="registration-use-example">Use example</button></div>
-        <label class="registration-pages registration-wide" hidden>Web-page example<select id="registration-page-example"><option value="">Choose an example…</option>${pagePresets.map(p=>`<option value="${p.url}">${p.label}</option>`).join("")}</select></label>
-        <label>Maximum sample bytes<input name="max_bytes" type="number" min="1" max="33554432" value="33554432" required></label>
-        <label>Timeout (ms)<input name="timeout_ms" type="number" min="100" max="60000" value="5000" required></label>
-        <label class="registration-camera" hidden>Decoded size<select name="resolution"><option>160x120</option><option selected>320x240</option><option>640x480</option></select></label>
-        <label class="registration-onvif" hidden>ONVIF profile token<input name="profile_token" maxlength="256" placeholder="Empty: first Media profile"></label>
-        <label class="registration-pool registration-wide">Additional page URLs, one per line<textarea name="urls" rows="3" placeholder="Optional pool: one URL chosen per sample"></textarea></label>
+        <label><span data-i18n="Source kind">Source kind</span><select name="kind">${kinds.map(kind=>`<option>${kind}</option>`).join("")}</select></label>
+        <label><span data-i18n="ID">ID</span><input name="id" required pattern="[a-z][a-z0-9_-]{0,31}" placeholder="lab-camera"></label>
+        <label><span data-i18n="Display name">Display name</span><input name="name" maxlength="80" placeholder="Optional friendly name" data-i18n-placeholder="Optional friendly name"></label>
+        <label class="registration-wide"><span id="registration-endpoint-label" data-i18n="Endpoint">Endpoint</span><input name="endpoint" required aria-describedby="registration-example registration-help" placeholder="https://example.org/"></label>
+        <div class="registration-wide"><p id="registration-example" class="note"></p><button type="button" id="registration-use-example" data-i18n="Use example">Use example</button></div>
+        <label class="registration-pages registration-wide" hidden><span data-i18n="Web-page example">Web-page example</span><select id="registration-page-example"><option value="" data-i18n="Choose an example…">Choose an example…</option>${pagePresets.map(p=>`<option value="${p.url}">${p.label}</option>`).join("")}</select></label>
+        <label><span data-i18n="Maximum sample bytes">Maximum sample bytes</span><input name="max_bytes" type="number" min="1" max="33554432" value="33554432" required></label>
+        <label><span data-i18n="Timeout (ms)">Timeout (ms)</span><input name="timeout_ms" type="number" min="100" max="60000" value="5000" required></label>
+        <label class="registration-camera" hidden><span data-i18n="Decoded size">Decoded size</span><select name="resolution"><option>160x120</option><option selected>320x240</option><option>640x480</option></select></label>
+        <label class="registration-onvif" hidden><span data-i18n="ONVIF profile token">ONVIF profile token</span><input name="profile_token" maxlength="256" placeholder="Empty: first Media profile" data-i18n-placeholder="Empty: first Media profile"></label>
+        <label class="registration-pool registration-wide"><span data-i18n="Additional page URLs, one per line">Additional page URLs, one per line</span><textarea name="urls" rows="3" placeholder="Optional pool: one URL chosen per sample" data-i18n-placeholder="Optional pool: one URL chosen per sample"></textarea></label>
       </div>
       <p id="registration-help" class="note"></p>
-      <div class="lab-actions"><button type="submit" id="registration-submit">Add registration</button><button type="button" id="registration-cancel-edit">Clear form</button></div>
+      <div class="lab-actions"><button type="submit" id="registration-submit" data-i18n="Add registration">Add registration</button><button type="button" id="registration-cancel-edit" data-i18n="Clear form">Clear form</button></div>
     </form>
-    <label>Import existing registry (local file)<input type="file" id="registration-import" accept=".json,application/json"></label>
-    <details><summary>Configuration JSON</summary><label>Local draft<textarea id="registration-json" rows="8" readonly spellcheck="false"></textarea></label></details>
-    <p class="note">Save this file on the entropy-server host, then restart with:</p><pre>./bin/entropy-server -lab-sources=lab-sources.json</pre>
-    <p class="note" id="registration-camera-note" hidden>Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.</p>
-    </div><footer class="registration-footer"><div class="lab-actions"><button type="button" id="registration-download">Download JSON</button><button type="button" id="registration-copy">Copy JSON</button><button type="button" id="registration-reset">New configuration</button></div></footer>`;
+    <label><span data-i18n="Import existing registry (local file)">Import existing registry (local file)</span><input type="file" id="registration-import" accept=".json,application/json"></label>
+    <details><summary data-i18n="Configuration JSON">Configuration JSON</summary><label><span data-i18n="Local draft">Local draft</span><textarea id="registration-json" rows="8" readonly spellcheck="false"></textarea></label></details>
+    <p class="note" data-i18n="Save this file on the entropy-server host, then restart with:">Save this file on the entropy-server host, then restart with:</p><pre>./bin/entropy-server -lab-sources=lab-sources.json</pre>
+    <p class="note" id="registration-camera-note" hidden data-i18n="Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.">Camera credentials are entered in the capture form for each session. Camera registration needs FFmpeg on the server. ONVIF uses an explicit Device service URL; no LAN scanning is performed.</p>
+    </div><footer class="registration-footer"><div class="lab-actions"><button type="button" id="registration-download" data-i18n="Download JSON">Download JSON</button><button type="button" id="registration-copy" data-i18n="Copy JSON">Copy JSON</button><button type="button" id="registration-reset" data-i18n="New configuration">New configuration</button></div></footer>`;
     dialog.setAttribute("aria-labelledby","registration-title");document.body.append(dialog);
-    const form=dialog.querySelector("form"),field=name=>form.elements.namedItem(name),status=text=>{dialog.querySelector("#registration-status").textContent=text;};
+    window.EntropyI18n?.translate(dialog);
+    dialog.querySelectorAll("#registration-page-example option").forEach((option,index)=>{if(index)setText(option,pagePresets[index-1].label);});
+    const form=dialog.querySelector("form"),field=name=>form.elements.namedItem(name),status=(text,values={})=>{setText(dialog.querySelector("#registration-status"),text,values);};
     const json=()=>JSON.stringify(registry,null,2);
     let registry={sources:[]},saved=json(),formDirty=false,editing=null,revision=0,leavingGuard=false;
     let previousKind=field("kind").value,previousBytes=field("max_bytes").value;
@@ -154,19 +167,19 @@
     function beforeUnload(event){if(dirty()){event.preventDefault();event.returnValue="";}}
     function draftState(){
         const unsaved=dirty();
-        dialog.querySelector("#registration-draft-state").textContent=`${registry.sources.length} ${registry.sources.length===1?"registration":"registrations"} · ${unsaved?"Unsaved changes":"No pending changes"}`;
+        setText(dialog.querySelector("#registration-draft-state"),registry.sources.length===1?(unsaved?"{count} registration · Unsaved changes":"{count} registration · No pending changes"):(unsaved?"{count} registrations · Unsaved changes":"{count} registrations · No pending changes"),{count:registry.sources.length});
         if(unsaved!==leavingGuard){window[unsaved?"addEventListener":"removeEventListener"]("beforeunload",beforeUnload);leavingGuard=unsaved;}
     }
     function clearErrors(){
         form.querySelectorAll("[name]").forEach(control=>{control.removeAttribute("aria-invalid");control.setCustomValidity("");});
-        form.querySelectorAll(".field-error").forEach(node=>{node.hidden=true;node.textContent="";});
+        form.querySelectorAll(".field-error").forEach(node=>{node.hidden=true;setText(node,"");});
     }
     function showError(error){
         status(error.message);
         const control=error.field&&field(error.field);
         if(control&&!control.disabled){
             control.setAttribute("aria-invalid","true");
-            const feedback=form.querySelector(`#registration-error-${control.name}`);feedback.textContent=error.message;feedback.hidden=false;
+            const feedback=form.querySelector(`#registration-error-${control.name}`);setText(feedback,error.message);feedback.hidden=false;
             control.focus();control.scrollIntoView({block:"center"});
         }
     }
@@ -176,30 +189,30 @@
     });
     function resetForm(){
         form.reset();editing=null;formDirty=false;clearErrors();previousKind=field("kind").value;previousBytes=field("max_bytes").value;fields();
-        dialog.querySelector("#registration-submit").textContent="Add registration";dialog.querySelector("#registration-cancel-edit").textContent="Clear form";
+        setText(dialog.querySelector("#registration-submit"),"Add registration");setText(dialog.querySelector("#registration-cancel-edit"),"Clear form");
     }
     function render(){
         dialog.querySelector("#registration-json").value=json();
         dialog.querySelector("#registration-download").disabled=dialog.querySelector("#registration-copy").disabled=!registry.sources.length;
         const list=dialog.querySelector("#registration-list");list.replaceChildren();
-        if(!registry.sources.length){const item=document.createElement("li");item.className="note";item.textContent="No draft sources. Add one below or import a registry.";list.append(item);}
+        if(!registry.sources.length){const item=document.createElement("li");item.className="note";setText(item,"No draft sources. Add one below or import a registry.");list.append(item);}
         for(const source of registry.sources){
             const item=document.createElement("li"),text=document.createElement("span"),actions=document.createElement("div");
             text.textContent=`${source.name} · ${source.id} · ${source.kind}`;actions.className="registration-entry-actions";
             for(const action of ["Edit","Remove"]){
-                const button=document.createElement("button");button.type="button";button.textContent=action;button.setAttribute("aria-label",`${action} ${source.id}`);
+                const button=document.createElement("button");button.type="button";setText(button,action);setAttribute(button,"aria-label",action+" {id}",{id:source.id});
                 button.addEventListener("click",()=>{
                     if(action==="Edit"){
-                        if(formDirty&&!window.confirm("Discard the unfinished form edits?"))return;
+                        if(formDirty&&!window.confirm(t("Discard the unfinished form edits?")))return;
                         revision++;resetForm();
                         for(const key of ["id","name","kind","endpoint","max_bytes","timeout_ms","profile_token"])field(key).value=source[key]??"";
                         if(source.width)field("resolution").value=`${source.width}x${source.height}`;
                         field("urls").value=(source.urls||[]).join("\n");fields(true);editing=source.id;
-                        dialog.querySelector("#registration-submit").textContent="Save registration";dialog.querySelector("#registration-cancel-edit").textContent="Cancel edit";
-                        status(`Editing ${source.id}; Save registration applies your changes to the draft.`);field("id").focus();
+                        setText(dialog.querySelector("#registration-submit"),"Save registration");setText(dialog.querySelector("#registration-cancel-edit"),"Cancel edit");
+                        status("Editing {id}; Save registration applies your changes to the draft.",{id:source.id});field("id").focus();
                     }else{
                         revision++;registry={sources:registry.sources.filter(item=>item.id!==source.id)};
-                        if(editing===source.id)resetForm();render();status(`${source.id} removed from the draft.`);
+                        if(editing===source.id)resetForm();render();status("{id} removed from the draft.",{id:source.id});
                     }
                     draftState();
                 });actions.append(button);
@@ -220,9 +233,9 @@
         const [width,height]=field("resolution").value.split("x").map(Number);field("max_bytes").disabled=camera;if(camera)field("max_bytes").value=width*height*3;
         previousKind=kind;
         const schema=schemaFor(kind);field("endpoint").placeholder=schema.example;
-        dialog.querySelector("#registration-endpoint-label").textContent=schema.label;
-        dialog.querySelector("#registration-example").textContent=`Example: ${schema.example}`;
-        dialog.querySelector("#registration-help").textContent=schema.help;
+        setText(dialog.querySelector("#registration-endpoint-label"),schema.label);
+        setText(dialog.querySelector("#registration-example"),"Example: {example}",{example:schema.example});
+        setText(dialog.querySelector("#registration-help"),schema.help);
         dialog.querySelector("#registration-camera-note").hidden=!camera;
     }
     function changed(){revision++;formDirty=true;clearErrors();draftState();}
@@ -240,21 +253,21 @@
         const source=build(values);
         if(registry.sources.some(item=>item.id===source.id&&item.id!==editing))invalid("id","ID already exists; choose another ID");
         const sources=editing?registry.sources.map(item=>item.id===editing?source:item):[...registry.sources,source];
-        registry=configuration({sources});revision++;resetForm();render();status(`${source.id} saved in the draft; not active yet. Download/install the JSON and restart entropy-server with -lab-sources=lab-sources.json.`);
+        registry=configuration({sources});revision++;resetForm();render();status("{id} saved in the draft; not active yet. Download/install the JSON and restart entropy-server with -lab-sources=lab-sources.json.",{id:source.id});
     }catch(error){showError(error);}});
     dialog.querySelector("#registration-import").addEventListener("change",async event=>{
         const file=event.target.files[0];event.target.value="";if(!file)return;
         const token=++revision;
-        if(dirty()&&!window.confirm("Replace the unsaved draft and unfinished form with this registry?"))return;
+        if(dirty()&&!window.confirm(t("Replace the unsaved draft and unfinished form with this registry?")))return;
         status("Reading local registry…");
         try{
             if(file.size>65536)throw new Error("Registry exceeds 64 KiB");
             const text=await file.text();if(token!==revision)return;
-            const imported=configuration(JSON.parse(text));registry=imported;resetForm();saved=json();render();status(`Imported ${registry.sources.length} registrations locally.`);
+            const imported=configuration(JSON.parse(text));registry=imported;resetForm();saved=json();render();status("Imported {count} registrations locally.",{count:registry.sources.length});
         }catch(error){if(token===revision)status(error.message);}
     });
     dialog.querySelector("#registration-reset").addEventListener("click",()=>{
-        if(dirty()&&!window.confirm("Discard the unsaved draft and start a new configuration?"))return;
+        if(dirty()&&!window.confirm(t("Discard the unsaved draft and start a new configuration?")))return;
         revision++;registry={sources:[]};resetForm();saved=json();render();status("New empty configuration.");
     });
     dialog.querySelector("#registration-copy").addEventListener("click",async()=>{
@@ -264,5 +277,6 @@
         const text=json(),url=URL.createObjectURL(new Blob([text],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="lab-sources.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
         saved=text;draftState();status("Download requested; install the JSON on the server to activate sources.");
     });
+    window.addEventListener("entropylanguagechange",draftState);
     render();fields();
 })();

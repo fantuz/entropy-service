@@ -4,32 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Entropy Service — Random Bytes</title>
+  <title data-i18n="Entropy Service — Random Bytes">Entropy Service — Random Bytes</title>
+  <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-bytes" data-entropy-view="bytes">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <main class="panel">
     <p id="stream-notice" class="stream-notice" role="status" aria-live="polite"
-       data-state="waiting">AWAITING FIRST SAMPLE</p>
+       data-state="waiting"><span data-i18n="AWAITING FIRST SAMPLE">AWAITING FIRST SAMPLE</span></p>
     <p id="sample-info" class="analysis-meta"></p>
     <section class="section" aria-labelledby="bytes-hex-title">
-      <h3 id="bytes-hex-title">Hex preview</h3>
+      <h3 id="bytes-hex-title"><span data-i18n="Hex preview">Hex preview</span></h3>
       <div class="hex" id="hex">—</div>
     </section>
     <section class="section" aria-labelledby="bytes-base64-title">
-      <h3 id="bytes-base64-title">Base64 preview</h3>
+      <h3 id="bytes-base64-title"><span data-i18n="Base64 preview">Base64 preview</span></h3>
       <div class="base64" id="base64">—</div>
     </section>
     <section class="section" aria-labelledby="bytes-sha-title">
       <h3 id="bytes-sha-title">SHA-256</h3>
       <div class="hash" id="hash">—</div>
     </section>
-    <p><a href="/">← Back to all endpoints</a></p>
+    <p><a href="/"><span data-i18n="← Back to all endpoints">← Back to all endpoints</span></a></p>
   </main>
   <script src="/display-clock.js" defer></script>
   <script src="/entropy-display.js" defer></script>

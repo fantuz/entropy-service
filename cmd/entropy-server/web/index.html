@@ -5,102 +5,103 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Explore entropy-service: random-data APIs, browser demonstrations, and operational health checks.">
-  <title>Entropy Service — Explore APIs and demos</title>
+  <title data-i18n="Entropy Service — Explore APIs and demos">Entropy Service — Explore APIs and demos</title>
+  <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/theme.css">
 </head>
 <body class="page-home">
-  <nav class="site-toolbar" aria-label="Site and appearance">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
     <a href="/">Entropy Service</a>
-    <button type="button" data-theme-toggle hidden>Dark mode</button>
+    <button type="button" data-theme-toggle hidden><span data-i18n="Dark mode">Dark mode</span></button>
   </nav>
   <div class="wrap">
     <header>
-      <div class="eyebrow">Self-hosted / Go / HTTP + WebSocket</div>
+      <div class="eyebrow"><span data-i18n="Self-hosted / Go / HTTP + WebSocket">Self-hosted / Go / HTTP + WebSocket</span></div>
       <h1>Entropy Service</h1>
-      <p class="lede">A self-hosted random-data laboratory and distribution service. Explore live demos, programmatic APIs and operational checks. Seed from supported hardware or the operating system; generate bulk output using a software DRBG.</p>
-      <div class="pills" aria-label="Capabilities">
-        <span class="pill">ChaCha20 or AES-256-CTR</span>
-        <span class="pill">Bounded HTTP samples</span>
-        <span class="pill">WebSocket streams</span>
-        <span class="pill">Health &amp; metrics</span>
+      <p class="lede"><span data-i18n="A self-hosted random-data laboratory and distribution service. Explore live demos, programmatic APIs and operational checks. Seed from supported hardware or the operating system; generate bulk output using a software DRBG.">A self-hosted random-data laboratory and distribution service. Explore live demos, programmatic APIs and operational checks. Seed from supported hardware or the operating system; generate bulk output using a software DRBG.</span></p>
+      <div class="pills" aria-label="Capabilities" data-i18n-aria-label="Capabilities">
+        <span class="pill"><span data-i18n="ChaCha20 or AES-256-CTR">ChaCha20 or AES-256-CTR</span></span>
+        <span class="pill"><span data-i18n="Bounded HTTP samples">Bounded HTTP samples</span></span>
+        <span class="pill"><span data-i18n="WebSocket streams">WebSocket streams</span></span>
+        <span class="pill"><span data-i18n="Health &amp; metrics">Health &amp; metrics</span></span>
       </div>
     </header>
 
     <main>
       <section aria-labelledby="status-title">
-        <h2 id="status-title">Check the service</h2>
-        <p class="sub">Monitor readiness, liveness and resource pressure, or inspect the raw operational metrics.</p>
+        <h2 id="status-title"><span data-i18n="Check the service">Check the service</span></h2>
+        <p class="sub"><span data-i18n="Monitor readiness, liveness and resource pressure, or inspect the raw operational metrics.">Monitor readiness, liveness and resource pressure, or inspect the raw operational metrics.</span></p>
         <div class="grid service-grid">
-          <a class="card" href="/api-status.html"><strong>Service status dashboard</strong><span>Live, ready, and metrics in a single browser view.</span><small class="path">/api-status.html</small></a>
-          <a class="card" href="/live"><strong>Liveness</strong><span>Check whether the HTTP service responds.</span><small class="path">/live</small></a>
-          <a class="card" href="/ready"><strong>Readiness</strong><span>Inspect seed freshness and reseed errors.</span><small class="path">/ready</small></a>
-          <a class="card" href="/metrics"><strong>Metrics</strong><span>Canonical Prometheus counters, gauges and resource budgets.</span><small class="path">/metrics</small></a>
+          <a class="card" href="/api-status.html"><strong><span data-i18n="Service status dashboard">Service status dashboard</span></strong><span><span data-i18n="Live, ready, and metrics in a single browser view.">Live, ready, and metrics in a single browser view.</span></span><small class="path">/api-status.html</small></a>
+          <a class="card" href="/live"><strong><span data-i18n="Liveness">Liveness</span></strong><span><span data-i18n="Check whether the HTTP service responds.">Check whether the HTTP service responds.</span></span><small class="path">/live</small></a>
+          <a class="card" href="/ready"><strong><span data-i18n="Readiness">Readiness</span></strong><span><span data-i18n="Inspect seed freshness and reseed errors.">Inspect seed freshness and reseed errors.</span></span><small class="path">/ready</small></a>
+          <a class="card" href="/metrics"><strong><span data-i18n="Metrics">Metrics</span></strong><span><span data-i18n="Canonical Prometheus counters, gauges and resource budgets.">Canonical Prometheus counters, gauges and resource budgets.</span></span><small class="path">/metrics</small></a>
         </div>
       </section>
 
       <section aria-labelledby="explore-title">
-        <h2 id="explore-title">Explore in your browser</h2>
-        <p class="sub">Explore live, interactive demonstrations of random bytes, colours, words, sound and analysis.</p>
+        <h2 id="explore-title"><span data-i18n="Explore in your browser">Explore in your browser</span></h2>
+        <p class="sub"><span data-i18n="Explore live, interactive demonstrations of random bytes, colours, words, sound and analysis.">Explore live, interactive demonstrations of random bytes, colours, words, sound and analysis.</span></p>
         <div class="grid">
-          <a class="card" href="/api-bytes.html"><strong>Random bytes</strong><span>Inspect byte samples, encodings and their digest.</span><small class="path">/api-bytes.html</small></a>
-          <a class="card" href="/api-colors.html"><strong>Colours</strong><span>Watch changing colours derived from sample hashes.</span><small class="path">/api-colors.html</small></a>
-          <a class="card" href="/api-words.html"><strong>Random words</strong><span>Explore dictionary word samples and their SHA-256 digest.</span><small class="path">/api-words.html</small></a>
-          <a class="card" href="/api-sound.html"><strong>Sound</strong><span>Generate and play short harmonically synthesised clips.</span><small class="path">/api-sound.html</small></a>
-          <a class="card" href="/api-upload.html"><strong>File analysis</strong><span>Upload a file to inspect its byte statistics and SHA-256 digest.</span><small class="path">/api-upload.html</small></a>
-          <a class="card" href="/api-stream.html"><strong>Live stream analysis</strong><span>Histogram, RGB mosaic, Yin/Yang, waveform and FFT of selected binary samples.</span><small class="path">/api-stream.html</small></a>
-          <a class="card" href="/api-sources.html"><strong>Source lab</strong><span>Experimental tools to generate, meter and compare Web Crypto, patterns, files, camera, audio and serial samples.</span><small class="path">/api-sources.html</small></a>
-          <a class="card" href="/api-socket.html"><strong>Socket lab</strong><span>Experimental tools to connect this instance or a peer, inspect HTTP/WS data and registered devices.</span><small class="path">/api-socket.html</small></a>
+          <a class="card" href="/api-bytes.html"><strong><span data-i18n="Random bytes">Random bytes</span></strong><span><span data-i18n="Inspect byte samples, encodings and their digest.">Inspect byte samples, encodings and their digest.</span></span><small class="path">/api-bytes.html</small></a>
+          <a class="card" href="/api-colors.html"><strong><span data-i18n="Colours">Colours</span></strong><span><span data-i18n="Watch changing colours derived from sample hashes.">Watch changing colours derived from sample hashes.</span></span><small class="path">/api-colors.html</small></a>
+          <a class="card" href="/api-words.html"><strong><span data-i18n="Random words">Random words</span></strong><span><span data-i18n="Explore dictionary word samples and their SHA-256 digest.">Explore dictionary word samples and their SHA-256 digest.</span></span><small class="path">/api-words.html</small></a>
+          <a class="card" href="/api-sound.html"><strong><span data-i18n="Sound">Sound</span></strong><span><span data-i18n="Generate and play short harmonically synthesised clips.">Generate and play short harmonically synthesised clips.</span></span><small class="path">/api-sound.html</small></a>
+          <a class="card" href="/api-upload.html"><strong><span data-i18n="File analysis">File analysis</span></strong><span><span data-i18n="Upload a file to inspect its byte statistics and SHA-256 digest.">Upload a file to inspect its byte statistics and SHA-256 digest.</span></span><small class="path">/api-upload.html</small></a>
+          <a class="card" href="/api-stream.html"><strong><span data-i18n="Live stream analysis">Live stream analysis</span></strong><span><span data-i18n="Histogram, RGB mosaic, Yin/Yang, waveform and FFT of selected binary samples.">Histogram, RGB mosaic, Yin/Yang, waveform and FFT of selected binary samples.</span></span><small class="path">/api-stream.html</small></a>
+          <a class="card" href="/api-sources.html"><strong><span data-i18n="Source lab">Source lab</span></strong><span><span data-i18n="Experimental tools to generate, meter and compare Web Crypto, patterns, files, camera, audio and serial samples.">Experimental tools to generate, meter and compare Web Crypto, patterns, files, camera, audio and serial samples.</span></span><small class="path">/api-sources.html</small></a>
+          <a class="card" href="/api-socket.html"><strong><span data-i18n="Socket lab">Socket lab</span></strong><span><span data-i18n="Experimental tools to connect this instance or a peer, inspect HTTP/WS data and registered devices.">Experimental tools to connect this instance or a peer, inspect HTTP/WS data and registered devices.</span></span><small class="path">/api-socket.html</small></a>
         </div>
       </section>
 
       <section aria-labelledby="ws-title">
-        <h2 id="ws-title">Live WebSocket endpoints</h2>
-        <p class="sub">Explore streaming demos; raw WebSocket routes require a WebSocket client, not an ordinary GET.</p>
+        <h2 id="ws-title"><span data-i18n="Live WebSocket endpoints">Live WebSocket endpoints</span></h2>
+        <p class="sub"><span data-i18n="Explore streaming demos; raw WebSocket routes require a WebSocket client, not an ordinary GET.">Explore streaming demos; raw WebSocket routes require a WebSocket client, not an ordinary GET.</span></p>
         <div class="grid websocket-grid">
-          <a class="card" href="/api-stream.html"><strong>Binary stream</strong><span>Raw binary frames, visualized by the stream-analysis page.</span><small class="path">WS /stream</small></a>
-          <a class="card" href="/api-bytes.html"><strong>Byte stream</strong><span>Compact binary digest + sample, or optional JSON formats.</span><small class="path">WS /bytes</small></a>
-          <a class="card" href="/api-colors.html"><strong>Colour stream</strong><span>Hash-only or compact previews of generated samples.</span><small class="path">WS /colors</small></a>
-          <a class="card" href="/api-socket.html"><strong>Source bridge</strong><span>Experimental bridge: read an operator-registered peer, socket or device.</span><small class="path">WS /lab/stream</small></a>
-          <a class="card" href="/api-words.html"><strong>Word stream</strong><span>JSON dictionary words and SHA-256.</span><small class="path">WS /words</small></a>
+          <a class="card" href="/api-stream.html"><strong><span data-i18n="Binary stream">Binary stream</span></strong><span><span data-i18n="Raw binary frames, visualized by the stream-analysis page.">Raw binary frames, visualized by the stream-analysis page.</span></span><small class="path">WS /stream</small></a>
+          <a class="card" href="/api-bytes.html"><strong><span data-i18n="Byte stream">Byte stream</span></strong><span><span data-i18n="Compact binary digest + sample, or optional JSON formats.">Compact binary digest + sample, or optional JSON formats.</span></span><small class="path">WS /bytes</small></a>
+          <a class="card" href="/api-colors.html"><strong><span data-i18n="Colour stream">Colour stream</span></strong><span><span data-i18n="Hash-only or compact previews of generated samples.">Hash-only or compact previews of generated samples.</span></span><small class="path">WS /colors</small></a>
+          <a class="card" href="/api-socket.html"><strong><span data-i18n="Source bridge">Source bridge</span></strong><span><span data-i18n="Experimental bridge: read an operator-registered peer, socket or device.">Experimental bridge: read an operator-registered peer, socket or device.</span></span><small class="path">WS /lab/stream</small></a>
+          <a class="card" href="/api-words.html"><strong><span data-i18n="Word stream">Word stream</span></strong><span><span data-i18n="JSON dictionary words and SHA-256.">JSON dictionary words and SHA-256.</span></span><small class="path">WS /words</small></a>
         </div>
       </section>
 
       <section aria-labelledby="http-title">
-        <h2 id="http-title">Direct HTTP endpoints</h2>
-        <p class="sub">Use the raw HTTP APIs directly: binary downloads, generated media and POST file analysis.</p>
+        <h2 id="http-title"><span data-i18n="Direct HTTP endpoints">Direct HTTP endpoints</span></h2>
+        <p class="sub"><span data-i18n="Use the raw HTTP APIs directly: binary downloads, generated media and POST file analysis.">Use the raw HTTP APIs directly: binary downloads, generated media and POST file analysis.</span></p>
         <div class="grid">
-          <a class="card" href="/v1/data/random?bytes=4096"><strong>Random bytes</strong><span>Download a 4 KiB demonstration response from a private DRBG.</span><small class="path">GET /v1/data/random?bytes=4096</small></a>
-          <a class="card" href="/v1/data/test?bytes=1024"><strong>Test bytes</strong><span>Download a 1 KiB response from the serving root generator.</span><small class="path">GET /v1/data/test?bytes=1024</small></a>
-          <a class="card" href="/v1/meta/random?words=8"><strong>Words and digest</strong><span>HTML word sample generated on the server.</span><small class="path">GET /v1/meta/random</small></a>
-          <a class="card" href="/v1/image/random"><strong>Random image API</strong><span>RGB PNG; optional size from 64 to 1024 pixels per side.</span><small class="path">GET /v1/image/random</small></a>
-          <a class="card" href="/v1/image/heatmap"><strong>Bit heatmap API</strong><span>Byte bit counts on a nine-colour scale; optional image size.</span><small class="path">GET /v1/image/heatmap</small></a>
-          <a class="card" href="/v1/qr/random"><strong>QR image API</strong><span>PNG code with a random hex sample.</span><small class="path">GET /v1/qr/random</small></a>
-          <a class="card" href="/sound?duration_ms=2500&amp;style=bloom"><strong>Harmonic WAV API</strong><span>Download a generated 2.5-second WAV clip.</span><small class="path">GET /sound</small></a>
-          <a class="card" href="/lab/sources"><strong>Source catalog</strong><span>Experimental catalog: registered source names and byte limits; endpoint paths stay private.</span><small class="path">GET /lab/sources</small></a>
-          <a class="card" href="/api-upload.html"><strong>File analysis API</strong><span>Upload using the interactive form; the underlying request is POST.</span><small class="path">POST /files</small></a>
-          <a class="card" href="/paroleparoleparole?words=8"><strong>Words alias</strong><span>Compatibility route for the server-side word page.</span><small class="path">GET /paroleparoleparole</small></a>
+          <a class="card" href="/v1/data/random?bytes=4096"><strong><span data-i18n="Random bytes">Random bytes</span></strong><span><span data-i18n="Download a 4 KiB demonstration response from a private DRBG.">Download a 4 KiB demonstration response from a private DRBG.</span></span><small class="path">GET /v1/data/random?bytes=4096</small></a>
+          <a class="card" href="/v1/data/test?bytes=1024"><strong><span data-i18n="Test bytes">Test bytes</span></strong><span><span data-i18n="Download a 1 KiB response from the serving root generator.">Download a 1 KiB response from the serving root generator.</span></span><small class="path">GET /v1/data/test?bytes=1024</small></a>
+          <a class="card" href="/v1/meta/random?words=8"><strong><span data-i18n="Words and digest">Words and digest</span></strong><span><span data-i18n="HTML word sample generated on the server.">HTML word sample generated on the server.</span></span><small class="path">GET /v1/meta/random</small></a>
+          <a class="card" href="/v1/image/random"><strong><span data-i18n="Random image API">Random image API</span></strong><span><span data-i18n="RGB PNG; optional size from 64 to 1024 pixels per side.">RGB PNG; optional size from 64 to 1024 pixels per side.</span></span><small class="path">GET /v1/image/random</small></a>
+          <a class="card" href="/v1/image/heatmap"><strong><span data-i18n="Bit heatmap API">Bit heatmap API</span></strong><span><span data-i18n="Byte bit counts on a nine-colour scale; optional image size.">Byte bit counts on a nine-colour scale; optional image size.</span></span><small class="path">GET /v1/image/heatmap</small></a>
+          <a class="card" href="/v1/qr/random"><strong><span data-i18n="QR image API">QR image API</span></strong><span><span data-i18n="PNG code with a random hex sample.">PNG code with a random hex sample.</span></span><small class="path">GET /v1/qr/random</small></a>
+          <a class="card" href="/sound?duration_ms=2500&amp;style=bloom"><strong><span data-i18n="Harmonic WAV API">Harmonic WAV API</span></strong><span><span data-i18n="Download a generated 2.5-second WAV clip.">Download a generated 2.5-second WAV clip.</span></span><small class="path">GET /sound</small></a>
+          <a class="card" href="/lab/sources"><strong><span data-i18n="Source catalog">Source catalog</span></strong><span><span data-i18n="Experimental catalog: registered source names and byte limits; endpoint paths stay private.">Experimental catalog: registered source names and byte limits; endpoint paths stay private.</span></span><small class="path">GET /lab/sources</small></a>
+          <a class="card" href="/api-upload.html"><strong><span data-i18n="File analysis API">File analysis API</span></strong><span><span data-i18n="Upload using the interactive form; the underlying request is POST.">Upload using the interactive form; the underlying request is POST.</span></span><small class="path">POST /files</small></a>
+          <a class="card" href="/paroleparoleparole?words=8"><strong><span data-i18n="Words alias">Words alias</span></strong><span><span data-i18n="Compatibility route for the server-side word page.">Compatibility route for the server-side word page.</span></span><small class="path">GET /paroleparoleparole</small></a>
         </div>
       </section>
 
       <section aria-labelledby="gallery-title">
-        <h2 id="gallery-title">HTTP endpoint gallery</h2>
-        <p class="sub">See server-generated images, heatmaps, QR codes and words in one synchronized gallery.</p>
+        <h2 id="gallery-title"><span data-i18n="HTTP endpoint gallery">HTTP endpoint gallery</span></h2>
+        <p class="sub"><span data-i18n="See server-generated images, heatmaps, QR codes and words in one synchronized gallery.">See server-generated images, heatmaps, QR codes and words in one synchronized gallery.</span></p>
         <a class="card gallery-feature" href="/api-gallery.html">
-          <strong>Open the HTTP endpoint gallery</strong>
-          <span>Explore four live HTTP responses in framed previews, with the same controls and appearance.</span>
+          <strong><span data-i18n="Open the HTTP endpoint gallery">Open the HTTP endpoint gallery</span></strong>
+          <span><span data-i18n="Explore four live HTTP responses in framed previews, with the same controls and appearance.">Explore four live HTTP responses in framed previews, with the same controls and appearance.</span></span>
           <small class="path">/api-gallery.html</small>
         </a>
       </section>
 
       <section aria-labelledby="scope-title">
-        <h2 id="scope-title">Understanding the output</h2>
+        <h2 id="scope-title"><span data-i18n="Understanding the output">Understanding the output</span></h2>
         <div class="panel">
-          <p>The configured source supplies seed material. ChaCha20 or AES-256-CTR generates the bulk response bytes; these are <strong>not</strong> independent fresh samples directly from the hardware. Visual checks can illustrate statistical patterns, but do not certify unpredictability or cryptographic suitability.</p>
-          <p class="note">This homepage links the supported API routes and demos; internal JavaScript workers and CSS are intentionally omitted from the navigation but remain available to the browser. The stream-analysis page samples data for display and does not establish cryptographic quality.</p>
-          <strong>HTTP example · download 4,096 bytes</strong>
+          <p><span data-i18n="The configured source supplies seed material. ChaCha20 or AES-256-CTR generates the bulk response bytes; these are">The configured source supplies seed material. ChaCha20 or AES-256-CTR generates the bulk response bytes; these are</span> <strong><span data-i18n="not">not</span></strong> <span data-i18n="independent fresh samples directly from the hardware. Visual checks can illustrate statistical patterns, but do not certify unpredictability or cryptographic suitability.">independent fresh samples directly from the hardware. Visual checks can illustrate statistical patterns, but do not certify unpredictability or cryptographic suitability.</span></p>
+          <p class="note"><span data-i18n="This homepage links the supported API routes and demos; internal JavaScript workers and CSS are intentionally omitted from the navigation but remain available to the browser. The stream-analysis page samples data for display and does not establish cryptographic quality.">This homepage links the supported API routes and demos; internal JavaScript workers and CSS are intentionally omitted from the navigation but remain available to the browser. The stream-analysis page samples data for display and does not establish cryptographic quality.</span></p>
+          <strong><span data-i18n="HTTP example · download 4,096 bytes">HTTP example · download 4,096 bytes</span></strong>
           <pre><code>curl --fail 'http://127.0.0.1:8080/v1/data/random?bytes=4096' -o sample.bin</code></pre>
-          <strong>WebSocket example · stream 4,096 bytes per message</strong>
+          <strong><span data-i18n="WebSocket example · stream 4,096 bytes per message">WebSocket example · stream 4,096 bytes per message</span></strong>
           <pre><code>curl --http1.1 --no-buffer --max-time 3 \
   -H 'Connection: Upgrade' \
   -H 'Upgrade: websocket' \
@@ -108,21 +109,21 @@
   -H "Sec-WebSocket-Key: $(openssl rand -base64 16)" \
   'http://127.0.0.1:8080/stream?bytes=4096&amp;refresh=500' \
   --output stream.ws --write-out 'HTTP status: %{http_code}\n'</code></pre>
-          <p class="note">This curl command performs an HTTP/1.1 WebSocket upgrade: a successful handshake reports HTTP <code>101</code>. The resulting <code>stream.ws</code> contains raw WebSocket frames (including frame headers), <strong>not</strong> a plain file of random payload bytes. The endpoint streams continuously, so <code>--max-time 3</code> intentionally ends the capture with curl exit code 28. Use a WebSocket-aware client to decode messages.</p>
-          <p>Replace <code>127.0.0.1:8080</code> with your server address. Use <code>https://</code> for HTTP APIs and <code>wss://</code> for WebSocket clients when TLS is enabled; for a curl-based manual upgrade, use the corresponding <code>https://</code> URL. For parameter details, see the <a href="https://github.com/fantuz/entropy-service#api-reference">full API reference</a>.</p>
-          <strong>WebSocket example · stream 8 MiB to rngtest</strong>
+          <p class="note"><span data-i18n="This curl command performs an HTTP/1.1 WebSocket upgrade: a successful handshake reports HTTP">This curl command performs an HTTP/1.1 WebSocket upgrade: a successful handshake reports HTTP</span> <code>101</code><span data-i18n=". The resulting">. The resulting</span> <code>stream.ws</code> <span data-i18n="contains raw WebSocket frames (including frame headers),">contains raw WebSocket frames (including frame headers),</span> <strong><span data-i18n="not">not</span></strong> <span data-i18n="a plain file of random payload bytes. The endpoint streams continuously, so">a plain file of random payload bytes. The endpoint streams continuously, so</span> <code>--max-time 3</code> <span data-i18n="intentionally ends the capture with curl exit code 28. Use a WebSocket-aware client to decode messages.">intentionally ends the capture with curl exit code 28. Use a WebSocket-aware client to decode messages.</span></p>
+          <p><span data-i18n="Replace">Replace</span> <code>127.0.0.1:8080</code> <span data-i18n="with your server address. Use">with your server address. Use</span> <code>https://</code> <span data-i18n="for HTTP APIs and">for HTTP APIs and</span> <code>wss://</code> <span data-i18n="for WebSocket clients when TLS is enabled; for a curl-based manual upgrade, use the corresponding">for WebSocket clients when TLS is enabled; for a curl-based manual upgrade, use the corresponding</span> <code>https://</code> <span data-i18n="URL. For parameter details, see the">URL. For parameter details, see the</span> <a href="https://github.com/fantuz/entropy-service#api-reference"><span data-i18n="full API reference">full API reference</span></a>.</p>
+          <strong><span data-i18n="WebSocket example · stream 8 MiB to rngtest">WebSocket example · stream 8 MiB to rngtest</span></strong>
           <pre><code>curl --no-buffer -N "ws://127.0.0.1:8080/stream?bytes=$(echo 1024*1024*8 | bc)&amp;refresh=500" --output - | rngtest --pipe >/dev/null</code></pre>
-          <p class="note">Requires a curl build supporting the <code>ws</code> protocol (check <code>curl --version</code>), plus <code>bc</code> and <code>rngtest</code>. Native <code>ws://</code> transfers deliver WebSocket payload data, unlike the raw framed HTTP-upgrade capture above. <code>rngtest</code> reports statistics on stderr; <code>--pipe</code> passes accepted blocks to stdout, which is discarded here. These statistical tests do not certify entropy quality or cryptographic security.</p>
+          <p class="note"><span data-i18n="Requires a curl build supporting the">Requires a curl build supporting the</span> <code>ws</code> <span data-i18n="protocol (check">protocol (check</span> <code>curl --version</code><span data-i18n="), plus">), plus</span> <code>bc</code> <span data-i18n="and">and</span> <code>rngtest</code><span data-i18n=". Native">. Native</span> <code>ws://</code> <span data-i18n="transfers deliver WebSocket payload data, unlike the raw framed HTTP-upgrade capture above.">transfers deliver WebSocket payload data, unlike the raw framed HTTP-upgrade capture above.</span> <code>rngtest</code> <span data-i18n="reports statistics on stderr;">reports statistics on stderr;</span> <code>--pipe</code> <span data-i18n="passes accepted blocks to stdout, which is discarded here. These statistical tests do not certify entropy quality or cryptographic security.">passes accepted blocks to stdout, which is discarded here. These statistical tests do not certify entropy quality or cryptographic security.</span></p>
           <details>
-            <summary>Compatibility health and metrics aliases</summary>
-            <p>These legacy routes return the same operational information and remain available for existing clients:
+            <summary><span data-i18n="Compatibility health and metrics aliases">Compatibility health and metrics aliases</span></summary>
+            <p><span data-i18n="These legacy routes return the same operational information and remain available for existing clients:">These legacy routes return the same operational information and remain available for existing clients:</span>
               <a href="/health-1">/health-1</a> ·
               <a href="/health-2">/health-2</a> ·
-              <a href="/metrics-1">/metrics-1</a> and <a href="/metrics-2">/metrics-2</a> (compatibility metrics; scrape only one route).
+              <a href="/metrics-1">/metrics-1</a> <span data-i18n="and">and</span> <a href="/metrics-2">/metrics-2</a> <span data-i18n="(compatibility metrics; scrape only one route).">(compatibility metrics; scrape only one route).</span>
             </p>
           </details>
-          <details><summary>Legacy navigation shortcuts (optional)</summary>
-            <p>These browser-side redirect helpers are retained for old bookmarks; they are not separate API implementations.</p>
+          <details><summary><span data-i18n="Legacy navigation shortcuts (optional)">Legacy navigation shortcuts (optional)</span></summary>
+            <p><span data-i18n="These browser-side redirect helpers are retained for old bookmarks; they are not separate API implementations.">These browser-side redirect helpers are retained for old bookmarks; they are not separate API implementations.</span></p>
             <div class="legacy-links">
               <a href="/aa_health-1">/aa_health-1</a> ·
               <a href="/aa_health-2">/aa_health-2</a> ·
@@ -136,13 +137,13 @@
               <a href="/zz_v1-qr-random.html">/zz_v1-qr-random.html</a>
             </div>
           </details>
-          <details><summary>Optional developer profiling</summary><p>With <code>-debug=true</code>, Go pprof is served separately at <code>http://127.0.0.1:6060/debug/pprof/</code> on the server host; it is deliberately not linked as a public endpoint.</p></details>
+          <details><summary><span data-i18n="Optional developer profiling">Optional developer profiling</span></summary><p><span data-i18n="With">With</span> <code>-debug=true</code><span data-i18n=", Go pprof is served separately at">, Go pprof is served separately at</span> <code>http://127.0.0.1:6060/debug/pprof/</code> <span data-i18n="on the server host; it is deliberately not linked as a public endpoint.">on the server host; it is deliberately not linked as a public endpoint.</span></p></details>
         </div>
       </section>
     </main>
 
     <footer>
-      Entropy Service &mdash; <a href="https://github.com/fantuz/entropy-service">source code and documentation</a>. Embedded assets only; no external fonts or libraries.
+      <span data-i18n="Entropy Service —">Entropy Service —</span> <a href="https://github.com/fantuz/entropy-service"><span data-i18n="source code and documentation">source code and documentation</span></a><span data-i18n=". Embedded assets only; no external fonts or libraries.">. Embedded assets only; no external fonts or libraries.</span>
     </footer>
   </div>
 </body>

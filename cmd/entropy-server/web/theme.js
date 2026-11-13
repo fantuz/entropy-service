@@ -20,8 +20,15 @@
         root.dataset.theme = theme;
         for (const button of document.querySelectorAll("[data-theme-toggle]")) {
             button.hidden = false;
-            button.textContent = dark ? "Light mode" : "Dark mode";
-            button.title = `Switch to ${dark ? "light" : "dark"} mode`;
+            const label = dark ? "Light mode" : "Dark mode";
+            const title = dark ? "Switch to light mode" : "Switch to dark mode";
+            if (window.EntropyI18n) {
+                window.EntropyI18n.set(button, label);
+                window.EntropyI18n.attr(button, "title", title);
+            } else {
+                button.textContent = label;
+                button.title = title;
+            }
         }
         if (changed) window.dispatchEvent(new Event("entropythemechange"));
     }

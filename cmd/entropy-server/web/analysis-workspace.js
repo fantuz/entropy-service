@@ -2,6 +2,12 @@
 
 // Shared controls, worker pipeline and rendering for live and file sources.
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
+    function text(element, message, params = {}) {
+        if (globalThis.window?.EntropyI18n) window.EntropyI18n.set(element, message, params);
+        else element.textContent = tr(message, params);
+    }
     window.EntropyWorkspace = function createWorkspace({kind, describe, onAnalyzed = () => {},
         onRender = () => {}, onError, onSelectionChange, onSampleNeeded = () => false}) {
         const $ = id => document.getElementById(id);
@@ -69,7 +75,7 @@
             if (!last) return;
             const bytes = new Uint8Array(last.buffer), value = bytes[cursor];
             $("trace-cursor").value = cursor;
-            $("trace-reading").textContent = `Byte ${last.offset + cursor}: ${value} · 0x${value.toString(16).padStart(2, "0")} · ${value.toString(2).padStart(8, "0")}`;
+            text($("trace-reading"), "Byte {offset}: {value} · 0x{hex} · {binary}", {offset: last.offset + cursor, value, hex: value.toString(16).padStart(2, "0"), binary: value.toString(2).padStart(8, "0")});
         }
         function drawMarkers() {
             for (const [i, id] of ["marker-a", "marker-b"].entries()) {
@@ -77,20 +83,20 @@
                 marker.hidden = !traceGeometry || index === undefined || index < traceGeometry.start || index >= traceGeometry.end;
                 if (!marker.hidden) marker.style.left = traceGeometry.x(last.offset + index) + "px";
             }
-            $("marker-reading").textContent = markers.length === 2 && last ?
-                `A → B: Δ offset ${markers[1] - markers[0]} bytes · Δ value ${new Uint8Array(last.buffer)[markers[1]] - new Uint8Array(last.buffer)[markers[0]]}` :
-                markers.length === 1 ? "A set. Click a second byte for B." : "";
+            if (markers.length === 2 && last) text($("marker-reading"), "A → B: Δ offset {offset} bytes · Δ value {value}", {
+                offset: markers[1] - markers[0], value: new Uint8Array(last.buffer)[markers[1]] - new Uint8Array(last.buffer)[markers[0]]});
+            else text($("marker-reading"), markers.length === 1 ? "A set. Click a second byte for B." : "");
         }
         function draw() {
             const trace = traceSettings();
             if (!last) {
                 window.EntropyShannonAlert.update(null);
-                $("byte-statistics").textContent = "Mean / standard deviation / range: —";
-                $("zero-count").textContent = "Zeros: —"; $("one-count").textContent = "Ones: —";
-                $("trace-reading").textContent = "Byte: —";
-                $("trace-info").textContent = "Awaiting selected bytes.";
-                $("fftvalue").textContent = "Awaiting FFT input.";
-                $("waterfall-info").textContent = `0 / 240 ${kind === "file" ? "file windows" : "selected frames"}`;
+                text($("byte-statistics"), "Mean / standard deviation / range: —");
+                text($("zero-count"), "Zeros: —"); text($("one-count"), "Ones: —");
+                text($("trace-reading"), "Byte: —");
+                text($("trace-info"), "Awaiting selected bytes.");
+                text($("fftvalue"), "Awaiting FFT input.");
+                text($("waterfall-info"), kind === "file" ? "0 / 240 file windows" : "0 / 240 selected frames");
                 $("bit-rates").dataset.state = "waiting";
                 for (let bit = 0; bit < 8; bit++) $("rate-" + bit).textContent = "—";
                 for (const id of ["histogram", "wave", "fft", "mosaic", "pie"]) plots.empty($(id), "Awaiting selected bytes");
@@ -101,30 +107,36 @@
             $("bit-rates").dataset.state = "ready";
             $("sample-info").textContent = describe(last, paused);
             window.EntropyShannonAlert.update(last.entropy);
-            $("byte-statistics").textContent = `Mean ${last.mean.toFixed(3)} · σ ${last.stddev.toFixed(3)} · range ${last.min}–${last.max}`;
+            text($("byte-statistics"), "Mean {mean} · σ {stddev} · range {min}–{max}", {mean: last.mean.toFixed(3), stddev: last.stddev.toFixed(3), min: last.min, max: last.max});
             plots.balance($("pie"), last.zeros, last.ones);
-            $("zero-count").textContent = `Zeros: ${last.zeros.toLocaleString()} (${(last.zeros / (last.zeros + last.ones) * 100).toFixed(3)}%)`;
-            $("one-count").textContent = `Ones: ${last.ones.toLocaleString()} (${(last.ones / (last.zeros + last.ones) * 100).toFixed(3)}%)`;
+            text($("zero-count"), "Zeros: {count} ({percent}%)", {count: last.zeros.toLocaleString(), percent: (last.zeros / (last.zeros + last.ones) * 100).toFixed(3)});
+            text($("one-count"), "Ones: {count} ({percent}%)", {count: last.ones.toLocaleString(), percent: (last.ones / (last.zeros + last.ones) * 100).toFixed(3)});
             for (let bit = 0; bit < 8; bit++) {
                 const rate = last.bitOnes[bit] / bytes.length * 100;
                 $("bit-" + bit).value = rate;
                 $("rate-" + bit).textContent = rate.toFixed(3) + "%";
             }
             const clipped = plots.histogram($("histogram"), last, {unit: $("histogram-unit").value, scale: $("histogram-scale").value});
-            $("histogram-info").textContent = `Uniform reference: 0.390625% (${(bytes.length / 256).toFixed(2)} counts). ${clipped ? clipped + " clipped bars." : "No clipped bars."}`;
+            text($("histogram-info"), "Uniform reference: 0.390625% ({count} counts). {clipping}", {count: (bytes.length / 256).toFixed(2), clipping: clipped ? tr("{count} clipped bars.", {count: clipped}) : tr("No clipped bars.")});
             traceGeometry = plots.trace($("wave"), bytes, trace);
-            $("trace-info").textContent = `Offsets ${last.offset + traceGeometry.start}–${last.offset + traceGeometry.end - 1} · ${traceGeometry.envelope ? "min/max envelope per display column" : trace.style + " · individual bytes"} · dashed centre: 127.5`;
+            text($("trace-info"), "Offsets {start}–{end} · {style} · dashed centre: 127.5", {start: last.offset + traceGeometry.start, end: last.offset + traceGeometry.end - 1, style: traceGeometry.envelope ? tr("min/max envelope per display column") : tr("{style} · individual bytes", {style: tr(trace.style)})});
             readCursor(); drawMarkers();
             plots.spectrum($("fft"), displayFFT, fftScale);
-            $("fftvalue").textContent = displayFFT ?
-                `${displayFFT.size.toLocaleString()} points · Δf ${displayFFT.binWidth.toPrecision(4)} cycles/byte · ${displayFFT.window} · ${displayFFT.averages} ${kind === "file" ? "window(s)" : "frame(s)"} · input mean ${displayFFT.mean.toFixed(3)}` :
-                `Needs ${$("fft-size").value === "auto" ? "at least 32" : Number($("fft-size").value).toLocaleString()} bytes in the selected window; available ${bytes.length.toLocaleString()}.`;
+            if (displayFFT) text($("fftvalue"), kind === "file" ? "{size} points · Δf {binWidth} cycles/byte · {window} · {averages} window(s) · input mean {mean}" :
+                "{size} points · Δf {binWidth} cycles/byte · {window} · {averages} frame(s) · input mean {mean}", {
+                    size: displayFFT.size.toLocaleString(), binWidth: displayFFT.binWidth.toPrecision(4), window: displayFFT.window,
+                    averages: displayFFT.averages, mean: displayFFT.mean.toFixed(3)});
+            else text($("fftvalue"), "Needs {required} bytes in the selected window; available {available}.", {
+                required: $("fft-size").value === "auto" ? tr("at least 32") : Number($("fft-size").value).toLocaleString(), available: bytes.length.toLocaleString()});
             const mode = $("waterfall-mode").value;
             const requestedBytes = $("waterfall-bytes").value;
             const view = plots.waterfall($("mosaic"), history.rows, {mode, bit: Number($("waterfall-bit").value),
                 rowBytes: requestedBytes === "auto" ? "auto" : Number(requestedBytes),
                 historyRows: Number($("waterfall-rows").value), offset: last.offset, source: kind});
-            $("waterfall-info").textContent = `${history.rows.length} / ${history.capacity} ${kind === "file" ? "file windows" : "selected frames"} · showing latest ${view?.shownRows || 0} · ${view?.rowBytes || 0} bytes/row · newest at top · ${mode === "rgb" ? "RGB triplets" : mode === "vivid" ? "hue 0–255: red → green → blue → red" : mode === "gray" ? "0 = black, 255 = white" : "bit " + $("waterfall-bit").value + ": 0 = black, 1 = white"}`;
+            text($("waterfall-info"), kind === "file" ? "{rows} / {capacity} file windows · showing latest {shown} · {bytes} bytes/row · newest at top · {mode}" :
+                "{rows} / {capacity} selected frames · showing latest {shown} · {bytes} bytes/row · newest at top · {mode}", {
+                    rows: history.rows.length, capacity: history.capacity, shown: view?.shownRows || 0, bytes: view?.rowBytes || 0,
+                    mode: mode === "rgb" ? tr("RGB triplets") : mode === "vivid" ? tr("hue 0–255: red → green → blue → red") : mode === "gray" ? tr("0 = black, 255 = white") : tr("bit {bit}: 0 = black, 1 = white", {bit: $("waterfall-bit").value})});
             diagnostics.draw(last, fftScale);
         }
         function invalidate(resetAverage = true) { epoch++; queued = null; pending = null; if (resetAverage) average.reset(); }
@@ -143,6 +155,7 @@
             const row = document.createElement("div"); row.className = "bit-rate-row";
             // Only constant labels/IDs enter this markup; stream bytes never become HTML.
             row.innerHTML = `<label for="bit-${bit}">Bit ${bit}</label><span class="bit-meter"><meter id="bit-${bit}" min="0" max="100" value="50">50%</meter></span><output id="rate-${bit}">—</output>`;
+            if (row.firstElementChild) text(row.firstElementChild, "Bit {bit}", {bit});
             $("bit-rate-grid").append(row);
         }
         $("clear-markers").addEventListener("click", clearMarkers);
@@ -163,7 +176,7 @@
             const values = ["fft-min", "fft-max", "fft-floor", "fft-ceiling"].map(id => Number($(id).value));
             const [min, max, floor, ceiling] = values;
             const valid = values.every(Number.isFinite) && min >= 0 && max <= .5 && min < max && floor >= -160 && ceiling <= 100 && floor < ceiling;
-            $("fft-scale-error").textContent = valid ? "" : "Use 0 ≤ min < max ≤ 0.5 and −160 ≤ floor < ceiling ≤ 100. Keeping the last valid scale.";
+            text($("fft-scale-error"), valid ? "" : "Use 0 ≤ min < max ≤ 0.5 and −160 ≤ floor < ceiling ≤ 100. Keeping the last valid scale.");
             if (valid) { fftScale = {min, max, floor, ceiling}; redraw(); }
         });
         function pointerIndex(event) {
@@ -183,6 +196,7 @@
         observer.observe(document.querySelector(".analysis-panel"));
         window.addEventListener("entropythemechange", redraw);
         window.addEventListener("entropygraphpalettechange", redraw);
+        window.addEventListener("entropylanguagechange", redraw);
         worker.onerror = () => { busy = false; onError("ANALYSIS WORKER FAILED"); };
         worker.onmessage = ({data}) => {
             busy = false;
@@ -199,7 +213,7 @@
         function clear(message = "Awaiting selected bytes.") {
             invalidate(); needsReanalysis = false; history.clear(); diagnostics.clear(); last = null; displayFFT = null; traceGeometry = null;
             clearMarkers();
-            $("sample-info").textContent = message;
+            text($("sample-info"), message);
             redraw();
         }
         const api = {
@@ -212,7 +226,7 @@
             setFrozen(value) { paused = value; invalidate(); clearMarkers(); redraw(); },
             get frozen() { return paused; },
             get sample() { return last; },
-            destroy() { worker.terminate(); observer.disconnect(); window.removeEventListener("entropythemechange", redraw); window.removeEventListener("entropygraphpalettechange", redraw); }
+            destroy() { worker.terminate(); observer.disconnect(); window.removeEventListener("entropythemechange", redraw); window.removeEventListener("entropygraphpalettechange", redraw); window.removeEventListener("entropylanguagechange", redraw); }
         };
         redraw();
         return api;

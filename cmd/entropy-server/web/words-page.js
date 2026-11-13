@@ -1,6 +1,12 @@
 /* Language-specific dictionaries; network samples retain the shared display clock. */
 "use strict";
 (() => {
+    const t = (message, values = {}) => window.EntropyI18n?.t(message, values) ??
+        message.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
+    function setText(node, message, values = {}) {
+        if (window.EntropyI18n) window.EntropyI18n.set(node, message, values);
+        else node.textContent = t(message, values);
+    }
     const params = new URLSearchParams(location.search);
     const status = document.getElementById("stream-notice");
     const words = document.getElementById("words-content");
@@ -16,7 +22,7 @@
     function setStatus(state, message) {
         status.hidden = false;
         status.dataset.state = state;
-        status.textContent = message;
+        setText(status, message);
     }
 
     function paintLatest(data) {
@@ -71,9 +77,12 @@
             select.value = language.code;
             words.setAttribute("lang", language.code);
             words.setAttribute("dir", "auto");
-            const mnemonic = language.kind === "bip39-word-data" ? " Dictionary only; samples are not wallet mnemonics." : "";
-            const spelling = language.kind === "spelling-word-data" ? " Spelling dictionary subset; not curated as a passphrase list." : "";
-            info.textContent = `${language.title} · ${language.size.toLocaleString()} entries · ${language.selection_bits_per_word.toFixed(2)} bits/word of uniform selection.${mnemonic}${spelling}`;
+            const description = language.kind === "bip39-word-data" ?
+                "{title} · {entries} entries · {bits} bits/word of uniform selection. Dictionary only; samples are not wallet mnemonics." :
+                language.kind === "spelling-word-data" ?
+                "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list." :
+                "{title} · {entries} entries · {bits} bits/word of uniform selection.";
+            setText(info, description, {title: language.title, entries: language.size.toLocaleString(), bits: language.selection_bits_per_word.toFixed(2)});
             params.set("lang", language.code);
             ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/words?" + params.toString());
             ws.onopen = () => { if (!disposed) setStatus("waiting", "Awaiting first sample"); };

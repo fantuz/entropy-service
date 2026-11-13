@@ -4,7 +4,8 @@ import vm from "node:vm";
 
 const root = new URL("../cmd/entropy-server/web/", import.meta.url);
 const source = readFileSync(new URL("entropy-display.js", root), "utf8");
-const html = name => readFileSync(new URL(name, root), "utf8");
+// Count visible English fallback text once; translation keys repeat it in attributes.
+const html = name => readFileSync(new URL(name, root), "utf8").replace(/\sdata-i18n(?:-[\w-]+)?="[^"]*"/g, "");
 const css = html("theme.css");
 
 function simulateFrame(view, frame) {

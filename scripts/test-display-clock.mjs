@@ -50,8 +50,8 @@ assert.deepEqual(painted.at(-1), {at: 2000, value: "restored"});
 // Existing analysis/playback choices retain defaults and now offer 20 FPS.
 for (const name of ["api-stream.html", "api-sources.html", "api-socket.html", "api-upload.html"]) {
     const html = readFileSync(new URL("../cmd/entropy-server/web/" + name, import.meta.url), "utf8");
-    assert.match(html, /id="display-fps"[^]*?<option value="20">20 (?:fps|windows\/s)<\/option>/);
-    assert.match(html, /<option value="5" selected>/);
+    assert.match(html, /id="display-fps"[^]*?<option value="20"[^>]*>20 (?:fps|windows\/s)<\/option>/);
+    assert.match(html, /<option value="5" selected[^>]*>/);
 }
 for (const name of ["api-bytes.html", "api-colors.html", "api-words.html", "api-stream.html", "api-sources.html", "api-socket.html"]) {
     const html = readFileSync(new URL("../cmd/entropy-server/web/" + name, import.meta.url), "utf8");

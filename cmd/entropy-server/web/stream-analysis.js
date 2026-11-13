@@ -1,13 +1,22 @@
 "use strict";
 
 (() => {
+    const tr = (message, params = {}) => globalThis.window?.EntropyI18n?.t(message, params) ??
+        message.replace(/\{(\w+)\}/g, (_, key) => Object.hasOwn(params, key) ? String(params[key]) : `{${key}}`);
+    function text(element, message, params = {}) {
+        if (globalThis.window?.EntropyI18n) window.EntropyI18n.set(element, message, params);
+        else element.textContent = tr(message, params);
+    }
+    function uiError(message, params = {}) {
+        return Object.assign(new Error(tr(message, params)), {uiMessage: message, uiParams: params});
+    }
     const $ = id => document.getElementById(id), controls = $("stream-controls");
     let ws, receivedFrames = 0, receivedBytes = 0, analyzedFrames = 0, analyzedBytes = 0;
     let lastAccepted = -Infinity, fatal = false, closed = false;
-    function showNotice(state, text) {
+    function showNotice(state, message, params = {}) {
         $("stream-notice").hidden = false;
         $("stream-notice").dataset.state = state;
-        $("stream-notice").textContent = text;
+        text($("stream-notice"), message, params);
     }
     const statsClock = window.EntropyDisplayClock.create(() => {
         for (const [id, value] of [["received-bytes", receivedBytes], ["received-frames", receivedFrames],
@@ -16,20 +25,23 @@
     function statistics() { statsClock.submit(true); }
     function setPaused(value) {
         workspace.setFrozen(value);
-        $("pause-plots").textContent = value ? "Resume plots" : "Pause plots";
+        text($("pause-plots"), value ? "Resume plots" : "Pause plots");
         $("pause-plots").setAttribute("aria-pressed", String(value));
         $("analysis-size").disabled = $("analysis-offset").disabled = value;
-        $("capture-state").textContent = value ? "Paused · plots frozen; received counters continue. Pan, inspect or change FFT settings." :
-            "Live · receiving continues while plots are paused. Hidden tabs skip analysis.";
+        text($("capture-state"), value ? "Paused · plots frozen; received counters continue. Pan, inspect or change FFT settings." :
+            "Live · receiving continues while plots are paused. Hidden tabs skip analysis.");
         lastAccepted = -Infinity;
     }
     let workspace;
     try {
         workspace = window.EntropyWorkspace({kind: "stream",
-            describe: (data, frozen) => `${frozen ? "FROZEN" : "LATEST"} FRAME #${data.frame.toLocaleString()} · ${data.totalBytes.toLocaleString()} bytes received · [${data.offset.toLocaleString()}, ${(data.offset + data.analyzedBytes).toLocaleString()}) analysed · ${new Date(data.time).toLocaleTimeString()} · worker ${data.analysisMs.toFixed(1)} ms`,
+            describe: (data, frozen) => tr(frozen ? "FROZEN FRAME #{frame} · {total} bytes received · [{start}, {end}) analysed · {time} · worker {duration} ms" :
+                "LATEST FRAME #{frame} · {total} bytes received · [{start}, {end}) analysed · {time} · worker {duration} ms", {
+                    frame: data.frame.toLocaleString(), total: data.totalBytes.toLocaleString(), start: data.offset.toLocaleString(),
+                    end: (data.offset + data.analyzedBytes).toLocaleString(), time: new Date(data.time).toLocaleTimeString(), duration: data.analysisMs.toFixed(1)}),
             onAnalyzed(data) { analyzedFrames++; analyzedBytes += data.analyzedBytes; statistics(); },
             onRender() { if (!fatal && !closed) $("stream-notice").hidden = true; },
-            onError(message) { fatal = true; showNotice("error", message); ws?.close(1002, "analysis failed"); },
+            onError(message) { fatal = true; showNotice("error", message === "ANALYSIS WORKER FAILED" ? message : "{error}", {error: message}); ws?.close(1002, "analysis failed"); },
             onSelectionChange() { workspace.clear("Waiting for the next frame at the new shared window."); lastAccepted = -Infinity; }
         });
         $("pause-plots").addEventListener("click", () => setPaused(!workspace.frozen));
@@ -61,12 +73,12 @@
             workspace.submit(event.data.slice(offset, Math.min(event.data.byteLength, offset + Number($("analysis-size").value))),
                 {totalBytes: event.data.byteLength, offset, frame: receivedFrames, time: Date.now(), captureTime: now});
         };
-    } catch (error) { fatal = true; showNotice("error", error.message); }
+    } catch (error) { fatal = true; showNotice("error", error.uiMessage || "{error}", error.uiParams || {error: error.message}); }
     function parseOption(params, key, fallback, max) {
         const all = params.getAll(key);
         if (!all.length) return fallback;
         const number = Number(all[0]);
-        if (all.length !== 1 || !/^\d+$/.test(all[0]) || !Number.isSafeInteger(number) || number < 1 || number > max) throw new Error(`${key.toUpperCase()} MUST BE 1–${max}`);
+        if (all.length !== 1 || !/^\d+$/.test(all[0]) || !Number.isSafeInteger(number) || number < 1 || number > max) throw uiError("{option} MUST BE 1–{max}", {option: key.toUpperCase(), max});
         return number;
     }
     controls.addEventListener("submit", event => {
