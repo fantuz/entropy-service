@@ -1,8 +1,10 @@
 """Bounded, verified, read-only polling of the server's existing health API."""
+import errno
 import http.client
 import json
 import math
 import os
+import selectors
 import socket
 import ssl
 import threading
@@ -15,6 +17,8 @@ from .model import safe_text
 
 
 MAX_HEALTH_BYTES = 65536
+_MAX_DIAL_ADDRESSES = 16
+_CONTEXT_UNSET = object()
 _TEXT_FIELDS = ("rng_source", "rng_drbg", "rng_version", "last_reseed_at", "last_reseed_error")
 _NUMBER_FIELDS = ("reseed_age_ms", "reseed_failures_total", "reseed_interval_ms", "max_reseed_age_ms")
 
@@ -96,6 +100,30 @@ class _Control:
         self.cancelled = threading.Event()
         self.connection = None
         self.socket = None
+        self.connecting = set()
+        self.deadline = None
+        self.request_generation = 0
+
+    def dial_opened(self, sock):
+        with self.lock:
+            self.connecting.add(sock)
+            cancelled = self.cancelled.is_set()
+        if cancelled:
+            self.abort()
+            raise TimeoutError("Health request cancelled")
+
+    def dial_closed(self, sock):
+        with self.lock:
+            self.connecting.discard(sock)
+        sock.close()
+
+    def dial_connected(self, sock):
+        with self.lock:
+            self.connecting.discard(sock)
+            self.socket = sock
+        if self.cancelled.is_set():
+            self.abort()
+            raise TimeoutError("Health request cancelled")
 
     def connection_opened(self, connection):
         with self.lock:
@@ -113,18 +141,166 @@ class _Control:
             self.abort()
             raise OSError("Health request cancelled")
 
-    def abort(self):
-        self.cancelled.set()
+    def begin_request(self, timeout):
         with self.lock:
-            connection = self.connection
-            active = self.socket or (connection.sock if connection else None)
+            if self.cancelled.is_set():
+                raise TimeoutError("Health request cancelled")
+            self.request_generation += 1
+            self.deadline = time.monotonic() + timeout
+            return self.request_generation
+
+    def end_request(self, token):
+        with self.lock:
+            if token == self.request_generation:
+                self.request_generation += 1
+
+    def _cancel_locked(self):
+        self.cancelled.set()
+        connection = self.connection
+        active = self.socket or (connection.sock if connection else None)
+        sockets = set(self.connecting)
         if active is not None:
+            sockets.add(active)
+        return connection, sockets
+
+    def abort_request(self, token):
+        with self.lock:
+            if token != self.request_generation:
+                return
+            active = self._cancel_locked()
+        self._close_active(*active)
+
+    def abort(self):
+        with self.lock:
+            self.request_generation += 1
+            active = self._cancel_locked()
+        self._close_active(*active)
+
+    @staticmethod
+    def _close_active(connection, sockets):
+        for active in sockets:
             try:
                 active.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
+            active.close()
         if connection is not None:
             connection.close()
+
+
+def _addresses(host, port):
+    """Keep resolver preference, but do not put every IPv6 address before IPv4."""
+    families = {}
+    seen = set()
+    for item in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
+        family, kind, protocol, _name, address = item
+        if family not in (socket.AF_INET, socket.AF_INET6):
+            continue
+        group = families.setdefault(family, [])
+        if len(group) >= _MAX_DIAL_ADDRESSES:
+            continue
+        key = family, kind, protocol, address
+        if key not in seen:
+            seen.add(key)
+            group.append(item)
+    ordered = []
+    while len(ordered) < _MAX_DIAL_ADDRESSES and any(families.values()):
+        for group in families.values():
+            if group and len(ordered) < _MAX_DIAL_ADDRESSES:
+                ordered.append(group.pop(0))
+    return ordered
+
+
+def _connect(address, timeout, source_address, control):
+    """Race a bounded address list without a thread per address or family.
+
+    Windows can wait for an IPv6 refusal even when IPv4 is immediately usable.
+    A small stagger lets the other family connect within the same I/O deadline.
+    getaddrinfo itself remains an OS operation that Python cannot preempt.
+    """
+    deadline = min(time.monotonic() + timeout, control.deadline or float("inf"))
+    candidates = iter(_addresses(*address))
+    pending = set()
+    winner = None
+    connected = False
+    next_attempt = time.monotonic()
+    stagger = min(.2, timeout / 2)
+    exhausted = False
+    in_progress = {errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EALREADY, errno.EINTR,
+                   10035, 10036, 10037}  # Winsock's nonblocking connect results.
+    last_error = None
+    try:
+        with selectors.DefaultSelector() as selector:
+            while time.monotonic() < deadline and not control.cancelled.is_set():
+                now = time.monotonic()
+                if not exhausted and (not pending or now >= next_attempt):
+                    item = next(candidates, None)
+                    if item is None:
+                        exhausted = True
+                    else:
+                        family, kind, protocol, _name, target = item
+                        try:
+                            sock = socket.socket(family, kind, protocol)
+                        except OSError as error:
+                            last_error = error
+                            next_attempt = now
+                            continue
+                        pending.add(sock)
+                        control.dial_opened(sock)
+                        try:
+                            sock.setblocking(False)
+                            if source_address:
+                                sock.bind(source_address)
+                            code = sock.connect_ex(target)
+                            if code == 0:
+                                winner = sock
+                                break
+                            if code not in in_progress:
+                                raise OSError(code, "Health connection failed")
+                            selector.register(sock, selectors.EVENT_WRITE)
+                            next_attempt = now + stagger
+                        except OSError as error:
+                            last_error = error
+                            pending.discard(sock)
+                            control.dial_closed(sock)
+                            next_attempt = now
+                if exhausted and not pending:
+                    if last_error:
+                        raise last_error
+                    raise OSError("No usable health endpoint address")
+                wait = max(0, min(.05, deadline - time.monotonic(),
+                                  next_attempt - time.monotonic() if not exhausted else .05))
+                try:
+                    events = selector.select(wait)
+                except (OSError, ValueError):
+                    if control.cancelled.is_set():
+                        raise TimeoutError("Health request cancelled")
+                    raise
+                for key, _mask in events:
+                    if control.cancelled.is_set():
+                        raise TimeoutError("Health request cancelled")
+                    sock = key.fileobj
+                    code = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+                    selector.unregister(sock)
+                    if code == 0:
+                        winner = sock
+                        break
+                    last_error = OSError(code, "Health connection failed")
+                    pending.discard(sock)
+                    control.dial_closed(sock)
+                    next_attempt = time.monotonic()
+                if winner is not None:
+                    break
+        if winner is None or control.cancelled.is_set() or time.monotonic() >= deadline:
+            raise TimeoutError("Health connection timed out or was cancelled")
+        winner.settimeout(max(.001, deadline - time.monotonic()))
+        control.dial_connected(winner)
+        connected = True
+        return winner
+    finally:
+        for sock in pending:
+            if sock is not winner or not connected or control.cancelled.is_set():
+                control.dial_closed(sock)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -140,11 +316,18 @@ def _opener(control, context):
 
     class TLSConnection(http.client.HTTPSConnection):
         def connect(self):
-            super().connect()
+            # Retain urllib's CONNECT tunnel handling, then register the SSL
+            # socket before its handshake so Disconnect can interrupt it too.
+            http.client.HTTPConnection.connect(self)
+            self.sock = self._context.wrap_socket(self.sock,
+                                                  server_hostname=self._tunnel_host or self.host,
+                                                  do_handshake_on_connect=False)
             control.socket_opened(self)
+            self.sock.do_handshake()
 
     def connection(kind, host, **kwargs):
         result = kind(host, **kwargs)
+        result._create_connection = lambda address, timeout, source_address=None: _connect(address, timeout, source_address, control)
         control.connection_opened(result)
         return result
 
@@ -162,7 +345,21 @@ def _opener(control, context):
     return urllib.request.build_opener(urllib.request.ProxyHandler(), HTTP(), HTTPS(), _NoRedirect())
 
 
-def _read(opener, url, timeout):
+def _read(opener, url, timeout, control):
+    token = control.begin_request(timeout)
+    timer = threading.Timer(timeout, control.abort_request, args=(token,))
+    timer.daemon = True
+    timer.start()
+    try:
+        return _read_response(opener, url, timeout)
+    finally:
+        # A canceled Timer may already be executing. Invalidate its generation
+        # before the next endpoint starts, so it cannot close that connection.
+        control.end_request(token)
+        timer.cancel()
+
+
+def _read_response(opener, url, timeout):
     request = urllib.request.Request(url, headers={"Accept": "application/json", "Cache-Control": "no-cache"})
     try:
         response = opener.open(request, timeout=timeout)
@@ -188,25 +385,27 @@ def _empty(url, state="disconnected", error="", listener="unknown"):
             "live": None, "ready": None, "health": {}, "checked_at": None, "error": error}
 
 
-def _fetch(url, ca_file, timeout, control):
+def _tls_context(url, ca_file):
+    context = ssl.create_default_context() if urlsplit(url).scheme == "https" else None
+    if context is not None and ca_file:
+        context.load_verify_locations(cafile=ca_file)
+    return context
+
+
+def _ca_error(url):
+    result = _empty(url, "tls-error", "The selected CA certificate could not be loaded.", "tls-unverified")
+    result["checked_at"] = time.time()
+    return result
+
+
+def _fetch(url, timeout, control, context):
     result = _empty(url)
-    timer = threading.Timer(timeout, control.abort)
-    timer.daemon = True
-    timer.start()
     try:
-        try:
-            context = ssl.create_default_context() if urlsplit(url).scheme == "https" else None
-            if context is not None and ca_file:
-                context.load_verify_locations(cafile=ca_file)
-        except (OSError, ValueError, ssl.SSLError):
-            result.update(state="tls-error", listener="tls-unverified", error="The selected CA certificate could not be loaded.")
-            result["checked_at"] = time.time()
-            return result
         opener = _opener(control, context)
-        code, live = _read(opener, url + "/live", timeout)
+        code, live = _read(opener, url + "/live", timeout, control)
         if code != 200 or live.get("status") != "ok":
             raise HealthError("Unexpected liveness response")
-        code, ready = _read(opener, url + "/ready", timeout)
+        code, ready = _read(opener, url + "/ready", timeout, control)
         health = _ready(ready, code)
         if control.cancelled.is_set():
             raise OSError("Health request cancelled")
@@ -224,7 +423,6 @@ def _fetch(url, ca_file, timeout, control):
     except (OSError, ValueError, http.client.HTTPException):
         result.update(state="unavailable", listener="unreachable", error="The health endpoint could not be reached.")
     finally:
-        timer.cancel()
         control.abort()
     result["checked_at"] = time.time()
     return result
@@ -237,7 +435,11 @@ def fetch_health(url, ca_file=None, timeout=2.0):
         raise ValueError("Health timeout must be 0.05–10 seconds")
     if ca_file and urlsplit(url).scheme != "https":
         raise ValueError("A CA certificate is only used with an HTTPS health URL")
-    return _fetch(url, ca_file, timeout, _Control())
+    try:
+        context = _tls_context(url, ca_file)
+    except (OSError, ValueError, ssl.SSLError):
+        return _ca_error(url)
+    return _fetch(url, timeout, _Control(), context)
 
 
 class HealthSession:
@@ -278,6 +480,7 @@ class HealthSession:
             self._thread.start()
 
     def _run(self, generation):
+        context = _CONTEXT_UNSET
         try:
             while not self._stop.is_set():
                 control = _Control()
@@ -285,7 +488,18 @@ class HealthSession:
                     if generation != self._generation:
                         return
                     self._control = control
-                value = _fetch(self.url, self.ca_file, self.timeout, control)
+                try:
+                    if context is _CONTEXT_UNSET:
+                        # System/Windows trust loading belongs to initialization,
+                        # not either HTTP endpoint's network budget. Reconnect
+                        # reloads it; an initially invalid CA can recover on retry.
+                        context = _tls_context(self.url, self.ca_file)
+                except (OSError, ValueError, ssl.SSLError):
+                    value = _ca_error(self.url)
+                else:
+                    if control.cancelled.is_set():
+                        return
+                    value = _fetch(self.url, self.timeout, control, context)
                 with self._lock:
                     if generation != self._generation or self._stop.is_set():
                         return
@@ -313,7 +527,7 @@ class HealthSession:
 
     def snapshot(self):
         with self._lock:
-            stale_after = max(2 * self.interval, 2 * self.timeout + 1)
+            stale_after = max(2 * self.interval, self.interval + 2 * self.timeout + 1)
             if self._value["fresh"] and self._observed is not None and time.monotonic() - self._observed > stale_after:
                 checked = self._value["checked_at"]
                 self._value = _empty(self.url, "unavailable", "Health data is stale; waiting for a new observation.")

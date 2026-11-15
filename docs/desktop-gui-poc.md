@@ -123,7 +123,14 @@ settings are honored. Health responses are bounded to 64 KiB, one polling
 worker runs at a time, and late responses cannot restore status after a
 Disconnect or target change.
 
-Active HTTP requests have a short deadline. OS DNS resolution can take longer;
+System trust and the selected CA are loaded once per Connect; reconnect to
+reload them after a trust-store or CA-file change. IPv6/IPv4 connection attempts
+use bounded, staggered fallback, with unused sockets closed after a successful
+connection. Each of `/live` and `/ready` has its own two-second network budget;
+trust-store initialization does not consume it. Both requests run sequentially
+inside the single polling worker.
+
+OS DNS resolution and local certificate loading can take longer;
 Disconnect clears the displayed state immediately, while reconnect waits for
 the previous worker to finish instead of accumulating background lookups.
 

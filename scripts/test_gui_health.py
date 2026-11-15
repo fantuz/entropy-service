@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read-only health polling, TLS verification and lifecycle regression tests."""
 import contextlib
+import errno
 import http.server
 import json
 import os
@@ -17,7 +18,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/desktop-gui"))
-from entropy_gui.health import HealthSession, MAX_HEALTH_BYTES, fetch_health, normalize_url
+from entropy_gui.health import HealthSession, MAX_HEALTH_BYTES, _Control, _connect, fetch_health, normalize_url
 
 
 def health(ready=True):
@@ -80,6 +81,8 @@ class Fixture:
                     self.end_headers()
                     return
                 ready_path = self.path.endswith("/ready")
+                if mode == "delayed":
+                    time.sleep(.15)
                 if mode == "hold" and ready_path:
                     fixture.entered.set()
                     fixture.release.wait(3)
@@ -98,8 +101,8 @@ class Fixture:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                with contextlib.suppress(BrokenPipeError, ConnectionResetError, ssl.SSLError):
-                    if mode == "drip":
+                with contextlib.suppress(BrokenPipeError, ConnectionResetError, ConnectionAbortedError, ssl.SSLError):
+                    if mode == "drip" or mode == "ready-drip" and ready_path:
                         for item in data:
                             self.wfile.write(bytes([item]))
                             self.wfile.flush()
@@ -200,6 +203,52 @@ class HealthTests(_HealthBase):
             self.assertFalse(value["fresh"])
             self.assertIsNone(value["ready"])
 
+    def test_second_endpoint_has_an_independent_body_deadline(self):
+        with Fixture() as fixture:
+            fixture.mode = "ready-drip"
+            began = time.monotonic()
+            value = fetch_health(fixture.url, timeout=.15)
+            self.assertLess(time.monotonic() - began, 1)
+            self.assertEqual(fixture.requests, ["/live", "/ready"])
+            self.assertFalse(value["fresh"])
+            self.assertIsNone(value["ready"])
+
+    def test_each_healthy_endpoint_can_use_its_own_io_budget(self):
+        with Fixture() as fixture:
+            fixture.mode = "delayed"
+            value = fetch_health(fixture.url, timeout=.25)
+            self.assertTrue(value["fresh"] and value["ready"], value)
+            self.assertEqual(fixture.requests, ["/live", "/ready"])
+
+    def test_late_first_endpoint_timer_cannot_abort_the_second_request(self):
+        timers = []
+        original = threading.Timer
+
+        def timer(*args, **kwargs):
+            result = original(*args, **kwargs)
+            timers.append(result)
+            return result
+
+        with Fixture() as fixture:
+            fixture.mode = "hold"
+            result = []
+            with mock.patch("entropy_gui.health.threading.Timer", side_effect=timer):
+                worker = threading.Thread(target=lambda: result.append(fetch_health(fixture.url)))
+                worker.start()
+                try:
+                    self.assertTrue(fixture.entered.wait(1))
+                    self.assertEqual(len(timers), 2)
+                    # Simulate an already-dispatched first timer arriving after
+                    # /live completed and /ready began, despite Timer.cancel().
+                    timers[0].function(*timers[0].args, **timers[0].kwargs)
+                    fixture.release.set()
+                    worker.join(timeout=3)
+                    self.assertFalse(worker.is_alive())
+                    self.assertTrue(result[0]["fresh"] and result[0]["ready"], result)
+                finally:
+                    fixture.release.set()
+                    worker.join(timeout=3)
+
     def test_poller_clears_stale_green_after_drop_and_recovers(self):
         with Fixture() as fixture:
             session = HealthSession(fixture.url, interval=.05, timeout=.3)
@@ -248,7 +297,9 @@ class HealthTests(_HealthBase):
 
     def test_snapshot_freshness_expiry_increments_revision_and_clears_health(self):
         with Fixture() as fixture:
-            session = HealthSession(fixture.url, interval=60, timeout=.1)
+            # This case tests 120-second freshness expiry, not a tight network
+            # deadline. Dedicated drip tests keep their short timeout bounds.
+            session = HealthSession(fixture.url, interval=60, timeout=2)
             try:
                 session.start()
                 wait_until(lambda: session.snapshot()["ready"] is True)
@@ -260,6 +311,22 @@ class HealthTests(_HealthBase):
                 self.assertFalse(stale["fresh"])
                 self.assertIsNone(stale["ready"])
                 self.assertEqual(stale["health"], {})
+            finally:
+                session.stop()
+                wait_until(lambda: not session.snapshot()["stopping"])
+
+    def test_freshness_covers_interval_plus_both_endpoint_budgets(self):
+        with Fixture() as fixture:
+            session = HealthSession(fixture.url, interval=2, timeout=2)
+            try:
+                session.start()
+                wait_until(lambda: session.snapshot()["ready"] is True)
+                observed = time.monotonic()
+                with mock.patch("entropy_gui.health.time.monotonic", return_value=observed + 6):
+                    self.assertTrue(session.snapshot()["fresh"])
+                with mock.patch("entropy_gui.health.time.monotonic", return_value=observed + 8):
+                    self.assertFalse(session.snapshot()["fresh"])
+                    self.assertIsNone(session.snapshot()["ready"])
             finally:
                 session.stop()
                 wait_until(lambda: not session.snapshot()["stopping"])
@@ -311,6 +378,176 @@ class HealthTLSTests(_HealthBase):
             with mock.patch.dict(os.environ, {"SSL_CERT_FILE": str(self.cert)}):
                 value, timing = observe_fetch(fixture.url.replace("127.0.0.1", "localhost"), ca_file=str(self.extra_cert))
             self.assertTrue(value["fresh"] and value["ready"], (value, timing, list(fixture.requests)))
+
+    def test_context_initialization_is_not_an_http_io_deadline(self):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(self.cert, self.key)
+        original = ssl.create_default_context
+
+        def slow_context():
+            time.sleep(.35)
+            return original()
+
+        with Fixture(context) as fixture:
+            with mock.patch("entropy_gui.health.ssl.create_default_context", side_effect=slow_context):
+                value = fetch_health(fixture.url.replace("127.0.0.1", "localhost"),
+                                     ca_file=str(self.cert), timeout=.3)
+            self.assertTrue(value["fresh"] and value["ready"], value)
+
+    def test_session_reuses_initialized_context_and_reloads_on_reconnect(self):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(self.cert, self.key)
+        original = ssl.create_default_context
+        with Fixture(context) as fixture:
+            session = HealthSession(fixture.url.replace("127.0.0.1", "localhost"),
+                                    ca_file=str(self.cert), interval=.05)
+            with mock.patch("entropy_gui.health.ssl.create_default_context", wraps=original) as build:
+                try:
+                    session.start()
+                    wait_until(lambda: len(fixture.requests) >= 4 and session.snapshot()["ready"] is True)
+                    self.assertEqual(build.call_count, 1)
+                    session.stop()
+                    wait_until(lambda: not session.snapshot()["stopping"])
+                    session.start()
+                    wait_until(lambda: session.snapshot()["ready"] is True)
+                    self.assertEqual(build.call_count, 2)
+                finally:
+                    session.stop()
+                    wait_until(lambda: not session.snapshot()["stopping"])
+
+    def test_context_load_failure_can_recover_without_caching_the_failure(self):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(self.cert, self.key)
+        with tempfile.TemporaryDirectory() as directory, Fixture(context) as fixture:
+            ca = Path(directory) / "not-created-yet.pem"
+            session = HealthSession(fixture.url.replace("127.0.0.1", "localhost"), ca_file=str(ca), interval=.05)
+            try:
+                session.start()
+                wait_until(lambda: session.snapshot()["state"] == "tls-error")
+                self.assertFalse(fixture.requests)
+                ca.write_bytes(self.cert.read_bytes())
+                wait_until(lambda: session.snapshot()["ready"] is True)
+            finally:
+                session.stop()
+                wait_until(lambda: not session.snapshot()["stopping"])
+
+    def test_disconnect_during_context_loading_prevents_late_network_io(self):
+        entered, release = threading.Event(), threading.Event()
+        original = ssl.create_default_context
+
+        def delayed_context():
+            entered.set()
+            release.wait(2)
+            return original()
+
+        with Fixture() as fixture:
+            # Initialization is independent from the server fixture's transport;
+            # cancellation must win before any HTTP operation can be attempted.
+            session = HealthSession(fixture.url)
+            with mock.patch("entropy_gui.health._tls_context", side_effect=lambda *_args: delayed_context()):
+                try:
+                    session.start()
+                    self.assertTrue(entered.wait(1))
+                    session.stop()
+                    self.assertEqual(session.snapshot()["state"], "disconnected")
+                    with self.assertRaises(RuntimeError):
+                        session.start()
+                    release.set()
+                    wait_until(lambda: not session.snapshot()["stopping"])
+                    self.assertFalse(fixture.requests)
+                    self.assertIsNone(session.snapshot()["ready"])
+                finally:
+                    release.set()
+                    session.stop()
+
+
+class DialTests(unittest.TestCase):
+    def blocked_socket(self):
+        writer, reader = socket.socketpair()
+        writer.setblocking(False)
+        try:
+            while True:
+                writer.send(bytes(4096))
+        except BlockingIOError:
+            pass
+
+        class Pending:
+            def __init__(self):
+                self.started = threading.Event()
+
+            def fileno(self):
+                return writer.fileno()
+
+            def setblocking(self, value):
+                writer.setblocking(value)
+
+            def connect_ex(self, _address):
+                self.started.set()
+                return errno.EINPROGRESS
+
+            def getsockopt(self, *args):
+                return writer.getsockopt(*args)
+
+            def shutdown(self, how):
+                writer.shutdown(how)
+
+            def close(self):
+                writer.close()
+
+        self.addCleanup(reader.close)
+        self.addCleanup(writer.close)
+        return Pending()
+
+    def test_slow_first_family_does_not_delay_a_working_second_family(self):
+        blocked = self.blocked_socket()
+        original = socket.socket
+        with Fixture() as fixture:
+            port = fixture.server.server_port
+            addresses = [(socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("::1", port, 0, 0)),
+                         (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("127.0.0.1", port))]
+
+            def create_socket(family, *args, **kwargs):
+                return blocked if family == socket.AF_INET6 and "fileno" not in kwargs else original(family, *args, **kwargs)
+
+            control = _Control()
+            began = time.monotonic()
+            with mock.patch("entropy_gui.health.socket.getaddrinfo", return_value=addresses), \
+                    mock.patch("entropy_gui.health.socket.socket", side_effect=create_socket):
+                connection = _connect(("fixture.invalid", port), 1, None, control)
+            try:
+                self.assertLess(time.monotonic() - began, .8)
+                self.assertEqual(connection.getpeername(), ("127.0.0.1", port))
+                self.assertEqual(blocked.fileno(), -1)
+            finally:
+                connection.close()
+
+    def test_cancel_closes_a_pending_dial_without_an_address_worker_thread(self):
+        blocked = self.blocked_socket()
+        addresses = [(socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("::1", 12345, 0, 0))]
+        control = _Control()
+        failures = []
+
+        def dial():
+            try:
+                _connect(("fixture.invalid", 12345), 2, None, control)
+            except OSError as error:
+                failures.append(error)
+
+        with mock.patch("entropy_gui.health.socket.getaddrinfo", return_value=addresses), \
+                mock.patch("entropy_gui.health.socket.socket", return_value=blocked):
+            worker = threading.Thread(target=dial)
+            worker.start()
+            self.assertTrue(blocked.started.wait(1))
+            began = time.monotonic()
+            control.abort()
+            worker.join(timeout=.5)
+        self.assertLess(time.monotonic() - began, .5)
+        self.assertFalse(worker.is_alive())
+        self.assertTrue(failures)
+        self.assertEqual(blocked.fileno(), -1)
 
 
 if __name__ == "__main__":
