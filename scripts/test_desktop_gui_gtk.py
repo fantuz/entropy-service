@@ -97,6 +97,72 @@ def capture_window(context, window, path):
         return {"captured": False, "reason": type(error).__name__ + ": " + str(error)}
 
 
+def resize_native_window(window, width, height):
+    """Request a real user-style resize, including an already mapped Win32 HWND."""
+    assert window.get_resizable(), "The GUI must permit user window resizing"
+    window.unfullscreen()
+    window.unmaximize()
+    window.set_default_size(width, height)
+    if not WINDOWS:
+        return "gtk-default-size"
+
+    # Gtk's Win32 backend can constrain the initial default to the work area
+    # and ignore later default-size changes. Resize the owned native window,
+    # just as a user dragging its border would; allocation/paint assertions
+    # below still validate GTK receives and renders the actual size change.
+    import ctypes
+    from ctypes import wintypes
+    import gi
+
+    user = ctypes.WinDLL("user32", use_last_error=True)
+    user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user.GetWindowThreadProcessId.restype = wintypes.DWORD
+    handle = None
+    try:
+        gi.require_version("GdkWin32", "4.0")
+        from gi.repository import GdkWin32
+        handle = int(GdkWin32.Win32Surface.get_handle(window.get_surface()))
+    except (ImportError, ValueError, AttributeError, TypeError):
+        pass  # Some GI builds omit the native HWND return-type binding.
+    if not handle:
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+        user.EnumWindows.restype = wintypes.BOOL
+        user.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user.GetWindowTextW.restype = ctypes.c_int
+        matches = []
+
+        @callback_type
+        def find_owned(candidate, _parameter):
+            process_id = wintypes.DWORD()
+            user.GetWindowThreadProcessId(candidate, ctypes.byref(process_id))
+            if process_id.value == os.getpid():
+                title = ctypes.create_unicode_buffer(512)
+                user.GetWindowTextW(candidate, title, len(title))
+                if title.value == window.get_title():
+                    matches.append(candidate)
+            return True
+
+        if not user.EnumWindows(find_owned, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        assert len(matches) == 1, "Could not identify this GTK window's owned HWND"
+        handle = matches[0]
+    process_id = wintypes.DWORD()
+    user.GetWindowThreadProcessId(handle, ctypes.byref(process_id))
+    assert process_id.value == os.getpid(), "Refusing to resize a window owned by another process"
+    user.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user.ShowWindow.restype = wintypes.BOOL
+    user.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                  ctypes.c_int, ctypes.c_int, wintypes.UINT]
+    user.SetWindowPos.restype = wintypes.BOOL
+    user.ShowWindow(handle, 9)  # SW_RESTORE: leave a work-area-maximized window.
+    scale = window.get_scale_factor()
+    # SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE, targeting this HWND only.
+    if not user.SetWindowPos(handle, None, 0, 0, width * scale, height * scale, 0x0016):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return "win32-owned-window-position"
+
+
 def server_configuration(context, application_type, binary):
     port = free_port()
     missing = "/definitely-not-present/entropy-gui-device"
@@ -243,7 +309,7 @@ class HealthFixture(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
-        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.wfile.write(encoded)
 
 
@@ -402,8 +468,17 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         # Real GTK allocation and paint must respond to resize, independent of
         # source arrival or a second byte-acquisition implementation.
         first_width = window.drawing_area.get_width()
-        window.set_default_size(900, 620)
-        wait_for(context, lambda: window.drawing_area.get_width() != first_width, "window resize")
+        geometry = {"platform": sys.platform, "before_window": [window.get_width(), window.get_height()],
+                    "before_canvas_width": first_width, "requested_window": [900, 620],
+                    "was_maximized": window.is_maximized()}
+        geometry["method"] = resize_native_window(window, 900, 620)
+        try:
+            wait_for(context, lambda: window.drawing_area.get_width() != first_width, "window resize")
+        finally:
+            geometry["after_window"] = [window.get_width(), window.get_height()]
+            geometry["after_canvas_width"] = window.drawing_area.get_width()
+            (artifacts / "resize.json").write_text(json.dumps(geometry, indent=2) + "\n")
+            print("Native resize: " + json.dumps(geometry), flush=True)
         resized_width = window.drawing_area.get_width()
         wait_for(context, lambda: any(width == resized_width and drawn for width, _height, drawn in draws),
                  "Cairo repaint at resized allocation")
