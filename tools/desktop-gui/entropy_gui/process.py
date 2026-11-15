@@ -1,5 +1,6 @@
 """Owned CLI processes and bounded pipe draining; no GTK or network client."""
 import os
+import re
 import selectors
 import subprocess
 import sys
@@ -88,6 +89,20 @@ def spawn_owned(command, *, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
         options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     return subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=stdout,
                             stderr=stderr, bufsize=0, close_fds=True, **options)
+
+
+def _spawn_utility(binary, arguments, role):
+    """Keep executable selection explicit and explain OS launch failures."""
+    try:
+        return spawn_owned([str(binary), *arguments])
+    except OSError as error:
+        path = safe_text(str(binary))
+        detail = safe_text(str(error))
+        raise RuntimeError(
+            f'Could not launch selected {role} executable "{path}". '
+            f"Check that file or pass --{role}-binary PATH before --. "
+            "No configuration file is required. " + detail
+        ) from error
 
 
 def _close_pipes(child):
@@ -205,7 +220,7 @@ def describe(binary, args, role):
     args = _arguments(args, _INSPECT_RESERVED)
     # Set the dry-run flag before user arguments: a stray positional argument
     # must not cause Go's flag parser to skip our protection at the end.
-    child = spawn_owned([str(binary), "-describe-json=true", *args])
+    child = _spawn_utility(binary, ["-describe-json=true", *args], role)
     output, errors = bytearray(), bytearray()
     deadline = time.monotonic() + 3
     try:
@@ -232,7 +247,14 @@ def describe(binary, args, role):
             raise RuntimeError("Configuration inspection timed out") from error
         if result:
             detail = safe_text(errors.decode("utf-8", "replace")).strip()
-            raise RuntimeError(detail or "Configuration inspection failed")
+            selected = f'Selected {role} executable "{safe_text(str(binary))}"'
+            if re.search(r"flag provided but not defined: --?describe-json(?:\s|$)", detail):
+                raise RuntimeError(
+                    selected + " does not support -describe-json. "
+                    "Use entropy-service v2.2.0 or newer, selected with "
+                    f"--{role}-binary PATH before --. No configuration file is required."
+                )
+            raise RuntimeError(selected + ": " + (detail or "Startup inspection failed"))
         return configuration(bytes(output), role)
     finally:
         if child.poll() is None:
@@ -264,7 +286,9 @@ class ClientSession:
         try:
             if self._thread and self._thread.is_alive():
                 raise RuntimeError("The previous client is still stopping")
-            child = spawn_owned([self.binary, *self.args, "-headless=true", "-report=-", "-report-waterfall=true"])
+            child = _spawn_utility(self.binary,
+                                   [*self.args, "-headless=true", "-report=-", "-report-waterfall=true"],
+                                   "client")
             self.model.reset()
             with self._lock:
                 self._child = child

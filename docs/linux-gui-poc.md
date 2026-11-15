@@ -1,4 +1,4 @@
-# Desktop GUI proof of concept
+# Desktop GUI
 
-The prototype now covers Linux and Windows. See the
-[desktop GUI launch and health-monitoring guide](desktop-gui-poc.md).
+The interface supports Linux and Windows. See the
+[desktop GUI setup and controls guide](desktop-gui.md).

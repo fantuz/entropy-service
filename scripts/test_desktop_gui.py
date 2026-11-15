@@ -123,6 +123,51 @@ class ModelTests(unittest.TestCase):
                 StreamModel(history_limit=limit)
 
 
+class ExecutableDiagnosticsTests(unittest.TestCase):
+    def test_windows_path_is_displayed_literally_without_repr_escaping(self):
+        for role in ("server", "client"):
+            with self.subTest(role=role):
+                binary = fr"C:\Users\Test User\Downloads\entropy-{role}.exe"
+                with mock.patch("entropy_gui.process.spawn_owned",
+                                side_effect=FileNotFoundError(2, "The system cannot find the file specified")) as spawn:
+                    with self.assertRaises(RuntimeError) as caught:
+                        describe(binary, [], role)
+                message = str(caught.exception)
+                self.assertIn(f'executable "{binary}"', message)
+                self.assertNotIn(f"executable {binary!r}", message)
+                spawn.assert_called_once_with([binary, "-describe-json=true"])
+
+    def test_missing_inspection_executable_names_selected_file_and_path_option(self):
+        with tempfile.TemporaryDirectory(prefix="entropy gui missing ") as directory:
+            for role in ("server", "client"):
+                with self.subTest(role=role):
+                    binary = Path(directory) / ("entropy-" + role + ".exe")
+                    with self.assertRaises(RuntimeError) as caught:
+                        describe(binary, [], role)
+                    self.assertIsInstance(caught.exception.__cause__, FileNotFoundError)
+                    message = str(caught.exception)
+                    self.assertIn(str(binary), message)
+                    self.assertIn("--" + role + "-binary PATH before --", message)
+                    self.assertIn("No configuration file is required", message)
+
+    def test_failed_client_launch_keeps_previous_sample_and_can_be_retried(self):
+        with tempfile.TemporaryDirectory(prefix="entropy gui missing ") as directory:
+            binary = Path(directory) / "entropy-client.exe"
+            model = StreamModel()
+            model.feed_line(encode(sample_record()))
+            before = model.snapshot()
+            session = ClientSession(binary, [], model)
+            self.addCleanup(session.stop)
+            for _ in range(2):
+                with self.assertRaises(RuntimeError) as caught:
+                    session.start()
+                self.assertIn(str(binary), str(caught.exception))
+                self.assertIn("--client-binary PATH before --", str(caught.exception))
+                self.assertIsInstance(caught.exception.__cause__, FileNotFoundError)
+                self.assertFalse(session.snapshot()["running"])
+                self.assertEqual(model.snapshot(), before)
+
+
 @unittest.skipUnless(sys.platform.startswith("linux"), "POSIX executable-script fixtures require Linux")
 class ProcessTests(unittest.TestCase):
     def setUp(self):
@@ -145,6 +190,43 @@ class ProcessTests(unittest.TestCase):
         value = describe(binary, [literal], "server")
         self.assertEqual(value["settings"]["argument"], literal)
         self.assertFalse(marker.exists())
+
+    def test_explicit_executable_with_spaces_is_inspected(self):
+        binary = self.binary("import sys,json\nassert sys.argv[1]=='-describe-json=true'\n"
+                             "print(json.dumps({'schema_version':1,'type':'configuration','role':'server','live':False,"
+                             "'settings':{'argument':sys.argv[2]},'features':{}}))\n")
+        binary = binary.rename(self.root / "server with spaces")
+        self.assertEqual(describe(binary, ["value with spaces"], "server")["settings"]["argument"],
+                         "value with spaces")
+
+    def test_missing_explicit_path_never_substitutes_a_different_path_executable(self):
+        marker = self.root / "wrong-version-ran"
+        alternative = self.binary("from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n"
+                                  "import json\nprint(json.dumps({'schema_version':1,'type':'configuration',"
+                                  "'role':'server','live':False,'settings':{},'features':{}}))\n")
+        selected = self.root / "different directory" / alternative.name
+        with mock.patch.dict(os.environ, {"PATH": str(self.root)}):
+            with self.assertRaises(RuntimeError) as caught:
+                describe(selected, [], "server")
+        self.assertIn(str(selected), str(caught.exception))
+        self.assertFalse(marker.exists())
+
+    def test_old_describe_flag_is_distinguished_from_other_invalid_flags(self):
+        for flag, old in (("describe-json", True), ("describe-json-extra", False), ("bad-option", False)):
+            with self.subTest(flag=flag):
+                detail = "flag provided but not defined: -" + flag + "\n"
+                binary = self.binary("import sys\nsys.stderr.write(" + repr(detail) + ")\nsys.exit(2)\n")
+                with self.assertRaises(RuntimeError) as caught:
+                    describe(binary, [], "server")
+                message = str(caught.exception)
+                self.assertIn(str(binary), message)
+                if old:
+                    self.assertIn("does not support -describe-json", message)
+                    self.assertIn("v2.2.0 or newer", message)
+                    self.assertIn("--server-binary PATH before --", message)
+                else:
+                    self.assertIn(detail.strip(), message)
+                    self.assertNotIn("does not support -describe-json", message)
 
     def test_rejects_dry_run_overrides_and_hidden_output_before_spawn(self):
         marker = self.root / "ran"

@@ -1,9 +1,9 @@
 """Small native GTK 4 view over the existing command-line utilities.
 
-The server view describes an invocation and can query an existing server.
-It never starts or changes a server.
-Only the client view can start a process, and it owns that process throughout.
+Each view can launch and stop its own utility using validated startup options.
+Server health can also monitor an independently running local or remote server.
 """
+import signal
 import sys
 import threading
 from datetime import datetime
@@ -17,9 +17,11 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Pango", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango
 
-from .model import StreamModel
+from .model import StreamModel, safe_text
 from .process import ClientSession, describe
 from .health import HealthSession
+from .controls import SettingsWindow
+from .server_process import ServerSession
 
 
 HISTORY_ROWS = 128
@@ -50,13 +52,13 @@ LABELS = {
     "layout": "Terminal layout",
 }
 CSS = b"""
-.poc-content { padding: 20px; }
-.poc-title { font-size: 20px; font-weight: bold; }
-.poc-subtitle { opacity: 0.75; }
-.poc-card { padding: 14px; border-radius: 10px; background: alpha(@theme_fg_color, 0.045); }
-.poc-heading { font-weight: bold; margin-bottom: 8px; }
-.poc-number { font-family: monospace; font-size: 20px; font-weight: bold; }
-.poc-status { padding: 4px 0; }
+.gui-content { padding: 20px; }
+.gui-title { font-size: 20px; font-weight: bold; }
+.gui-subtitle { opacity: 0.75; }
+.gui-card { padding: 14px; border-radius: 10px; background: alpha(@theme_fg_color, 0.045); }
+.gui-heading { font-weight: bold; margin-bottom: 8px; }
+.gui-number { font-family: monospace; font-size: 20px; font-weight: bold; }
+.gui-status { padding: 4px 0; }
 .status-ok { color: #238636; }
 .status-warn { color: #da3633; }
 """
@@ -108,6 +110,11 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.model = StreamModel(history_limit=HISTORY_ROWS)
         self.session = None
         self.descriptor = None
+        self.settings_window = None
+        self._inspection_busy = False
+        self._inspection_serial = 0
+        self._inspection_thread = None
+        self.inspection_error_label = None
         self.feature_checks = {}
         self.stat_labels = {}
         self.health_session = None
@@ -116,6 +123,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._health_revision = -1
         self._fullscreen = False
         self._closing = False
+        self._destroyed = False
         self._stopping = False
         self._was_running = False
         self._last_error = ""
@@ -124,26 +132,30 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._pixels = None
         self._rows = ()
         self._palette = "byte"
-        self.set_title(f"Entropy {role.title()} · Desktop PoC")
+        self.set_title(f"Entropy {role.title()}")
         self.set_default_size(1100, 760)
         self.set_size_request(640, 640 if role == "server" else 480)
         self.connect("close-request", self._on_close)
 
         self.header = Gtk.HeaderBar()
         title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        title.append(label(f"Entropy {role.title()}", "poc-heading"))
-        title.append(label(f"{'Windows' if sys.platform == 'win32' else 'Linux'} desktop proof of concept", "poc-subtitle"))
+        title.append(label(f"Entropy {role.title()}", "gui-heading"))
+        title.append(label(f"{'Windows' if sys.platform == 'win32' else 'Linux'} desktop interface", "gui-subtitle"))
         self.header.set_title_widget(title)
         self.set_titlebar(self.header)
+        self.start_button = Gtk.Button(label="Start", sensitive=False)
+        self.start_button.add_css_class("suggested-action")
+        self.start_button.set_tooltip_text(f"Start a local {role} owned by this window")
+        self.start_button.connect("clicked", lambda _button: self.start_client() if role == "client" else self.start_server())
+        self.header.pack_start(self.start_button)
+        self.stop_button = Gtk.Button(label="Stop", sensitive=False)
+        self.stop_button.set_tooltip_text(f"Stop only this window's local {role}")
+        self.stop_button.connect("clicked", lambda _button: self.stop_client())
+        self.header.pack_start(self.stop_button)
+        self.options_button = Gtk.Button(label="Options…", sensitive=False)
+        self.options_button.connect("clicked", lambda _button: self.open_options())
+        self.header.pack_end(self.options_button)
         if role == "client":
-            self.start_button = Gtk.Button(label="Start")
-            self.start_button.set_sensitive(False)
-            self.start_button.add_css_class("suggested-action")
-            self.start_button.connect("clicked", lambda _button: self.start_client())
-            self.header.pack_start(self.start_button)
-            self.stop_button = Gtk.Button(label="Stop", sensitive=False)
-            self.stop_button.connect("clicked", lambda _button: self.stop_client())
-            self.header.pack_start(self.stop_button)
             fullscreen = Gtk.Button(icon_name="view-fullscreen-symbolic", tooltip_text="Fullscreen waterfall (F11)")
             fullscreen.connect("clicked", lambda _button: self.set_fullscreen(not self._fullscreen))
             self.header.pack_end(fullscreen)
@@ -151,16 +163,23 @@ class DesktopWindow(Gtk.ApplicationWindow):
         keys.connect("key-pressed", self._on_key)
         self.add_controller(keys)
 
-        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        body.add_css_class("poc-content")
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8 if role == "server" else 12)
+        body.add_css_class("gui-content")
         self.set_child(body)
-        self.status_label = label("Reading startup options…", "poc-status")
+        self.status_label = label("Inspecting local startup options…", "gui-status")
         self.status_label.set_lines(3)
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.binary_label = label(f"Local {role} executable: {safe_text(str(binary))}", "gui-subtitle")
+        self.binary_label.set_selectable(True)
+        self.binary_label.set_lines(2)
+        self.binary_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        self.binary_label.set_tooltip_text(safe_text(str(binary)))
         if role == "server":
+            self._build_local_server_panel(body)
             self._build_health_panel(body, health_url)
-            body.append(label("Requested startup configuration", "poc-title"))
-            body.append(label("Read only · these options are independent from the selected live server. No server is started or modified.", "poc-subtitle"))
+            body.append(label("Requested startup configuration", "gui-title"))
+            body.append(label("Options edits local startup settings. Start launches a new local server; Connect monitors the selected endpoint independently.", "gui-subtitle"))
+            body.append(self.binary_label)
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             scroller = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
             scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -171,8 +190,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
             for column, (key, heading, initial) in enumerate((
                     ("shannon", "Shannon · bits/byte", "—"), ("threshold", "Threshold", "—"),
                     ("assessment", "Status", "WAIT"), ("throughput", "Avg received · MiB/s", "—"))):
-                stats.attach(label(heading, "poc-subtitle"), column, 0, 1, 1)
-                value = label(initial, "poc-number")
+                stats.attach(label(heading, "gui-subtitle"), column, 0, 1, 1)
+                value = label(initial, "gui-number")
                 value.set_hexpand(True)
                 stats.attach(value, column, 1, 1, 1)
                 self.stat_labels[key] = value
@@ -192,11 +211,12 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self.palette_dropdown = Gtk.DropDown.new_from_strings(["Byte hue", "RGB triplets", "Grayscale"])
             self.palette_dropdown.connect("notify::selected", self._select_palette)
             self.controls.append(self.palette_dropdown)
-            self.controls.append(label("Newest first · 256 bytes/sample · 128 rows · F11 / Escape", "poc-subtitle"))
+            self.controls.append(label("Newest first · 256 bytes/sample · 128 rows · F11 / Escape", "gui-subtitle"))
             body.append(self.controls)
             self.settings_expander = Gtk.Expander(label="Startup options · read only")
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            self.settings_box.append(label("Requested utility options. Start uses headless JSONL reporting for the GUI.", "poc-subtitle"))
+            self.settings_box.append(label("Options edits the next run. Start uses headless JSONL reporting for the GUI.", "gui-subtitle"))
+            self.settings_box.append(self.binary_label)
             settings_scroller = Gtk.ScrolledWindow()
             settings_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
             settings_scroller.set_max_content_height(220)
@@ -208,15 +228,57 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._tick_id = GLib.timeout_add(50, self._tick)
         # Inspection is bounded by describe(). Keep its cleanup alive if the
         # window closes before the short-lived description child has exited.
-        self._inspection_thread = threading.Thread(target=self._inspect, name="entropy-gui-inspection")
-        self._inspection_thread.start()
+        self._start_inspection(self.binary, self.arguments)
+
+    def _build_local_server_panel(self, body):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.process_state_label = label("Local server · not started", "gui-heading")
+        box.append(self.process_state_label)
+        self.server_log_view = Gtk.TextView(editable=False, monospace=True, cursor_visible=False)
+        self.server_log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        scroller = Gtk.ScrolledWindow(hexpand=True)
+        scroller.set_min_content_height(90)
+        scroller.set_max_content_height(140)
+        scroller.set_propagate_natural_height(True)
+        scroller.set_child(self.server_log_view)
+        self.server_log_expander = Gtk.Expander(label="Local server logs")
+        self.server_log_expander.set_child(scroller)
+        body.append(box)
+
+    def open_options(self):
+        if self._closing or self._inspection_busy or self._stopping:
+            return
+        if self.session and self.session.snapshot()["running"]:
+            return
+        if self.settings_window is None:
+            try:
+                self.settings_window = SettingsWindow(self, self.role, str(self.binary), self.arguments,
+                                                       self.descriptor, self._apply_settings)
+            except ValueError as error:
+                self.status_label.set_text("Options could not be opened: " + safe_text(str(error)))
+                return
+            self.settings_window.connect("close-request", self._settings_closed)
+        self.settings_window.present()
+
+    def _settings_closed(self, _window):
+        self.settings_window = None
+        return False
+
+    def _apply_settings(self, editor, binary, arguments):
+        if self._closing or self._inspection_busy or self._stopping or self.session and self.session.snapshot()["running"]:
+            editor.set_error("Stop the owned process before applying startup options.")
+            return
+        if not binary.strip():
+            editor.set_error("Select the local utility executable.")
+            return
+        self._start_inspection(binary, arguments, editor)
 
     def _build_health_panel(self, body, health_url):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        card.add_css_class("poc-card")
+        card.add_css_class("gui-card")
         heading = Gtk.Box(spacing=16)
-        heading.append(label("Live server health", "poc-heading"))
-        state = label("DISCONNECTED", "poc-heading")
+        heading.append(label("Live server health", "gui-heading"))
+        state = label("DISCONNECTED", "gui-heading")
         heading.append(state)
         self.health_labels["state"] = state
         card.append(heading)
@@ -234,7 +296,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.health_disconnect_button.connect("clicked", lambda _button: self.disconnect_health())
         controls.append(self.health_disconnect_button)
         card.append(controls)
-        card.append(label("TLS verification uses the supplied CA file." if self.health_ca else "TLS verification uses system trust. Connect checks only the selected endpoint.", "poc-subtitle"))
+        card.append(label("TLS verification uses the supplied CA file." if self.health_ca else "TLS verification uses system trust. Connect checks only the selected endpoint.", "gui-subtitle"))
         grid = Gtk.Grid(column_spacing=20, row_spacing=5)
         fields = (
             ("listener", "Selected listener"), ("live", "Process"),
@@ -244,7 +306,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         )
         for index, (key, caption) in enumerate(fields):
             row, column = divmod(index, 2)
-            grid.attach(label(caption, "poc-subtitle"), column * 2, row, 1, 1)
+            grid.attach(label(caption, "gui-subtitle"), column * 2, row, 1, 1)
             value = label("—")
             value.set_hexpand(True)
             value.set_selectable(True)
@@ -253,7 +315,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             grid.attach(value, column * 2 + 1, row, 1, 1)
             self.health_labels[key] = value
         card.append(grid)
-        self.health_labels["checked_at"] = label("No live check has been made.", "poc-subtitle")
+        self.health_labels["checked_at"] = label("No live check has been made.", "gui-subtitle")
         self.health_labels["checked_at"].set_lines(2)
         self.health_labels["checked_at"].set_ellipsize(Pango.EllipsizeMode.END)
         card.append(self.health_labels["checked_at"])
@@ -331,25 +393,50 @@ class DesktopWindow(Gtk.ApplicationWindow):
             detail += " · " + state["error"]
         self.health_labels["checked_at"].set_text(detail)
 
-    def _inspect(self):
+    def _start_inspection(self, binary, arguments, editor=None):
+        self._inspection_busy = True
+        self._inspection_serial += 1
+        serial = self._inspection_serial
+        self.options_button.set_sensitive(False)
+        self.start_button.set_sensitive(False)
+        self.status_label.set_text("Validating local startup options…")
+        self._inspection_thread = threading.Thread(target=self._inspect,
+            args=(binary, list(arguments), serial, editor), name="entropy-gui-inspection")
+        self._inspection_thread.start()
+
+    def _inspect(self, binary, arguments, serial, editor):
         try:
-            result = describe(self.binary, self.arguments, self.role)
+            result = describe(binary, arguments, self.role)
         except (OSError, RuntimeError, ValueError) as error:
             if not self._closing:
-                GLib.idle_add(self._inspection_failed, str(error))
+                GLib.idle_add(self._inspection_failed, str(error), serial, editor)
         else:
             if not self._closing:
-                GLib.idle_add(self._inspection_finished, result)
+                GLib.idle_add(self._inspection_finished, result, binary, arguments, serial, editor)
 
-    def _inspection_failed(self, message):
-        if not self._closing:
-            self.status_label.set_text("Configuration could not be read: " + message)
+    def _inspection_failed(self, message, serial=None, editor=None):
+        if not self._closing and (serial is None or serial == self._inspection_serial):
+            self._inspection_busy = False
+            self.options_button.set_sensitive(True)
+            self.start_button.set_sensitive(self.descriptor is not None)
+            if editor is not None:
+                editor.set_error(message)
+                self.status_label.set_text("Options were not applied. The last validated settings are retained.")
+                return GLib.SOURCE_REMOVE
+            self.inspection_error_label = label(safe_text(message), "gui-status")
+            self.inspection_error_label.set_selectable(True)
+            self.settings_box.append(self.inspection_error_label)
+            if self.role == "server":
+                self.status_label.set_text("Local startup settings unavailable. Live server health can still be checked independently.")
+            else:
+                self.settings_expander.set_expanded(True)
+                self.status_label.set_text("Local startup settings unavailable. Select a compatible client executable to enable Start.")
         return GLib.SOURCE_REMOVE
 
     def _group(self, title, values):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
-        box.add_css_class("poc-card")
-        box.append(label(title, "poc-heading"))
+        box.add_css_class("gui-card")
+        box.append(label(title, "gui-heading"))
         grid = Gtk.Grid(column_spacing=22, row_spacing=8)
         for row, (key, value) in enumerate(values):
             grid.attach(label(LABELS.get(key, key.replace("_", " ").capitalize())), 0, row, 1, 1)
@@ -360,22 +447,39 @@ class DesktopWindow(Gtk.ApplicationWindow):
         box.append(grid)
         self.settings_box.append(box)
 
-    def _inspection_finished(self, descriptor):
-        if self._closing:
+    def _inspection_finished(self, descriptor, binary=None, arguments=None, serial=None, editor=None):
+        if self._closing or serial is not None and serial != self._inspection_serial:
             return GLib.SOURCE_REMOVE
+        previous_mode = self.descriptor["settings"].get("waterfall_mode") if self.descriptor else None
+        if binary is not None:
+            self.binary = binary
+            self.arguments = list(arguments)
+        self._inspection_busy = False
         self.descriptor = descriptor
+        self.inspection_error_label = None
+        self.binary_label.set_text(f"Local {self.role} executable: {safe_text(str(self.binary))}")
+        self.binary_label.set_tooltip_text(safe_text(str(self.binary)))
+        child = self.settings_box.get_first_child()
+        while child is not None:
+            self.settings_box.remove(child)
+            child = self.settings_box.get_first_child()
+        self.feature_checks.clear()
+        if self.role == "client":
+            self.settings_box.append(label("Validated startup options. Use Options to edit the next run.", "gui-subtitle"))
+            self.settings_box.append(self.binary_label)
         settings = descriptor["settings"]
         features = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=3, row_spacing=6, column_spacing=16)
         for key, enabled in descriptor["features"].items():
             check = Gtk.CheckButton(label=LABELS.get(key, key.replace("_", " ").capitalize()), active=enabled, sensitive=False)
-            check.set_tooltip_text("Configured value; this is not a runtime control or a health check")
+            check.set_tooltip_text("Validated startup value. Use Options to edit the next run; live health is separate.")
             self.feature_checks[key] = check
             features.append(check)
         feature_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        feature_box.add_css_class("poc-card")
-        feature_box.append(label("Configured features · read only", "poc-heading"))
+        feature_box.add_css_class("gui-card")
+        feature_box.append(label("Validated startup features", "gui-heading"))
         feature_box.append(features)
         if self.role == "server":
+            self.settings_box.append(self.server_log_expander)
             self.settings_box.append(feature_box)
             if not self.health_url_entry.get_text().strip():
                 self.health_url_entry.set_text(default_health_url(descriptor))
@@ -383,9 +487,11 @@ class DesktopWindow(Gtk.ApplicationWindow):
                       ("Network configuration", ("http_address", "https_address"))]
         else:
             groups = [("Connection & sampling", ("mode", "endpoint", "payload_bytes", "refresh", "analysis_bytes", "analysis_interval", "shannon_threshold_bits_per_byte"))]
-            self.stat_labels["threshold"].set_text(f"{settings.get('shannon_threshold_bits_per_byte', 0):.6f}")
-            self.palette_dropdown.set_selected(("byte", "rgb", "gray").index(settings.get("waterfall_mode", "byte")))
-            self.start_button.set_sensitive(True)
+            if not self.model.snapshot()["sample"]:
+                self.stat_labels["threshold"].set_text(f"{settings.get('shannon_threshold_bits_per_byte', 0):.6f}")
+            mode = settings.get("waterfall_mode", "byte")
+            if previous_mode is None or previous_mode != mode:
+                self.palette_dropdown.set_selected(("byte", "rgb", "gray").index(mode))
         shown = set()
         for title, keys in groups:
             values = [(key, settings[key]) for key in keys if key in settings]
@@ -397,11 +503,16 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self._group("Limits & other startup options", other)
         if self.role == "client":
             self.settings_box.append(feature_box)
-        self.status_label.set_text("Configuration read. Live observations use the selected health URL; they do not prove this invocation matches that process." if self.role == "server" else "Ready · Start launches an owned client process. No raw export or device writes are enabled by this GUI.")
+        self.start_button.set_sensitive(True)
+        self.options_button.set_sensitive(True)
+        if editor is not None:
+            editor.destroy()
+            self.settings_window = None
+        self.status_label.set_text("Options validated. Start launches an owned local server; Connect checks the selected health URL independently." if self.role == "server" else "Ready · Start launches an owned client process. Options edits the next run.")
         return GLib.SOURCE_REMOVE
 
     def start_client(self):
-        if self.role != "client" or self.descriptor is None or self._closing or self._stopping:
+        if self.role != "client" or self.descriptor is None or self._closing or self._stopping or self._inspection_busy:
             return
         if self.session and self.session.snapshot()["running"]:
             return
@@ -426,14 +537,37 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.drawing_area.queue_draw()
         self.start_button.set_sensitive(False)
         self.stop_button.set_sensitive(True)
+        self.options_button.set_sensitive(False)
         self.status_label.set_text("Connecting · waiting for the first analysed sample…")
+
+    def start_server(self):
+        if self.role != "server" or self.descriptor is None or self._closing or self._stopping or self._inspection_busy:
+            return
+        if self.session and self.session.snapshot()["running"]:
+            return
+        try:
+            self.session = ServerSession(self.binary, self.arguments)
+            self.session.start()
+        except (OSError, RuntimeError, ValueError) as error:
+            self.session = None
+            self.status_label.set_text("Server could not start: " + safe_text(str(error)))
+            return
+        self._revision = -1
+        self.start_button.set_sensitive(False)
+        self.stop_button.set_sensitive(True)
+        self.options_button.set_sensitive(False)
+        self.process_state_label.set_text("Local server · starting")
+        self.status_label.set_text("Starting the owned local server. Connect checks the selected endpoint independently.")
+
+    def stop_server(self):
+        self.stop_client()
 
     def stop_client(self):
         if not self.session or self._stopping:
             return
         self._stopping = True
         self.stop_button.set_sensitive(False)
-        self.status_label.set_text("Stopping client…")
+        self.status_label.set_text(f"Stopping owned {self.role}…")
         def stop():
             try:
                 self.session.stop()
@@ -452,6 +586,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             return GLib.SOURCE_CONTINUE
         if self.role == "server":
             self._tick_health()
+            self._tick_server()
             return GLib.SOURCE_CONTINUE
         if not self.session:
             return GLib.SOURCE_CONTINUE
@@ -463,8 +598,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
             # Keep its statistical assessment, but reveal the status message.
             self.set_fullscreen(False)
         self._was_running, self._last_error = state["running"], state["error"]
-        self.start_button.set_sensitive(not state["running"] and not self._stopping)
+        self.start_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
         self.stop_button.set_sensitive(state["running"] and not self._stopping)
+        self.options_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
         if state["revision"] != self._revision:
             self._revision = state["revision"]
             sample, settings, summary = state["sample"], state["settings"], state["summary"]
@@ -498,6 +634,28 @@ class DesktopWindow(Gtk.ApplicationWindow):
                 sample = state["sample"]
                 self.status_label.set_text(f"Receiving · {sample.get('received_frames', 0):,} frames · {sample.get('received_bytes', 0) / (1 << 20):.2f} MiB · statistics cover the latest analysed sample")
         return GLib.SOURCE_CONTINUE
+
+    def _tick_server(self):
+        if self.session is None:
+            return
+        state = self.session.snapshot()
+        self.start_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
+        self.stop_button.set_sensitive(state["running"] and not self._stopping)
+        self.options_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
+        view_revision = (state["revision"], state["running"], state["returncode"], self._stopping)
+        if view_revision != self._revision:
+            self._revision = view_revision
+            self.server_log_view.get_buffer().set_text(state["logs"])
+            if state["running"]:
+                self.process_state_label.set_text("Local server · running")
+                if not self._stopping:
+                    self.status_label.set_text("Owned local server is running. Use Connect to check the selected health URL.")
+            else:
+                self.process_state_label.set_text(f"Local server · stopped (exit {state['returncode']})")
+                if state["error"]:
+                    self.server_log_expander.set_expanded(True)
+                if not self._stopping:
+                    self.status_label.set_text("Server error: " + state["error"] if state["error"] else "Owned server stopped.")
 
     def _select_palette(self, dropdown, _property):
         self._palette = ("byte", "rgb", "gray")[dropdown.get_selected()]
@@ -565,6 +723,12 @@ class DesktopWindow(Gtk.ApplicationWindow):
         return True
 
     def _finish_close(self):
+        if self._destroyed:
+            return
+        self._destroyed = True
+        if self.settings_window is not None:
+            self.settings_window.destroy()
+            self.settings_window = None
         if self._tick_id:
             GLib.source_remove(self._tick_id)
             self._tick_id = None
@@ -574,7 +738,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
 
 class DesktopApplication(Gtk.Application):
     def __init__(self, role, binary, arguments, health_url=None, health_ca=None):
-        super().__init__(application_id="org.entropyservice.DesktopPoC", flags=Gio.ApplicationFlags.NON_UNIQUE)
+        super().__init__(application_id="org.entropyservice.Desktop", flags=Gio.ApplicationFlags.NON_UNIQUE)
         self.role, self.binary, self.arguments = role, binary, list(arguments)
         self.health_url, self.health_ca = health_url, health_ca
         self.window = None
@@ -587,9 +751,68 @@ class DesktopApplication(Gtk.Application):
             self.window = DesktopWindow(self, self.role, self.binary, self.arguments, self.health_url, self.health_ca)
         self.window.present()
 
+    def stop_owned_resources(self):
+        """Finish owned work even if a signal has already stopped the GTK loop."""
+        window = self.window
+        if window is None:
+            return
+        window._closing = True
+        try:
+            if window.health_session:
+                window.health_session.stop()
+        finally:
+            try:
+                if window.session:
+                    # Closing the event loop does not emit close-request. Join
+                    # the existing bounded stop/drain path synchronously here;
+                    # an idle callback cannot finish after run() has returned.
+                    window.session.stop()
+            finally:
+                window._finish_close()
+                window._inspection_thread.join(timeout=4)
+
 
 def run(role, binary, arguments, health_url=None, health_ca=None):
     if not Gtk.init_check() or Gdk.Display.get_default() is None:
         print("No graphical display is available. Launch entropy-gui from a desktop session.", file=sys.stderr)
         return 2
-    return DesktopApplication(role, binary, arguments, health_url, health_ca).run([])
+    application = DesktopApplication(role, binary, arguments, health_url, health_ca)
+    interrupted = False
+    quit_source = None
+    previous_handlers = {}
+
+    def quit_after_interrupt():
+        nonlocal quit_source
+        quit_source = None
+        application.quit()
+        return GLib.SOURCE_REMOVE
+
+    def interrupt(_signum, _frame):
+        nonlocal interrupted, quit_source
+        interrupted = True
+        if quit_source is None:
+            # Defer into GTK, including a signal arriving just before run().
+            # PyGObject's default fallback re-raises KeyboardInterrupt after
+            # quitting, without closing the owned client window first.
+            quit_source = GLib.idle_add(quit_after_interrupt)
+
+    try:
+        signals = [signal.SIGINT]
+        if sys.platform == "win32":
+            signals.append(signal.SIGBREAK)
+        for signum in signals:
+            previous_handlers[signum] = signal.signal(signum, interrupt)
+        try:
+            result = application.run([])
+        except KeyboardInterrupt:
+            # Also cover an interrupt delivered by an embedding GI fallback.
+            interrupted, result = True, 130
+    finally:
+        try:
+            application.stop_owned_resources()
+        finally:
+            if quit_source is not None:
+                GLib.source_remove(quit_source)
+            for signum, handler in previous_handlers.items():
+                signal.signal(signum, handler)
+    return 130 if interrupted else result

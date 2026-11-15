@@ -40,6 +40,18 @@ def choose_palette(page, palette):
     wait_paint(page)
 
 
+def navigate_analysis_page(page, url=None):
+    # Register before navigation: a snapshot of page.workers taken after load
+    # can miss a worker whose creation event has not reached Playwright yet.
+    # Queue a task on the exact new worker after its synchronous importScripts
+    # bootstrap, before this test deliberately reloads or navigates away.
+    with page.expect_worker() as created:
+        page.goto(url) if url is not None else page.reload()
+    worker = created.value
+    assert worker.url.endswith("/worker.js"), worker.url
+    worker.evaluate("new Promise(resolve=>setTimeout(resolve,0))")
+
+
 def checkpoint(artifacts, phase, **details):
     entry = {"time_utc": datetime.now(timezone.utc).isoformat(), "phase": phase, **details}
     line = json.dumps(entry)
@@ -252,25 +264,25 @@ def desktop_width_checks(page, base, artifacts):
 def preference_checks(context, page, base):
     from playwright.sync_api import expect
 
-    page.goto(base + "/api-upload.html")
+    navigate_analysis_page(page, base + "/api-upload.html")
     choose_palette(page, "classic")
     second = context.new_page()
-    second.goto(base + "/api-upload.html")
+    navigate_analysis_page(second, base + "/api-upload.html")
     choose_palette(second, "blue-orange")
     expect(page.locator("html")).to_have_attribute("data-graph-palette", "blue-orange")
     choose_palette(page, "contrast")
     expect(second.locator("select[data-graph-palette]")).to_have_value("contrast")
     for path in ("/api-upload.html", "/api-sources.html", "/api-socket.html", "/api-stream.html?bytes=4096"):
-        page.goto(base + path)
+        navigate_analysis_page(page, base + path)
         expect(page.locator("html")).to_have_attribute("data-graph-palette", "contrast")
         expect(page.locator("select[data-graph-palette]")).to_have_value("contrast")
-        for worker in page.workers:
-            worker.evaluate("new Promise(resolve=>setTimeout(resolve,0))")
-    page.goto(base + "/api-upload.html")
-    page.reload()
-    expect(page.locator("select[data-graph-palette]")).to_have_value("contrast")
     page.bring_to_front()
     page.wait_for_function("!document.hidden")
+    navigate_analysis_page(page, base + "/api-upload.html")
+    wait_paint(page)
+    navigate_analysis_page(page)
+    wait_paint(page)
+    expect(page.locator("select[data-graph-palette]")).to_have_value("contrast")
     for event in ("focus", "pageshow", "visibilitychange"):
         page.evaluate("""event=>{
           document.documentElement.dataset.graphPalette='classic';
@@ -315,12 +327,12 @@ def storage_disabled_checks(browser, base):
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     try:
-        page.goto(base + "/api-upload.html")
+        navigate_analysis_page(page, base + "/api-upload.html")
         choose_palette(page, "blue-orange")
         page.evaluate("dispatchEvent(new Event('focus'));dispatchEvent(new PageTransitionEvent('pageshow'))")
         expect(page.locator("html")).to_have_attribute("data-graph-palette", "blue-orange")
         choose_palette(page, "contrast")
-        page.reload()
+        navigate_analysis_page(page)
         expect(page.locator("select[data-graph-palette]")).to_have_value("classic")
         assert not errors, errors
         return {"in_page_selection": True, "reload_default_without_storage": True}
@@ -328,62 +340,82 @@ def storage_disabled_checks(browser, base):
         context.close()
 
 
+def run_browser_group(playwright, base, artifacts, engine, chromium, group):
+    # High-DPI raster checks retain their complete rendering/layout sequence.
+    # Persistence has its own fresh process instead of inheriting compositor
+    # resources from repeated large-canvas resizes. This is isolation, not a
+    # retry: either group's assertion or browser crash still fails the suite.
+    if engine == "firefox":
+        browser = playwright.firefox.launch(headless=True, firefox_user_prefs={"gfx.webrender.software": True, "layers.acceleration.disabled": True})
+    else:
+        browser = playwright.chromium.launch(executable_path=chromium or None, headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+    context = browser.new_context(viewport={"width": 1440, "height": 1000}, device_scale_factor=2, accept_downloads=True)
+    context.add_init_script(OBSERVE_WORKSPACE)
+    context.add_init_script(OBSERVE_PALETTE)
+    page = context.new_page()
+    errors = []
+    context.on("page", lambda new_page: new_page.on("pageerror", lambda error: errors.append(str(error))))
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    failure = None
+    def phase(name, action):
+        checkpoint(artifacts, name, status="started")
+        result = action()
+        checkpoint(artifacts, name, status="passed")
+        return result
+    try:
+        if group == "rendering-layout-exports":
+            results = {"rendering": phase("palette-rendering", lambda: palette_rendering(page, base, artifacts)),
+                       "desktop_width": phase("desktop-width", lambda: desktop_width_checks(page, base, artifacts)),
+                       "source_exports": phase("source-exports", lambda: source_export_checks(page, base))}
+        else:
+            results = {"preferences": phase("preferences", lambda: preference_checks(context, page, base)),
+                       "storage_disabled": phase("storage-disabled", lambda: storage_disabled_checks(browser, base))}
+        assert not errors, errors
+        return results, errors
+    except Exception as error:
+        failure = error
+        traceback.print_exc()
+        report = {"type": type(error).__name__, "exception": str(error), "group": group, "page_closed": page.is_closed(),
+                  "browser_connected": browser.is_connected(), "last_checkpoint": json.loads((artifacts / "progress.json").read_text())}
+        # Failure evidence must not replace the original test exception,
+        # especially when a crashed content process cannot take a picture.
+        try:
+            if not page.is_closed() and browser.is_connected():
+                page.screenshot(path=str(artifacts / "failure.png"), full_page=False, timeout=3000)
+            else:
+                report["screenshot"] = "Page/browser already closed"
+        except Exception as screenshot_error:
+            report["screenshot_error"] = str(screenshot_error)
+        (artifacts / "failure.json").write_text(json.dumps(report, indent=2) + "\n")
+        raise
+    finally:
+        cleanup_errors = []
+        for close in (context.close, browser.close):
+            try:
+                close()
+            except Exception as error:
+                cleanup_errors.append(error)
+        if cleanup_errors:
+            (artifacts / "cleanup-errors.json").write_text(json.dumps([str(error) for error in cleanup_errors], indent=2) + "\n")
+            if failure is None:
+                raise cleanup_errors[0]
+
+
 def run_browser(base, artifacts, engine, chromium):
     from playwright.sync_api import sync_playwright
 
+    groups = ("rendering-layout-exports", "preferences-storage")
+    results, errors = {}, []
     with sync_playwright() as playwright:
-        if engine == "firefox":
-            browser = playwright.firefox.launch(headless=True, firefox_user_prefs={"gfx.webrender.software": True, "layers.acceleration.disabled": True})
-        else:
-            browser = playwright.chromium.launch(executable_path=chromium or None, headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-        context = browser.new_context(viewport={"width": 1440, "height": 1000}, device_scale_factor=2, accept_downloads=True)
-        context.add_init_script(OBSERVE_WORKSPACE)
-        context.add_init_script(OBSERVE_PALETTE)
-        page = context.new_page()
-        errors = []
-        context.on("page", lambda new_page: new_page.on("pageerror", lambda error: errors.append(str(error))))
-        page.on("pageerror", lambda error: errors.append(str(error)))
-        failure = None
-        def phase(name, action):
-            checkpoint(artifacts, name, status="started")
-            result = action()
-            checkpoint(artifacts, name, status="passed")
-            return result
-        try:
-            results = {"rendering": phase("palette-rendering", lambda: palette_rendering(page, base, artifacts)),
-                       "desktop_width": phase("desktop-width", lambda: desktop_width_checks(page, base, artifacts)),
-                       "source_exports": phase("source-exports", lambda: source_export_checks(page, base)),
-                       "preferences": phase("preferences", lambda: preference_checks(context, page, base)),
-                       "storage_disabled": phase("storage-disabled", lambda: storage_disabled_checks(browser, base))}
-            assert not errors, errors
-            return {"browser": engine, **results, "browser_errors": errors}
-        except Exception as error:
-            failure = error
-            traceback.print_exc()
-            report = {"type": type(error).__name__, "exception": str(error), "page_closed": page.is_closed(),
-                      "browser_connected": browser.is_connected(), "last_checkpoint": json.loads((artifacts / "progress.json").read_text())}
-            # Failure evidence must not replace the original test exception,
-            # especially when a crashed content process cannot take a picture.
-            try:
-                if not page.is_closed() and browser.is_connected():
-                    page.screenshot(path=str(artifacts / "failure.png"), full_page=False, timeout=3000)
-                else:
-                    report["screenshot"] = "Page/browser already closed"
-            except Exception as screenshot_error:
-                report["screenshot_error"] = str(screenshot_error)
-            (artifacts / "failure.json").write_text(json.dumps(report, indent=2) + "\n")
-            raise
-        finally:
-            cleanup_errors = []
-            for close in (context.close, browser.close):
-                try:
-                    close()
-                except Exception as error:
-                    cleanup_errors.append(error)
-            if cleanup_errors:
-                (artifacts / "cleanup-errors.json").write_text(json.dumps([str(error) for error in cleanup_errors], indent=2) + "\n")
-                if failure is None:
-                    raise cleanup_errors[0]
+        for group in groups:
+            checkpoint(artifacts, "isolated-browser", group=group, status="started")
+            observed, group_errors = run_browser_group(playwright, base, artifacts, engine, chromium, group)
+            assert not group_errors, group_errors
+            results.update(observed)
+            errors.extend(group_errors)
+            checkpoint(artifacts, "isolated-browser", group=group, status="passed")
+    assert not errors, errors
+    return {"browser": engine, **results, "browser_errors": errors, "isolated_groups": groups}
 
 
 def main():

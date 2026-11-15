@@ -1,4 +1,4 @@
-name: desktop-gui-poc
+name: desktop-gui
 
 on:
   pull_request:
@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   gtk:
-    name: Linux GTK PoC
+    name: Linux GTK GUI
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -44,7 +44,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Test bounded reports and owned-process lifecycle
-        run: python3 -m unittest discover -s scripts -p 'test_desktop_gui.py'
+        run: python3 -m unittest discover -s scripts -p 'test_desktop_gui*.py'
       - name: Setup Go
         uses: actions/setup-go@v6.5.0
         with:
@@ -89,13 +89,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: linux-gtk-poc
+          name: linux-gtk-gui
           path: gui-artifacts/
           if-no-files-found: ignore
           retention-days: 7
 
   windows-gtk:
-    name: Windows GTK PoC
+    name: Windows GTK GUI
     runs-on: windows-2025
     timeout-minutes: 30
     env:
@@ -146,7 +146,7 @@ jobs:
       - name: Test Windows report pipes, owned-child shutdown and server health
         shell: msys2 {0}
         run: |
-          /ucrt64/bin/python.exe -m unittest discover -s scripts -p 'test_desktop_gui.py'
+          /ucrt64/bin/python.exe -m unittest discover -s scripts -p 'test_desktop_gui*.py'
           /ucrt64/bin/python.exe -m unittest discover -s scripts -p 'test_gui_health.py'
       - name: Test native Windows GTK rendering and real client integration
         shell: msys2 {0}
@@ -157,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: windows-gtk-poc
+          name: windows-gtk-gui
           path: gui-artifacts/windows/
           if-no-files-found: ignore
           retention-days: 7
