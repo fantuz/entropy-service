@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -605,6 +606,141 @@ def fullscreen_outcomes(context, application_type, gdk, binary, port):
     return results
 
 
+def terminal_interrupts(context, server_binary, client_binary, port, artifacts):
+    """Real terminal interruption quits GTK and reaps only its owned client."""
+    from entropy_gui.process import _signal, spawn_owned
+
+    probe = '''import json, signal, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from gi.repository import GLib
+from entropy_gui import app
+
+configuration = json.loads(Path(sys.argv[2]).read_text())
+ready = Path(configuration['ready'])
+finished = Path(configuration['finished'])
+original = app.DesktopApplication
+instances = []
+
+class ProbeApplication(original):
+    def do_activate(self):
+        super().do_activate()
+        instances.append(self)
+        GLib.timeout_add(25, self.mark_ready)
+
+    def mark_ready(self):
+        window = self.window
+        if window.descriptor is None:
+            return GLib.SOURCE_CONTINUE
+        if configuration['role'] == 'client':
+            if window.session is None:
+                window.start_client()
+            if not window.model.snapshot()['rows']:
+                return GLib.SOURCE_CONTINUE
+        else:
+            if window.health_session is None:
+                window.connect_health()
+            if not window.health_session.snapshot()['fresh']:
+                return GLib.SOURCE_CONTINUE
+        ready.write_text(json.dumps({'ready': True}))
+        if configuration['action'] == 'close':
+            window.close()
+        return GLib.SOURCE_REMOVE
+
+app.DesktopApplication = ProbeApplication
+signals = [signal.SIGINT] + ([signal.SIGBREAK] if sys.platform == 'win32' else [])
+before = {signum: signal.getsignal(signum) for signum in signals}
+result = app.run(configuration['role'], configuration['binary'], configuration['arguments'],
+                 health_url=configuration.get('health_url'))
+window = instances[0].window
+state = window.session.snapshot() if window.session else None
+health_stopped = True
+if window.health_session:
+    window.health_session._thread.join(timeout=2)
+    health_stopped = not window.health_session._thread.is_alive()
+finished.write_text(json.dumps({
+    'exit_code': result,
+    'handlers_restored': all(signal.getsignal(signum) is handler for signum, handler in before.items()),
+    'window_destroyed': window._destroyed,
+    'inspection_reaped': not window._inspection_thread.is_alive(),
+    'health_stopped': health_stopped,
+    'client_reaped': state is None or window.session._child.poll() is not None,
+    'client_summary': state['summary'] if state else None,
+    'forced_stop': state['forced_stop'] if state else False,
+}))
+raise SystemExit(result)
+'''
+    results = {}
+    with tempfile.TemporaryDirectory(prefix="entropy-gui-interrupt-") as directory:
+        directory = Path(directory)
+        script = directory / "interrupt_probe.py"
+        script.write_text(probe)
+        for role, binary, action in (("server", server_binary, "interrupt"),
+                                     ("client", client_binary, "interrupt"),
+                                     ("client", client_binary, "close")):
+            name = role if action == "interrupt" else role + "_close"
+            ready, finished = directory / (name + "-ready.json"), directory / (name + "-finished.json")
+            options = directory / (name + "-options.json")
+            arguments = (["-device=windows-csprng" if WINDOWS else "-device=/dev/urandom", "-enable-https=false"]
+                         if role == "server" else
+                         [f"-url=http://127.0.0.1:{port}/v1/data/random", "-slice=4096", "-refresh=50ms",
+                          "-analysis-interval=50ms", "-duration=15s"])
+            options.write_text(json.dumps({"role": role, "action": action, "binary": str(binary), "arguments": arguments,
+                                          "health_url": f"http://127.0.0.1:{port}" if role == "server" else None,
+                                          "ready": str(ready), "finished": str(finished)}))
+            with (artifacts / (name + "-interrupt.log")).open("w+b") as log:
+                child = spawn_owned([sys.executable, str(script), str(ROOT / "tools/desktop-gui"), str(options)],
+                                    stdout=log, stderr=subprocess.STDOUT)
+                try:
+                    wait_for(context, lambda: ready.is_file() or child.poll() is not None,
+                             role + " GUI interruption readiness", timeout=12)
+                    assert ready.is_file(), role + " GUI exited before interruption"
+                    if action == "close":
+                        expected_exit = 0
+                    elif WINDOWS:
+                        # CTRL_C cannot target an owned process group. The run()
+                        # handler treats targeted CTRL_BREAK the same as Ctrl+C.
+                        assert _signal(child), "Targeted Windows CTRL_BREAK could not be sent"
+                        expected_exit = 130
+                    else:
+                        child.send_signal(signal.SIGINT)
+                        expected_exit = 130
+                    assert child.wait(timeout=8) == expected_exit
+                    log.seek(0)
+                    output = log.read(65536).decode("utf-8", "replace")
+                    assert "Traceback" not in output and "KeyboardInterrupt" not in output, output
+                    state = json.loads(finished.read_text())
+                    assert state["exit_code"] == expected_exit and state["handlers_restored"], state
+                    assert state["window_destroyed"] and state["inspection_reaped"] and state["health_stopped"], state
+                    assert state["client_reaped"] and not state["forced_stop"], state
+                    if role == "client":
+                        assert state["client_summary"]["termination"] == "interrupted", state
+                    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+                    try:
+                        connection.request("GET", "/live")
+                        response = connection.getresponse()
+                        response.read(8192)
+                        assert response.status == 200
+                    finally:
+                        connection.close()
+                    results[name] = {**state, "separate_server_still_live": True,
+                                     "signal": "window close" if action == "close" else
+                                     "targeted CTRL_BREAK" if WINDOWS else "SIGINT"}
+                finally:
+                    if child.poll() is None:
+                        # Preserve the same graceful path for assertion cleanup.
+                        if WINDOWS:
+                            _signal(child)
+                        else:
+                            child.send_signal(signal.SIGINT)
+                        try:
+                            child.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            child.kill()
+                            child.wait(timeout=2)
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     suffix = ".exe" if WINDOWS else ""
@@ -637,6 +773,8 @@ def main():
         result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
         result["inspection_close"] = close_during_inspection(context, DesktopApplication)
         with entropy_server(args.server.resolve()) as port:
+            result["terminal_interrupts"] = terminal_interrupts(context, args.server.resolve(), args.client.resolve(),
+                                                                port, args.artifacts)
             result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)
             result["client"] = client_waterfall(context, DesktopApplication, Gdk, args.client.resolve(), port, args.artifacts)
             result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk, args.client.resolve(), port)

@@ -40,6 +40,15 @@ def choose_palette(page, palette):
     wait_paint(page)
 
 
+def wait_for_worker_bootstrap(page):
+    # Navigation/reload can otherwise terminate a classic worker while its
+    # importScripts requests are starting. Evaluate a queued task after that
+    # bootstrap before deliberately tearing down the page; keep worker errors
+    # and browser crashes visible to the existing assertions.
+    for worker in page.workers:
+        worker.evaluate("new Promise(resolve=>setTimeout(resolve,0))")
+
+
 def checkpoint(artifacts, phase, **details):
     entry = {"time_utc": datetime.now(timezone.utc).isoformat(), "phase": phase, **details}
     line = json.dumps(entry)
@@ -242,8 +251,7 @@ def desktop_width_checks(page, base, artifacts):
     data_panel = page.locator("main.panel").bounding_box()
     assert data_panel["width"] > 2200, data_panel
     assert not page.evaluate("document.documentElement.scrollWidth>innerWidth")
-    for worker in page.workers:
-        worker.evaluate("new Promise(resolve=>setTimeout(resolve,0))")
+    wait_for_worker_bootstrap(page)
     page.set_viewport_size({"width": 1440, "height": 1000})
     return {"analysis": widths, "containers": containers, "full_width_prose": prose,
             "ordinary_panel_width_at_2560": data_panel["width"]}
@@ -253,9 +261,11 @@ def preference_checks(context, page, base):
     from playwright.sync_api import expect
 
     page.goto(base + "/api-upload.html")
+    wait_for_worker_bootstrap(page)
     choose_palette(page, "classic")
     second = context.new_page()
     second.goto(base + "/api-upload.html")
+    wait_for_worker_bootstrap(second)
     choose_palette(second, "blue-orange")
     expect(page.locator("html")).to_have_attribute("data-graph-palette", "blue-orange")
     choose_palette(page, "contrast")
@@ -264,10 +274,11 @@ def preference_checks(context, page, base):
         page.goto(base + path)
         expect(page.locator("html")).to_have_attribute("data-graph-palette", "contrast")
         expect(page.locator("select[data-graph-palette]")).to_have_value("contrast")
-        for worker in page.workers:
-            worker.evaluate("new Promise(resolve=>setTimeout(resolve,0))")
+        wait_for_worker_bootstrap(page)
     page.goto(base + "/api-upload.html")
+    wait_for_worker_bootstrap(page)
     page.reload()
+    wait_for_worker_bootstrap(page)
     expect(page.locator("select[data-graph-palette]")).to_have_value("contrast")
     page.bring_to_front()
     page.wait_for_function("!document.hidden")
@@ -316,11 +327,13 @@ def storage_disabled_checks(browser, base):
     page.on("pageerror", lambda error: errors.append(str(error)))
     try:
         page.goto(base + "/api-upload.html")
+        wait_for_worker_bootstrap(page)
         choose_palette(page, "blue-orange")
         page.evaluate("dispatchEvent(new Event('focus'));dispatchEvent(new PageTransitionEvent('pageshow'))")
         expect(page.locator("html")).to_have_attribute("data-graph-palette", "blue-orange")
         choose_palette(page, "contrast")
         page.reload()
+        wait_for_worker_bootstrap(page)
         expect(page.locator("select[data-graph-palette]")).to_have_value("classic")
         assert not errors, errors
         return {"in_page_selection": True, "reload_default_without_storage": True}

@@ -7,7 +7,8 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(description="Linux/Windows GTK 4 entropy-service PoC. Pass utility startup options after --.")
-    parser.add_argument("--view", choices=("server", "client"), default="server")
+    parser.add_argument("--view", choices=("server", "client"), default="server",
+                        help="server: inspect settings and Connect to live health; client: Start acquisition and the waterfall")
     suffix = ".exe" if sys.platform == "win32" else ""
     parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-server" + suffix)),
                         help="native server executable to inspect; may be outside the source folder (default: %(default)s); pass before --")

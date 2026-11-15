@@ -10,6 +10,11 @@ from an existing server. The client window provides statistics and a bounded,
 resizable waterfall with fullscreen mode. Neither window installs or controls
 an operating-system service.
 
+| Window | Main button | What it does |
+| --- | --- | --- |
+| Server (`--view server`) | **Connect** | Monitor an already-running server. This window has no Start button. |
+| Client (`--view client`) | **Start**, at the top left | Launch the selected client and show its statistics and waterfall. |
+
 [![Server configuration and live health](images/desktop-gui-server-poc.png)](images/desktop-gui-server-poc.png)
 [![Client waterfall](images/desktop-gui-client-poc.png)](images/desktop-gui-client-poc.png)
 
@@ -144,7 +149,9 @@ python tools/desktop-gui/entropy-gui --view client -- \
   -slice=1048576 -refresh=250ms -analysis-interval=250ms
 ```
 
-Click **Start** to receive samples and display the waterfall. **F11** toggles
+Click **Start** at the top left of the **client** window to receive samples
+and display the waterfall. It becomes enabled after local startup inspection
+succeeds. The **server** window uses **Connect** instead. **F11** toggles
 fullscreen and **Escape** returns. **Stop** affects only the client process
 started by that window; the separate server keeps running.
 
@@ -295,9 +302,19 @@ An existing console is preserved. Forced termination is a bounded fallback,
 reported as forced instead of inventing a clean summary. The GUI never stops
 a separately started entropy-server or an operating-system service.
 
+**Ctrl+C** in the GUI's launch terminal also closes the GUI and cleans up its
+owned client and health polling, with exit status 130 and no Python traceback.
+Windows also accepts **Ctrl+Break**. Keep a separately started server in its
+own terminal as shown above; the GUI does not send it a stop request.
+
 Change utility options by reopening the window with arguments after `--`.
-`--server-binary` and `--client-binary` select explicit native executables;
-Windows batch/command scripts are rejected. The GUI manages headless/report
+`--server-binary` selects the local executable used to inspect server startup
+options; it does not start or replace the server at the health URL.
+`--client-binary` selects the local executable used for inspection and launched
+when you click **Start**. It does not select a remote server: that address is
+the client's `-url` argument after `--`. Both options can be omitted when the
+executables are in the source directory's `bin` folder. Windows batch/command
+scripts are rejected. The GUI manages headless/report
 flags. Raw exports and device writes through the GUI are unsupported; use the
 CLI for deliberate exports. Certificate trust for client acquisition follows
 [the existing client guidance](client-tls.md).

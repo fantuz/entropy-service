@@ -4,6 +4,7 @@ The server view describes an invocation and can query an existing server.
 It never starts or changes a server.
 Only the client view can start a process, and it owns that process throughout.
 """
+import signal
 import sys
 import threading
 from datetime import datetime
@@ -117,6 +118,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._health_revision = -1
         self._fullscreen = False
         self._closing = False
+        self._destroyed = False
         self._stopping = False
         self._was_running = False
         self._last_error = ""
@@ -580,6 +582,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
         return True
 
     def _finish_close(self):
+        if self._destroyed:
+            return
+        self._destroyed = True
         if self._tick_id:
             GLib.source_remove(self._tick_id)
             self._tick_id = None
@@ -602,9 +607,68 @@ class DesktopApplication(Gtk.Application):
             self.window = DesktopWindow(self, self.role, self.binary, self.arguments, self.health_url, self.health_ca)
         self.window.present()
 
+    def stop_owned_resources(self):
+        """Finish owned work even if a signal has already stopped the GTK loop."""
+        window = self.window
+        if window is None:
+            return
+        window._closing = True
+        try:
+            if window.health_session:
+                window.health_session.stop()
+        finally:
+            try:
+                if window.session:
+                    # Closing the event loop does not emit close-request. Join
+                    # the existing bounded stop/drain path synchronously here;
+                    # an idle callback cannot finish after run() has returned.
+                    window.session.stop()
+            finally:
+                window._finish_close()
+                window._inspection_thread.join(timeout=4)
+
 
 def run(role, binary, arguments, health_url=None, health_ca=None):
     if not Gtk.init_check() or Gdk.Display.get_default() is None:
         print("No graphical display is available. Launch entropy-gui from a desktop session.", file=sys.stderr)
         return 2
-    return DesktopApplication(role, binary, arguments, health_url, health_ca).run([])
+    application = DesktopApplication(role, binary, arguments, health_url, health_ca)
+    interrupted = False
+    quit_source = None
+    previous_handlers = {}
+
+    def quit_after_interrupt():
+        nonlocal quit_source
+        quit_source = None
+        application.quit()
+        return GLib.SOURCE_REMOVE
+
+    def interrupt(_signum, _frame):
+        nonlocal interrupted, quit_source
+        interrupted = True
+        if quit_source is None:
+            # Defer into GTK, including a signal arriving just before run().
+            # PyGObject's default fallback re-raises KeyboardInterrupt after
+            # quitting, without closing the owned client window first.
+            quit_source = GLib.idle_add(quit_after_interrupt)
+
+    try:
+        signals = [signal.SIGINT]
+        if sys.platform == "win32":
+            signals.append(signal.SIGBREAK)
+        for signum in signals:
+            previous_handlers[signum] = signal.signal(signum, interrupt)
+        try:
+            result = application.run([])
+        except KeyboardInterrupt:
+            # Also cover an interrupt delivered by an embedding GI fallback.
+            interrupted, result = True, 130
+    finally:
+        try:
+            application.stop_owned_resources()
+        finally:
+            if quit_source is not None:
+                GLib.source_remove(quit_source)
+            for signum, handler in previous_handlers.items():
+                signal.signal(signum, handler)
+    return 130 if interrupted else result
