@@ -15,7 +15,9 @@
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/fantuz/entropy-service?logo=go" alt="Go version" height="20"></a>
   <a href="https://github.com/fantuz/entropy-service/releases/latest"><img src="https://img.shields.io/badge/Install-DEB%2FRPM%20%C2%B7%20amd64%2Farm64%2Farmv7-2e7d32" alt="Linux DEB and RPM packages for amd64, arm64 and ARMv7" height="20"></a>
   <br>
-  <a href="https://github.com/fantuz/entropy-service/actions/workflows/release.yml"><img src="https://github.com/fantuz/entropy-service/actions/workflows/release.yml/badge.svg" alt="Release workflow" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/release.yml?query=event%3Apush"><img src="https://github.com/fantuz/entropy-service/actions/workflows/release.yml/badge.svg?event=push" alt="Tagged release workflow" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/browser-ui.yml?query=branch%3Amain"><img src="https://github.com/fantuz/entropy-service/actions/workflows/browser-ui.yml/badge.svg?branch=main" alt="Browser UI tests on main" height="20"></a>
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/desktop-gui.yml?query=branch%3Amain"><img src="https://github.com/fantuz/entropy-service/actions/workflows/desktop-gui.yml/badge.svg?branch=main" alt="Desktop GUI tests on main" height="20"></a>
   <a href="https://golangci-lint.run/"><img src="https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go" alt="golangci-lint" height="20"></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/security-private%20reporting-507269" alt="Security policy and private vulnerability reporting" height="20"></a>
 </p>
