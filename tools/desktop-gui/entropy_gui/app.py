@@ -1,10 +1,13 @@
 """Small native GTK 4 view over the existing command-line utilities.
 
-The server view describes an invocation; it never starts or changes a server.
+The server view describes an invocation and can query an existing server.
+It never starts or changes a server.
 Only the client view can start a process, and it owns that process throughout.
 """
 import sys
 import threading
+from datetime import datetime
+from urllib.parse import urlsplit
 
 import cairo
 import gi
@@ -16,6 +19,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango
 
 from .model import StreamModel
 from .process import ClientSession, describe
+from .health import HealthSession
 
 
 HISTORY_ROWS = 128
@@ -77,8 +81,28 @@ def byte_hue(value):
 BYTE_COLORS = tuple(byte_hue(value) for value in range(256))
 
 
+def default_health_url(descriptor):
+    """Suggest one configured endpoint without claiming that it is listening."""
+    secure = descriptor["features"].get("https", False)
+    address = descriptor["settings"].get("https_address" if secure else "http_address", "")
+    if not isinstance(address, str):
+        return ""
+    try:
+        target = urlsplit("//" + address)
+        port = target.port
+        if not port:
+            return ""
+        host = target.hostname or "127.0.0.1"
+        host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(host, host)
+        if ":" in host:
+            host = "[" + host + "]"
+        return f"{'https' if secure else 'http'}://{host}:{port}"
+    except ValueError:
+        return ""
+
+
 class DesktopWindow(Gtk.ApplicationWindow):
-    def __init__(self, application, role, binary, arguments):
+    def __init__(self, application, role, binary, arguments, health_url=None, health_ca=None):
         super().__init__(application=application)
         self.role, self.binary, self.arguments = role, binary, list(arguments)
         self.model = StreamModel(history_limit=HISTORY_ROWS)
@@ -86,6 +110,10 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.descriptor = None
         self.feature_checks = {}
         self.stat_labels = {}
+        self.health_session = None
+        self.health_labels = {}
+        self.health_ca = health_ca
+        self._health_revision = -1
         self._fullscreen = False
         self._closing = False
         self._stopping = False
@@ -96,15 +124,15 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._pixels = None
         self._rows = ()
         self._palette = "byte"
-        self.set_title(f"Entropy {role.title()} · Linux PoC")
+        self.set_title(f"Entropy {role.title()} · Desktop PoC")
         self.set_default_size(1100, 760)
-        self.set_size_request(640, 480)
+        self.set_size_request(640, 640 if role == "server" else 480)
         self.connect("close-request", self._on_close)
 
         self.header = Gtk.HeaderBar()
         title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         title.append(label(f"Entropy {role.title()}", "poc-heading"))
-        title.append(label("Linux desktop proof of concept", "poc-subtitle"))
+        title.append(label(f"{'Windows' if sys.platform == 'win32' else 'Linux'} desktop proof of concept", "poc-subtitle"))
         self.header.set_title_widget(title)
         self.set_titlebar(self.header)
         if role == "client":
@@ -130,8 +158,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.status_label.set_lines(3)
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
         if role == "server":
-            body.append(label("Startup configuration", "poc-title"))
-            body.append(label("Read only · requested options, not observed runtime health. No server is started or modified.", "poc-subtitle"))
+            self._build_health_panel(body, health_url)
+            body.append(label("Requested startup configuration", "poc-title"))
+            body.append(label("Read only · these options are independent from the selected live server. No server is started or modified.", "poc-subtitle"))
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             scroller = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
             scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -182,6 +211,126 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._inspection_thread = threading.Thread(target=self._inspect, name="entropy-gui-inspection")
         self._inspection_thread.start()
 
+    def _build_health_panel(self, body, health_url):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.add_css_class("poc-card")
+        heading = Gtk.Box(spacing=16)
+        heading.append(label("Live server health", "poc-heading"))
+        state = label("DISCONNECTED", "poc-heading")
+        heading.append(state)
+        self.health_labels["state"] = state
+        card.append(heading)
+        controls = Gtk.Box(spacing=8)
+        self.health_url_entry = Gtk.Entry(hexpand=True)
+        self.health_url_entry.set_placeholder_text("https://127.0.0.1:8443")
+        self.health_url_entry.set_text(health_url or "")
+        self.health_url_entry.set_tooltip_text("An existing server's base URL. Connect queries /live and /ready without changing its configuration.")
+        self.health_url_entry.connect("activate", lambda _entry: self.connect_health())
+        controls.append(self.health_url_entry)
+        self.health_connect_button = Gtk.Button(label="Connect")
+        self.health_connect_button.connect("clicked", lambda _button: self.connect_health())
+        controls.append(self.health_connect_button)
+        self.health_disconnect_button = Gtk.Button(label="Disconnect", sensitive=False)
+        self.health_disconnect_button.connect("clicked", lambda _button: self.disconnect_health())
+        controls.append(self.health_disconnect_button)
+        card.append(controls)
+        card.append(label("TLS verification uses the supplied CA file." if self.health_ca else "TLS verification uses system trust. Connect checks only the selected endpoint.", "poc-subtitle"))
+        grid = Gtk.Grid(column_spacing=20, row_spacing=5)
+        fields = (
+            ("listener", "Selected listener"), ("live", "Process"),
+            ("ready", "Readiness"), ("generation_allowed", "Generation"),
+            ("rng_drbg", "Observed DRBG"), ("rng_source", "Observed seed source"),
+            ("reseed_age_ms", "Seed age"), ("reseed_failures_total", "Reseed failures"),
+        )
+        for index, (key, caption) in enumerate(fields):
+            row, column = divmod(index, 2)
+            grid.attach(label(caption, "poc-subtitle"), column * 2, row, 1, 1)
+            value = label("—")
+            value.set_hexpand(True)
+            value.set_selectable(True)
+            value.set_max_width_chars(40)
+            value.set_ellipsize(Pango.EllipsizeMode.END)
+            grid.attach(value, column * 2 + 1, row, 1, 1)
+            self.health_labels[key] = value
+        card.append(grid)
+        self.health_labels["checked_at"] = label("No live check has been made.", "poc-subtitle")
+        self.health_labels["checked_at"].set_lines(2)
+        self.health_labels["checked_at"].set_ellipsize(Pango.EllipsizeMode.END)
+        card.append(self.health_labels["checked_at"])
+        body.append(card)
+
+    def connect_health(self):
+        if self.role != "server" or self._closing:
+            return
+        if self.health_session:
+            state = self.health_session.snapshot()
+            if state["running"] or state.get("stopping"):
+                return
+        # Move focus out of GtkEntry's internal text widget before disabling
+        # the URL control, including when Connect was activated with Enter.
+        self.set_focus(None)
+        try:
+            self.health_session = HealthSession(self.health_url_entry.get_text().strip(), ca_file=self.health_ca)
+            self.health_session.start()
+        except (OSError, RuntimeError, ValueError) as error:
+            self.health_session = None
+            self._health_revision = -1
+            self._show_health({"state": "invalid", "fresh": False, "listener": "unknown", "running": False,
+                               "stopping": False, "health": {}, "live": None, "ready": None,
+                               "checked_at": None, "error": str(error)})
+            return
+        self._health_revision = -1
+        self._tick_health()
+
+    def disconnect_health(self):
+        if self.health_session:
+            self.health_session.stop()
+            self._health_revision = -1
+            self._tick_health()
+
+    def _tick_health(self):
+        if self.health_session is None:
+            return
+        state = self.health_session.snapshot()
+        active = state["running"] or state.get("stopping", False)
+        self.health_url_entry.set_sensitive(not active)
+        self.health_connect_button.set_sensitive(not active)
+        self.health_disconnect_button.set_sensitive(state["running"])
+        revision = (state["revision"], state["state"], state.get("fresh"), state.get("checked_at"))
+        if revision != self._health_revision:
+            self._health_revision = revision
+            self._show_health(state)
+
+    def _show_health(self, state):
+        fresh = state.get("fresh", False)
+        heading = self.health_labels["state"]
+        heading.set_text(state["state"].replace("-", " ").upper())
+        for css in ("status-ok", "status-warn"):
+            heading.remove_css_class(css)
+        if fresh and state["state"] == "ready":
+            heading.add_css_class("status-ok")
+        elif state["state"] not in ("disconnected", "checking"):
+            heading.add_css_class("status-warn")
+        listener = state.get("listener", "unknown")
+        self.health_labels["listener"].set_text({"unknown": "Not checked", "reachable": "Reachable",
+                                                "unreachable": "Unreachable", "tls-unverified": "TLS not trusted"}.get(listener, "Unknown"))
+        health = state.get("health", {}) if fresh else {}
+        self.health_labels["live"].set_text("ONLINE" if fresh and state.get("live") is True else "NOT OK" if fresh and state.get("live") is False else "—")
+        self.health_labels["ready"].set_text("READY" if fresh and state.get("ready") is True else "DEGRADED" if fresh and state.get("ready") is False else "—")
+        self.health_labels["generation_allowed"].set_text("Allowed" if health.get("generation_allowed") is True else "Paused" if health.get("generation_allowed") is False else "—")
+        for key in ("rng_drbg", "rng_source", "reseed_failures_total"):
+            self.health_labels[key].set_text(str(health[key]) if key in health else "—")
+        age = health.get("reseed_age_ms")
+        self.health_labels["reseed_age_ms"].set_text(f"{age:,} ms" if age is not None else "—")
+        checked = state.get("checked_at")
+        detail = "Checked " + datetime.fromtimestamp(checked).astimezone().strftime("%H:%M:%S %Z") if checked else {
+            "disconnected": "Live monitoring is disconnected.",
+            "checking": "Checking the selected endpoint…",
+        }.get(state["state"], "No fresh live response is available.")
+        if state.get("error"):
+            detail += " · " + state["error"]
+        self.health_labels["checked_at"].set_text(detail)
+
     def _inspect(self):
         try:
             result = describe(self.binary, self.arguments, self.role)
@@ -228,6 +377,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
         feature_box.append(features)
         if self.role == "server":
             self.settings_box.append(feature_box)
+            if not self.health_url_entry.get_text().strip():
+                self.health_url_entry.set_text(default_health_url(descriptor))
             groups = [("DRBG & seed configuration", ("drbg", "seed_source", "reseed_failure_policy", "reseed_interval_ms", "max_reseed_age_ms", "reseed_bytes", "source_timeout")),
                       ("Network configuration", ("http_address", "https_address"))]
         else:
@@ -246,7 +397,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self._group("Limits & other startup options", other)
         if self.role == "client":
             self.settings_box.append(feature_box)
-        self.status_label.set_text("Configuration read. Runtime DRBG, listener and certificate health have not been checked." if self.role == "server" else "Ready · Start launches an owned client process. No raw export or device writes are enabled by this GUI.")
+        self.status_label.set_text("Configuration read. Live observations use the selected health URL; they do not prove this invocation matches that process." if self.role == "server" else "Ready · Start launches an owned client process. No raw export or device writes are enabled by this GUI.")
         return GLib.SOURCE_REMOVE
 
     def start_client(self):
@@ -298,6 +449,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
 
     def _tick(self):
         if self._closing:
+            return GLib.SOURCE_CONTINUE
+        if self.role == "server":
+            self._tick_health()
             return GLib.SOURCE_CONTINUE
         if not self.session:
             return GLib.SOURCE_CONTINUE
@@ -402,6 +556,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
 
     def _on_close(self, _window):
         self._closing = True
+        if self.health_session:
+            self.health_session.stop()
         if self.session and self.session.snapshot()["running"]:
             self.stop_client()
             return True
@@ -412,13 +568,15 @@ class DesktopWindow(Gtk.ApplicationWindow):
         if self._tick_id:
             GLib.source_remove(self._tick_id)
             self._tick_id = None
+        self.set_focus(None)
         self.destroy()
 
 
 class DesktopApplication(Gtk.Application):
-    def __init__(self, role, binary, arguments):
-        super().__init__(application_id="org.entropyservice.LinuxPoC", flags=Gio.ApplicationFlags.NON_UNIQUE)
+    def __init__(self, role, binary, arguments, health_url=None, health_ca=None):
+        super().__init__(application_id="org.entropyservice.DesktopPoC", flags=Gio.ApplicationFlags.NON_UNIQUE)
         self.role, self.binary, self.arguments = role, binary, list(arguments)
+        self.health_url, self.health_ca = health_url, health_ca
         self.window = None
 
     def do_activate(self):
@@ -426,12 +584,12 @@ class DesktopApplication(Gtk.Application):
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         if self.window is None:
-            self.window = DesktopWindow(self, self.role, self.binary, self.arguments)
+            self.window = DesktopWindow(self, self.role, self.binary, self.arguments, self.health_url, self.health_ca)
         self.window.present()
 
 
-def run(role, binary, arguments):
+def run(role, binary, arguments, health_url=None, health_ca=None):
     if not Gtk.init_check() or Gdk.Display.get_default() is None:
-        print("No graphical display is available. Launch entropy-gui from a Linux desktop session.", file=sys.stderr)
+        print("No graphical display is available. Launch entropy-gui from a desktop session.", file=sys.stderr)
         return 2
-    return DesktopApplication(role, binary, arguments).run([])
+    return DesktopApplication(role, binary, arguments, health_url, health_ca).run([])

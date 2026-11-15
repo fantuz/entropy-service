@@ -14,6 +14,12 @@ This first port targets x64 console applications on modern Windows. It does not
 install a Windows service. Windows ARM64 releases await native validation. Linux
 release targets and socket/device implementations remain unchanged.
 
+An optional [GTK desktop PoC](desktop-gui-poc.md#windows-setup) runs from source
+with MSYS2 UCRT64 Python/GTK dependencies. It provides live server health and
+read-only startup configuration, plus a client waterfall/fullscreen view. Its
+native Windows GUI and process checks run separately from the existing CLI
+checks. The GUI is not bundled in release ZIPs or a standalone installer.
+
 ## Build or install
 
 Extract a Windows release ZIP into a directory you control. It contains both

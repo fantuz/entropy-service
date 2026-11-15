@@ -1,4 +1,4 @@
-"""Bounded, GTK-independent state for the optional Linux frontend."""
+"""Bounded, GTK-independent state for the optional desktop frontend."""
 import base64
 from collections import deque
 import json
@@ -54,7 +54,7 @@ def safe_endpoint(value):
 def safe_text(value):
     value = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", value)
     value = "".join(char for char in value if char in "\n\t" or ord(char) >= 32 and ord(char) != 127)
-    return re.sub(r"(?:https?|wss?)://[^\s<>]+", lambda match: safe_endpoint(match.group()), value)
+    return re.sub(r"(?:https?|wss?)://[^\s<>]+", lambda match: safe_endpoint(match.group()), value, flags=re.IGNORECASE)
 
 
 def _settings(value):

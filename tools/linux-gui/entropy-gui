@@ -1,31 +1,9 @@
 #!/usr/bin/python3
-"""Launch the optional Linux GTK 4 proof of concept."""
-import argparse
+"""Compatibility entry for the former Linux-only PoC path."""
 from pathlib import Path
+import runpy
 import sys
 
-
-def main():
-    parser = argparse.ArgumentParser(description="Linux GTK 4 entropy-service PoC. Pass utility startup options after --.")
-    parser.add_argument("--view", choices=("server", "client"), default="server")
-    parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / "bin/entropy-server"))
-    parser.add_argument("--client-binary", default=str(Path(__file__).resolve().parents[2] / "bin/entropy-client"))
-    arguments = sys.argv[1:]
-    divider = arguments.index("--") if "--" in arguments else len(arguments)
-    options = parser.parse_args(arguments[:divider])
-    utility_arguments = arguments[divider + 1:] if divider < len(arguments) else []
-    if sys.platform != "linux":
-        parser.error("this proof of concept supports Linux only")
-    try:
-        from entropy_gui.app import run
-    except (ImportError, ValueError) as error:
-        print("GTK 4 desktop dependencies are unavailable: " + str(error), file=sys.stderr)
-        print("Debian/Ubuntu: sudo apt install python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0", file=sys.stderr)
-        print("Use /usr/bin/python3 if a virtual environment hides distribution packages.", file=sys.stderr)
-        return 2
-    binary = options.server_binary if options.view == "server" else options.client_binary
-    return run(options.view, binary, utility_arguments)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+root = Path(__file__).resolve().parents[1] / "desktop-gui"
+sys.path.insert(0, str(root))
+runpy.run_path(str(root / "entropy-gui"), run_name="__main__")

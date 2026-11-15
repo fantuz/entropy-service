@@ -5,7 +5,7 @@ Run either binary with `-help` for its complete flag list. Boolean values use `-
 Both binaries also accept `-describe-json` to validate and emit an allowlisted
 startup configuration, then exit before opening runtime devices, listeners,
 TLS material or output destinations. It describes requested options rather
-than live health. See the optional [Linux desktop PoC](linux-gui-poc.md).
+than live health. See the optional [desktop PoC](desktop-gui-poc.md).
 
 ## Server
 

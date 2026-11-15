@@ -160,7 +160,7 @@ waterfall bytes are omitted by default. Explicit `-report-waterfall` adds
 `settings.report_waterfall: true` and, per analysed sample, a base64
 `waterfall_prefix_base64` containing at most 256 raw bytes (also bounded by
 the analysed sample length). This opt-in supports the
-[Linux desktop PoC](linux-gui-poc.md); it requires `-report` and changes a
+[desktop PoC](desktop-gui-poc.md); it requires `-report` and changes a
 report from statistics-only to including sampled data.
 
 `settings.layout` records `auto`, `compact`, `full` or `waterfall`. Zero waterfall dimensions

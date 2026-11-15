@@ -1,0 +1,39 @@
+#!/usr/bin/python3
+"""Launch the optional Linux/Windows GTK 4 proof of concept."""
+import argparse
+from pathlib import Path
+import sys
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Linux/Windows GTK 4 entropy-service PoC. Pass utility startup options after --.")
+    parser.add_argument("--view", choices=("server", "client"), default="server")
+    suffix = ".exe" if sys.platform == "win32" else ""
+    parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-server" + suffix)))
+    parser.add_argument("--client-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-client" + suffix)))
+    parser.add_argument("--health-url", help="server view: existing server base URL; Connect starts verified read-only health polling")
+    parser.add_argument("--health-ca", help="server view: PEM CA certificate trusted for HTTPS health checks")
+    arguments = sys.argv[1:]
+    divider = arguments.index("--") if "--" in arguments else len(arguments)
+    options = parser.parse_args(arguments[:divider])
+    utility_arguments = arguments[divider + 1:] if divider < len(arguments) else []
+    if sys.platform not in ("linux", "win32"):
+        parser.error("this proof of concept supports Linux and Windows")
+    if options.view != "server" and (options.health_url or options.health_ca):
+        parser.error("--health-url and --health-ca apply to the server view")
+    try:
+        from entropy_gui.app import run
+    except (ImportError, ValueError) as error:
+        print("GTK 4 desktop dependencies are unavailable: " + str(error), file=sys.stderr)
+        if sys.platform == "win32":
+            print("Use MSYS2 UCRT64 Python with mingw-w64-ucrt-x86_64-python-gobject, mingw-w64-ucrt-x86_64-python-cairo and mingw-w64-ucrt-x86_64-gtk4.", file=sys.stderr)
+        else:
+            print("Debian/Ubuntu: sudo apt install python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0", file=sys.stderr)
+            print("Use /usr/bin/python3 if a virtual environment hides distribution packages.", file=sys.stderr)
+        return 2
+    binary = options.server_binary if options.view == "server" else options.client_binary
+    return run(options.view, binary, utility_arguments, health_url=options.health_url, health_ca=options.health_ca)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Exercise real GTK windows and the owned CLI client under a Linux display.
+"""Exercise native GTK windows, live health and the owned CLI on Linux/Windows.
 
 Run after building both utilities, for example:
-  xvfb-run -a /usr/bin/python3 scripts/test_linux_gui_gtk.py
-The core/protocol tests remain independent of GTK in test_linux_gui.py.
+  xvfb-run -a /usr/bin/python3 scripts/test_desktop_gui_gtk.py
+The core/protocol tests remain independent of GTK in test_desktop_gui.py.
 """
 import argparse
 import contextlib
 import http.client
+import http.server
 import json
 import os
 from pathlib import Path
@@ -16,11 +17,13 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools/linux-gui"))
+sys.path.insert(0, str(ROOT / "tools/desktop-gui"))
+WINDOWS = sys.platform == "win32"
 
 
 def free_port():
@@ -61,11 +64,52 @@ def close_window(context, window):
         assert window.session._child.poll() is not None
 
 
+def capture_window(context, window, path):
+    """Capture a native GTK snapshot without Linux-only screenshot utilities."""
+    from gi.repository import GLib, Graphene, Gtk
+
+    clock = window.get_frame_clock()
+    if clock is not None:
+        # Widget state can be updated before GTK has committed its next paint.
+        for _ in range(4):
+            previous = clock.get_frame_counter()
+            window.queue_draw()
+            wait_for(context, lambda: clock.get_frame_counter() > previous,
+                     "settled native screenshot frame", timeout=3)
+    try:
+        width, height = window.get_width(), window.get_height()
+        paintable = Gtk.WidgetPaintable.new(window)
+        snapshot = Gtk.Snapshot()
+        paintable.snapshot(snapshot, width, height)
+        node = snapshot.to_node()
+        if node is None:
+            return {"captured": False, "reason": "GTK snapshot returned no render node"}
+        bounds = Graphene.Rect()
+        bounds.init(0, 0, width, height)
+        texture = window.get_native().get_renderer().render_texture(node, bounds)
+        texture.save_to_png(str(path))
+        if not path.is_file() or path.stat().st_size == 0:
+            return {"captured": False, "reason": "GTK texture did not produce a PNG"}
+        return {"captured": True, "file": path.name, "width": width, "height": height}
+    except (TypeError, ValueError, AttributeError, RuntimeError, GLib.Error) as error:
+        # Some distribution bindings do not marshal GskRenderNode. Keep exact
+        # evidence while native paint/geometry assertions still test the UI.
+        return {"captured": False, "reason": type(error).__name__ + ": " + str(error)}
+
+
 def server_configuration(context, application_type, binary):
     port = free_port()
     missing = "/definitely-not-present/entropy-gui-device"
-    app = application_type("server", str(binary), [f"-http=127.0.0.1:{port}",
-                           "-enable-https=false", "-require-device=true", f"-device={missing}"])
+    if WINDOWS:
+        # Windows deliberately rejects Linux device paths, even in a startup
+        # description. Missing TLS files instead prove inspection avoids I/O.
+        arguments = [f"-http=127.0.0.1:{port}", "-device=windows-csprng",
+                     "-enable-https=true", "-cert-file=missing-gui-certificate.pem",
+                     "-key-file=missing-gui-key.pem"]
+    else:
+        arguments = [f"-http=127.0.0.1:{port}", "-enable-https=false",
+                     "-require-device=true", f"-device={missing}"]
+    app = application_type("server", str(binary), arguments)
     # The smoke check creates both roles in one process. Separate application
     # IDs keep their D-Bus object paths distinct, as separate real invocations do.
     app.set_application_id("org.entropyservice.LinuxPoC.TestServer")
@@ -75,18 +119,18 @@ def server_configuration(context, application_type, binary):
     try:
         wait_for(context, lambda: window.descriptor is not None and window.get_mapped(), "server invocation description and window mapping")
         assert_read_only(window)
-        assert window.descriptor["settings"]["seed_source"] == missing
-        assert window.descriptor["features"]["https"] is False
-        assert window.descriptor["features"]["require_device"] is True
-        assert "not been checked" in window.status_label.get_text()
+        assert window.descriptor["settings"]["seed_source"] == ("windows-csprng" if WINDOWS else missing)
+        assert window.descriptor["features"]["https"] is WINDOWS
+        assert window.descriptor["features"]["require_device"] is (not WINDOWS)
         assert window.session is None
+        assert window.health_session is None, "Startup inspection must not auto-connect"
         # Description succeeds despite an unreadable device, and the requested
         # address remains unbound: this window never starts a server.
         with socket.socket() as probe:
             probe.settimeout(.2)
             assert probe.connect_ex(("127.0.0.1", port)) != 0
         return {"read_only_features": len(window.feature_checks), "server_started": False,
-                "missing_device_opened": False}
+                "runtime_resources_opened": False, "health_auto_connected": False}
     finally:
         close_window(context, window)
         app.quit()
@@ -94,6 +138,10 @@ def server_configuration(context, application_type, binary):
 
 def close_during_inspection(context, application_type):
     """Closing before describe completes must not abandon an owned child."""
+    if WINDOWS:
+        # A Unix shebang helper is not a Windows executable. Native core tests
+        # separately exercise describe deadlines with a Python command argv.
+        return {"not_applicable": "POSIX executable-helper fixture; covered by Windows process tests"}
     with tempfile.TemporaryDirectory(prefix="entropy-gui-inspection-") as directory:
         inspector = Path(directory) / "hung-inspector"
         pid_file = inspector.with_suffix(".pid")
@@ -129,11 +177,13 @@ def close_during_inspection(context, application_type):
 
 @contextlib.contextmanager
 def entropy_server(binary):
+    from entropy_gui.process import spawn_owned, stop_owned
+
     port = free_port()
     with tempfile.TemporaryFile() as log:
-        child = subprocess.Popen([str(binary), f"-http=127.0.0.1:{port}",
-                                  "-enable-https=false", "-device=/dev/urandom", "-require-device=true"],
-                                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+        source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom", "-require-device=true"]
+        child = spawn_owned([str(binary), f"-http=127.0.0.1:{port}",
+                             "-enable-https=false", *source], stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 8
             while True:
@@ -154,13 +204,154 @@ def entropy_server(binary):
                 time.sleep(.02)
             yield port
         finally:
-            if child.poll() is None:
-                child.terminate()
-            try:
-                child.wait(timeout=4)
-            except subprocess.TimeoutExpired:
-                child.kill()
-                child.wait(timeout=1)
+            stop_owned(child)
+
+
+class HealthFixture(http.server.BaseHTTPRequestHandler):
+    """Controlled HTTP health faults without replacing GTK's actual poller."""
+
+    def log_message(self, *_args):
+        pass
+
+    def do_GET(self):
+        self.server.requests += 1
+        mode = self.server.mode
+        if mode == "slow":
+            self.server.entered.set()
+            self.server.release.wait(timeout=4)
+            mode = "healthy"
+        if mode == "drop":
+            self.connection.shutdown(socket.SHUT_RDWR)
+            self.connection.close()
+            return
+        ready = mode == "healthy"
+        if self.path == "/live":
+            status, body = 200, {"status": "ok"}
+        elif self.path == "/ready":
+            status = 200 if ready else 503
+            body = {"status": "ok" if ready else "degraded", "ready": ready,
+                    "rng_version": "test", "rng_source": "fixture-csprng", "rng_drbg": "chacha20",
+                    "seed_state": "fresh" if ready else "failed", "on_reseed_failure": "stop",
+                    "generation_allowed": ready, "reseed_age_ms": 123,
+                    "reseed_interval_ms": 15000, "max_reseed_age_ms": 60000,
+                    "reseed_size_bits": 2048, "reseed_failures_total": 0 if ready else 2,
+                    "last_reseed_at": "2026-01-01T00:00:00Z"}
+        else:
+            status, body = 404, {"error": "unexpected test path"}
+        encoded = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+            self.wfile.write(encoded)
+
+
+@contextlib.contextmanager
+def health_fixture():
+    fixture = http.server.ThreadingHTTPServer(("127.0.0.1", 0), HealthFixture)
+    fixture.daemon_threads = True
+    fixture.mode = "healthy"
+    fixture.requests = 0
+    fixture.entered = threading.Event()
+    fixture.release = threading.Event()
+    thread = threading.Thread(target=fixture.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield fixture
+    finally:
+        fixture.release.set()
+        fixture.shutdown()
+        fixture.server_close()
+        thread.join(timeout=2)
+
+
+def live_server_health(context, application_type, binary, port, artifacts):
+    """Fresh state, reseed degradation, disconnection and recovery reach widgets."""
+    source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom"]
+    arguments = [f"-http=127.0.0.1:{port}", "-enable-https=false", *source]
+    base = f"http://127.0.0.1:{port}"
+    app = application_type("server", str(binary), arguments, health_url=base)
+    app.set_application_id("org.entropyservice.DesktopPoC.TestHealth")
+    assert app.register(None)
+    app.activate()
+    window = app.window
+    try:
+        wait_for(context, lambda: window.descriptor is not None and window.get_mapped(), "live-health window")
+        assert window.health_session is None
+        assert window.health_connect_button.get_sensitive()
+        window.health_connect_button.emit("clicked")
+        wait_for(context, lambda: window.health_session is not None and
+                 window.health_labels["state"].get_text() == "READY", "observed real server readiness")
+        state = window.health_session.snapshot()
+        assert state["fresh"] and state["ready"] is True and state["live"] is True, state
+        assert state["listener"] == "reachable", state
+        assert state["health"]["rng_source"]
+        assert state["health"]["rng_drbg"].lower() in ("aes-256-ctr", "chacha20"), state
+        assert state["health"]["generation_allowed"] is True
+        assert state["health"]["reseed_age_ms"] >= 0
+        assert state["health"]["reseed_failures_total"] == 0
+        assert window.health_labels["state"].has_css_class("status-ok")
+        assert window.health_labels["rng_drbg"].get_text() == state["health"]["rng_drbg"]
+        screenshot = capture_window(context, window, artifacts / "server-health.png")
+        window.health_disconnect_button.emit("clicked")
+        wait_for(context, lambda: window.health_labels["state"].get_text() == "DISCONNECTED" and
+                 window.health_connect_button.get_sensitive(), "explicit health disconnect")
+        assert not window.health_session.snapshot()["fresh"]
+        assert not window.health_labels["state"].has_css_class("status-ok")
+        assert window.health_labels["rng_drbg"].get_text() == "—"
+
+        with health_fixture() as fixture:
+            window.health_url_entry.set_text(f"http://127.0.0.1:{fixture.server_port}")
+            assert fixture.requests == 0
+            window.health_connect_button.emit("clicked")
+            wait_for(context, lambda: window.health_labels["state"].get_text() == "READY" and
+                     window.health_labels["rng_source"].get_text() == "fixture-csprng", "fixture health connection")
+            fixture.mode = "degraded"
+            wait_for(context, lambda: window.health_labels["state"].get_text() == "DEGRADED", "503 reseed degradation")
+            degraded = window.health_session.snapshot()
+            assert degraded["fresh"] and degraded["ready"] is False and degraded["live"] is True
+            assert degraded["health"]["reseed_failures_total"] == 2
+            assert degraded["health"]["generation_allowed"] is False
+            assert window.health_labels["reseed_failures_total"].get_text() == "2"
+            assert not window.health_labels["state"].has_css_class("status-ok")
+            fixture.mode = "drop"
+            wait_for(context, lambda: window.health_labels["state"].get_text() == "UNAVAILABLE", "connection loss clears fresh health")
+            assert not window.health_session.snapshot()["fresh"]
+            assert window.health_session.snapshot()["ready"] is None
+            for key in ("rng_source", "rng_drbg", "reseed_age_ms", "generation_allowed"):
+                assert window.health_labels[key].get_text() == "—", key
+            assert not window.health_labels["state"].has_css_class("status-ok")
+            fixture.mode = "healthy"
+            wait_for(context, lambda: window.health_labels["state"].get_text() == "READY", "live health recovery")
+            assert window.health_labels["state"].has_css_class("status-ok")
+            fixture.mode = "slow"
+            wait_for(context, fixture.entered.is_set, "in-flight health request")
+            began = time.monotonic()
+            window.health_disconnect_button.emit("clicked")
+            assert time.monotonic() - began < .5, "Disconnect blocked the GTK thread"
+            assert window.health_labels["state"].get_text() == "DISCONNECTED"
+            assert not window.health_labels["state"].has_css_class("status-ok")
+            fixture.mode = "healthy"
+            fixture.release.set()
+            wait_for(context, lambda: window.health_connect_button.get_sensitive(), "stopped health request drained")
+            assert window.health_labels["state"].get_text() == "DISCONNECTED", "Late reply restored stale ready state"
+            assert not window.health_session.snapshot()["fresh"]
+            window.health_connect_button.emit("clicked")
+            wait_for(context, lambda: window.health_labels["state"].get_text() == "READY", "health reconnect after in-flight stop")
+            session = window.health_session
+            close_window(context, window)
+            wait_for(context, lambda: not session.snapshot()["running"] and not session.snapshot()["stopping"],
+                     "health worker close cleanup", timeout=5)
+            assert not session.snapshot()["fresh"]
+        return {"real_server_ready": True, "reseed_degraded": True,
+                "listener_loss_clears_health": True, "recovery": True,
+                "inflight_disconnect_ignores_late_reply": True, "health_close_cleanup": True,
+                "screenshot": screenshot}
+    finally:
+        if window.get_visible():
+            close_window(context, window)
+        app.quit()
 
 
 def client_waterfall(context, application_type, gdk, binary, port, artifacts):
@@ -205,6 +396,8 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         assert window._surface.get_width() <= 256 and window._surface.get_height() <= 128
         assert len(set(bytes(window._pixels)[offset:offset + 3] for offset in range(0, len(window._pixels), 4))) > 16
         window._surface.write_to_png(str(artifacts / "waterfall-raster.png"))
+        wait_for(context, lambda: len(window.model.snapshot()["rows"]) >= 16, "populated native waterfall screenshot")
+        screenshot = capture_window(context, window, artifacts / "client-window.png")
 
         # Real GTK allocation and paint must respond to resize, independent of
         # source arrival or a second byte-acquisition implementation.
@@ -226,7 +419,9 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         wait_for(context, lambda: not window.session.snapshot()["running"] and not window._stopping,
                  "Stop and joined owned-client shutdown", timeout=5)
         assert owned_child.poll() is not None
-        assert window.session.snapshot()["summary"].get("termination") == "interrupted"
+        stopped = window.session.snapshot()
+        assert stopped["summary"].get("termination") == "interrupted", stopped
+        assert not stopped.get("forced_stop", False), stopped
         frozen_rows = window.model.snapshot()["rows"]
         wait_for(context, lambda: window._rows == frozen_rows, "final frozen rows displayed")
         palette = window.palette_dropdown
@@ -251,11 +446,13 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         restarted_child = window.session._child
         close_window(context, window)
         assert restarted_child.poll() is not None
+        assert not window.session.snapshot().get("forced_stop", False)
         return {"received_bytes": state["sample"]["received_bytes"], "prefix_rows": len(state["rows"]),
                 "maximum_prefix_bytes": max(map(len, state["rows"])), "native_paints": len(draws),
                 "resized_canvas_width": resized_width, "fullscreen_shortcuts": True,
                 "frozen_palettes": ["byte", "rgb", "gray"],
                 "stop_and_close_cleanup": True,
+                "screenshot": screenshot,
                 "fullscreen_note": "GTK fullscreen requested; a window manager applies compositor state"}
     finally:
         if window.get_visible():
@@ -300,20 +497,22 @@ def fullscreen_outcomes(context, application_type, gdk, binary, port):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", "--server-binary", type=Path, default=ROOT / "bin/entropy-server")
-    parser.add_argument("--client", "--client-binary", type=Path, default=ROOT / "bin/entropy-client")
+    suffix = ".exe" if WINDOWS else ""
+    parser.add_argument("--server", "--server-binary", type=Path, default=ROOT / ("bin/entropy-server" + suffix))
+    parser.add_argument("--client", "--client-binary", type=Path, default=ROOT / ("bin/entropy-client" + suffix))
     parser.add_argument("--artifacts", type=Path, default=ROOT / "gui-artifacts")
     args = parser.parse_args()
-    if not sys.platform.startswith("linux"):
-        parser.error("the GTK PoC smoke test is Linux-only")
+    if not sys.platform.startswith("linux") and not WINDOWS:
+        parser.error("the GTK PoC smoke test supports Linux and Windows")
     import gi
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
+    gi.require_version("Graphene", "1.0")
     from gi.repository import Gdk, GLib, Gtk
     from entropy_gui.app import DesktopApplication
 
-    if not Gtk.init_check():
-        parser.error("no GTK display; run this check with xvfb-run -a")
+    if not Gtk.init_check() or Gdk.Display.get_default() is None:
+        parser.error("no GTK display; use a Windows desktop session or xvfb-run -a on Linux")
     args.artifacts.mkdir(parents=True, exist_ok=True)
     context = GLib.MainContext.default()
     callback_errors = []
@@ -323,9 +522,11 @@ def main():
         old_hook(kind, error, traceback)
     sys.excepthook = observe_callback_error
     try:
-        result = {"server": server_configuration(context, DesktopApplication, args.server.resolve())}
+        result = {"platform": sys.platform,
+                  "server": server_configuration(context, DesktopApplication, args.server.resolve())}
         result["inspection_close"] = close_during_inspection(context, DesktopApplication)
         with entropy_server(args.server.resolve()) as port:
+            result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)
             result["client"] = client_waterfall(context, DesktopApplication, Gdk, args.client.resolve(), port, args.artifacts)
             result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk, args.client.resolve(), port)
     finally:

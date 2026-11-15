@@ -9,10 +9,11 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools/linux-gui"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools/desktop-gui"))
 from entropy_gui.model import MAX_RECORD_BYTES, ReportError, StreamModel, configuration, decode_record, safe_text
-from entropy_gui.process import ClientSession, MAX_STDERR_BYTES, describe
+from entropy_gui.process import ClientSession, MAX_STDERR_BYTES, describe, spawn_owned, stop_owned, _signal
 
 
 def start_record():
@@ -114,12 +115,15 @@ class ModelTests(unittest.TestCase):
     def test_controls_and_credentials_are_not_displayed(self):
         text = safe_text("\x1b[31merror\x1b[0m\x00 https://user:password@example.org/path?token=secret#fragment\n")
         self.assertEqual(text, "error https://example.org/path\n")
+        for scheme in ("HTTPS", "HtTp", "WSS", "Ws"):
+            text = safe_text(f"failure {scheme}://operator:password@example.org/path?token=secret#fragment")
+            self.assertEqual(text, f"failure {scheme.lower()}://example.org/path")
         for limit in (0, 129, True):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
                 StreamModel(history_limit=limit)
 
 
-@unittest.skipUnless(sys.platform.startswith("linux"), "The GUI process adapter is Linux-only")
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX executable-script fixtures require Linux")
 class ProcessTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="entropy-gui-test-")
@@ -210,6 +214,9 @@ class ProcessTests(unittest.TestCase):
         session.stop()
         self.assertLess(time.monotonic() - began, 2.1)
         self.assertFalse(session.snapshot()["running"])
+        self.assertTrue(session.snapshot()["forced_stop"])
+        self.assertIn("forced termination", session.snapshot()["error"])
+        self.assertFalse(session._thread.is_alive())
         self.assertIsNone(unrelated.poll())
         self.assertLessEqual(len(session.snapshot()["rows"]), 128)
 
@@ -222,6 +229,122 @@ class ProcessTests(unittest.TestCase):
         wait_until(lambda: session.snapshot()["returncode"] is not None)
         wait_until(lambda: not session._thread.is_alive(), timeout=1)
         self.assertFalse(session.snapshot()["running"])
+
+    def test_restart_resets_model_only_after_previous_pump_has_finished(self):
+        body = ("import json,os,time\nrecord=" + repr(sample_record()) + "\n"
+                "record['received_bytes']=os.getpid()\n"
+                "while True:\n print(json.dumps(record),flush=True);time.sleep(.01)\n")
+        session = ClientSession(self.binary(body), [])
+        self.addCleanup(session.stop)
+        session.start()
+        first = session._child.pid
+        wait_until(lambda: session.snapshot()["sample"].get("received_bytes") == first)
+        with self.assertRaisesRegex(RuntimeError, "still stopping"):
+            session.start()
+        session.stop()
+        self.assertFalse(session._thread.is_alive())
+        self.assertFalse(session.snapshot()["running"])
+        session.start()
+        second = session._child.pid
+        self.assertNotEqual(first, second)
+        wait_until(lambda: session.snapshot()["sample"].get("received_bytes") == second)
+        self.assertFalse(session.snapshot()["forced_stop"])
+        self.assertFalse(session.snapshot()["error"])
+
+
+class SpawnTests(unittest.TestCase):
+    def test_explicit_file_outputs_are_supported_for_server_fixtures(self):
+        with tempfile.TemporaryFile() as output:
+            child = spawn_owned([sys.executable, "-c", "print('fixture output')"], stdout=output, stderr=output)
+            self.assertEqual(child.wait(timeout=4), 0)
+            output.seek(0)
+            self.assertIn(b"fixture output", output.read())
+
+    def test_windows_command_scripts_are_rejected_before_spawn(self):
+        with mock.patch("entropy_gui.process.sys.platform", "win32"):
+            for binary in ("helper.cmd", "helper.BAT", "helper.cmd ", "helper.BAT."):
+                with self.subTest(binary=binary), self.assertRaisesRegex(ValueError, "native executable"):
+                    spawn_owned([binary, "&echo unwanted"])
+
+    def test_windows_natural_exit_racing_console_signal_is_not_forced(self):
+        child = mock.Mock(pid=42)
+        child.poll.return_value = 0
+        kernel = mock.Mock()
+        kernel.GenerateConsoleCtrlEvent.return_value = False
+        with mock.patch("entropy_gui.process.sys.platform", "win32"), \
+                mock.patch("entropy_gui.process._windows_api", return_value=kernel):
+            self.assertTrue(_signal(child))
+        kernel.GenerateConsoleCtrlEvent.assert_called_once_with(1, 42)
+        child.terminate.assert_not_called()
+        child.poll.return_value = None
+        child.wait.return_value = 0
+        with mock.patch("entropy_gui.process._signal", return_value=False):
+            self.assertFalse(stop_owned(child))
+        child.wait.side_effect = [subprocess.TimeoutExpired("owned-cli", 1.5), 0]
+        with mock.patch("entropy_gui.process._signal", return_value=True):
+            self.assertFalse(stop_owned(child))
+
+
+@unittest.skipUnless(sys.platform == "win32", "Native Windows pipe and console adapter required")
+class WindowsProcessTests(unittest.TestCase):
+    def python_session(self, body, model=None):
+        # -c executes this controlled test program before the GUI-owned flags;
+        # unlike .cmd wrappers, it does not introduce shell interpretation.
+        session = ClientSession(sys.executable, ["-c", body], model)
+        self.addCleanup(session.stop)
+        session.start()
+        return session
+
+    def test_both_pipe_drain_and_buffer_bounds(self):
+        records = [start_record()] + [sample_record(bytes([index])) for index in range(200)] + [summary_record()]
+        body = "import os\nos.write(2,b'e'*1000000)\nos.write(1," + repr(b"".join(map(encode, records))) + ")\n"
+        session = self.python_session(body, StreamModel(history_limit=3))
+        wait_until(lambda: not session.snapshot()["running"], timeout=8)
+        state = session.snapshot()
+        self.assertEqual(state["returncode"], 0)
+        self.assertFalse(state["error"])
+        self.assertLessEqual(len(state["stderr"]), MAX_STDERR_BYTES)
+        self.assertEqual(state["rows"], (bytes([199]), bytes([198]), bytes([197])))
+
+    def test_targeted_console_interrupt_keeps_summary_and_other_process_alive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / "ready"
+            body = ("import json,signal,time\nfrom pathlib import Path\n"
+                    "def stopped(*_):\n print(" + repr(json.dumps(summary_record())) + ",flush=True);raise SystemExit(0)\n"
+                    "signal.signal(signal.SIGBREAK,stopped)\n"
+                    "Path(" + repr(str(ready)) + ").touch()\n"
+                    "while True:time.sleep(.01)\n")
+            unrelated = spawn_owned([sys.executable, "-c", "import time;time.sleep(30)"],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.addCleanup(lambda: (unrelated.kill(), unrelated.wait(timeout=3)))
+            session = self.python_session(body)
+            wait_until(ready.exists)
+            session.stop()
+            state = session.snapshot()
+            self.assertFalse(state["running"])
+            self.assertFalse(state["forced_stop"])
+            self.assertFalse(state["error"])
+            self.assertFalse(state["summary"]["failed"])
+            self.assertIsNone(unrelated.poll())
+
+    def test_stubborn_busy_pipe_child_is_forced_and_reaped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / "ready"
+            body = ("import os,signal\nfrom pathlib import Path\n"
+                    "signal.signal(signal.SIGBREAK,signal.SIG_IGN)\n"
+                    "Path(" + repr(str(ready)) + ").touch()\n"
+                    "data=" + repr(encode(sample_record())) + "\n"
+                    "while True:\n os.write(1,data*100);os.write(2,b'busy'*1000)\n")
+            session = self.python_session(body)
+            wait_until(ready.exists)
+            began = time.monotonic()
+            session.stop()
+            self.assertLess(time.monotonic() - began, 3)
+            state = session.snapshot()
+            self.assertFalse(state["running"])
+            self.assertTrue(state["forced_stop"])
+            self.assertIn("forced termination", state["error"])
+            self.assertFalse(session._thread.is_alive())
 
 
 if __name__ == "__main__":
