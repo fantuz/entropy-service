@@ -36,6 +36,24 @@ def wait_until(predicate, timeout=3):
         time.sleep(.01)
 
 
+def observe_fetch(url, **options):
+    """Keep timing diagnostics outside the production health/error protocol."""
+    original_context = ssl.create_default_context
+    context_ms = []
+
+    def create_context(*args, **kwargs):
+        began = time.monotonic()
+        try:
+            return original_context(*args, **kwargs)
+        finally:
+            context_ms.append(round((time.monotonic() - began) * 1000, 1))
+
+    began = time.monotonic()
+    with mock.patch("entropy_gui.health.ssl.create_default_context", side_effect=create_context):
+        result = fetch_health(url, **options)
+    return result, {"elapsed_ms": round((time.monotonic() - began) * 1000, 1), "context_ms": context_ms}
+
+
 class Fixture:
     def __init__(self, tls=None):
         self.mode = "ready"
@@ -279,8 +297,8 @@ class HealthTLSTests(_HealthBase):
             self.assertEqual(rejected["state"], "tls-error")
             self.assertEqual(rejected["listener"], "tls-unverified")
             self.assertFalse(rejected["fresh"])
-            verified = fetch_health(url, ca_file=str(self.cert))
-            self.assertTrue(verified["fresh"] and verified["ready"])
+            verified, timing = observe_fetch(url, ca_file=str(self.cert))
+            self.assertTrue(verified["fresh"] and verified["ready"], (verified, timing, list(fixture.requests)))
             wrong_host = fetch_health(fixture.url, ca_file=str(self.cert))
             self.assertEqual(wrong_host["state"], "tls-error")
             self.assertFalse(wrong_host["fresh"])
@@ -291,8 +309,8 @@ class HealthTLSTests(_HealthBase):
         context.load_cert_chain(self.cert, self.key)
         with Fixture(context) as fixture:
             with mock.patch.dict(os.environ, {"SSL_CERT_FILE": str(self.cert)}):
-                value = fetch_health(fixture.url.replace("127.0.0.1", "localhost"), ca_file=str(self.extra_cert))
-            self.assertTrue(value["fresh"] and value["ready"])
+                value, timing = observe_fetch(fixture.url.replace("127.0.0.1", "localhost"), ca_file=str(self.extra_cert))
+            self.assertTrue(value["fresh"] and value["ready"], (value, timing, list(fixture.requests)))
 
 
 if __name__ == "__main__":
