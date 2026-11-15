@@ -2,6 +2,11 @@
 
 Run either binary with `-help` for its complete flag list. Boolean values use `-flag=true` or `-flag=false`.
 
+Both binaries also accept `-describe-json` to validate and emit an allowlisted
+startup configuration, then exit before opening runtime devices, listeners,
+TLS material or output destinations. It describes requested options rather
+than live health. See the optional [desktop PoC](desktop-gui-poc.md).
+
 ## Server
 
 Server millisecond flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=15000`, not `15s`. The `-source-timeout` flag instead accepts a **Go duration**, such as `3s`; hardware subcommand `-timeout` flags also use durations. Sizes below are bytes unless explicitly labelled MiB.
@@ -413,6 +418,7 @@ round-trip measurements.
 | `-retries` | `0` | Maximum total transport retries per measured run, 0–100; opt-in, without resetting output or timing limits. |
 | `-retry-delay` | `1s` | Initial backoff, 1ms–30s; exponential with jitter, capped at 30s. See [retryable failures and limits](client-recovery.md). |
 | `-report` | empty | Write JSONL metadata, analysed samples and a final summary to a **new** file (mode 0600). `-` selects stdout and requires `-headless`. |
+| `-report-waterfall` | `false` | Requires `-report`; explicitly include up to 256 raw analysed-prefix bytes per sample as base64 for the graphical waterfall. Default reports contain no raw bytes. |
 | `-headless` | `false` | Skip interactive preflight and all terminal rendering, previews and bells; suitable for scripts and JSONL stdout. |
 
 The measurement clock includes connection establishment, reception, analysis

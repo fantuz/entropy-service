@@ -80,8 +80,11 @@ assurance claim.
 
 No extra privilege is requested. Normal Linux device permissions may already
 allow writing; a denied policy is a failure, not a reason to run the whole
-network client as root or relax device permissions. No raw received bytes
-are stored in reports or logs. The client retains transport bounds and uses
+network client as root or relax device permissions. Raw received bytes are
+omitted from reports by default and are not logged. The separate, explicit
+`-report-waterfall` option includes bounded sampled prefixes in JSONL; see
+[the reporting contract](client-experiments.md#jsonl-schema-version-1).
+The client retains transport bounds and uses
 backpressure; mixing every frame adds CPU/kernel work and can reduce reception
 throughput. Increasing input volume does not imply a security improvement.
 

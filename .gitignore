@@ -19,7 +19,8 @@ vendor/
 # Build output
 /bin/
 /dist/
-/scripts/__pycache__/
+__pycache__/
+/gui-artifacts/
 
 # Editor / OS files
 .DS_Store

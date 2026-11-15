@@ -1,0 +1,163 @@
+name: desktop-gui-poc
+
+on:
+  pull_request:
+    paths:
+      - 'tools/desktop-gui/**'
+      - 'tools/linux-gui/**'
+      - 'scripts/test_desktop_gui*.py'
+      - 'scripts/test_gui_health.py'
+      - 'cmd/entropy-client/**'
+      - 'cmd/entropy-server/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/desktop-gui.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/desktop-gui/**'
+      - 'tools/linux-gui/**'
+      - 'scripts/test_desktop_gui*.py'
+      - 'scripts/test_gui_health.py'
+      - 'cmd/entropy-client/**'
+      - 'cmd/entropy-server/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/desktop-gui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-gui-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gtk:
+    name: Linux GTK PoC
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Test bounded reports and owned-process lifecycle
+        run: python3 -m unittest discover -s scripts -p 'test_desktop_gui.py'
+      - name: Setup Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Build the actual GUI companion binaries
+        run: make build
+      - name: Test live server health, TLS verification and polling lifecycle
+        run: python3 -m unittest discover -s scripts -p 'test_gui_health.py'
+      - name: Install optional native desktop test dependencies
+        run: |
+          export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"
+          export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"
+          export no_proxy="${no_proxy:-${NO_PROXY:-}}"
+          # Keep the runner's suites, signing keys and components; use HTTPS
+          # instead of mirror+file redirects when the runner supplies them.
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          sources = [Path('/etc/apt/sources.list')]
+          sources += list(Path('/etc/apt/sources.list.d').glob('*.list'))
+          sources += list(Path('/etc/apt/sources.list.d').glob('*.sources'))
+          for source in sources:
+              if source.is_file():
+                  original = source.read_text()
+                  updated = original.replace('mirror+file:/etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu')
+                  updated = updated.replace('mirror+file:/etc/apt/apt-security-mirrors.txt', 'https://security.ubuntu.com/ubuntu')
+                  if updated != original:
+                      source.write_text(updated)
+          PY
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=20 update
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=20 install -y --no-install-recommends \
+              python3-gi python3-cairo python3-gi-cairo gir1.2-gtk-4.0 xvfb xauth dbus-x11
+      - name: Test native GTK rendering and real client integration
+        env:
+          GSK_RENDERER: cairo
+          GDK_BACKEND: x11
+        run: |
+          xvfb-run -a dbus-run-session -- /usr/bin/python3 scripts/test_desktop_gui_gtk.py \
+            --server bin/entropy-server --client bin/entropy-client --artifacts gui-artifacts
+      - name: Preserve GUI smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-gtk-poc
+          path: gui-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  windows-gtk:
+    name: Windows GTK PoC
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: '0'
+      PYTHONUTF8: '1'
+      GSK_RENDERER: cairo
+      GDK_BACKEND: win32
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Build the actual Windows GUI companion binaries
+        shell: pwsh
+        run: |
+          go build -o bin/entropy-server.exe ./cmd/entropy-server
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -o bin/entropy-client.exe ./cmd/entropy-client
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install optional native Windows GTK runtime
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: UCRT64
+          path-type: minimal
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-python-cairo
+      - name: Verify native Windows Python and GTK bindings
+        shell: msys2 {0}
+        run: |
+          /ucrt64/bin/python.exe - <<'PY'
+          import sys
+          import cairo
+          import gi
+          gi.require_version('Gtk', '4.0')
+          from gi.repository import Gtk
+          assert sys.platform == 'win32', sys.platform
+          print(sys.version)
+          print('GTK', Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())
+          PY
+          pacman -Q mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-python-gobject mingw-w64-ucrt-x86_64-python-cairo
+      - name: Test Windows report pipes, owned-child shutdown and server health
+        shell: msys2 {0}
+        run: |
+          /ucrt64/bin/python.exe -m unittest discover -s scripts -p 'test_desktop_gui.py'
+          /ucrt64/bin/python.exe -m unittest discover -s scripts -p 'test_gui_health.py'
+      - name: Test native Windows GTK rendering and real client integration
+        shell: msys2 {0}
+        run: |
+          /ucrt64/bin/python.exe scripts/test_desktop_gui_gtk.py \
+            --server bin/entropy-server.exe --client bin/entropy-client.exe --artifacts gui-artifacts/windows
+      - name: Preserve Windows GUI smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-gtk-poc
+          path: gui-artifacts/windows/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -52,6 +52,15 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 		return fmt.Errorf("configure endpoint: %w", err)
 	}
 
+	if cfg.DescribeJSON {
+		endpoint := httpURL
+		if cfg.Mode == modeStream {
+			endpoint = wsURL
+		}
+
+		return writeClientDescription(os.Stdout, cfg, endpoint)
+	}
+
 	if !cfg.Headless {
 		restore := terminal.Prepare(os.Stdout)
 		defer restore()

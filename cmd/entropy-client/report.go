@@ -16,7 +16,10 @@ import (
 	"github.com/fantuz/entropy-service/internal/privatefile"
 )
 
-const reportSchemaVersion = 1
+const (
+	reportSchemaVersion  = 1
+	reportWaterfallBytes = 256
+)
 
 type reportHeader struct {
 	SchemaVersion int       `json:"schema_version"`
@@ -28,8 +31,9 @@ func newReportHeader(kind string) reportHeader {
 	return reportHeader{SchemaVersion: reportSchemaVersion, Type: kind, Timestamp: time.Now().UTC()}
 }
 
-// Each Encode writes a complete record immediately. Reports contain statistics,
-// not raw entropy; a new file prevents accidentally replacing an earlier run.
+// Each Encode writes a complete record immediately. Reports contain statistics;
+// raw prefixes require explicit -report-waterfall. A new file prevents
+// accidentally replacing an earlier run.
 type runReport struct {
 	encoder *json.Encoder
 	file    *os.File
@@ -139,6 +143,7 @@ type reportSettings struct {
 	Layout           string  `json:"layout"`
 	Retries          int     `json:"retries"`
 	RetryDelay       string  `json:"retry_delay"`
+	ReportWaterfall  bool    `json:"report_waterfall,omitempty"`
 }
 
 type startRecord struct {
@@ -162,20 +167,24 @@ func (r *runReport) start(ctx context.Context, cfg *config.Config, endpoint stri
 
 	return r.write(ctx, startRecord{
 		reportHeader: newReportHeader("run_start"),
-		Settings: reportSettings{
-			Mode: cfg.Mode, Endpoint: endpoint, PayloadBytes: cfg.Slice,
-			Refresh: cfg.Refresh.String(), AnalysisBytes: cfg.AnalysisBytes,
-			AnalysisInterval: cfg.AnalysisInterval.String(), DisplayInterval: cfg.DisplayInterval.String(),
-			ShannonThreshold: cfg.ShannonThreshold, Duration: cfg.Duration.String(),
-			Headless: cfg.Headless, Matrix: cfg.ShowMatrix, WriteOut: cfg.WriteOut,
-			OutputKind: cfg.OutputKind(), OutputLimit: cfg.OutputBytes,
-			Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
-			WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
-			Layout:  cfg.Layout,
-			Retries: cfg.Retries, RetryDelay: cfg.RetryDelay.String(),
-		},
-		GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
+		Settings:     clientReportSettings(cfg, endpoint),
+		GoVersion:    runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
 	})
+}
+
+func clientReportSettings(cfg *config.Config, endpoint string) reportSettings {
+	return reportSettings{
+		Mode: cfg.Mode, Endpoint: endpoint, PayloadBytes: cfg.Slice,
+		Refresh: cfg.Refresh.String(), AnalysisBytes: cfg.AnalysisBytes,
+		AnalysisInterval: cfg.AnalysisInterval.String(), DisplayInterval: cfg.DisplayInterval.String(),
+		ShannonThreshold: cfg.ShannonThreshold, Duration: cfg.Duration.String(),
+		Headless: cfg.Headless, Matrix: cfg.ShowMatrix, WriteOut: cfg.WriteOut,
+		OutputKind: cfg.OutputKind(), OutputLimit: cfg.OutputBytes,
+		Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
+		WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
+		Layout: cfg.Layout, Retries: cfg.Retries, RetryDelay: cfg.RetryDelay.String(),
+		ReportWaterfall: cfg.ReportWaterfall,
+	}
 }
 
 type reportCounts struct {
@@ -219,6 +228,7 @@ type sampleRecord struct {
 	SerialP           float64 `json:"serial_p"`
 	ReceiveWaitMS     float64 `json:"receive_wait_ms"`
 	AnalysisMS        float64 `json:"analysis_ms"`
+	WaterfallPrefix   []byte  `json:"waterfall_prefix_base64,omitempty"`
 }
 
 func (r *runReport) sample(ctx context.Context, m *monitorState) error {
@@ -234,6 +244,7 @@ func (r *runReport) sample(ctx context.Context, m *monitorState) error {
 		ChiSquare: m.latest.Chi2, ChiSquareP: m.latest.Chi2P,
 		MonobitP: m.latest.MonobitP, SerialCorrelation: m.latest.SerialR, SerialP: m.latest.SerialP,
 		ReceiveWaitMS: m.lastReceive.Seconds() * 1000, AnalysisMS: m.analysisTime.Seconds() * 1000,
+		WaterfallPrefix: m.reportPrefix,
 	})
 }
 
