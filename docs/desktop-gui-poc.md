@@ -15,16 +15,12 @@ an operating-system service.
 
 ## Linux setup
 
-On Debian/Ubuntu:
+On Debian/Ubuntu, install the desktop dependencies and build both utilities
+from the source directory:
 
 ```sh
 sudo apt install python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0
 make build
-
-# Inspect this invocation; this does not start a server.
-/usr/bin/python3 tools/desktop-gui/entropy-gui --view server -- \
-  -device=/dev/urandom -require-device=true -enable-https=false \
-  -http=127.0.0.1:8080 -drbg=chacha20
 ```
 
 Use the distribution's Python: virtual environments can hide PyGObject even
@@ -32,53 +28,193 @@ when its OS package is installed. Ubuntu 24.04 and Debian 13 are the initial
 Linux targets. GTK supports X11 and Wayland; native Linux CI uses X11 under
 Xvfb. `--help` does not require GTK or a graphical session.
 
-Start a server separately for initial loopback testing:
+Start the actual server in one terminal for loopback testing:
 
 ```sh
 ./bin/entropy-server -device=/dev/urandom -require-device=true \
   -enable-https=false -http=127.0.0.1:8080
 ```
 
-## Windows setup
+Keep that terminal running. In another terminal in the same source directory,
+open the server GUI and click **Connect**:
 
-Build the current branch's Go binaries in PowerShell or CMD using the Go
-version required by `go.mod`:
-
-```powershell
-go build -o bin/entropy-server.exe ./cmd/entropy-server
-go build -o bin/entropy-client.exe ./cmd/entropy-client
-
-# Separate terminal: an OS CSPRNG source, with loopback HTTP for initial testing.
-./bin/entropy-server.exe -device=windows-csprng -enable-https=false -http=127.0.0.1:8080
+```sh
+/usr/bin/python3 tools/desktop-gui/entropy-gui --view server \
+  --health-url=http://127.0.0.1:8080 -- \
+  -device=/dev/urandom -require-device=true -enable-https=false \
+  -http=127.0.0.1:8080
 ```
 
-Install [MSYS2](https://www.msys2.org/), open its **UCRT64** terminal, and install
-the native GTK/Python bindings:
+To open the client GUI, use another terminal and click **Start**:
+
+```sh
+/usr/bin/python3 tools/desktop-gui/entropy-gui --view client -- \
+  -mode=pull -url=http://127.0.0.1:8080/v1/data/random \
+  -slice=1048576 -refresh=250ms -analysis-interval=250ms
+```
+
+Use **F11** for the client waterfall's fullscreen view and **Escape** to return.
+The server GUI observes the separately running server; it does not start it.
+
+## Windows setup
+
+### Download the source and the executables
+
+For the v2.2.0 release, download **both** archives:
+
+- [Source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.2.0.zip): contains the GUI launcher and its Python modules.
+- [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.2.0/entropy-service_2.2.0_windows_amd64.zip): contains `entropy-server.exe` and `entropy-client.exe`.
+
+Extract the entire source ZIP. The resulting `entropy-service-2.2.0` directory
+contains `go.mod`, `cmd` and `tools`. Create a `bin` directory inside it, then
+copy the two executables from the binaries ZIP into `bin`:
+
+```text
+entropy-service-2.2.0/
+  bin/
+    entropy-server.exe
+    entropy-client.exe
+  tools/
+    desktop-gui/
+      entropy-gui
+      entropy_gui/
+```
+
+`entropy-gui` is a Python launcher **without a filename extension**. Keep its
+neighboring `entropy_gui` directory; downloading the launcher alone is not
+sufficient. This arrangement uses released binaries and does not require Go.
+
+### Install the desktop dependencies
+
+Install [MSYS2](https://www.msys2.org/) and open its **UCRT64** terminal:
 
 ```sh
 pacman -Syu
+```
+
+Restart the terminal if the update asks you to, then install the native
+GTK/Python bindings:
+
+```sh
 pacman -S --needed mingw-w64-ucrt-x86_64-gtk4 \
   mingw-w64-ucrt-x86_64-python-gobject mingw-w64-ucrt-x86_64-python-cairo
 ```
 
-Follow MSYS2's prompt to restart the terminal if an update requires it. From
-that same UCRT64 terminal, enter your checkout, for example
-`cd /c/Users/yourname/entropy-service`, then run:
+Use UCRT64's `python` for the GUI commands below so its GTK DLLs and bindings
+match. The GUI runs from source; binary archives and Linux packages do not
+contain a bundled GUI application or GUI installer.
+
+### Start the server and its GUI
+
+In **PowerShell**, enter the extracted source directory and start the server:
+
+```powershell
+cd "$env:USERPROFILE\Downloads\entropy-service-2.2.0"
+.\bin\entropy-server.exe -device=windows-csprng -enable-https=false -http=127.0.0.1:8080
+```
+
+Adjust the directory if you extracted elsewhere. Keep this terminal running.
+The example uses the Windows OS CSPRNG and loopback HTTP with HTTPS disabled
+for initial testing. If a server is already running there, keep that process
+and skip starting another one.
+
+In **MSYS2 UCRT64**, enter the same source directory, replacing `yourname`
+with your Windows account name:
 
 ```sh
+cd /c/Users/yourname/Downloads/entropy-service-2.2.0
+ls tools/desktop-gui
+
 python tools/desktop-gui/entropy-gui --view server \
   --health-url=http://127.0.0.1:8080 -- \
   -device=windows-csprng -enable-https=false -http=127.0.0.1:8080
+```
 
+The `ls` command should show `entropy-gui` and `entropy_gui`. Click **Connect**
+to display live server health. The GUI displays requested startup settings and
+observes the existing server; it does not start or reconfigure that server.
+
+### Start the client GUI
+
+In another **MSYS2 UCRT64** terminal in that same source directory:
+
+```sh
 python tools/desktop-gui/entropy-gui --view client -- \
   -mode=pull -url=http://127.0.0.1:8080/v1/data/random \
   -slice=1048576 -refresh=250ms -analysis-interval=250ms
 ```
 
-Use UCRT64's Python, not an unrelated Python installation: its GTK DLLs and
-bindings must match. The launcher chooses `.exe` binary names on Windows.
-This PoC has no self-contained `.exe` bundle or installer; the normal Go
-release ZIP continues to contain the CLI utilities.
+Click **Start** to receive samples and display the waterfall. **F11** toggles
+fullscreen and **Escape** returns. **Stop** affects only the client process
+started by that window; the separate server keeps running.
+
+### Build from source instead
+
+As an alternative to copying the released executables, install the Go version
+required by `go.mod` and run these commands from the source directory in
+PowerShell or CMD:
+
+```powershell
+go build -o bin/entropy-server.exe ./cmd/entropy-server
+go build -o bin/entropy-client.exe ./cmd/entropy-client
+```
+
+Then follow the same server and client launch steps above. Make and a C
+compiler are not required for these Go builds.
+
+## Troubleshooting startup inspection
+
+**No configuration file is required.** Arguments after the launcher's `--`
+separator describe the requested CLI invocation. To display those settings,
+the GUI briefly runs the selected local executable with `-describe-json`,
+which returns before opening runtime devices or listeners. It does not read
+the command line of an already-running process or infer its startup options
+from the health URL. Use the same CLI arguments after `--` if you want the
+requested settings to match the server you started separately.
+
+`Configuration could not be read: [WinError 2]` on Windows, or
+`[Errno 2] No such file or directory` on Linux, normally means the inspection
+executable could not be found. A green **READY** health panel can still appear:
+network health and local startup inspection are separate operations.
+
+By default, the launcher selects the source directory's `bin/entropy-server`
+and `bin/entropy-client`, with `.exe` on Windows. These paths are relative to
+the launcher location, independently of the terminal's working directory or
+where you started the running server. It does not select another version from
+`PATH` automatically.
+
+The executables can be stored in another directory. Supply their paths
+explicitly **before** `--`; moving or restarting an already-running server is
+not required. Use native Windows paths with forward slashes and quote paths
+containing spaces. For example, in UCRT64:
+
+```sh
+python tools/desktop-gui/entropy-gui --view server \
+  --server-binary "C:/Users/yourname/Downloads/Entropy binaries/entropy-server.exe" \
+  --health-url=http://127.0.0.1:8080 -- \
+  -device=windows-csprng -enable-https=false -http=127.0.0.1:8080
+
+python tools/desktop-gui/entropy-gui --view client \
+  --client-binary "C:/Users/yourname/Downloads/Entropy binaries/entropy-client.exe" -- \
+  -mode=pull -url=http://127.0.0.1:8080/v1/data/random
+```
+
+An installed Linux executable can be selected in the same way:
+
+```sh
+/usr/bin/python3 tools/desktop-gui/entropy-gui --view server \
+  --server-binary /usr/bin/entropy-server --health-url=http://127.0.0.1:8080 -- \
+  -device=/dev/urandom -enable-https=false -http=127.0.0.1:8080
+
+/usr/bin/python3 tools/desktop-gui/entropy-gui --view client \
+  --client-binary /usr/bin/entropy-client -- \
+  -mode=pull -url=http://127.0.0.1:8080/v1/data/random
+```
+
+If the file exists but the error mentions an unknown `-describe-json` flag,
+use matching v2.2.0-or-newer source and executable versions. A CLI option
+validation error should be corrected in the arguments after `--`; creating a
+configuration file does not resolve a missing executable or invalid option.
 
 ## Live server health
 

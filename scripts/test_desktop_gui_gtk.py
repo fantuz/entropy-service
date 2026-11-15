@@ -332,6 +332,41 @@ def health_fixture():
         thread.join(timeout=2)
 
 
+def missing_local_executables(context, application_type):
+    """Explain missing local binaries without disabling remote server health."""
+    outcomes = {}
+    with tempfile.TemporaryDirectory(prefix="entropy-gui-missing-") as directory, health_fixture() as fixture:
+        for role in ("server", "client"):
+            missing = Path(directory) / ("missing " + role + (".exe" if WINDOWS else ""))
+            app = application_type(role, str(missing), [],
+                                   health_url=f"http://127.0.0.1:{fixture.server_port}" if role == "server" else None)
+            app.set_application_id("org.entropyservice.DesktopPoC.Missing" + role.title())
+            assert app.register(None)
+            app.activate()
+            window = app.window
+            try:
+                wait_for(context, lambda: window.inspection_error_label is not None, role + " missing executable guidance")
+                detail = window.inspection_error_label.get_text()
+                assert str(missing) in detail and "--" + role + "-binary" in detail, detail
+                assert "configuration file" in detail.lower(), detail
+                assert str(missing) in window.binary_label.get_text()
+                assert window.descriptor is None
+                if role == "server":
+                    window.health_connect_button.emit("clicked")
+                    wait_for(context, lambda: window.health_labels["state"].get_text() == "READY",
+                             "remote health despite missing local server executable")
+                    assert window.inspection_error_label.get_text() == detail
+                    outcomes[role] = {"actionable_path_error": True, "independent_live_health": True}
+                else:
+                    assert not window.start_button.get_sensitive()
+                    assert window.settings_expander.get_expanded()
+                    outcomes[role] = {"actionable_path_error": True, "start_disabled": True}
+            finally:
+                close_window(context, window)
+                app.quit()
+    return outcomes
+
+
 def live_server_health(context, application_type, binary, port, artifacts):
     """Fresh state, reseed degradation, disconnection and recovery reach widgets."""
     source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom"]
@@ -599,6 +634,7 @@ def main():
     try:
         result = {"platform": sys.platform,
                   "server": server_configuration(context, DesktopApplication, args.server.resolve())}
+        result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
         result["inspection_close"] = close_during_inspection(context, DesktopApplication)
         with entropy_server(args.server.resolve()) as port:
             result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)

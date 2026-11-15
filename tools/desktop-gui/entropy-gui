@@ -9,8 +9,10 @@ def main():
     parser = argparse.ArgumentParser(description="Linux/Windows GTK 4 entropy-service PoC. Pass utility startup options after --.")
     parser.add_argument("--view", choices=("server", "client"), default="server")
     suffix = ".exe" if sys.platform == "win32" else ""
-    parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-server" + suffix)))
-    parser.add_argument("--client-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-client" + suffix)))
+    parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-server" + suffix)),
+                        help="native server executable to inspect; may be outside the source folder (default: %(default)s); pass before --")
+    parser.add_argument("--client-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-client" + suffix)),
+                        help="native client executable to inspect and run; may be outside the source folder (default: %(default)s); pass before --")
     parser.add_argument("--health-url", help="server view: existing server base URL; Connect starts verified read-only health polling")
     parser.add_argument("--health-ca", help="server view: PEM CA certificate trusted for HTTPS health checks")
     arguments = sys.argv[1:]

@@ -17,7 +17,7 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Pango", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango
 
-from .model import StreamModel
+from .model import StreamModel, safe_text
 from .process import ClientSession, describe
 from .health import HealthSession
 
@@ -108,6 +108,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.model = StreamModel(history_limit=HISTORY_ROWS)
         self.session = None
         self.descriptor = None
+        self.inspection_error_label = None
         self.feature_checks = {}
         self.stat_labels = {}
         self.health_session = None
@@ -154,13 +155,19 @@ class DesktopWindow(Gtk.ApplicationWindow):
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         body.add_css_class("poc-content")
         self.set_child(body)
-        self.status_label = label("Reading startup options…", "poc-status")
+        self.status_label = label("Inspecting local startup options…", "poc-status")
         self.status_label.set_lines(3)
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.binary_label = label(f"Local {role} executable: {safe_text(str(binary))}", "poc-subtitle")
+        self.binary_label.set_selectable(True)
+        self.binary_label.set_lines(2)
+        self.binary_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        self.binary_label.set_tooltip_text(safe_text(str(binary)))
         if role == "server":
             self._build_health_panel(body, health_url)
             body.append(label("Requested startup configuration", "poc-title"))
             body.append(label("Read only · these options are independent from the selected live server. No server is started or modified.", "poc-subtitle"))
+            body.append(self.binary_label)
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             scroller = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
             scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -197,6 +204,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self.settings_expander = Gtk.Expander(label="Startup options · read only")
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             self.settings_box.append(label("Requested utility options. Start uses headless JSONL reporting for the GUI.", "poc-subtitle"))
+            self.settings_box.append(self.binary_label)
             settings_scroller = Gtk.ScrolledWindow()
             settings_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
             settings_scroller.set_max_content_height(220)
@@ -343,7 +351,14 @@ class DesktopWindow(Gtk.ApplicationWindow):
 
     def _inspection_failed(self, message):
         if not self._closing:
-            self.status_label.set_text("Configuration could not be read: " + message)
+            self.inspection_error_label = label(safe_text(message), "poc-status")
+            self.inspection_error_label.set_selectable(True)
+            self.settings_box.append(self.inspection_error_label)
+            if self.role == "server":
+                self.status_label.set_text("Local startup settings unavailable. Live server health can still be checked independently.")
+            else:
+                self.settings_expander.set_expanded(True)
+                self.status_label.set_text("Local startup settings unavailable. Select a compatible client executable to enable Start.")
         return GLib.SOURCE_REMOVE
 
     def _group(self, title, values):

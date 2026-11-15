@@ -16,9 +16,18 @@ release targets and socket/device implementations remain unchanged.
 
 An optional [GTK desktop PoC](desktop-gui-poc.md#windows-setup) runs from source
 with MSYS2 UCRT64 Python/GTK dependencies. It provides live server health and
-read-only startup configuration, plus a client waterfall/fullscreen view. Its
-native Windows GUI and process checks run separately from the existing CLI
-checks. The GUI is not bundled in release ZIPs or a standalone installer.
+read-only startup configuration, plus a client waterfall/fullscreen view. For
+v2.2.0, download both the [source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.2.0.zip)
+and the [Windows binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.2.0/entropy-service_2.2.0_windows_amd64.zip):
+the Python GUI files are in the source archive. The guide explains how to put
+the released executables in its `bin` directory and launch both windows
+without installing Go. The GUI is not bundled in the CLI ZIP or a standalone
+installer. Native Windows GUI/process checks run separately from CLI checks.
+
+No configuration file is needed for the GUI. A healthy remote server can be
+**READY** while local startup inspection reports `WinError 2` because its
+executable is missing. See [binary-path troubleshooting](desktop-gui-poc.md#troubleshooting-startup-inspection)
+for `--server-binary` and `--client-binary` examples.
 
 ## Build or install
 
