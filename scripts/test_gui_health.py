@@ -271,6 +271,7 @@ class HealthTLSTests(_HealthBase):
 
     def test_tls_requires_trust_and_the_correct_hostname(self):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(self.cert, self.key)
         with Fixture(context) as fixture:
             url = fixture.url.replace("127.0.0.1", "localhost")
@@ -286,6 +287,7 @@ class HealthTLSTests(_HealthBase):
 
     def test_selected_ca_adds_to_the_environment_trust_roots(self):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(self.cert, self.key)
         with Fixture(context) as fixture:
             with mock.patch.dict(os.environ, {"SSL_CERT_FILE": str(self.cert)}):

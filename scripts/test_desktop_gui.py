@@ -288,9 +288,13 @@ class SpawnTests(unittest.TestCase):
 @unittest.skipUnless(sys.platform == "win32", "Native Windows pipe and console adapter required")
 class WindowsProcessTests(unittest.TestCase):
     def python_session(self, body, model=None):
-        # -c executes this controlled test program before the GUI-owned flags;
-        # unlike .cmd wrappers, it does not introduce shell interpretation.
-        session = ClientSession(sys.executable, ["-c", body], model)
+        # Keep test data out of CreateProcess's 32767-character command line.
+        # A Python file also avoids Windows command-script interpretation.
+        directory = tempfile.TemporaryDirectory(prefix="entropy-gui-windows-")
+        self.addCleanup(directory.cleanup)
+        script = Path(directory.name) / "child.py"
+        script.write_text(body, encoding="utf-8")
+        session = ClientSession(sys.executable, [str(script)], model)
         self.addCleanup(session.stop)
         session.start()
         return session
