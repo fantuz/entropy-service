@@ -42,6 +42,7 @@ func defaultDRBGForArch(goarch string) string {
 }
 
 type Config struct {
+	DescribeJSON      bool
 	LabSources        string
 	LabAllowRemote    bool
 	LabAllowedHosts   []string
@@ -96,6 +97,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags := flag.NewFlagSet("entropy-server", flag.ContinueOnError)
 	flags.SetOutput(output)
 
+	flags.BoolVar(&cfg.DescribeJSON, "describe-json", false, "print validated requested configuration as JSON and exit without opening files, devices or listeners")
 	flags.StringVar(&cfg.LabSources, "lab-sources", "", "Experimental source registry JSON file (device/socket/peer endpoints are configured by the operator)")
 	flags.BoolVar(&cfg.LabAllowRemote, "lab-allow-remote", false, "Allow non-loopback clients to use registered experimental source bridges")
 	flags.Func("lab-allowed-hosts", "Additional trusted Host names/IPs for loopback-only LAB access (comma-separated, exact hosts, no ports/wildcards; does not enable remote peers)", func(value string) error {

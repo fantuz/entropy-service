@@ -156,7 +156,12 @@ The additive display settings `waterfall`, `waterfall_mode`,
 `waterfall_columns`, `waterfall_rows` and `color` record the requested flags,
 including in headless runs. They do not indicate that a display was
 allocated or that a particular terminal capability was detected. Raw
-waterfall bytes are never included in reports.
+waterfall bytes are omitted by default. Explicit `-report-waterfall` adds
+`settings.report_waterfall: true` and, per analysed sample, a base64
+`waterfall_prefix_base64` containing at most 256 raw bytes (also bounded by
+the analysed sample length). This opt-in supports the
+[Linux desktop PoC](linux-gui-poc.md); it requires `-report` and changes a
+report from statistics-only to including sampled data.
 
 `settings.layout` records `auto`, `compact`, `full` or `waterfall`. Zero waterfall dimensions
 mean automatic fitting. Effective layout depends on the interactive terminal;
@@ -165,8 +170,9 @@ reports for throughput experiments so terminal output does not dominate I/O.
 
 `settings.endpoint` retains scheme, host and path but omits URL user
 information, **all query parameters** and fragments. Effective payload and
-refresh are recorded separately. Raw entropy, hex previews, histograms and
-transition matrices are not recorded. Custom query settings and the server's
+refresh are recorded separately. Without `-report-waterfall`, raw entropy
+bytes are not recorded. Hex previews, histograms and transition matrices are
+not recorded. Custom query settings and the server's
 source/backend are not automatically discovered; record them separately
 along with the exact client/server versions when comparing experiments.
 Paths can still contain deployment-specific information, so review reports

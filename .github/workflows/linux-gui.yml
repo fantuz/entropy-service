@@ -1,0 +1,89 @@
+name: linux-gui-poc
+
+on:
+  pull_request:
+    paths:
+      - 'tools/linux-gui/**'
+      - 'scripts/test_linux_gui*.py'
+      - 'cmd/entropy-client/**'
+      - 'cmd/entropy-server/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/linux-gui.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/linux-gui/**'
+      - 'scripts/test_linux_gui*.py'
+      - 'cmd/entropy-client/**'
+      - 'cmd/entropy-server/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/linux-gui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-gui-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gtk:
+    name: Linux GTK PoC
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Test bounded reports and owned-process lifecycle
+        run: python3 -m unittest discover -s scripts -p 'test_linux_gui.py'
+      - name: Setup Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Build the actual GUI companion binaries
+        run: make build
+      - name: Install optional native desktop test dependencies
+        run: |
+          export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"
+          export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"
+          export no_proxy="${no_proxy:-${NO_PROXY:-}}"
+          # Keep the runner's suites, signing keys and components; use HTTPS
+          # instead of mirror+file redirects when the runner supplies them.
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          sources = [Path('/etc/apt/sources.list')]
+          sources += list(Path('/etc/apt/sources.list.d').glob('*.list'))
+          sources += list(Path('/etc/apt/sources.list.d').glob('*.sources'))
+          for source in sources:
+              if source.is_file():
+                  original = source.read_text()
+                  updated = original.replace('mirror+file:/etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu')
+                  updated = updated.replace('mirror+file:/etc/apt/apt-security-mirrors.txt', 'https://security.ubuntu.com/ubuntu')
+                  if updated != original:
+                      source.write_text(updated)
+          PY
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=20 update
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=20 install -y --no-install-recommends \
+              python3-gi python3-cairo python3-gi-cairo gir1.2-gtk-4.0 xvfb xauth dbus-x11
+      - name: Test native GTK rendering and real client integration
+        env:
+          GSK_RENDERER: cairo
+          GDK_BACKEND: x11
+        run: |
+          xvfb-run -a dbus-run-session -- /usr/bin/python3 scripts/test_linux_gui_gtk.py \
+            --server bin/entropy-server --client bin/entropy-client --artifacts gui-artifacts
+      - name: Preserve GUI smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-gtk-poc
+          path: gui-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1119,6 +1119,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if cfg.DescribeJSON {
+		if err := writeServerDescription(os.Stdout, cfg); err != nil {
+			log.Fatal(err)
+		}
+
+		return
+	}
+
 	startup := serverInvocation(os.Stderr, cfg)
 
 	labRegistry, err := lab.Load(cfg.LabSources)

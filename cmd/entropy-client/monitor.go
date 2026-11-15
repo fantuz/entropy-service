@@ -36,6 +36,7 @@ type monitorState struct {
 	outputErrors  uint64
 	sampleBytes   int
 	preview       string
+	reportPrefix  []byte
 	started       time.Time
 	nextAnalysis  time.Time
 	sampleAt      time.Time
@@ -155,6 +156,12 @@ func (m *monitorState) observe(frame client.StreamFrame, now time.Time) bool {
 	m.samples++
 	m.analysedBytes += uint64(m.latest.N)
 	m.sampleBytes = len(frame.Data)
+
+	if m.cfg.ReportWaterfall {
+		// The transport may recycle its frame after observe returns. Retain only
+		// this explicitly requested, bounded prefix of the analysed sample.
+		m.reportPrefix = append(m.reportPrefix[:0], frame.Data[:min(m.latest.N, reportWaterfallBytes)]...)
+	}
 
 	m.hasSample = true
 	if diag.ShannonAssessment(&m.latest, m.cfg.ShannonThreshold) == diag.ShannonOK {
