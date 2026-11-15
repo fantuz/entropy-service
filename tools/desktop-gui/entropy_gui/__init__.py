@@ -1,1 +1,1 @@
-"""Optional Linux desktop proof of concept for entropy-service."""
+"""Linux and Windows desktop interface for entropy-service."""

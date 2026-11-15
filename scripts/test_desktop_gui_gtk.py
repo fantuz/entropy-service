@@ -610,7 +610,7 @@ def terminal_interrupts(context, server_binary, client_binary, port, artifacts):
     """Real terminal interruption quits GTK and reaps only its owned client."""
     from entropy_gui.process import _signal, spawn_owned
 
-    probe = '''import json, signal, sys
+    probe = '''import http.client, json, signal, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from gi.repository import GLib
@@ -638,6 +638,22 @@ class ProbeApplication(original):
             if not window.model.snapshot()['rows']:
                 return GLib.SOURCE_CONTINUE
         else:
+            if configuration['action'] == 'owned_interrupt':
+                if window.session is None:
+                    window.start_server()
+                if not window.session.snapshot()['process_running']:
+                    return GLib.SOURCE_CONTINUE
+                connection = http.client.HTTPConnection('127.0.0.1', configuration['owned_port'], timeout=.1)
+                try:
+                    connection.request('GET', '/live')
+                    response = connection.getresponse()
+                    response.read(8192)
+                    if response.status != 200:
+                        return GLib.SOURCE_CONTINUE
+                except (OSError, http.client.HTTPException):
+                    return GLib.SOURCE_CONTINUE
+                finally:
+                    connection.close()
             if window.health_session is None:
                 window.connect_health()
             if not window.health_session.snapshot()['fresh']:
@@ -664,8 +680,9 @@ finished.write_text(json.dumps({
     'window_destroyed': window._destroyed,
     'inspection_reaped': not window._inspection_thread.is_alive(),
     'health_stopped': health_stopped,
-    'client_reaped': state is None or window.session._child.poll() is not None,
-    'client_summary': state['summary'] if state else None,
+    'owned_process_reaped': state is None or window.session._child.poll() is not None,
+    'client_summary': state.get('summary') if state else None,
+    'owned_error': state.get('error', '') if state else '',
     'forced_stop': state['forced_stop'] if state else False,
 }))
 raise SystemExit(result)
@@ -676,18 +693,22 @@ raise SystemExit(result)
         script = directory / "interrupt_probe.py"
         script.write_text(probe)
         for role, binary, action in (("server", server_binary, "interrupt"),
+                                     ("server", server_binary, "owned_interrupt"),
                                      ("client", client_binary, "interrupt"),
                                      ("client", client_binary, "close")):
-            name = role if action == "interrupt" else role + "_close"
+            name = role + "_owned" if action == "owned_interrupt" else role if action == "interrupt" else role + "_close"
             ready, finished = directory / (name + "-ready.json"), directory / (name + "-finished.json")
             options = directory / (name + "-options.json")
             arguments = (["-device=windows-csprng" if WINDOWS else "-device=/dev/urandom", "-enable-https=false"]
                          if role == "server" else
                          [f"-url=http://127.0.0.1:{port}/v1/data/random", "-slice=4096", "-refresh=50ms",
                           "-analysis-interval=50ms", "-duration=15s"])
+            owned_port = free_port() if action == "owned_interrupt" else None
+            if owned_port is not None:
+                arguments.append(f"-http=127.0.0.1:{owned_port}")
             options.write_text(json.dumps({"role": role, "action": action, "binary": str(binary), "arguments": arguments,
                                           "health_url": f"http://127.0.0.1:{port}" if role == "server" else None,
-                                          "ready": str(ready), "finished": str(finished)}))
+                                          "ready": str(ready), "finished": str(finished), "owned_port": owned_port}))
             with (artifacts / (name + "-interrupt.log")).open("w+b") as log:
                 child = spawn_owned([sys.executable, str(script), str(ROOT / "tools/desktop-gui"), str(options)],
                                     stdout=log, stderr=subprocess.STDOUT)
@@ -712,7 +733,8 @@ raise SystemExit(result)
                     state = json.loads(finished.read_text())
                     assert state["exit_code"] == expected_exit and state["handlers_restored"], state
                     assert state["window_destroyed"] and state["inspection_reaped"] and state["health_stopped"], state
-                    assert state["client_reaped"] and not state["forced_stop"], state
+                    assert state["owned_process_reaped"] and not state["forced_stop"], state
+                    assert not state["owned_error"], state
                     if role == "client":
                         assert state["client_summary"]["termination"] == "interrupted", state
                     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
@@ -773,6 +795,9 @@ def main():
         result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
         result["inspection_close"] = close_during_inspection(context, DesktopApplication)
         with entropy_server(args.server.resolve()) as port:
+            from test_desktop_gui_controls_gtk import controls_and_owned_server
+            result["controls"] = controls_and_owned_server(context, DesktopApplication, args.server.resolve(),
+                                                          args.client.resolve(), port, args.artifacts)
             result["terminal_interrupts"] = terminal_interrupts(context, args.server.resolve(), args.client.resolve(),
                                                                 port, args.artifacts)
             result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)

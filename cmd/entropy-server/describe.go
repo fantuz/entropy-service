@@ -8,7 +8,7 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/config"
 )
 
-// The desktop PoC inspects requested settings without starting a service. These
+// The desktop interface inspects requested settings without starting a service. These
 // allowlisted fields intentionally omit TLS paths and private source registries.
 // Enabled features describe configuration, not successful runtime checks.
 type serverDescription struct {

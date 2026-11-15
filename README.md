@@ -136,10 +136,10 @@ Large interactive terminals use the [adaptive full layout](docs/client-terminal.
 with adjacent panels and wider histories. `-layout=compact` keeps stacked
 output; `-layout=full -waterfall` requests the larger dashboard explicitly.
 
-An optional [GTK desktop PoC](docs/desktop-gui-poc.md) for Linux and Windows
-combines server startup options with live readiness/reseed observations and a
-graphical client waterfall with fullscreen mode. It runs from source with
-separate Python/GTK dependencies.
+An optional [GTK desktop GUI](docs/desktop-gui.md) for Linux and Windows
+edits common startup options, starts and stops its own server/client processes,
+and displays live server health or a client waterfall with fullscreen mode.
+It runs from source with separate Python/GTK dependencies.
 
 ![Entropy client with byte-hue waterfall](docs/images/client-waterfall.png)
 

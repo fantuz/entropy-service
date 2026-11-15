@@ -1,14 +1,14 @@
 #!/usr/bin/python3
-"""Launch the optional Linux/Windows GTK 4 proof of concept."""
+"""Launch the optional Linux/Windows GTK 4 desktop interface."""
 import argparse
 from pathlib import Path
 import sys
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Linux/Windows GTK 4 entropy-service PoC. Pass utility startup options after --.")
+    parser = argparse.ArgumentParser(description="Linux/Windows GTK 4 entropy-service GUI. Pass utility startup options after --.")
     parser.add_argument("--view", choices=("server", "client"), default="server",
-                        help="server: inspect settings and Connect to live health; client: Start acquisition and the waterfall")
+                        help="server: Start/Stop a local server or Connect to live health; client: Start/Stop acquisition and the waterfall")
     suffix = ".exe" if sys.platform == "win32" else ""
     parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-server" + suffix)),
                         help="native server executable to inspect; may be outside the source folder (default: %(default)s); pass before --")
@@ -21,7 +21,7 @@ def main():
     options = parser.parse_args(arguments[:divider])
     utility_arguments = arguments[divider + 1:] if divider < len(arguments) else []
     if sys.platform not in ("linux", "win32"):
-        parser.error("this proof of concept supports Linux and Windows")
+        parser.error("this desktop interface supports Linux and Windows")
     if options.view != "server" and (options.health_url or options.health_ca):
         parser.error("--health-url and --health-ca apply to the server view")
     try:
