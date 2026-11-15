@@ -164,6 +164,13 @@ and display the waterfall. It becomes enabled after local startup inspection
 succeeds. **F11** toggles fullscreen and **Escape** returns. Use **Options**
 while the client is stopped to change its connection and sampling settings.
 
+### Windows interface
+
+The native Windows server options editor and running client waterfall:
+
+[![Windows server options](images/desktop-gui-windows-server-options.png)](images/desktop-gui-windows-server-options.png)
+[![Windows client waterfall](images/desktop-gui-windows-client.png)](images/desktop-gui-windows-client.png)
+
 ### Monitor a separately started server
 
 A server can instead be started from **PowerShell**:
