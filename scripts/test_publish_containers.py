@@ -1,10 +1,11 @@
 import copy
 import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
 
-from publish_containers import validate_request, verify_archive, verify_image
+from publish_containers import validate_request, verify_archive, verify_image, verify_security_reports
 
 
 class PublicationTests(unittest.TestCase):
@@ -61,6 +62,22 @@ class PublicationTests(unittest.TestCase):
             (root / "checksums.txt").write_text(digest + "  ../different.tar.gz\n")
             with self.assertRaises(ValueError):
                 verify_archive(root)
+
+    def test_security_reports_must_match_image_and_checksums(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image_id = "sha256:" + "b" * 64
+            for role in ("server", "client"):
+                (root / (role + ".spdx.json")).write_text(json.dumps({"SPDXID": "SPDXRef-DOCUMENT", "spdxVersion": "SPDX-2.3", "packages": [{}]}))
+                (root / (role + ".vulnerabilities.json")).write_text(json.dumps({"ArtifactType": "container_image", "Metadata": {"ImageID": image_id}, "Results": []}))
+            checksum = "".join(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n" for p in sorted(root.glob("*.json")))
+            (root / "security-checksums.txt").write_text(checksum)
+            self.assertEqual(verify_security_reports(root, "server", image_id), root / "server.spdx.json")
+            with self.assertRaisesRegex(ValueError, "exact tested image"):
+                verify_security_reports(root, "server", "sha256:" + "c" * 64)
+            (root / "server.spdx.json").write_text("changed SBOM")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                verify_security_reports(root, "server", image_id)
 
 
 if __name__ == "__main__":

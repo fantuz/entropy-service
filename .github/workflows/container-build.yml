@@ -41,8 +41,11 @@ jobs:
           ref: ${{ inputs.source_sha || github.sha }}
           path: source
           persist-credentials: false
-      - name: Use the maintained build-context exclusions
-        run: cp .dockerignore source/.dockerignore
+      - name: Use the maintained build context and standalone readiness probe
+        run: |
+          cp .dockerignore source/.dockerignore
+          mkdir -p source/tools/container-health
+          cp tools/container-health/*.go source/tools/container-health/
       - name: Normalize the binary and OCI version
         id: version
         env:
@@ -70,6 +73,7 @@ jobs:
           build-args: |
             VERSION=${{ steps.version.outputs.value }}
             VCS_REF=${{ inputs.source_sha || github.sha }}
+            RECIPE_REF=${{ github.sha }}
             SOURCE_URL=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=containers-${{ matrix.id }}
           cache-to: type=gha,mode=max,scope=containers-${{ matrix.id }}
@@ -86,6 +90,7 @@ jobs:
           build-args: |
             VERSION=${{ steps.version.outputs.value }}
             VCS_REF=${{ inputs.source_sha || github.sha }}
+            RECIPE_REF=${{ github.sha }}
             SOURCE_URL=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=containers-${{ matrix.id }}
           cache-to: type=gha,mode=max,scope=containers-${{ matrix.id }}
@@ -96,19 +101,36 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
           IMAGE_VERSION: ${{ steps.version.outputs.value }}
         run: |
-          python3 -m unittest discover -s scripts -p 'test_publish_containers.py'
+          python3 -m unittest discover -s scripts -p 'test_*containers.py'
+          python3 -m unittest discover -s scripts -p 'test_check_container_scan.py'
           python3 scripts/test_containers.py --platform "$IMAGE_PLATFORM" \
             --server-image "entropy-service/server:$IMAGE_ID" \
             --client-image "entropy-service/client:$IMAGE_ID" \
             --repository "$GITHUB_REPOSITORY" --source-sha "$SOURCE_SHA" --version "$IMAGE_VERSION"
+      - name: Scan final images and create SBOMs before publication
+        uses: ./.github/actions/container-security
+        with:
+          server: entropy-service/server:${{ matrix.id }}
+          client: entropy-service/client:${{ matrix.id }}
+          output: container-images
+      - name: Preserve vulnerability reports and SBOMs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-security-${{ matrix.id }}
+          path: |
+            container-images/*.json
+          if-no-files-found: warn
+          retention-days: 90
       - name: Preserve the exact tested images
         env:
           IMAGE_ID: ${{ matrix.id }}
         run: |
-          mkdir container-images
+          mkdir -p container-images
           docker image save "entropy-service/server:$IMAGE_ID" "entropy-service/client:$IMAGE_ID" |
             gzip > container-images/images.tar.gz
           (cd container-images && sha256sum images.tar.gz > checksums.txt)
+          (cd container-images && sha256sum server.spdx.json client.spdx.json server.vulnerabilities.json client.vulnerabilities.json > security-checksums.txt)
       - name: Upload tested image archives
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

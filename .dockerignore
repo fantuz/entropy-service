@@ -7,6 +7,9 @@
 !cmd/**
 !internal/
 !internal/**
+!tools/
+!tools/container-health/
+!tools/container-health/**
 !LICENSE
 !QUANTIS_NOTICES.txt
 

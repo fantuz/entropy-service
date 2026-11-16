@@ -1,0 +1,75 @@
+name: Container maintenance
+
+on:
+  schedule:
+    - cron: '37 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: container-maintenance
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Scan published images (${{ matrix.id }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-amd64
+            platform: linux/amd64
+          - id: linux-arm64
+            platform: linux/arm64
+          - id: linux-armv7
+            platform: linux/arm/v7
+    steps:
+      - name: Checkout maintained scanner and policy
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: Authenticate for package read access
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull current stable images
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker pull --platform "$PLATFORM" "ghcr.io/${GITHUB_REPOSITORY,,}:latest"
+          docker pull --platform "$PLATFORM" "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/entropy-client:latest"
+      - name: Rescan current stable images against current vulnerability data
+        uses: ./.github/actions/container-security
+        with:
+          server: ghcr.io/${{ github.repository }}:latest
+          client: ghcr.io/${{ github.repository_owner }}/entropy-client:latest
+          output: container-reports/stable
+      - name: Pull current edge images
+        if: success() || failure()
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker pull --platform "$PLATFORM" "ghcr.io/${GITHUB_REPOSITORY,,}:edge"
+          docker pull --platform "$PLATFORM" "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/entropy-client:edge"
+      - name: Rescan current edge images against current vulnerability data
+        if: success() || failure()
+        uses: ./.github/actions/container-security
+        with:
+          server: ghcr.io/${{ github.repository }}:edge
+          client: ghcr.io/${{ github.repository_owner }}/entropy-client:edge
+          output: container-reports/edge
+      - name: Preserve all findings and SBOMs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: published-container-reports-${{ matrix.id }}
+          path: container-reports/
+          if-no-files-found: warn
+          retention-days: 90

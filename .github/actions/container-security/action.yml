@@ -1,0 +1,31 @@
+name: Scan final container images
+description: Install the pinned image scanner and produce complete vulnerability reports and SPDX SBOMs
+inputs:
+  server:
+    description: Locally loaded server image
+    required: true
+  client:
+    description: Locally loaded client image
+    required: true
+  output:
+    description: Report directory
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install pinned Trivy
+      uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+      with:
+        version: v0.76.2
+        cache: true
+    - name: Scan both final images and create SPDX SBOMs
+      shell: bash
+      env:
+        SERVER_IMAGE: ${{ inputs.server }}
+        CLIENT_IMAGE: ${{ inputs.client }}
+        REPORT_DIRECTORY: ${{ inputs.output }}
+      run: |
+        status=0
+        bash scripts/scan-container.sh "$SERVER_IMAGE" server "$REPORT_DIRECTORY" || status=1
+        bash scripts/scan-container.sh "$CLIENT_IMAGE" client "$REPORT_DIRECTORY" || status=1
+        exit "$status"

@@ -20,16 +20,30 @@ notices, and use a minimal distroless runtime. They include no Go toolchain,
 shell, operator registry or TLS private key. Docker's normal SIGTERM reaches
 the utility directly for graceful shutdown.
 
-## Tags and first publication
+## Stable downloads and publication
 
 - `edge` follows validated pushes to `main`.
 - `vMAJOR.MINOR.PATCH` identifies a validated release; prerelease suffixes are
   retained when present.
 - `latest` follows the most recent published stable GitHub release. Backfilling
-  an older release leaves it unchanged.
+  an older release reconciles it with the current stable release instead of
+  promoting that older backfill.
 
-The container workflows must be merged before the first registry publication.
-Merging publishes `edge` after the main build, native Windows/package and
+```sh
+docker pull ghcr.io/fantuz/entropy-service:latest
+docker pull ghcr.io/fantuz/entropy-client:latest
+# Select an explicit application release for controlled deployments.
+docker pull ghcr.io/fantuz/entropy-service:v2.3.0
+docker pull ghcr.io/fantuz/entropy-client:v2.3.0
+```
+
+Both package pages list available tags:
+[server](https://github.com/fantuz/entropy-service/pkgs/container/entropy-service)
+and [client](https://github.com/fantuz/entropy-service/pkgs/container/entropy-client).
+`latest` is a moving stable channel; pin an image digest for an exact image,
+including its base, readiness probe and SBOM.
+
+Validated merges publish `edge` after the main build, native Windows/package and
 endurance checks plus all three container-platform checks pass. Subsequent
 release tags publish containers after the full release validation and binary
 release. Publishing promotes the exact tested image archives without rebuilding.
@@ -40,9 +54,31 @@ The workflow requires an already-published release, checks out that tag's exact
 source commit, and builds/tests it with the maintained container recipe. It
 does not change the tag, GitHub release or existing binary downloads.
 
+With an authenticated GitHub CLI, the same one-time action is:
+
+```sh
+gh workflow run container-backfill.yml --ref main -f release_tag=v2.3.0
+gh run list --workflow container-backfill.yml
+```
+
+Run it after the maintained recipe is merged, and wait for successful image
+validation and publication before using that tag. Re-running an application
+release can refresh its container base/probe without changing its application
+source; existing image digests continue to identify the previous builds.
+
+All stable/backfill publishers share a separate `latest` promotion lock. A queued
+job resolves the current published stable GitHub release after acquiring that
+lock, validates both three-platform image indexes and all six application
+source/version labels, and copies the indexes by digest. It rechecks the release
+before writing either alias. A missing or invalid current-release image fails
+promotion and leaves it visible for retry; it never falls back to the older
+triggering tag. A queued older backfill therefore also repairs the current stable
+aliases if GitHub coalesces pending promotion jobs. The server/client registry
+updates are separate operations, not an atomic pair.
+
 GitHub's `GITHUB_TOKEN` supplies registry authentication with `packages: write`;
 no separate registry password is required. After the first publication, check
-both packages under the owner's **Packages** page. GHCR packages start private:
+both packages under the owner's **Packages** page. New GHCR packages start private:
 to allow anonymous pulls, the owner must change each package's visibility to
 **Public** in its package settings. Existing packages may also need this source
 repository granted access under **Manage Actions access**. Private pulls require
@@ -60,7 +96,7 @@ semantics or qualify a physical entropy source.
 docker network create entropy-net
 docker run -d --name entropy-server --network entropy-net \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges:true \
-  -p 127.0.0.1:8080:8080 ghcr.io/fantuz/entropy-service:edge
+  -p 127.0.0.1:8080:8080 ghcr.io/fantuz/entropy-service:latest
 
 curl --fail http://127.0.0.1:8080/ready
 docker logs entropy-server
@@ -97,7 +133,7 @@ Run the CLI against that container:
 docker run --rm -it --network entropy-net \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges:true \
   -e NO_PROXY=entropy-server,localhost,127.0.0.1 \
-  ghcr.io/fantuz/entropy-client:edge \
+  ghcr.io/fantuz/entropy-client:latest \
   -mode=push -wsurl=ws://entropy-server:8080/stream \
   -slice=1048576 -refresh=50ms -analysis-interval=50ms \
   -layout=waterfall -display-interval=50ms -color=auto
@@ -133,7 +169,7 @@ docker volume create entropy-output
 docker run --rm --network entropy-net --read-only \
   --mount type=volume,src=entropy-output,dst=/data \
   -e NO_PROXY=entropy-server,localhost,127.0.0.1 \
-  ghcr.io/fantuz/entropy-client:edge \
+  ghcr.io/fantuz/entropy-client:latest \
   -headless -mode=pull -url=http://entropy-server:8080/v1/data/random \
   -output=/data/sample.bin -output-bytes=1048576 -report=/data/sample.jsonl
 ```
@@ -150,14 +186,14 @@ Generate a unique short-lived identity into a persistent named volume:
 ```sh
 docker volume create entropy-tls
 docker run --rm --mount type=volume,src=entropy-tls,dst=/data \
-  ghcr.io/fantuz/entropy-service:edge generate-cert \
+  ghcr.io/fantuz/entropy-service:latest generate-cert \
   -cert-file=/data/cert.pem -key-file=/data/key.pem \
   -hosts=localhost,127.0.0.1,entropy-tls-server
 
 docker run -d --name entropy-tls-server --network entropy-net \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges:true \
   --mount type=volume,src=entropy-tls,dst=/data,readonly \
-  -p 127.0.0.1:8443:8443 ghcr.io/fantuz/entropy-service:edge \
+  -p 127.0.0.1:8443:8443 ghcr.io/fantuz/entropy-service:latest \
   -device=/dev/urandom -require-device=true \
   -http=127.0.0.1:8080 -https=:8443 -enable-https=true \
   -cert-file=/data/cert.pem -key-file=/data/key.pem
@@ -169,7 +205,7 @@ curl --fail --cacert ./entropy-ca.pem https://localhost:8443/ready
 docker run --rm --network entropy-net --read-only \
   --mount "type=bind,src=$PWD/entropy-ca.pem,dst=/run/entropy-ca.pem,readonly" \
   -e SSL_CERT_FILE=/run/entropy-ca.pem -e NO_PROXY=entropy-tls-server \
-  ghcr.io/fantuz/entropy-client:edge \
+  ghcr.io/fantuz/entropy-client:latest \
   -headless -mode=push -wsurl=wss://entropy-tls-server:8443/stream \
   -duration=5s -report=-
 ```
@@ -189,7 +225,7 @@ available to the container user:
 ```sh
 docker run --rm --device=/dev/qrandom0:/dev/qrandom0:r \
   --group-add "$(stat -c %g /dev/qrandom0)" \
-  -p 127.0.0.1:8080:8080 ghcr.io/fantuz/entropy-service:edge \
+  -p 127.0.0.1:8080:8080 ghcr.io/fantuz/entropy-service:latest \
   -device=/dev/qrandom0 -require-device=true -http=:8080 -enable-https=false
 ```
 
@@ -199,6 +235,74 @@ there is no automatic device discovery or passthrough from Docker Desktop into
 its Linux VM. Consult [hardware examples](hardware-examples.md), the source-specific
 guides and [qualification records](hardware-qualification.md). The container
 checks exercise OS seeding and simulated application traffic, not physical cards.
+
+## Readiness and Compose startup
+
+The maintained server image includes `/usr/local/bin/entropy-health`. Docker
+runs it every 30 seconds, with a three-second external limit, a ten-second startup
+grace period and three retries. The probe itself times out after two seconds and
+accepts only HTTP 200 from `http://127.0.0.1:8080/ready`. Failed reseed readiness
+therefore marks the container unhealthy. It does not follow redirects or use an
+outbound proxy.
+
+```sh
+docker inspect --format '{{json .State.Health}}' entropy-server
+docker exec entropy-server /usr/local/bin/entropy-health
+```
+
+For a changed listener, configure the local readiness URL with
+`-e ENTROPY_HEALTH_URL=http://127.0.0.1:8090/ready`. HTTPS verification remains
+enabled; for a private/self-signed identity, mount the public certificate and
+set `ENTROPY_HEALTH_CA_FILE` to that path. For example, with the earlier TLS
+volume mounted at `/data`:
+
+```sh
+docker exec entropy-tls-server /usr/local/bin/entropy-health \
+  -url=https://127.0.0.1:8443/ready -ca-file=/data/cert.pem
+```
+
+The Compose example defaults to `latest` and waits for a healthy server before
+starting the optional client. Health status does not automatically restart a
+running process: `restart: unless-stopped` applies when the process exits.
+Inspect `/ready`, logs and metrics to diagnose a persistent source failure.
+Kubernetes can use `/ready` for readiness and `/live` for liveness directly.
+
+The standalone probe is built from the maintained container recipe, including
+when backfilling an older application release. The application revision and
+`io.entropy-service.recipe.revision` label identify these two sources separately.
+
+## Image maintenance and SBOMs
+
+Every image platform is scanned with pinned Trivy before publication. The scan
+covers the final runtime and Go binaries. Fixable **HIGH/CRITICAL** findings block
+publication; complete reports retain lower-severity and currently unfixed
+findings for review. Missing/failed scans or mismatched image IDs also block
+publication. The publisher checks the report/SBOM checksums and exact image ID
+before its first registry write.
+
+Each platform image has an SPDX JSON SBOM attached as an OCI referrer, accessible
+with ORAS, for example:
+
+```sh
+oras discover --artifact-type application/spdx+json \
+  ghcr.io/fantuz/entropy-service:v2.3.0-linux-amd64
+```
+
+Use the reported SBOM artifact digest with `oras pull` to download its JSON file.
+CI also retains the complete scan reports and SBOMs for 90 days in the
+`container-security-*` artifacts. They describe the scanned image, without operator
+configuration or exported sample data.
+
+The scheduled **Container maintenance** workflow rescans both published `latest`
+and `edge` channels, across all three architectures, every Monday and can also
+be run manually. These runs refresh vulnerability evidence without changing
+registry tags. Failures are reported through the normal Actions workflow status;
+reports are retained even when the vulnerability gate fails.
+
+Dependabot checks Docker base references and GitHub Actions weekly and proposes
+reviewable updates. Go major/minor toolchain changes remain deliberate; review
+patch updates alongside `go.mod` and native release builds. Base images remain
+digest-pinned, and updates pass the existing runtime/regression checks.
 
 ## Build and validation
 
