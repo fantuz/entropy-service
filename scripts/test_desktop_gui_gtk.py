@@ -23,7 +23,8 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools/desktop-gui"))
+GUI_SOURCE = ROOT / "tools/desktop-gui"
+sys.path.insert(0, str(GUI_SOURCE))
 WINDOWS = sys.platform == "win32"
 
 
@@ -710,7 +711,7 @@ raise SystemExit(result)
                                           "health_url": f"http://127.0.0.1:{port}" if role == "server" else None,
                                           "ready": str(ready), "finished": str(finished), "owned_port": owned_port}))
             with (artifacts / (name + "-interrupt.log")).open("w+b") as log:
-                child = spawn_owned([sys.executable, str(script), str(ROOT / "tools/desktop-gui"), str(options)],
+                child = spawn_owned([sys.executable, str(script), str(GUI_SOURCE), str(options)],
                                     stdout=log, stderr=subprocess.STDOUT)
                 try:
                     wait_for(context, lambda: ready.is_file() or child.poll() is not None,
@@ -764,14 +765,18 @@ raise SystemExit(result)
 
 
 def main():
+    global GUI_SOURCE
     parser = argparse.ArgumentParser(description=__doc__)
     suffix = ".exe" if WINDOWS else ""
     parser.add_argument("--server", "--server-binary", type=Path, default=ROOT / ("bin/entropy-server" + suffix))
     parser.add_argument("--client", "--client-binary", type=Path, default=ROOT / ("bin/entropy-client" + suffix))
+    parser.add_argument("--gui-source", type=Path, default=GUI_SOURCE)
     parser.add_argument("--artifacts", type=Path, default=ROOT / "gui-artifacts")
     args = parser.parse_args()
+    GUI_SOURCE = args.gui_source.resolve()
+    sys.path.insert(0, str(GUI_SOURCE))
     if not sys.platform.startswith("linux") and not WINDOWS:
-        parser.error("the GTK PoC smoke test supports Linux and Windows")
+        parser.error("the GTK smoke test supports Linux and Windows")
     import gi
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")

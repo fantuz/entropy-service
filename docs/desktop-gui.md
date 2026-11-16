@@ -130,7 +130,7 @@ pacman -S --needed mingw-w64-ucrt-x86_64-gtk4 \
 ```
 
 Use UCRT64's `python` for the GUI commands so its GTK DLLs and bindings match.
-There is no bundled GUI `.exe` application or GUI installer.
+A [bundled Windows GUI installer](windows-gui-installer.md) is available through the dedicated installer workflow. The manual source setup below remains supported.
 
 ### Start the server GUI
 
