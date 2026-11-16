@@ -102,6 +102,10 @@ make build
 
 **Start in your browser:** open **http://127.0.0.1:8080/** (or your configured HTTP/HTTPS base URL). The embedded homepage presents interactive demonstrations, HTTP APIs, WebSocket routes, health/metrics endpoints and optional legacy shortcuts in a three-column layout. It hides internal JavaScript files from navigation without denying access to those required assets.
 
+Prefer containers? The [GHCR container guide](docs/containers.md) covers separate
+server and CLI client images, Docker/Compose examples, TLS, exports and the
+amd64/arm64/ARMv7 build and publication workflow.
+
 In another terminal, from the repository directory:
 
 ```sh

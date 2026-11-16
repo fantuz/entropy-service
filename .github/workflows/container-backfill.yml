@@ -1,0 +1,60 @@
+name: Publish containers for an existing release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Already-published release tag, for example v2.3.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Resolve an existing published release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout the maintained container recipe
+        uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a published release and resolve its immutable source
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            printf 'Expected vMAJOR.MINOR.PATCH with an optional prerelease.\n' >&2
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/container-release.json"
+          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false and .published_at != null' "$RUNNER_TEMP/container-release.json"
+          source_sha=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
+          printf 'source_sha=%s\nversion=%s\n' "$source_sha" "${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+
+  images:
+    name: Build and test the released application
+    needs: release
+    uses: ./.github/workflows/container-build.yml
+    with:
+      source_sha: ${{ needs.release.outputs.source_sha }}
+      version: ${{ needs.release.outputs.version }}
+
+  publish:
+    name: Publish the tested release images
+    needs: [release, images]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/container-publish.yml
+    with:
+      source_sha: ${{ needs.release.outputs.source_sha }}
+      tag: ${{ inputs.release_tag }}

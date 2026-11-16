@@ -12,6 +12,23 @@ permissions:
   contents: read
 
 jobs:
+  containers:
+    name: Validate container images before publishing
+    uses: ./.github/workflows/container-build.yml
+    with:
+      version: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
+
+  publish-containers:
+    name: Publish released images to GHCR
+    needs: [release, containers]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/container-publish.yml
+    with:
+      tag: ${{ github.ref_name }}
+      source_sha: ${{ github.sha }}
+
   endurance:
     name: Validate endurance before publishing
     uses: ./.github/workflows/endurance.yml
@@ -180,7 +197,7 @@ jobs:
 
   release:
     name: Publish only after full tag validation
-    needs: [validate, browser, windows, windows-package, endurance]
+    needs: [validate, browser, windows, windows-package, endurance, containers]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

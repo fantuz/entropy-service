@@ -1,0 +1,21 @@
+# Only build inputs and distribution notices enter the context. In particular,
+# never send .git, local outputs, operator registries or desktop captures.
+**
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!LICENSE
+!QUANTIS_NOTICES.txt
+
+# Also exclude identities accidentally placed inside a source directory.
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/.env
+**/.env.*
+**/cookies.json
+**/lab-sources*.json
