@@ -442,6 +442,8 @@ python scripts/test_desktop_gui_gtk.py \
 CI exercises native GTK windows on Linux and Windows, real CLI acquisition,
 option editing, live health, process cleanup and terminal interruption,
 alongside the CLI/browser regression suites. Fullscreen geometry and native
-Wayland/HiDPI behavior can depend on the desktop compositor. macOS, standalone
-application bundles, installers, signing and service management remain separate
-follow-ups.
+Wayland/HiDPI behavior can depend on the desktop compositor. The
+[Windows installer](windows-gui-installer.md) bundles the private runtime; native
+[Windows Service commands](windows-service.md) are separate from GUI process
+controls. macOS, signing and GUI integration with operating-system services
+remain follow-ups.

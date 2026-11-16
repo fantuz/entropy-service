@@ -91,7 +91,11 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item build/runtime-sources.zip gui-installer/
-          python -c "import hashlib,pathlib; p=pathlib.Path('gui-installer'); (p/'checksums.txt').write_text(''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n' for f in sorted(p.iterdir()) if f.is_file() and f.name!='checksums.txt'))"
+          $checksums = @(Get-ChildItem gui-installer -File | Sort-Object Name | ForEach-Object {
+            $digest = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$digest  $($_.Name)"
+          })
+          [System.IO.File]::WriteAllLines("$pwd\gui-installer\checksums.txt", $checksums, [System.Text.UTF8Encoding]::new($false))
       - name: Preserve tested installer and runtime source
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
