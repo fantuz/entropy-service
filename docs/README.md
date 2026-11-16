@@ -4,6 +4,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 
 | Document | Contents |
 | --- | --- |
+| [v2.3.1 release notes](releases/v2.3.1.md) | Container distribution, readiness, image maintenance and retry/export test reliability. |
 | [DRBG construction](drbg-construction.md) | Byte-level root/child state transitions, reseed diagram, and limits of the cryptographic assurance claim. |
 | [Experimental Barzakh-521](experimental-barzakh.md) | Opt-in original Go scalar backend, build instructions, exact mapping, tests and licensing/patent boundary. |
 | [Process-memory hardening](process-memory-hardening.md) | Opt-in systemd protection, core-dump caveats and host security checklist. |
