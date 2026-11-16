@@ -60,7 +60,7 @@ it does not establish stronger randomness or replace OS boot seeding.
 For practical capture and remote consumers, [raw exports](docs/client-output.md)
 support private files, stdout/SSH pipes, explicit Linux devices and exact byte limits.
 
-[Quick start](#quick-start) · [Use cases](#use-cases) · [Architecture](#architecture) · [Configuration](#configuration) · [API reference](#api-reference) · [Performance](#performance) · [Statistical tests](#statistical-tests) · [Development](#development) · [Security](SECURITY.md) · [Full reference](docs/README.md)
+[Quick start](#quick-start) · [Screenshots](#project-background-and-screenshots) · [Use cases](#use-cases) · [Architecture](#architecture) · [Configuration](#configuration) · [API reference](#api-reference) · [Performance](#performance) · [Statistical tests](#statistical-tests) · [Development](#development) · [Security](SECURITY.md) · [Full reference](docs/README.md)
 
 ## Quick start
 
@@ -142,6 +142,7 @@ An optional [GTK desktop GUI](docs/desktop-gui.md) for Linux and Windows
 edits common startup options, starts and stops its own server/client processes,
 and displays live server health or a client waterfall with fullscreen mode.
 It runs from source with separate Python/GTK dependencies.
+See the [running server and client screenshots](#desktop-guis).
 
 ![Entropy client with byte-hue waterfall](docs/images/client-waterfall.png)
 
@@ -437,6 +438,21 @@ Available features are documented above. The following are follow-up work or ide
 
 ## Project background and screenshots
 
+### Desktop GUIs
+
+The optional GTK interface supports Linux and Windows. These live Linux captures
+show a GUI-launched server with readiness and reseed status, and a client
+receiving WebSocket samples with a filled 128-row waterfall. The demonstration
+uses a loopback connection and the operating system seed source.
+
+| Server — local process and live health | Client — live waterfall and sample statistics |
+| --- | --- |
+| [![Entropy server GUI running with live READY health and ChaCha20 settings](docs/images/desktop-gui-server-live.webp)](docs/images/desktop-gui-server-live.webp) | [![Entropy client GUI receiving WebSocket samples with a filled byte-hue waterfall, Shannon entropy and throughput](docs/images/desktop-gui-client-live.webp)](docs/images/desktop-gui-client-live.webp) |
+
+Select an image for the full-size view. The [desktop guide](docs/desktop-gui.md)
+includes Linux and Windows launch instructions, the Options editor and more
+platform screenshots.
+
 ### Current browser interface (November 2026)
 
 The same compact interface is available in light and dark. Use **Dark mode**
@@ -446,6 +462,16 @@ theme while sample colors and statistics keep their meaning.
 | Standard / light | Dark |
 | --- | --- |
 | ![Light interface](docs/images/interface-light.png) | ![Dark interface](docs/images/interface-dark.png) |
+
+The browser LAB pages add interactive source comparisons and stream diagnostics:
+
+| Source LAB — spectrum and sample history | Socket LAB — byte trace and histogram |
+| --- | --- |
+| [![Source LAB displaying the spectrum and RGB history of browser Web Crypto samples](docs/images/source-lab-live.webp)](docs/images/source-lab-live.webp) | [![Socket LAB displaying the byte trace and histogram of a live server WebSocket stream](docs/images/socket-lab-live.webp)](docs/images/socket-lab-live.webp) |
+
+These captures use browser Web Crypto and server DRBG samples respectively.
+See the [source and socket LAB guide](docs/source-labs.md) for source selection,
+sampling controls and interpretation.
 
 <details>
 <summary>Earlier November 2026 interface</summary>

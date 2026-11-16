@@ -16,8 +16,12 @@ It does not install or control an operating-system service.
 | Client (`--view client`) | **Start/Stop**, at the top left | Run the selected client and display its statistics and waterfall. |
 | Both | **Options** | Choose a local executable and edit startup options while its owned process is stopped. |
 
-[![Server configuration and live health](images/desktop-gui-server-poc.png)](images/desktop-gui-server-poc.png)
-[![Client waterfall](images/desktop-gui-client-poc.png)](images/desktop-gui-client-poc.png)
+| Server — local process and live health | Client — live waterfall |
+| --- | --- |
+| [![Server GUI running its local process with READY health](images/desktop-gui-server-live.webp)](images/desktop-gui-server-live.webp) | [![Client GUI receiving samples with a filled byte-hue waterfall](images/desktop-gui-client-live.webp)](images/desktop-gui-client-live.webp) |
+
+These Linux captures use an OS-seeded local server and a WebSocket client.
+Select an image for the full-size view.
 
 ## Source and executable versions
 
