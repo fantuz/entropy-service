@@ -32,11 +32,11 @@ jobs:
             platform: linux/arm/v7
     steps:
       - name: Checkout the container recipe and smoke tests
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Checkout the exact application source
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.source_sha || github.sha }}
           path: source

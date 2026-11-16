@@ -41,7 +41,7 @@ jobs:
       RUN_RACE: ${{ matrix.race }}
       PYTHONUTF8: "1"
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-go@v6.5.0

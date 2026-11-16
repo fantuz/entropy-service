@@ -15,7 +15,7 @@ jobs:
       PYTHONUTF8: "1"
     steps:
       - name: Checkout matching source for smoke tests
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Download the GoReleaser Windows ZIP from this run
