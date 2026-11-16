@@ -14,6 +14,10 @@ Windows targets x64 console applications and a native
 [Windows Service](windows-service.md) on modern Windows. Windows ARM64 releases await native validation. Linux
 release targets and socket/device implementations remain unchanged.
 
+A [bundled Windows GUI installer](windows-gui-installer.md) includes Python/GTK
+and both utilities, without separate dependency installation. The small portable
+CLI ZIP remains available.
+
 An optional [GTK desktop GUI](desktop-gui.md#windows-setup) runs from source
 with MSYS2 UCRT64 Python/GTK dependencies. The current source interface has an
 Options editor, Start/Stop for its own local processes, independent live server
