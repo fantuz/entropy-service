@@ -10,8 +10,8 @@ six-decimal plain-text Shannon diagnostics are shared with Linux. The native
 and packaged Windows smoke tests exercise every alias. Native VT-console sizing,
 monochrome waterfalls and opt-in colors share the Linux renderer.
 
-This first port targets x64 console applications on modern Windows. It does not
-install a Windows service. Windows ARM64 releases await native validation. Linux
+Windows targets x64 console applications and a native
+[Windows Service](windows-service.md) on modern Windows. Windows ARM64 releases await native validation. Linux
 release targets and socket/device implementations remain unchanged.
 
 An optional [GTK desktop GUI](desktop-gui.md#windows-setup) runs from source
@@ -20,10 +20,9 @@ Options editor, Start/Stop for its own local processes, independent live server
 health and a client waterfall/fullscreen view. The guide covers complete source
 downloads and using released executables without installing Go.
 
-The [v2.2.0 source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.2.0.zip)
-contains the earlier GUI with read-only server settings. Use the updated GUI
-source revision for Options and local-server controls; the compatible
-[v2.2.0 Windows binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.2.0/entropy-service_2.2.0_windows_amd64.zip)
+The [v2.3.1 source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.3.1.zip)
+contains the GUI with Options and local-server controls. The matching
+[v2.3.1 Windows binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.3.1/entropy-service_2.3.1_windows_amd64.zip)
 contains the two CLI executables. The Python GUI is a separate source download,
 and is not bundled in the CLI ZIP or a standalone installer. Native Windows
 GUI/process checks run separately from CLI checks.
@@ -50,6 +49,10 @@ Make and a C compiler are not required.
 For local driver/device diagnostics, use `entropy-server.exe hardware list -json`
 or `hardware probe -device=quantis-pci:0 -json`. The [hardware probe guide](hardware-probe.md)
 explains OS controls, strict selection, status fields and hardware-test limits.
+
+For persistent operation, use the [Windows Service guide](windows-service.md).
+Service installation is explicit and requires an elevated terminal; the portable
+console/GUI workflows continue to run without administrator privileges.
 
 ## Local demonstration
 

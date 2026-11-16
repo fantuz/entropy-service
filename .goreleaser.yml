@@ -70,6 +70,7 @@ archives:
       - LICENSE
       - README.md
       - docs/windows.md
+      - docs/windows-service.md
       - docs/quantis.md
       - docs/hardware-probe.md
       - docs/hardware-drivers.md

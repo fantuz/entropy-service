@@ -31,3 +31,5 @@ jobs:
           python scripts/check_windows_archive.py "$($archives[0].FullName)" --extract-to windows-package
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/test_windows.py --bin-dir windows-package
+      - name: Exercise packaged Windows Service lifecycle and private state
+        run: python scripts/test_windows_service.py --server windows-package/entropy-server.exe --require-admin

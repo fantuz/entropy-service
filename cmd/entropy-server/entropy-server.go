@@ -41,6 +41,8 @@ var webFS embed.FS
 // GoReleaser injects the release tag; development binaries report dev.
 var appVersion = "dev"
 
+const serviceCommand = "service"
+
 type ClientPrefs struct {
 	Bytes   int    `json:"bytes"`
 	Refresh int    `json:"refresh"`
@@ -1088,6 +1090,10 @@ func startHTTPS(ctx context.Context, addr string, handler http.Handler, tlsConfi
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == serviceCommand {
+		os.Exit(runServiceCommand(os.Args[2:], os.Stdout, os.Stderr))
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "hardware" {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
@@ -1102,36 +1108,37 @@ func main() {
 		os.Exit(runCertificateCommand(os.Args[2:], os.Stderr))
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := runServer(ctx, config.ParseConfig(), func() {}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// runServer shares the same startup, freshness and joined shutdown paths with
+// console execution and the Windows Service Control Manager.
+func runServer(ctx context.Context, cfg *config.Config, ready func()) error {
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+
 	log.SetPrefix("entropy-server ")
 
 	started := time.Now()
 
-	// Root context canceled on signal
-	ctx, stop := signal.NotifyContext(
-		context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-	)
-	defer stop()
-
-	cfg := config.ParseConfig()
 	if err := cfg.ValidatePlatform(); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if cfg.DescribeJSON {
-		if err := writeServerDescription(os.Stdout, cfg); err != nil {
-			log.Fatal(err)
-		}
-
-		return
+		return writeServerDescription(os.Stdout, cfg)
 	}
 
 	startup := serverInvocation(os.Stderr, cfg)
 
 	labRegistry, err := lab.Load(cfg.LabSources)
 	if err != nil {
-		log.Fatalf("lab configuration: %v", err)
+		return fmt.Errorf("lab configuration: %w", err)
 	}
 	defer labRegistry.Close()
 
@@ -1139,7 +1146,7 @@ func main() {
 
 	algorithm, err := drbg.ParseAlgorithm(cfg.DRBG)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if algorithm.Experimental() {
@@ -1153,7 +1160,7 @@ func main() {
 	if cfg.EnableHTTPS {
 		tlsCfg, err = transport.NewTLSConfig(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
-			log.Fatalf("%v%s", err, tlsStartupHint(cfg.CertFile, cfg.KeyFile, err))
+			return fmt.Errorf("%w%s", err, tlsStartupHint(cfg.CertFile, cfg.KeyFile, err))
 		}
 	}
 
@@ -1178,7 +1185,7 @@ func main() {
 	// not merely the path requested before potential fallback.
 	qrngdev, actualSource, err := openEntropySource(cfg.DevicePath, cfg.RequireDevice)
 	if err != nil {
-		log.Fatalf("open entropy source: %v", err)
+		return fmt.Errorf("open entropy source: %w", err)
 	}
 	defer qrngdev.Close()
 
@@ -1197,7 +1204,7 @@ func main() {
 			log.Printf("RDRAND mixing unavailable: %v; continuing with configured entropy source", err)
 		})
 		if err != nil {
-			log.Fatalf("enable RDRAND mixing: %v", err)
+			return fmt.Errorf("enable RDRAND mixing: %w", err)
 		}
 
 		seedReader = mixed
@@ -1207,7 +1214,7 @@ func main() {
 
 	deadlineSource, ok := qrngdev.(seedDeadlineSource)
 	if !ok {
-		log.Fatal("entropy source does not support bounded reads")
+		return errors.New("entropy source does not support bounded reads")
 	}
 
 	boundedSeed := &seedInput{source: deadlineSource, reader: seedReader, timeout: cfg.SourceTimeout}
@@ -1235,7 +1242,7 @@ func main() {
 
 	seed := make([]byte, 64)
 	if _, err := io.ReadFull(seedReader, seed); err != nil {
-		log.Fatalf("read root seed: %v", err)
+		return fmt.Errorf("read root seed: %w", err)
 	}
 
 	startup.Check("Root seed read", "OK", "64 bytes; seed contents never logged")
@@ -1244,7 +1251,7 @@ func main() {
 	clear(seed)
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	defer root.Close()
@@ -1253,7 +1260,7 @@ func main() {
 	root.SetMetadata(appVersion, actualSource, algorithm.String(), time.Duration(cfg.ReseedMs)*time.Millisecond, cfg.ReseedSize*8)
 
 	if err := root.ConfigureReseedPolicy(cfg.OnReseedFailure, maxReseedAge); err != nil {
-		log.Fatalf("configure generation freshness policy: %v", err)
+		return fmt.Errorf("configure generation freshness policy: %w", err)
 	}
 
 	startup.Check("Root DRBG", "OK", "initialized; metadata set")
@@ -1267,12 +1274,12 @@ func main() {
 
 	webRoot, err := fs.Sub(webFS, "web")
 	if err != nil {
-		log.Fatalf("open embedded web assets: %v", err)
+		return fmt.Errorf("open embedded web assets: %w", err)
 	}
 
 	staticAssets, err := newStaticAssetHandler(webRoot)
 	if err != nil {
-		log.Fatalf("prepare embedded web assets: %v", err)
+		return fmt.Errorf("prepare embedded web assets: %w", err)
 	}
 
 	mux.Handle("/", staticAssets)
@@ -1315,16 +1322,20 @@ func main() {
 
 	httpSrv, httpErr = startHTTP(ctx, cfg.HTTPAddr, countRequests(mux))
 	if httpErr != nil {
-		log.Fatal(httpErr)
+		return httpErr
 	} else {
+		defer httpSrv.Close()
+
 		startup.Check("HTTP listener", "OK", httpSrv.listenAddr)
 	}
 
 	if cfg.EnableHTTPS {
 		httpsSrv, httpsErr = startHTTPS(ctx, cfg.HTTPSAddr, countRequests(mux), tlsCfg)
 		if httpsErr != nil {
-			log.Fatal(httpsErr)
+			return httpsErr
 		} else {
+			defer httpsSrv.Close()
+
 			startup.Check("HTTPS listener", "OK", httpsSrv.listenAddr)
 		}
 	}
@@ -1340,8 +1351,10 @@ func main() {
 
 		debugSrv, err = startDebugHTTP(ctx, "127.0.0.1:6060", muxdebug)
 		if err != nil {
-			log.Fatalf("startup debug listener: %v", err)
+			return fmt.Errorf("startup debug listener: %w", err)
 		}
+
+		defer debugSrv.Close()
 
 		startup.Check("Debug listener", "OK", debugSrv.listenAddr+"/debug/pprof/")
 	}
@@ -1361,13 +1374,14 @@ func main() {
 	startup.Value("Health endpoints", "/live (process) /ready (seed freshness)")
 	fmt.Fprintln(os.Stderr)
 	log.Printf("ready: startup completed in %s", time.Since(started).Round(time.Millisecond))
+	ready()
 
 	<-ctx.Done()
 
-	log.Println("shutdown: signal received; draining listeners and active requests")
+	log.Println("shutdown: cancellation received; draining listeners and active requests")
 
 	// shutdownCtx, cancel := context.WithCancel(context.Background())
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 
 	// Stop listeners together and join all handlers, including WebSockets.
@@ -1393,6 +1407,8 @@ func main() {
 
 	logServingSummary(log.Default(), time.Since(started), len(shutdownErrors) == 0, metrics.ServingSnapshot())
 	log.Println("shutdown complete")
+
+	return nil
 }
 
 /*
