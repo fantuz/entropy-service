@@ -62,7 +62,7 @@ jobs:
           python3 scripts/check_credential_files.py
           python3 -m unittest discover -s scripts -p 'test_check_credential_files.py'
       - name: Setup Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
       - name: Ensure go.mod is already tidied
@@ -209,7 +209,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
       - name: Select curated release notes when available
