@@ -37,7 +37,7 @@ jobs:
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/container-release.json"
           jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false and .published_at != null' "$RUNNER_TEMP/container-release.json"
-          source_sha=$(git rev-parse "$RELEASE_TAG^{commit}")
+          source_sha=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
           printf 'source_sha=%s\nversion=%s\n' "$source_sha" "${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
 
   images:

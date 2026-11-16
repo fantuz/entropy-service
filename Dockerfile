@@ -6,9 +6,10 @@ FROM --platform=$BUILDPLATFORM golang:1.26.11-bookworm@sha256:dc40a13b61304647ed
 WORKDIR /src
 ENV GOTOOLCHAIN=local
 COPY go.mod go.sum ./
-# Optional enterprise/session CA trust is a BuildKit secret, never an image layer.
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=secret,id=proxy_ca \
+# Keep modules in a regular builder layer: exported CI caches do not preserve
+# cache-mount contents when a later source change invalidates the compile step.
+# Optional enterprise/session CA trust is a secret, never an image layer.
+RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca; fi; \
     go mod download
 COPY cmd ./cmd
@@ -17,8 +18,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 ARG VERSION=dev
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
+RUN --network=none --mount=type=cache,target=/root/.cache/go-build \
     test "$TARGETOS" = linux && \
     if [ "$TARGETARCH" = arm ]; then export GOARM="${TARGETVARIANT#v}"; fi && \
     export CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" GOPROXY=off && \
