@@ -83,7 +83,7 @@ jobs:
           grep -q '^QUANTIS_VM_TESTS_PASSED' quantis-vm.log
       - name: Upload kernel simulation evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: quantis-pci-kernel-tests
           path: |
