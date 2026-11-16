@@ -53,6 +53,22 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+      - name: Verify release tag matches VERSION
+        if: github.ref_type == 'tag'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = Path('VERSION').read_text(encoding='utf-8').strip()
+          expected_tag = f'v{version}'
+          tag = os.environ['RELEASE_TAG']
+          if tag != expected_tag:
+              raise SystemExit(f'Release tag {tag!r} does not match VERSION ({expected_tag!r})')
+          print(f'Release version: {version}')
+          PY
       - name: Validate latest download links and alias configuration
         run: |
           python3 scripts/check_release_downloads.py
