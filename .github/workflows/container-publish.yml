@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout publishing code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Download only this run's tested image archives
@@ -65,7 +65,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout promotion code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Set up Buildx

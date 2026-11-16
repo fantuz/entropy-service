@@ -30,7 +30,7 @@ jobs:
             platform: linux/arm/v7
     steps:
       - name: Checkout maintained scanner and policy
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Authenticate for package read access
