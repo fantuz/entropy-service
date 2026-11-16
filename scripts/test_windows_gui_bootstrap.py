@@ -16,7 +16,7 @@ SPEC.loader.exec_module(BOOTSTRAP)
 class BootstrapTests(unittest.TestCase):
     def invocation(self, arguments):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             captured = []
             with patch.object(BOOTSTRAP, "__file__", str(root / "app/gui_bootstrap.py")), \
                     patch.object(BOOTSTRAP, "configure_runtime"), \
