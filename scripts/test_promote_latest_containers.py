@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import call, patch
 
@@ -10,6 +11,16 @@ class LatestPromotionTests(unittest.TestCase):
     new = ("v2.4.0", "b" * 40)
     images = [("ghcr.io/fantuz/entropy-service", "sha256:" + "c" * 64),
               ("ghcr.io/fantuz/entropy-client", "sha256:" + "d" * 64)]
+
+    @patch.object(promotion, "docker")
+    def test_duplicate_platform_manifest_is_rejected(self, docker):
+        manifests = [{"platform": p} for p in [{"os": "linux", "architecture": "amd64"},
+                                               {"os": "linux", "architecture": "arm64"},
+                                               {"os": "linux", "architecture": "arm", "variant": "v7"}]]
+        docker.side_effect = [json.dumps({"digest": "sha256:" + "a" * 64}).encode(),
+                              json.dumps({"manifests": manifests + [manifests[0]]}).encode()]
+        with self.assertRaisesRegex(ValueError, "exactly the three"):
+            promotion.inspect_index("ghcr.io/fantuz/entropy-service:v2.4.0")
 
     @patch.object(promotion, "inspect_index")
     @patch.object(promotion, "docker")

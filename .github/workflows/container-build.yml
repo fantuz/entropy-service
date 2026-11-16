@@ -126,7 +126,7 @@ jobs:
         env:
           IMAGE_ID: ${{ matrix.id }}
         run: |
-          mkdir container-images
+          mkdir -p container-images
           docker image save "entropy-service/server:$IMAGE_ID" "entropy-service/client:$IMAGE_ID" |
             gzip > container-images/images.tar.gz
           (cd container-images && sha256sum images.tar.gz > checksums.txt)

@@ -21,10 +21,11 @@ class ContainerScanTests(unittest.TestCase):
         self.assertEqual(report, original)
 
     def test_wrong_image_or_missing_results_fail_closed(self):
-        for report in [{}, {"ArtifactType": "container_image", "Metadata": {"ImageID": self.image_id}},
-                       self.report([])]:
+        for report, expected_id in [({}, self.image_id),
+                                    ({"ArtifactType": "container_image", "Metadata": {"ImageID": self.image_id}}, self.image_id),
+                                    (self.report([]), "sha256:" + "b" * 64)]:
             with self.assertRaises(ValueError):
-                check_report(report, "sha256:" + "b" * 64)
+                check_report(report, expected_id)
 
     def test_malformed_finding_is_not_treated_as_clean_scan(self):
         with self.assertRaises(ValueError):

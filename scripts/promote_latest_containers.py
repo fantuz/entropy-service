@@ -46,7 +46,7 @@ def inspect_index(reference):
                              "--raw", capture=True))
     platforms = {(m["platform"]["os"], m["platform"]["architecture"], m["platform"].get("variant", ""))
                  for m in index["manifests"]}
-    if len(platforms) != 3 or ("linux", "amd64", "") not in platforms or ("linux", "arm", "v7") not in platforms or not any(p[:2] == ("linux", "arm64") for p in platforms):
+    if len(index["manifests"]) != 3 or len(platforms) != 3 or ("linux", "amd64", "") not in platforms or ("linux", "arm", "v7") not in platforms or not any(p[:2] == ("linux", "arm64") for p in platforms):
         raise ValueError("release image must contain exactly the three tested Linux platforms")
     return digest, index
 
