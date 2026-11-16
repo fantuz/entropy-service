@@ -54,9 +54,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify release tag matches VERSION
-        if: github.ref_type == 'tag'
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
         run: |
           python3 - <<'PY'
           import os
@@ -65,6 +65,8 @@ jobs:
           version = Path('VERSION').read_text(encoding='utf-8').strip()
           expected_tag = f'v{version}'
           tag = os.environ['RELEASE_TAG']
+          if os.environ['RELEASE_REF_TYPE'] != 'tag':
+              raise SystemExit(f'Select tag {expected_tag!r} when running the release workflow manually')
           if tag != expected_tag:
               raise SystemExit(f'Release tag {tag!r} does not match VERSION ({expected_tag!r})')
           print(f'Release version: {version}')
