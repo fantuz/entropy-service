@@ -1,0 +1,26 @@
+services:
+  entropy-server:
+    image: ghcr.io/fantuz/entropy-service:${ENTROPY_TAG:-edge}
+    ports:
+      - "127.0.0.1:${ENTROPY_HTTP_PORT:-8080}:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  entropy-client:
+    image: ghcr.io/fantuz/entropy-client:${ENTROPY_TAG:-edge}
+    profiles: [client]
+    depends_on: [entropy-server]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      NO_PROXY: entropy-server,localhost,127.0.0.1
+    stdin_open: true
+    tty: true
+    command:
+      - -mode=pull
+      - -url=http://entropy-server:8080/v1/data/random
+      - -retries=5
+      - -retry-delay=250ms

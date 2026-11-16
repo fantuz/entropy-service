@@ -21,6 +21,24 @@ permissions:
   contents: read
 
 jobs:
+  containers:
+    name: Container images
+    uses: ./.github/workflows/container-build.yml
+    with:
+      version: edge
+
+  publish-containers:
+    name: Publish validated main images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build, windows, windows-package, endurance, containers]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/container-publish.yml
+    with:
+      tag: edge
+      source_sha: ${{ github.sha }}
+
   endurance:
     name: Endurance and fault tests
     uses: ./.github/workflows/endurance.yml

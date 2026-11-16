@@ -1,0 +1,221 @@
+# Containers and GitHub Container Registry
+
+Two separate images package the existing Go utilities:
+
+| Image | Contents |
+| --- | --- |
+| `ghcr.io/fantuz/entropy-service` | `entropy-server`, its embedded web interface and LABs, wordlists, health endpoints and metrics |
+| `ghcr.io/fantuz/entropy-client` | CLI stream client, terminal waterfall, sample analysis and exports |
+
+Both are Linux images for **amd64, arm64 and ARMv7**. Docker selects the matching
+platform automatically. They also run in Docker Desktop's Linux-container mode;
+they are separate from the native Windows executables. The optional Python/GTK
+[desktop GUI](desktop-gui.md) runs on the host and can connect to the published
+server endpoint.
+
+The commands below use a POSIX shell, such as Linux, WSL or Git Bash.
+
+The images run as **UID/GID 65532**, contain CA trust roots and distribution
+notices, and use a minimal distroless runtime. They include no Go toolchain,
+shell, operator registry or TLS private key. Docker's normal SIGTERM reaches
+the utility directly for graceful shutdown.
+
+## Tags and first publication
+
+- `edge` follows validated pushes to `main`.
+- `vMAJOR.MINOR.PATCH` identifies a validated release; prerelease suffixes are
+  retained when present.
+- `latest` follows the most recent published stable GitHub release. Backfilling
+  an older release leaves it unchanged.
+
+The container workflows must be merged before the first registry publication.
+Merging publishes `edge` after the main build, native Windows/package and
+endurance checks plus all three container-platform checks pass. Subsequent
+release tags publish containers after the full release validation and binary
+release. Publishing promotes the exact tested image archives without rebuilding.
+
+For an existing release such as **v2.3.0**, open **Actions → Publish containers
+for an existing release → Run workflow**, choose `main`, and enter `v2.3.0`.
+The workflow requires an already-published release, checks out that tag's exact
+source commit, and builds/tests it with the maintained container recipe. It
+does not change the tag, GitHub release or existing binary downloads.
+
+GitHub's `GITHUB_TOKEN` supplies registry authentication with `packages: write`;
+no separate registry password is required. After the first publication, check
+both packages under the owner's **Packages** page. GHCR packages start private:
+to allow anonymous pulls, the owner must change each package's visibility to
+**Public** in its package settings. Existing packages may also need this source
+repository granted access under **Manage Actions access**. Private pulls require
+authentication with a GitHub identity allowed to read those packages.
+
+## Local server and browser interface
+
+The server image's default command explicitly uses `/dev/urandom` as its required
+seed source, listens on container port 8080 and disables HTTPS for a
+certificate-free local demonstration. The examples publish only to host loopback.
+Hardware or OS input seeds the DRBG; containerization does not change generation
+semantics or qualify a physical entropy source.
+
+```sh
+docker network create entropy-net
+docker run -d --name entropy-server --network entropy-net \
+  --read-only --cap-drop=ALL --security-opt=no-new-privileges:true \
+  -p 127.0.0.1:8080:8080 ghcr.io/fantuz/entropy-service:edge
+
+curl --fail http://127.0.0.1:8080/ready
+docker logs entropy-server
+```
+
+Open **http://127.0.0.1:8080/** for the web interface. Source LAB browser capture
+still needs browser permissions and a secure context (HTTPS or localhost).
+Readiness is available at `/ready`; container orchestrators can use an HTTP
+probe directly. The image does not depend on an in-container shell or `curl`.
+
+Use HTTPS or an appropriately configured TLS reverse proxy when exposing the
+service beyond the local demonstration. Authentication and access policy remain
+deployment responsibilities; see [security boundaries](security-boundaries.md).
+
+Docker networking can make a host browser appear as a nonloopback peer to the
+server. The registered-source LAB bridge retains its default peer/Host checks;
+browser-only sources and ordinary generation endpoints remain available. To
+allow registered sources across that network boundary, mount an operator-owned
+registry read-only and explicitly configure `-lab-sources` with
+`-lab-allow-remote=true`. Put those routes behind an authenticated access boundary.
+`-lab-allowed-hosts` alone does not permit nonloopback peers; see [LAB access](lab-safety.md).
+
+## Client and fullscreen waterfall
+
+Run the CLI against that container:
+
+```sh
+docker run --rm -it --network entropy-net \
+  --read-only --cap-drop=ALL --security-opt=no-new-privileges:true \
+  -e NO_PROXY=entropy-server,localhost,127.0.0.1 \
+  ghcr.io/fantuz/entropy-client:edge \
+  -mode=push -wsurl=ws://entropy-server:8080/stream \
+  -slice=1048576 -refresh=50ms -analysis-interval=50ms \
+  -layout=waterfall -display-interval=50ms -color=auto
+```
+
+`-it` supplies the interactive terminal. For automation, use `-headless` and a
+duration or output limit. A remote server can be selected with the same `-url`
+or `-wsurl` options as the native client. HTTPS/WSS uses the image's normal CA
+trust; an additional public CA/certificate can be mounted read-only and selected
+with `SSL_CERT_FILE`. The client needs the public trust material, not a server
+private key. See [client TLS trust](client-tls.md).
+
+Alternatively, the checked-in Compose example starts the server and an opt-in
+interactive client:
+
+```sh
+docker compose up -d entropy-server
+docker compose run --rm entropy-client
+docker compose down
+```
+
+Set `ENTROPY_TAG=v2.3.0` after that version's images have been published, or
+`ENTROPY_HTTP_PORT=8081` to select a different host port. Named service DNS works
+inside the Docker network; the host desktop GUI uses the published loopback URL.
+
+## Persistent exports
+
+The image's `/data` directory belongs to the non-root user. A new named volume
+inherits that ownership, including with rootless Docker:
+
+```sh
+docker volume create entropy-output
+docker run --rm --network entropy-net --read-only \
+  --mount type=volume,src=entropy-output,dst=/data \
+  -e NO_PROXY=entropy-server,localhost,127.0.0.1 \
+  ghcr.io/fantuz/entropy-client:edge \
+  -headless -mode=pull -url=http://entropy-server:8080/v1/data/random \
+  -output=/data/sample.bin -output-bytes=1048576 -report=/data/sample.jsonl
+```
+
+Choose new filenames for another run: the client refuses to overwrite exports
+and reports. A host bind mount is also possible if its ownership/UID mapping
+allows the container user to write. Raw stdout remains available with
+`-output=- -headless`; diagnostics stay on stderr. See [raw exports](client-output.md).
+
+## Provisioning HTTPS
+
+Generate a unique short-lived identity into a persistent named volume:
+
+```sh
+docker volume create entropy-tls
+docker run --rm --mount type=volume,src=entropy-tls,dst=/data \
+  ghcr.io/fantuz/entropy-service:edge generate-cert \
+  -cert-file=/data/cert.pem -key-file=/data/key.pem \
+  -hosts=localhost,127.0.0.1,entropy-tls-server
+
+docker run -d --name entropy-tls-server --network entropy-net \
+  --read-only --cap-drop=ALL --security-opt=no-new-privileges:true \
+  --mount type=volume,src=entropy-tls,dst=/data,readonly \
+  -p 127.0.0.1:8443:8443 ghcr.io/fantuz/entropy-service:edge \
+  -device=/dev/urandom -require-device=true \
+  -http=127.0.0.1:8080 -https=:8443 -enable-https=true \
+  -cert-file=/data/cert.pem -key-file=/data/key.pem
+
+docker cp entropy-tls-server:/data/cert.pem ./entropy-ca.pem
+curl --fail --cacert ./entropy-ca.pem https://localhost:8443/ready
+```
+
+Keep the private key in the server volume. The self-signed certificate requires
+explicit client trust and explicit renewal before expiry; use a CA-issued
+identity for a public deployment. Container replacement preserves the named
+volume. The existing [certificate provisioning](tls-certificates.md)
+guide explains SANs, safe replacement and expiry handling.
+
+## Hardware sources
+
+Container users do not automatically gain access to host hardware. An existing
+qualified Linux character device can be mapped explicitly, with its group
+available to the container user:
+
+```sh
+docker run --rm --device=/dev/qrandom0:/dev/qrandom0:r \
+  --group-add "$(stat -c %g /dev/qrandom0)" \
+  -p 127.0.0.1:8080:8080 ghcr.io/fantuz/entropy-service:edge \
+  -device=/dev/qrandom0 -require-device=true -http=:8080 -enable-https=false
+```
+
+The host driver, read permissions and bounded cancellation contract still apply.
+USB selectors additionally need their host USB nodes/sysfs and suitable binding;
+there is no automatic device discovery or passthrough from Docker Desktop into
+its Linux VM. Consult [hardware examples](hardware-examples.md), the source-specific
+guides and [qualification records](hardware-qualification.md). The container
+checks exercise OS seeding and simulated application traffic, not physical cards.
+
+## Build and validation
+
+For an amd64 build host (select matching image tags and `--platform` for ARM):
+
+```sh
+docker build --target server -t entropy-service/server:linux-amd64 .
+docker build --target client -t entropy-service/client:linux-amd64 .
+python3 scripts/test_containers.py
+python3 -m unittest discover -s scripts -p 'test_publish_containers.py'
+```
+
+The smoke test runs the real non-root images with a read-only root filesystem,
+HTTP/WebSocket samples, browser assets, private bounded exports, certificate
+provisioning, HTTPS/WSS acceptance/rejection and graceful shutdown. CI repeats
+it on amd64, arm64 and ARMv7 (ARM uses QEMU), then preserves checked archives.
+The publisher validates their checksums, image platform, entrypoint, source
+commit and version before pushing anything. Publication never runs on a PR.
+
+The Go and distroless base images are digest-pinned. Update the Go image with
+`go.mod` and refresh the runtime digest for CA/security maintenance. An optional
+BuildKit secret supplies enterprise/session build trust without copying it into
+the runtime image:
+
+```sh
+docker build --target server --secret id=proxy_ca,src=/path/to/combined-ca-bundle.crt \
+  -t entropy-service/server:linux-amd64 .
+```
+
+Container registry publication follows binary publication, so these two external
+services are not an atomic transaction. If a registry push fails, rerun the failed
+publication job while the tested artifacts remain available (seven days), or use
+the existing-release workflow afterward. This avoids rebuilding/replacing the
+GitHub release just to repair container delivery.
