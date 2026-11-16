@@ -106,6 +106,19 @@ Prefer containers? The [GHCR container guide](docs/containers.md) covers separat
 server and CLI client images, Docker/Compose examples, TLS, exports and the
 amd64/arm64/ARMv7 build and publication workflow.
 
+Pull the current stable server and client (Docker selects the CPU architecture):
+
+```sh
+docker pull ghcr.io/fantuz/entropy-service:latest
+docker pull ghcr.io/fantuz/entropy-client:latest
+```
+
+Browse the [server container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-service)
+and [client container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-client)
+versions. Pin `:v2.3.0`, or an image digest, for controlled deployments; `:edge`
+follows validated development builds. The container guide includes the one-time
+existing-release publication, readiness probes, SBOMs and maintenance policy.
+
 In another terminal, from the repository directory:
 
 ```sh

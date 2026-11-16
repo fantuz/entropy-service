@@ -50,6 +50,8 @@ class SmokeTest:
         assert info["Config"]["User"] == "65532:65532", info["Config"]
         assert info["Config"]["Entrypoint"] == ["/usr/local/bin/entropy-" + role]
         assert info["Config"]["Labels"]["org.opencontainers.image.source"].startswith("https://github.com/")
+        if role == "server":
+            assert info["Config"]["Healthcheck"]["Test"] == ["CMD", "/usr/local/bin/entropy-health"]
         if self.args.source_sha:
             platform_id = {"linux/amd64": "linux-amd64", "linux/arm64": "linux-arm64", "linux/arm/v7": "linux-armv7"}[self.args.platform]
             verify_image(info, role, platform_id, self.args.repository, self.args.source_sha, self.args.version)
@@ -68,6 +70,7 @@ class SmokeTest:
 
     def start_server(self, tls_volume=None):
         options = ["--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges:true",
+                   "--health-interval=1s", "--health-start-period=0s", "--health-timeout=3s",
                    "--network", self.network, "--network-alias", "entropy-server",
                    "-p", "127.0.0.1::8080"]
         args = []
@@ -97,6 +100,16 @@ class SmokeTest:
             assert status == 200 and expected.lower() in body.lower(), (path, status)
         status, _ = self.get(host, int(port), "/lab/sources", host_header="untrusted.invalid")
         assert status == 403, "Container defaults must preserve LAB Host restrictions"
+        while self.command("inspect", "--format", "{{.State.Health.Status}}", container).stdout.strip() != b"healthy":
+            if time.monotonic() > deadline:
+                raise AssertionError("Docker healthcheck did not become healthy")
+            time.sleep(.1)
+        failed_probe = self.command("exec", container, "/usr/local/bin/entropy-health", "-url=http://127.0.0.1:8080/missing-readiness", check=False)
+        assert failed_probe.returncode == 1, "A missing readiness endpoint must fail the probe"
+        if tls_volume:
+            assert self.command("exec", container, "/usr/local/bin/entropy-health", "-url=https://127.0.0.1:8443/ready", check=False).returncode == 1
+            self.command("exec", container, "/usr/local/bin/entropy-health", "-url=https://127.0.0.1:8443/ready", "-ca-file=/data/cert.pem")
+        print("PASS server readiness healthcheck, negative status and explicit TLS trust", flush=True)
         return container
 
     @staticmethod

@@ -1,6 +1,6 @@
 services:
   entropy-server:
-    image: ghcr.io/fantuz/entropy-service:${ENTROPY_TAG:-edge}
+    image: ghcr.io/fantuz/entropy-service:${ENTROPY_TAG:-latest}
     ports:
       - "127.0.0.1:${ENTROPY_HTTP_PORT:-8080}:8080"
     read_only: true
@@ -9,9 +9,11 @@ services:
     restart: unless-stopped
 
   entropy-client:
-    image: ghcr.io/fantuz/entropy-client:${ENTROPY_TAG:-edge}
+    image: ghcr.io/fantuz/entropy-client:${ENTROPY_TAG:-latest}
     profiles: [client]
-    depends_on: [entropy-server]
+    depends_on:
+      entropy-server:
+        condition: service_healthy
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

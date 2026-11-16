@@ -9,6 +9,8 @@ from pathlib import Path
 import re
 import subprocess
 
+from check_container_scan import check_report
+
 
 PLATFORMS = {"linux-amd64": ("amd64", ""), "linux-arm64": ("arm64", ""), "linux-armv7": ("arm", "v7")}
 VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?")
@@ -56,6 +58,29 @@ def verify_archive(directory):
     return archive
 
 
+def verify_security_reports(directory, role, image_id):
+    expected = {r + suffix for r in ("server", "client") for suffix in (".spdx.json", ".vulnerabilities.json")}
+    entries = {}
+    for line in (directory / "security-checksums.txt").read_text().splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  ([a-z.]+)", line)
+        if not match or match[2] not in expected or match[2] in entries:
+            raise ValueError("invalid image-security checksum manifest")
+        entries[match[2]] = match[1]
+    if set(entries) != expected:
+        raise ValueError("missing image-security reports")
+    for name, digest in entries.items():
+        if hashlib.sha256((directory / name).read_bytes()).hexdigest() != digest:
+            raise ValueError("image-security report checksum mismatch")
+    report = json.loads((directory / (role + ".vulnerabilities.json")).read_text())
+    if check_report(report, image_id):
+        raise ValueError("image has fixable HIGH/CRITICAL vulnerabilities")
+    sbom = directory / (role + ".spdx.json")
+    document = json.loads(sbom.read_text())
+    if document.get("SPDXID") != "SPDXRef-DOCUMENT" or not document.get("spdxVersion", "").startswith("SPDX-") or not document.get("packages"):
+        raise ValueError("invalid or empty image SBOM")
+    return sbom
+
+
 def docker(*args, capture=False):
     result = subprocess.run(["docker", *args], check=True, stdout=subprocess.PIPE if capture else None)
     return result.stdout if capture else None
@@ -67,16 +92,15 @@ def main():
     parser.add_argument("--tag", required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
-    parser.add_argument("--latest", choices=["true", "false"], default="false")
     args = parser.parse_args()
-    latest = args.latest == "true"
-    validate_request(args.repository, args.tag, args.source_sha, latest)
+    validate_request(args.repository, args.tag, args.source_sha, False)
     version = args.tag.removeprefix("v")
     repository = args.repository.lower()
     owner = repository.split("/", 1)[0]
     destinations = {"server": "ghcr.io/" + repository, "client": f"ghcr.io/{owner}/entropy-client"}
 
     # Validate all archives and all six loaded images before the first push.
+    sboms = {}
     for platform in PLATFORMS:
         directory = args.artifacts / ("container-images-" + platform)
         archive = verify_archive(directory)
@@ -85,6 +109,7 @@ def main():
             source = f"entropy-service/{role}:{platform}"
             info = json.loads(docker("image", "inspect", source, capture=True))[0]
             verify_image(info, role, platform, args.repository, args.source_sha, version)
+            sboms[platform, role] = verify_security_reports(directory, role, info["Id"])
 
     references = []
     for role, destination in destinations.items():
@@ -94,6 +119,15 @@ def main():
             destination_part = f"{destination}:{args.tag}-{platform}"
             docker("image", "tag", source, destination_part)
             docker("image", "push", destination_part)
+            descriptor = json.loads(docker("buildx", "imagetools", "inspect", destination_part,
+                                           "--format", "{{json .Manifest}}", capture=True))
+            digest = descriptor["digest"]
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                raise ValueError("invalid published platform digest")
+            sbom = sboms[platform, role]
+            subprocess.run(["oras", "attach", "--artifact-type", "application/spdx+json",
+                            destination + "@" + digest, sbom.name + ":application/spdx+json"],
+                           cwd=sbom.parent, check=True, timeout=120)
             parts.append(destination_part)
         reference = f"{destination}:{args.tag}"
         docker("buildx", "imagetools", "create", "--tag", reference, *parts)
@@ -101,8 +135,6 @@ def main():
         platforms = {(m["platform"]["os"], m["platform"]["architecture"], m["platform"].get("variant", "")) for m in index["manifests"]}
         if {("linux", "amd64", ""), ("linux", "arm", "v7")} - platforms or not any(p[:2] == ("linux", "arm64") for p in platforms) or len(platforms) != 3:
             raise ValueError("published image index does not contain the three tested platforms")
-        if latest:
-            docker("buildx", "imagetools", "create", "--tag", destination + ":latest", reference)
         references.append(reference)
     print("Published tested images:\n" + "\n".join(references))
     if os.environ.get("GITHUB_STEP_SUMMARY"):
