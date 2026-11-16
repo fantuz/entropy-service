@@ -6,9 +6,16 @@ on:
       - 'tools/windows-installer/**'
       - 'tools/desktop-gui/**'
       - 'scripts/*windows_gui*.py'
+      - 'scripts/*prepare_gui_release.py'
       - 'scripts/test_desktop_gui*.py'
       - '.github/workflows/windows-gui-installer.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -27,6 +34,7 @@ jobs:
       PYTHONUTF8: '1'
       GSK_RENDERER: cairo
       GDK_BACKEND: win32
+      GUI_RELEASE_TAG: ${{ inputs.release_tag || '' }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout
@@ -35,18 +43,20 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Test launcher argument forwarding
-        run: python -m unittest discover -s scripts -p 'test_windows_gui_bootstrap.py'
+        run: |
+          python -m unittest discover -s scripts -p 'test_windows_gui_bootstrap.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
       - name: Setup Go
         uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
+      - name: Select development or tagged installer version
+        run: python scripts/prepare_gui_release.py version
       - name: Build matching companion executables
         shell: pwsh
         run: |
-          $version = (Get-Content VERSION -Raw).Trim()
-          "BUNDLE_VERSION=$version-dev" >> $env:GITHUB_ENV
-          "BUNDLE_NUMERIC_VERSION=$version" >> $env:GITHUB_ENV
-          go build -ldflags="-s -w -X main.appVersion=$version-dev" -o bin/entropy-server.exe ./cmd/entropy-server
+          go build -ldflags="-s -w -X main.appVersion=$env:BUNDLE_VERSION" -o bin/entropy-server.exe ./cmd/entropy-server
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -ldflags='-s -w' -o bin/entropy-client.exe ./cmd/entropy-client
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -90,12 +100,17 @@ jobs:
       - name: Package tested installer, source and checksums together
         shell: pwsh
         run: |
-          Copy-Item build/runtime-sources.zip gui-installer/
+          Copy-Item build/runtime-sources.zip "gui-installer/entropy-service_${env:BUNDLE_VERSION}_windows_amd64_gui_sources.zip"
           $checksums = @(Get-ChildItem gui-installer -File | Sort-Object Name | ForEach-Object {
             $digest = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           })
           [System.IO.File]::WriteAllLines("$pwd\gui-installer\checksums.txt", $checksums, [System.Text.UTF8Encoding]::new($false))
+      - name: Validate published asset inventory, source identity and complete checksums
+        shell: pwsh
+        run: |
+          python scripts/prepare_gui_release.py prepare --artifacts gui-installer --version "$env:BUNDLE_VERSION" --source-sha "$env:SOURCE_SHA" --output build/goreleaser-gui.yml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve tested installer and runtime source
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

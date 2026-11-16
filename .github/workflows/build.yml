@@ -64,6 +64,7 @@ jobs:
         run: |
           python3 scripts/check_release_downloads.py
           python3 -m unittest discover -s scripts -p 'test_check_release_downloads.py'
+          python3 -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
       - name: Reject tracked TLS identities and private keys
         run: |
           python3 scripts/check_credential_files.py

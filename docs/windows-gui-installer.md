@@ -5,11 +5,17 @@ utilities and private Python/GTK libraries. Users do not need Go, Python, MSYS2
 or a separately downloaded source archive. It is separate from the small portable
 CLI ZIP and does not change Linux packaging.
 
-This installer is being introduced after v2.4.0. PR/manual workflow builds are
-development artifacts, not stable releases. Download the
-`windows-gui-installer-and-sources` artifact from a successful **Windows GUI
-installer** workflow. It contains the setup `.exe`, runtime source companion ZIP
-and `checksums.txt`. Verify the setup checksum before running it:
+Starting with **v2.4.1**, download the Windows GUI setup `.exe` from the
+[latest release](https://github.com/fantuz/entropy-service/releases/latest).
+For this release the file is `entropy-service_2.4.1_windows_amd64_gui_setup.exe`.
+Download `checksums.txt` from the same release to verify it. The versioned
+`entropy-service_2.4.1_windows_amd64_gui_sources.zip` contains matching runtime
+sources; it is a separate download and is not needed to run the application.
+
+PR/manual workflow builds remain development artifacts. Their installer, sources
+and checksum manifest are available together as the
+`windows-gui-installer-and-sources` CI artifact. Verify the setup checksum before
+running it:
 
 ```powershell
 Get-FileHash .\entropy-service_*_windows_amd64_gui_setup.exe -Algorithm SHA256
@@ -79,5 +85,9 @@ owned-process controls and shutdown. It then uninstalls and checks that user
 data is retained. Successful installer/source artifacts and diagnostic evidence
 are retained for 14 days. PR builds do not publish releases.
 
-Signing, stable release attachment and Windows ARM64 qualification remain
-separate steps. Native Windows x64 is the supported installer target.
+Tagged releases require the installer build/install tests before publication.
+The publication job downloads that run's tested setup and source archive, verifies
+checksums and exact version/source identity, and publishes the same bytes with
+the native CLI packages and one combined checksum manifest. No installer rebuild
+occurs during publication. Signing and Windows ARM64 qualification remain separate
+steps. Native Windows x64 is the supported installer target.
