@@ -83,6 +83,12 @@ registry read-only and explicitly configure `-lab-sources` with
 `-lab-allow-remote=true`. Put those routes behind an authenticated access boundary.
 `-lab-allowed-hosts` alone does not permit nonloopback peers; see [LAB access](lab-safety.md).
 
+Registered RTSP/ONVIF camera decoding also requires an external `ffmpeg` binary.
+The minimal image does not bundle that decoder; use a host installation or an
+extended image with the required media tools for those sources. Browser camera
+and microphone capture runs in the browser and does not need that server-side
+decoder.
+
 ## Client and fullscreen waterfall
 
 Run the CLI against that container:
@@ -157,7 +163,15 @@ docker run -d --name entropy-tls-server --network entropy-net \
   -cert-file=/data/cert.pem -key-file=/data/key.pem
 
 docker cp entropy-tls-server:/data/cert.pem ./entropy-ca.pem
+chmod 644 ./entropy-ca.pem # Public certificate, readable by the container client.
 curl --fail --cacert ./entropy-ca.pem https://localhost:8443/ready
+
+docker run --rm --network entropy-net --read-only \
+  --mount "type=bind,src=$PWD/entropy-ca.pem,dst=/run/entropy-ca.pem,readonly" \
+  -e SSL_CERT_FILE=/run/entropy-ca.pem -e NO_PROXY=entropy-tls-server \
+  ghcr.io/fantuz/entropy-client:edge \
+  -headless -mode=push -wsurl=wss://entropy-tls-server:8443/stream \
+  -duration=5s -report=-
 ```
 
 Keep the private key in the server volume. The self-signed certificate requires
