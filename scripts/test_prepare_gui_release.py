@@ -47,9 +47,13 @@ class GuiReleaseTests(unittest.TestCase):
             files = assets(root)
             self.assertEqual(verify_artifacts(root, VERSION, SHA), list(files))
             base = Path(__file__).resolve().parents[1] / ".goreleaser.yml"
-            config = release_config(base.read_text(), files)
+            config = release_config(base.read_text(), files, root)
             for file in files:
                 self.assertEqual(config.count('name_template: ' + json.dumps(file.name)), 2)
+            with self.assertRaises(ValueError):
+                release_config(base.read_text(), files, root / "outside")
+            self.assertNotIn(str(root.resolve()), config)
+            self.assertIn('glob: "./entropy-service_', config)
             self.assertIn('name_template: entropy-service_windows_amd64.zip', config)
             self.assertIn('name_template: entropy-service_linux_armv7.tar.gz', config)
 
@@ -80,7 +84,7 @@ class GuiReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "source checksum"):
                 verify_artifacts(root, VERSION, SHA)
             with self.assertRaisesRegex(ValueError, "release"):
-                release_config("release:\n  draft: false\nchecksum:\n  extra_files:\n", files)
+                release_config("release:\n  draft: false\nchecksum:\n  extra_files:\n", files, root)
 
     def test_unsafe_source_zip_is_rejected(self):
         for name in ("../escape", "C:drive", "nested/source"):
