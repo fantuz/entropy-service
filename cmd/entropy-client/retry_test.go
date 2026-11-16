@@ -119,13 +119,10 @@ func TestRetriesPreserveExportLimitAcrossConnections(t *testing.T) {
 				t.Fatalf("%+v", summary)
 			}
 
-			wantCalls := int32(3)
-			if mode == modePull {
-				wantCalls = 5
-			}
-
-			if calls.Load() != wantCalls {
-				t.Fatalf("attempts=%d want=%d", calls.Load(), wantCalls)
+			// Pull reception can prefetch while the final export is written.
+			// TestOutputLimitCancelsPrefetchedPull forces that overlap below.
+			if mode == modeStream && calls.Load() != 3 {
+				t.Fatalf("connections=%d want=3", calls.Load())
 			}
 		})
 	}
@@ -153,6 +150,113 @@ func TestRetryDefaultExhaustionAndPermanentFailure(t *testing.T) {
 				t.Fatalf("calls=%d want=%d", calls.Load(), tc.wantCalls)
 			}
 		})
+	}
+}
+
+type prefetchGatedWriteout struct {
+	writeoutSink
+
+	remaining int
+	gate      func(context.Context) error
+}
+
+func (s *prefetchGatedWriteout) WriteContext(ctx context.Context, data []byte) (int, error) {
+	if len(data) >= s.remaining {
+		if err := s.gate(ctx); err != nil {
+			return 0, err
+		}
+	}
+
+	n, err := s.writeoutSink.WriteContext(ctx, data)
+	s.remaining -= n
+
+	return n, err
+}
+
+func TestOutputLimitCancelsPrefetchedPull(t *testing.T) {
+	var calls atomic.Int32
+
+	prefetched, canceled := make(chan struct{}), make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempt := calls.Add(1)
+		if attempt <= 2 {
+			http.Error(w, "seed paused", http.StatusServiceUnavailable)
+			return
+		}
+
+		if attempt == 6 {
+			close(prefetched)
+			<-r.Context().Done()
+			close(canceled)
+
+			return
+		}
+
+		_, _ = w.Write(bytes.Repeat([]byte{byte(attempt - 2)}, 256))
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	cfg := experimentConfig(modePull, server.URL, filepath.Join(dir, "report.jsonl"))
+	cfg.Retries, cfg.RetryDelay, cfg.Duration = 2, time.Millisecond, 5*time.Second
+	cfg.OutputPath, cfg.OutputBytes = filepath.Join(dir, "raw.bin"), 600
+
+	var finalWriteAt time.Time
+
+	// Hold the final 88-byte export until the next HTTP pull is in flight.
+	// The server leaves that request blocked so shutdown must cancel it.
+	err := runConfiguredWithWriteout(t.Context(), cfg, func() (writeoutSink, error) {
+		sink, err := openOutput(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		return &prefetchGatedWriteout{writeoutSink: sink, remaining: 600, gate: func(ctx context.Context) error {
+			select {
+			case <-prefetched:
+				finalWriteAt = time.Now()
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Keep this below the pull request's three-second timeout, so waiting for
+	// that timeout cannot satisfy the cancellation assertion.
+	if finalWriteAt.IsZero() || time.Since(finalWriteAt) >= 2*time.Second {
+		t.Fatal("output-limit shutdown did not cancel the prefetched request promptly")
+	}
+
+	select {
+	case <-canceled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not observe prefetched request cancellation")
+	}
+
+	data, err := os.ReadFile(cfg.OutputPath)
+
+	want := append(bytes.Repeat([]byte{1}, 256), bytes.Repeat([]byte{2}, 256)...)
+
+	want = append(want, bytes.Repeat([]byte{3}, 88)...)
+	if err != nil || !bytes.Equal(data, want) {
+		t.Fatalf("output was reset, duplicated or contaminated: %d %v", len(data), err)
+	}
+
+	records := readReport(t, cfg.ReportPath)
+
+	summary := decodeRecord[summaryRecord](t, records[len(records)-1])
+	if summary.Failed || summary.Termination != reasonOutputLimit || summary.OutputBytes != 600 || summary.OutputFrames != 2 || summary.ReceivedFrames != 3 {
+		t.Fatalf("%+v", summary)
+	}
+
+	// Two failed attempts, three exported responses, and the blocked prefetch.
+	if calls.Load() != 6 {
+		t.Fatalf("attempts=%d want=6 with the controlled prefetch", calls.Load())
 	}
 }
 
@@ -197,7 +301,9 @@ func TestRetryDiscardsTruncatedHTTPBody(t *testing.T) {
 	}
 
 	data, err := os.ReadFile(cfg.OutputPath)
-	if err != nil || !bytes.Equal(data, bytes.Repeat([]byte{1}, 256)) || calls.Load() != 2 {
+	// The retry must discard the truncated payload. Subsequent valid pulls
+	// can be prefetched while the complete payload is exported.
+	if err != nil || !bytes.Equal(data, bytes.Repeat([]byte{1}, 256)) {
 		t.Fatalf("partial HTTP body reached export: len=%d calls=%d error=%v", len(data), calls.Load(), err)
 	}
 }

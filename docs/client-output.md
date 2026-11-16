@@ -49,6 +49,9 @@ needed. Zero means export until duration/interruption; **a file or remote
 capture can then grow without a size bound**. A duration can end before the
 byte limit: if exact size is required, check both `termination` and the count.
 Preflight samples and queued frames discarded during shutdown are excluded.
+The receiver can buffer another frame or have an HTTP request in flight while
+the final export finishes. Shutdown cancels outstanding requests and releases
+queued frames; the byte limit applies to exported data.
 The receiver counts the entire handled final frame even if only its prefix is
 exported. A retained file after a failed or interrupted run can be incomplete;
 it is deliberately preserved for inspection, never labeled as a complete capture.
