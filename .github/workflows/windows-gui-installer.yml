@@ -1,0 +1,114 @@
+name: Windows GUI installer
+
+on:
+  pull_request:
+    paths:
+      - 'tools/windows-installer/**'
+      - 'tools/desktop-gui/**'
+      - 'scripts/*windows_gui*.py'
+      - 'scripts/test_desktop_gui*.py'
+      - '.github/workflows/windows-gui-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-gui-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: Bundled Windows GTK installer
+    runs-on: windows-2025
+    timeout-minutes: 40
+    env:
+      CGO_ENABLED: '0'
+      PYTHONUTF8: '1'
+      GSK_RENDERER: cairo
+      GDK_BACKEND: win32
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Test launcher argument forwarding
+        run: python -m unittest discover -s scripts -p 'test_windows_gui_bootstrap.py'
+      - name: Setup Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Build matching companion executables
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          "BUNDLE_VERSION=$version-dev" >> $env:GITHUB_ENV
+          "BUNDLE_NUMERIC_VERSION=$version" >> $env:GITHUB_ENV
+          go build -ldflags="-s -w -X main.appVersion=$version-dev" -o bin/entropy-server.exe ./cmd/entropy-server
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -ldflags='-s -w' -o bin/entropy-client.exe ./cmd/entropy-client
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install verified MSYS2 runtime packages
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: UCRT64
+          path-type: minimal
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-python-cairo
+      - name: Stage private runtime, licenses and complete corresponding source packages
+        shell: msys2 {0}
+        run: |
+          /ucrt64/bin/python.exe scripts/build_windows_gui_bundle.py \
+            --output build/desktop-bundle --sources build/runtime-sources \
+            --version "$BUNDLE_VERSION" --source-sha "$SOURCE_SHA"
+          /ucrt64/bin/python.exe - <<'PY'
+          import json, sys
+          from pathlib import Path
+          Path('build/runtime-origin.json').write_text(json.dumps({'prefix': sys.prefix}))
+          PY
+      - name: Compile unsigned per-user installer
+        shell: pwsh
+        run: |
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) { throw 'The Windows runner must provide Inno Setup 6' }
+          New-Item -ItemType Directory -Force gui-installer | Out-Null
+          & $compiler "/DBundleDir=$pwd\build\desktop-bundle" "/DOutputDir=$pwd\gui-installer" "/DAppVersion=$env:BUNDLE_VERSION" "/DNumericVersion=$env:BUNDLE_NUMERIC_VERSION" tools/windows-installer/entropy-service.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install and test with the original MSYS2 runtime unavailable
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem gui-installer -Filter '*_gui_setup.exe')
+          if ($installers.Count -ne 1) { throw 'Expected one installer' }
+          $origin = Get-Content build/runtime-origin.json -Raw | ConvertFrom-Json
+          python scripts/test_windows_gui_installer.py --installer "$($installers[0].FullName)" --msys-prefix "$($origin.prefix)" --artifacts gui-installer-evidence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package tested installer, source and checksums together
+        shell: pwsh
+        run: |
+          Copy-Item build/runtime-sources.zip gui-installer/
+          $checksums = @(Get-ChildItem gui-installer -File | Sort-Object Name | ForEach-Object {
+            $digest = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$digest  $($_.Name)"
+          })
+          [System.IO.File]::WriteAllLines("$pwd\gui-installer\checksums.txt", $checksums, [System.Text.UTF8Encoding]::new($false))
+      - name: Preserve tested installer and runtime source
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-gui-installer-and-sources
+          path: gui-installer/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Preserve diagnostics and native GUI evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-gui-installer-evidence
+          path: gui-installer-evidence/
+          if-no-files-found: ignore
+          retention-days: 14

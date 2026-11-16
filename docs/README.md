@@ -4,6 +4,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 
 | Document | Contents |
 | --- | --- |
+| [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
 | [Windows Service](windows-service.md) | Native SCM installation, account/state policy, certificates, stop/restart, logs and upgrades. |
 | [v2.4.0 release notes](releases/v2.4.0.md) | Native Windows Service lifecycle, dedicated account, protected state and certificates. |
 | [v2.3.1 release notes](releases/v2.3.1.md) | Container distribution, readiness, image maintenance and retry/export test reliability. |
