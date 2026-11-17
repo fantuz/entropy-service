@@ -65,6 +65,7 @@ jobs:
           python3 scripts/check_release_downloads.py
           python3 -m unittest discover -s scripts -p 'test_check_release_downloads.py'
           python3 -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
+          python3 -m unittest discover -s scripts -p 'test_validate_release_recovery.py'
       - name: Reject tracked TLS identities and private keys
         run: |
           python3 scripts/check_credential_files.py
@@ -190,6 +191,8 @@ jobs:
           args: release --snapshot --skip=publish --clean
       - name: Verify download aliases and checksum coverage against actual archives
         run: python3 scripts/check_release_downloads.py --dist dist
+      - name: Exercise actual GoReleaser GUI asset globbing and checksums
+        run: python3 scripts/test_gui_goreleaser_integration.py --goreleaser "$RUNNER_TOOL_CACHE/goreleaser-checksum/2.17.0/x64/goreleaser"
       - name: Test real packaged systemd HTTP and HTTPS lifecycle
         run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh dist/*_amd64.deb
       - name: Verify Windows release ZIP layout, notices and executable architecture

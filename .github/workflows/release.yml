@@ -7,24 +7,49 @@ on:
       - "v*.*.*"
 
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing immutable tag to recover (leave blank for normal tagged release)'
+        type: string
+        required: false
+        default: ''
+      validated_run_id:
+        description: 'Failed release run whose validation jobs all succeeded; reuse its tested assets'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  recover-publication:
+    if: github.event_name == 'workflow_dispatch' && inputs.validated_run_id != ''
+    permissions:
+      contents: write
+      actions: read
+      packages: write
+    uses: ./.github/workflows/release-recovery.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
+      validated_run_id: ${{ inputs.validated_run_id }}
+
   gui-installer:
+    if: inputs.validated_run_id == ''
     name: Validate bundled Windows GUI installer
     uses: ./.github/workflows/windows-gui-installer.yml
     with:
       release_tag: ${{ github.ref_name }}
 
   containers:
+    if: inputs.validated_run_id == ''
     name: Validate container images before publishing
     uses: ./.github/workflows/container-build.yml
     with:
       version: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
 
   publish-containers:
+    if: inputs.validated_run_id == ''
     name: Publish released images to GHCR
     needs: [release, containers]
     permissions:
@@ -36,19 +61,23 @@ jobs:
       source_sha: ${{ github.sha }}
 
   endurance:
+    if: inputs.validated_run_id == ''
     name: Validate endurance before publishing
     uses: ./.github/workflows/endurance.yml
 
   windows:
+    if: inputs.validated_run_id == ''
     name: Validate Windows before publishing
     uses: ./.github/workflows/windows.yml
 
   windows-package:
+    if: inputs.validated_run_id == ''
     name: Validate packaged Windows archive
     needs: [validate, windows]
     uses: ./.github/workflows/windows-package.yml
 
   validate:
+    if: inputs.validated_run_id == ''
     name: Validate tagged commit before publishing
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -82,6 +111,7 @@ jobs:
           python3 scripts/check_release_downloads.py
           python3 -m unittest discover -s scripts -p 'test_check_release_downloads.py'
           python3 -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
+          python3 -m unittest discover -s scripts -p 'test_validate_release_recovery.py'
       - name: Reject tracked TLS identities and private keys
         run: |
           python3 scripts/check_credential_files.py
@@ -217,10 +247,12 @@ jobs:
           retention-days: 7
 
   browser:
+    if: inputs.validated_run_id == ''
     name: Validate Firefox and Chromium UI
     uses: ./.github/workflows/browser-ui.yml
 
   release:
+    if: inputs.validated_run_id == ''
     name: Publish only after full tag validation
     needs: [validate, browser, windows, windows-package, endurance, containers, gui-installer]
     runs-on: ubuntu-24.04
@@ -241,13 +273,13 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: windows-gui-installer-and-sources
-          path: ${{ runner.temp }}/gui-installer-assets
+          path: bin/gui-release
       - name: Verify tagged installer artifacts and prepare publication config
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          python3 scripts/prepare_gui_release.py prepare --artifacts "$RUNNER_TEMP/gui-installer-assets" \
+          python3 scripts/prepare_gui_release.py prepare --artifacts bin/gui-release \
             --version "${RELEASE_TAG#v}" --source-sha "$SOURCE_SHA" --output "$RUNNER_TEMP/goreleaser-release.yml"
       - name: Select curated release notes when available
         id: release-notes

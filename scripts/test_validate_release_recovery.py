@@ -1,0 +1,53 @@
+"""Recovery cannot replace failed tests, stale evidence or a moved release tag."""
+import copy
+from datetime import datetime, timedelta, timezone
+import unittest
+
+from validate_release_recovery import REQUIRED, validate
+
+
+SHA = "1" * 40
+NOW = datetime(2026, 11, 17, tzinfo=timezone.utc)
+
+
+def evidence():
+    run = {"event": "push", "path": ".github/workflows/release.yml", "head_branch": "v2.4.1",
+           "head_sha": SHA, "status": "completed", "conclusion": "failure", "created_at": NOW.isoformat()}
+    jobs = [{"name": name, "status": "completed", "conclusion": "success"} for name in sorted(REQUIRED)]
+    jobs.append({"name": "Publish only after full tag validation", "status": "completed", "conclusion": "failure"})
+    return run, jobs
+
+
+class RecoveryTests(unittest.TestCase):
+    def test_publication_failure_with_all_validation_passed(self):
+        run, jobs = evidence()
+        validate(run, jobs, "v2.4.1", SHA, NOW)
+
+    def test_failed_missing_cancelled_or_additional_failed_validation_rejected(self):
+        for change in ("missing", "failure", "cancelled", "extra", "duplicate"):
+            with self.subTest(change=change):
+                run, jobs = evidence()
+                if change == "missing":
+                    jobs.pop(0)
+                elif change == "duplicate":
+                    jobs.append(copy.deepcopy(jobs[0]))
+                elif change == "extra":
+                    jobs.append({"name": "New required validation", "status": "completed", "conclusion": "failure"})
+                else:
+                    jobs[0]["conclusion"] = change
+                with self.assertRaises(ValueError):
+                    validate(run, jobs, "v2.4.1", SHA, NOW)
+
+    def test_wrong_source_workflow_event_tag_and_stale_run_rejected(self):
+        for key, value in [("head_sha", "2" * 40), ("head_branch", "v2.4.0"), ("event", "pull_request"),
+                           ("path", ".github/workflows/build.yml"), ("status", "in_progress"),
+                           ("created_at", (NOW - timedelta(days=8)).isoformat())]:
+            with self.subTest(key=key):
+                run, jobs = evidence()
+                run[key] = value
+                with self.assertRaises(ValueError):
+                    validate(run, jobs, "v2.4.1", SHA, NOW)
+
+
+if __name__ == "__main__":
+    unittest.main()

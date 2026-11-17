@@ -75,10 +75,14 @@ def verify_artifacts(directory, version, source_sha):
     return [directory / name for name in names]
 
 
-def release_config(config, files):
+def release_config(config, files, directory=None):
     # Keep snapshot/native packaging independent of the optional Windows job.
     # Only publication consumes the augmented config and the tested artifacts.
-    extra = "".join("    - glob: " + json.dumps(str(p.resolve())) + "\n      name_template: " + json.dumps(p.name) + "\n" for p in files)
+    directory = Path.cwd() if directory is None else directory
+    # GoReleaser's extra-file globber uses io/fs paths: absolute paths and '..'
+    # escape its filesystem root and are rejected even when the schema is valid.
+    paths = [p.resolve().relative_to(directory.resolve()).as_posix() for p in files]
+    extra = "".join("    - glob: " + json.dumps("./" + path) + "\n      name_template: " + json.dumps(file.name) + "\n" for path, file in zip(paths, files))
     for section in ("release", "checksum"):
         match = re.search(r"^" + section + r":[ \t]*\n((?:[ \t].*\n|\n|#.*\n)*)", config, re.MULTILINE)
         if not match or match[1].count("  extra_files:\n") != 1:

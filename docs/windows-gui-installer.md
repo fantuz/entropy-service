@@ -91,3 +91,19 @@ checksums and exact version/source identity, and publishes the same bytes with
 the native CLI packages and one combined checksum manifest. No installer rebuild
 occurs during publication. Signing and Windows ARM64 qualification remain separate
 steps. Native Windows x64 is the supported installer target.
+
+## Recovering a publication failure
+
+A failure after all validation jobs succeed can be recovered without moving the
+release tag or rebuilding tested GUI/container artifacts. Run the current main
+`release` workflow manually with `release_tag` and `validated_run_id` set to the
+original failed tag run. Leave both fields empty for ordinary release operation
+on a selected tag.
+
+Recovery checks the original workflow/event, unchanged tag commit, complete
+successful validation matrix and recent evidence (within seven days). It rejects
+missing, cancelled or failed validation gates. Artifacts must still be retained.
+The corrected publication tools check out the exact original tagged source,
+verify/reuse its tested installer and images, publish native assets and reconcile
+`latest` using the existing shared promotion lock. This repairs the packaging
+recipe while preserving the version's code and artifact provenance.
