@@ -257,7 +257,7 @@ tests should not require a physical QRNG or external services.
 | Build | Build workflow status for `main`; follow the link for the exact commit and checks. Markdown-only changes do not trigger it. |
 | Go version | Minimum Go version declared by the default branch's root `go.mod`. |
 | CodeQL | GitHub's default CodeQL workflow on `main`; a successful analysis is not a certificate that the project has no vulnerabilities. |
-| Release workflow | Latest release-workflow result, covering validation and publishing; it can refer to an older tag than current `main`. |
+| Release workflow / view runs | Neutral link to the complete release-workflow history, including tag builds and manual publication recovery. It makes no pass/fail assertion. |
 | Last commit | Most recent commit on `main`, not the date of the latest published binary. |
 | Latest release / downloads | GitHub release metadata and asset-download counts, excluding Git clones and other distribution channels. |
 | License / golangci-lint | License metadata and the fact that lint is configured; build details show the actual lint result. |
@@ -266,5 +266,25 @@ tests should not require a physical QRNG or external services.
 Badges may be cached by GitHub/Shields. Open the linked workflow, module or
 release for the underlying result; no badge asserts general Go compliance
 or physical-entropy quality.
+
+### Release availability and workflow history
+
+The **release version** badge reads GitHub's latest published stable release
+metadata and links to that release. Use it to find the available binaries.
+The **release workflow / view runs** badge links to the unfiltered workflow
+history, where failed attempts and successful recovery runs remain visible.
+
+A tag-triggered run can fail during publication even after validation succeeds;
+a later manual recovery can publish those validated artifacts. A status badge
+filtered with `event=push` still reports the failed tag run because it excludes
+the `workflow_dispatch` recovery. Conversely, an unfiltered GitHub status badge
+[prefers runs on the default branch](https://docs.github.com/en/actions/how-tos/monitor-workflows/add-a-status-badge),
+so a successful recovery on `main` can obscure the status of later tag runs.
+Neither selection describes the current published release reliably.
+
+Keep publication metadata and workflow history separate rather than switching
+event/branch filters to obtain a green release-workflow badge. A published
+version indicates availability, not that every workflow or security check on
+current `main` passes; the other status badges retain their documented scopes.
 
 [Contributing](../CONTRIBUTING.md) · [Technical reference](README.md)
