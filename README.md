@@ -15,7 +15,9 @@
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/fantuz/entropy-service?logo=go" alt="Go version" height="20"></a>
   <a href="https://github.com/fantuz/entropy-service/releases/latest"><img src="https://img.shields.io/badge/Install-DEB%2FRPM%20%C2%B7%20amd64%2Farm64%2Farmv7-2e7d32" alt="Linux DEB and RPM packages for amd64, arm64 and ARMv7" height="20"></a>
   <br>
-  <a href="https://github.com/fantuz/entropy-service/actions/workflows/release.yml?query=event%3Apush"><img src="https://github.com/fantuz/entropy-service/actions/workflows/release.yml/badge.svg?event=push" alt="Tagged release workflow" height="20"></a>
+  <!-- Published release availability is shown by the version badge above.
+       Workflow history includes tag builds and manual publication recovery. -->
+  <a href="https://github.com/fantuz/entropy-service/actions/workflows/release.yml"><img src="https://img.shields.io/badge/release%20workflow-view%20runs-507269" alt="Release workflow run history: tag builds and manual recovery" height="20"></a>
   <a href="https://github.com/fantuz/entropy-service/actions/workflows/browser-ui.yml?query=branch%3Amain"><img src="https://github.com/fantuz/entropy-service/actions/workflows/browser-ui.yml/badge.svg?branch=main" alt="Browser UI tests on main" height="20"></a>
   <a href="https://github.com/fantuz/entropy-service/actions/workflows/desktop-gui.yml?query=branch%3Amain"><img src="https://github.com/fantuz/entropy-service/actions/workflows/desktop-gui.yml/badge.svg?branch=main" alt="Desktop GUI tests on main" height="20"></a>
   <a href="https://golangci-lint.run/"><img src="https://img.shields.io/badge/golangci--lint-enabled-brightgreen?logo=go" alt="golangci-lint" height="20"></a>
@@ -429,8 +431,12 @@ the pure-Go DRBG/CPU-random fallback, runs vet/lint, verifies module tidiness
 and checksums, checks reachable vulnerabilities, tests browser scripts and
 builds a GoReleaser snapshot. Successful build runs expose coverage in their
 job summary and a downloadable `go-coverage` artifact retained for 14 days.
-Markdown-only changes are excluded. The release workflow runs the same Go
-quality checks against the tagged commit before publishing.
+Every PR reports build and browser checks. PRs changing only regular
+`README.md` or `docs/**/*.md` files use a documentation validation path;
+all other changes run the complete suites. Fuzz, race, terminal and archive
+jobs run independently so native Windows ZIP testing can start as soon as
+the archive is ready. The release workflow runs the full checks against the
+tagged commit before publishing. See [CI execution and caching](docs/ci.md).
 
 See [Go conventions, module policy and coverage review](docs/go-quality.md)
 for the measured baseline, remaining test gaps and badge meanings. Hardware

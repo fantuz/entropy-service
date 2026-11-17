@@ -1,21 +1,19 @@
 name: browser-ui
-
 on:
   push:
-    branches: [main]
-    paths-ignore: ["**.md", ".gitignore"]
-  pull_request:
-    paths-ignore: ["**.md", ".gitignore"]
-  workflow_call:
-
+    branches:
+      - main
+  pull_request: {}
+  workflow_call: null
+  workflow_dispatch: {}
 permissions:
   contents: read
-
 concurrency:
   group: browser-ui-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
+  plan:
+    uses: ./.github/workflows/ci-plan.yml
   browser:
     name: Browser UI (${{ matrix.browser }})
     runs-on: ubuntu-24.04
@@ -23,21 +21,63 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox]
+        browser:
+          - chromium
+          - firefox
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+      - name: Require a successful recognized plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          CI_MODE: ${{ needs.plan.outputs.mode }}
+        run: |
+          test "$PLAN_RESULT" = success
+          case "$CI_MODE" in full|docs) ;; *) exit 1 ;; esac
+      - name: Report documentation fast path
+        if: needs.plan.outputs.mode == 'docs'
+        run: python3 scripts/check_release_downloads.py
+      - name: Setup Go and workload input caches
+        uses: ./.github/actions/setup-go-cache
         with:
-          go-version-file: go.mod
+          profile: browser
+        if: needs.plan.outputs.mode == 'full'
       - name: Build browser test server
         run: |
           mkdir -p bin
           go build -o bin/entropy-server ./cmd/entropy-server
-      - name: Install pinned browser test tools
+        if: needs.plan.outputs.mode == 'full'
+      - name: Setup Python and pip download cache
+        if: needs.plan.outputs.mode == 'full'
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: scripts/browser-requirements.txt
+      - name: Install exact Playwright Python package
+        if: needs.plan.outputs.mode == 'full'
+        id: playwright
+        run: |
+          python3 -m venv /tmp/entropy-browser-tests
+          /tmp/entropy-browser-tests/bin/pip install -r scripts/browser-requirements.txt
+          /tmp/entropy-browser-tests/bin/python - <<'PY'
+          import importlib.metadata
+          import os
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('version=' + importlib.metadata.version('playwright') + '\n')
+          PY
+      - name: Cache pinned browser downloads by engine
+        if: needs.plan.outputs.mode == 'full'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cache/ms-playwright/${{ matrix.browser }}-*
+            ~/.cache/ms-playwright/chromium_headless_shell-*
+            ~/.cache/ms-playwright/ffmpeg-*
+          key: playwright-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.browser }}-${{ steps.playwright.outputs.version }}
+      - name: Install OS dependencies and verify matching browser revision
         run: |
           # APT needs lowercase proxy variables, including after sudo. Do not
           # print their values: a configured proxy can contain credentials.
@@ -64,13 +104,12 @@ jobs:
               'Acquire::Retries "2";\nAcquire::http::Timeout "10";\n'
               'Acquire::https::Timeout "10";\nAPT::Update::Error-Mode "any";\n')
           PY
-          python3 -m venv /tmp/entropy-browser-tests
-          /tmp/entropy-browser-tests/bin/pip install playwright==1.62.0
           sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
             /tmp/entropy-browser-tests/bin/python -m playwright install-deps ${{ matrix.browser }}
           /tmp/entropy-browser-tests/bin/python -m playwright install ${{ matrix.browser }}
+        if: needs.plan.outputs.mode == 'full'
       - name: Provide a virtual audio output for headless Firefox
-        if: matrix.browser == 'firefox'
+        if: needs.plan.outputs.mode == 'full' && (matrix.browser == 'firefox')
         run: |
           export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"
           export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"
@@ -85,31 +124,40 @@ jobs:
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_theme_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/theme
+        if: needs.plan.outputs.mode == 'full'
       - name: Test source and socket controls with fake media
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_sources_browser.py --browser ${{ matrix.browser }} --chromium '' --artifacts browser-artifacts/sources
+        if: needs.plan.outputs.mode == 'full'
       - name: Test structure, spectral history and PCM diagnostic views
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_diagnostics_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/diagnostics
+        if: needs.plan.outputs.mode == 'full'
       - name: Test graph palettes, persistence and raw-data invariance
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_graph_palettes_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/palettes
+        if: needs.plan.outputs.mode == 'full'
       - name: Test interface languages, saved choices and payload invariance
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_ui_languages_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/languages
+        if: needs.plan.outputs.mode == 'full'
       - name: Test compressed static assets and versioned catalog cache reuse
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_static_assets_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/static-assets
+        if: needs.plan.outputs.mode == 'full'
       - name: Upload browser evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: needs.plan.outputs.mode == 'full' && (always())
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-ui-${{ matrix.browser }}
           path: browser-artifacts/
           retention-days: 7
           if-no-files-found: ignore
+    needs:
+      - plan
+    if: always()

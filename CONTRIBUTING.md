@@ -70,6 +70,11 @@ Do not commit device secrets, production TLS keys, credentials, or user data. Wh
 
 ## Tagged release validation
 
+See [CI execution and caching](docs/ci.md) for the documentation PR path,
+parallel validation jobs, same-run Windows archive tests and cache retention.
+The `build` PR gate and tagged `validate` gate reject failed, missing,
+cancelled or unexpectedly skipped validations.
+
 A `v*.*.*` tag triggers the release workflow against that **exact tagged
 commit**. The `validate` job must finish successfully before the
 token-bearing `release` job is eligible to publish any artifacts. Validation
