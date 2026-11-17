@@ -431,8 +431,12 @@ the pure-Go DRBG/CPU-random fallback, runs vet/lint, verifies module tidiness
 and checksums, checks reachable vulnerabilities, tests browser scripts and
 builds a GoReleaser snapshot. Successful build runs expose coverage in their
 job summary and a downloadable `go-coverage` artifact retained for 14 days.
-Markdown-only changes are excluded. The release workflow runs the same Go
-quality checks against the tagged commit before publishing.
+Every PR reports build and browser checks. PRs changing only regular
+`README.md` or `docs/**/*.md` files use a documentation validation path;
+all other changes run the complete suites. Fuzz, race, terminal and archive
+jobs run independently so native Windows ZIP testing can start as soon as
+the archive is ready. The release workflow runs the full checks against the
+tagged commit before publishing. See [CI execution and caching](docs/ci.md).
 
 See [Go conventions, module policy and coverage review](docs/go-quality.md)
 for the measured baseline, remaining test gaps and badge meanings. Hardware

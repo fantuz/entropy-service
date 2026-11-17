@@ -1,0 +1,24 @@
+name: Choose conservative PR validation plan
+on:
+  workflow_call:
+    outputs:
+      mode:
+        description: full or docs; unknown changes always use full
+        value: ${{ jobs.plan.outputs.mode }}
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      mode: ${{ steps.changes.outputs.mode }}
+    steps:
+      - name: Checkout matching source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Classify actual base-to-merge changes
+        id: changes
+        run: python3 scripts/ci_changes.py

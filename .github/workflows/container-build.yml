@@ -1,5 +1,4 @@
 name: Build and test container images
-
 on:
   workflow_call:
     inputs:
@@ -11,10 +10,12 @@ on:
         description: Version embedded in the server and OCI labels
         type: string
         default: dev
-
+      full:
+        description: Run complete validation; false is reserved for the conservative PR documentation plan
+        type: boolean
+        default: true
 permissions:
   contents: read
-
 jobs:
   images:
     name: Images (${{ matrix.id }})
@@ -35,17 +36,22 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+      - name: Report documentation fast path
+        if: ${{ !(inputs.full) }}
+        run: python3 scripts/check_release_downloads.py
       - name: Checkout the exact application source
         uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.source_sha || github.sha }}
           path: source
           persist-credentials: false
+        if: (inputs.full)
       - name: Use the maintained build context and standalone readiness probe
         run: |
           cp .dockerignore source/.dockerignore
           mkdir -p source/tools/container-health
           cp tools/container-health/*.go source/tools/container-health/
+        if: (inputs.full)
       - name: Normalize the binary and OCI version
         id: version
         env:
@@ -54,14 +60,17 @@ jobs:
           image_version="$CONTAINER_VERSION"
           if [[ "$image_version" == v[0-9]* ]]; then image_version="${image_version#v}"; fi
           printf 'value=%s\n' "$image_version" >> "$GITHUB_OUTPUT"
+        if: (inputs.full)
       - name: Enable ARM runtime tests
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1
         with:
           platforms: arm64,arm
+        if: (inputs.full)
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+        if: (inputs.full)
       - name: Build the server image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: source
           file: Dockerfile
@@ -77,8 +86,9 @@ jobs:
             SOURCE_URL=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=containers-${{ matrix.id }}
           cache-to: type=gha,mode=max,scope=containers-${{ matrix.id }}
+        if: (inputs.full)
       - name: Build the client image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: source
           file: Dockerfile
@@ -94,6 +104,7 @@ jobs:
             SOURCE_URL=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=containers-${{ matrix.id }}
           cache-to: type=gha,mode=max,scope=containers-${{ matrix.id }}
+        if: (inputs.full)
       - name: Exercise the real images, trust paths and exports
         env:
           IMAGE_PLATFORM: ${{ matrix.platform }}
@@ -107,15 +118,17 @@ jobs:
             --server-image "entropy-service/server:$IMAGE_ID" \
             --client-image "entropy-service/client:$IMAGE_ID" \
             --repository "$GITHUB_REPOSITORY" --source-sha "$SOURCE_SHA" --version "$IMAGE_VERSION"
+        if: (inputs.full)
       - name: Scan final images and create SBOMs before publication
         uses: ./.github/actions/container-security
         with:
           server: entropy-service/server:${{ matrix.id }}
           client: entropy-service/client:${{ matrix.id }}
           output: container-images
+        if: (inputs.full)
       - name: Preserve vulnerability reports and SBOMs
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: (inputs.full) && (always())
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: container-security-${{ matrix.id }}
           path: |
@@ -131,11 +144,13 @@ jobs:
             gzip > container-images/images.tar.gz
           (cd container-images && sha256sum images.tar.gz > checksums.txt)
           (cd container-images && sha256sum server.spdx.json client.spdx.json server.vulnerabilities.json client.vulnerabilities.json > security-checksums.txt)
+        if: (inputs.full)
       - name: Upload tested image archives
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: container-images-${{ matrix.id }}
           path: container-images/
           if-no-files-found: error
           retention-days: 7
           overwrite: true
+        if: (inputs.full)

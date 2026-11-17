@@ -1,46 +1,60 @@
 name: Optional Windows port
-
 on:
   workflow_call:
-
+    inputs:
+      full:
+        description: Run complete validation; false is reserved for the conservative PR documentation plan
+        type: boolean
+        default: true
 permissions:
   contents: read
-
 jobs:
   windows:
     name: Native Windows x64
-    runs-on: windows-2025
+    runs-on: ${{ inputs.full && 'windows-2025' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     env:
-      CGO_ENABLED: "0"
-      PYTHONUTF8: "1"
+      CGO_ENABLED: '0'
+      PYTHONUTF8: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+      - name: Report documentation fast path
+        if: ${{ !(inputs.full) }}
+        run: python3 scripts/check_release_downloads.py
+      - name: Setup Go and workload input caches
+        uses: ./.github/actions/setup-go-cache
         with:
-          go-version-file: go.mod
+          profile: windows
+        if: (inputs.full)
       - name: Verify module checksums
         run: go mod verify
+        if: (inputs.full)
       - name: Test offline Quantis PCI package inspector
         run: python -m unittest discover -s scripts -p 'test_inspect_quantis_pci.py'
+        if: (inputs.full)
       - name: Verify byte-exact pinned wordlists after Windows checkout
         run: python scripts/check-wordlists.py
+        if: (inputs.full)
       - name: Test shared code and Windows adapters
         run: go test -count=1 -timeout=5m ./...
+        if: (inputs.full)
       - name: Vet Windows code
         run: go vet ./...
+        if: (inputs.full)
       - name: Run Windows linters
         uses: golangci/golangci-lint-action@v9.3.0
         with:
           version: v2.12.2
           args: --timeout=3m0s
+        if: (inputs.full)
       - name: Build native executables
         run: |
           go build -o bin/entropy-server.exe ./cmd/entropy-server
           go build -o bin/entropy-client.exe ./cmd/entropy-client
+        if: (inputs.full)
       - name: Exercise real Windows CLI, TLS, files and shutdown
         run: python scripts/test_windows.py
+        if: (inputs.full)

@@ -254,7 +254,7 @@ tests should not require a physical QRNG or external services.
 
 | Badge | Source and scope |
 | --- | --- |
-| Build | Build workflow status for `main`; follow the link for the exact commit and checks. Markdown-only changes do not trigger it. |
+| Build | Build workflow status for `main`; follow the link for the exact commit and checks. Every PR receives a build gate; regular README/docs Markdown-only PRs use documentation validation. Main and tagged releases run full validation. |
 | Go version | Minimum Go version declared by the default branch's root `go.mod`. |
 | CodeQL | GitHub's default CodeQL workflow on `main`; a successful analysis is not a certificate that the project has no vulnerabilities. |
 | Release workflow / view runs | Neutral link to the complete release-workflow history, including tag builds and manual publication recovery. It makes no pass/fail assertion. |

@@ -1,0 +1,182 @@
+name: Independent Linux validation suite
+on:
+  workflow_call:
+    inputs:
+      suite:
+        description: quality, fuzz, race or terminal
+        type: string
+        required: true
+      release_tag:
+        description: Normal releases must match the exact VERSION tag
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  check:
+    name: ${{ inputs.suite }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout matching source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify exact release source when requested
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 scripts/ci_release_tag.py
+      - name: Reject unknown validation suite
+        env:
+          CI_SUITE: ${{ inputs.suite }}
+        run: case "$CI_SUITE" in quality|fuzz|race|terminal) ;; *) exit 1 ;; esac
+      - name: Setup Go and workload input caches
+        uses: ./.github/actions/setup-go-cache
+        with:
+          profile: ${{ inputs.suite }}
+      - name: Test offline Quantis PCI package inspector
+        run: python3 -m unittest discover -s scripts -p 'test_inspect_quantis_pci.py'
+        if: inputs.suite == 'quality'
+      - name: Ensure go.mod is already tidied
+        run: go mod tidy -diff
+        if: inputs.suite == 'quality'
+      - name: Verify cached module checksums
+        run: go mod verify
+        if: inputs.suite == 'quality'
+      - name: Check reachable Go vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        if: inputs.suite == 'quality'
+      - name: Run Go tests and collect coverage
+        run: make coverage
+        if: inputs.suite == 'quality'
+      - name: Summarize Go statement coverage
+        run: |
+          {
+            printf '### Go statement coverage\n\n```text\n'
+            awk '/^total:/' coverage/summary.txt
+            printf '```\n\nFull profile, per-function summary and HTML: `go-coverage` artifact (14 days).\n'
+            printf 'Statement coverage measures exercised code, not cryptographic assurance.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+        if: inputs.suite == 'quality'
+      - name: Upload Go coverage report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: go-coverage
+          path: coverage/
+          if-no-files-found: error
+          retention-days: 14
+        if: inputs.suite == 'quality'
+      - name: Vet all Go packages
+        run: go vet ./...
+        if: inputs.suite == 'quality'
+      - name: Test actual executable startup failures and clean exits
+        run: |
+          make build
+          python3 scripts/test_startup_failures.py
+        if: inputs.suite == 'quality'
+      - name: Verify client TLS trust and server identity replacement
+        run: python3 scripts/test_client_tls.py
+        if: inputs.suite == 'quality'
+      - name: Test pure-Go DRBG and CPU-random fallback
+        run: go test -count=1 -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand
+        if: inputs.suite == 'quality'
+      - name: Validate monitoring configuration and alert behavior
+        run: bash scripts/test-monitoring.sh
+        if: inputs.suite == 'quality'
+      - name: Verify pinned wordlists and multilingual word controls
+        run: |
+          python3 scripts/check-wordlists.py
+          python3 -m unittest discover -s scripts -p 'test_check_wordlists.py'
+          node scripts/test-word-languages.mjs
+        if: inputs.suite == 'quality'
+      - name: Test browser KPI calculations
+        run: node scripts/test-status-kpis.mjs
+        if: inputs.suite == 'quality'
+      - name: Test status refresh scheduling
+        run: node scripts/test-status-refresh.mjs
+        if: inputs.suite == 'quality'
+      - name: Test 20-FPS display pacing and controls
+        run: node scripts/test-display-clock.mjs
+        if: inputs.suite == 'quality'
+      - name: Test shared analysis mathematics and worker
+        run: node scripts/test-analysis-math.mjs
+        if: inputs.suite == 'quality'
+      - name: Test optional structure and PCM diagnostics
+        run: |
+          node scripts/test-structure-math.mjs
+          node scripts/test-structure-plots.mjs
+          node scripts/test-audio-analysis.mjs
+          node scripts/test-audio-plots.mjs
+          node scripts/test-diagnostic-worker.mjs
+          node scripts/test-workspace-reanalysis.mjs
+        if: inputs.suite == 'quality'
+      - name: Test stream Shannon entropy alerts
+        run: node scripts/test-stream-entropy-alert.mjs
+        if: inputs.suite == 'quality'
+      - name: Test experimental lab generators and meters
+        run: |
+          node scripts/test-lab-samples.mjs
+          node scripts/test-lab-audio.mjs
+        if: inputs.suite == 'quality'
+      - name: Test assisted source configuration
+        run: node scripts/test-lab-registration.mjs
+        if: inputs.suite == 'quality'
+      - name: Test interface translations, preference isolation and safe text bindings
+        run: |
+          python3 scripts/mark-ui-text.py --check
+          python3 -m unittest discover -s scripts -p 'test_mark_ui_text.py'
+          node scripts/test-ui-i18n.mjs
+        if: inputs.suite == 'quality'
+      - name: Check shared analysis markup
+        run: node scripts/render-analysis-pages.mjs --check
+        if: inputs.suite == 'quality'
+      - name: Test browser layout and digest formatting
+        run: node scripts/test-web-layout.mjs
+        if: inputs.suite == 'quality'
+      - name: Test shared appearance and lab help
+        run: node scripts/test-theme.mjs
+        if: inputs.suite == 'quality'
+      - name: Test graph palette preference and contrast
+        run: node scripts/test-graph-palette.mjs
+        if: inputs.suite == 'quality'
+      - name: Test synchronized HTTP gallery
+        run: node scripts/test_gallery.mjs
+        if: inputs.suite == 'quality'
+      - name: Test statistical capture and report contracts
+        run: python3 -m unittest discover -s scripts -p 'test_capture_randomness.py'
+        if: inputs.suite == 'quality'
+      - name: Smoke-test packaged service configuration
+        run: sh scripts/test-package-service.sh
+        if: inputs.suite == 'quality'
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.12.2
+          args: --timeout=3m0s
+        if: inputs.suite == 'quality'
+      - name: Exercise bounded parser and protocol fuzz targets
+        env:
+          ARGUMENTS_FUZZTIME: 500000x
+          GENERATION_FUZZTIME: 500000x
+        run: bash scripts/test-fuzz.sh
+        if: inputs.suite == 'fuzz'
+      - name: Race-test opt-in experimental Barzakh backend
+        run: go test -count=1 -race -tags=experimental_barzakh ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/config ./cmd/entropy-server
+        if: inputs.suite == 'race'
+      - name: Race-test all Go packages
+        run: make test-race
+        if: inputs.suite == 'race'
+      - name: Smoke-test client colors and terminal geometry
+        run: |
+          make build-client
+          python3 scripts/test_client_terminal.py
+        if: inputs.suite == 'terminal'
+      - name: Smoke-test 20-FPS terminal redraws
+        run: python3 scripts/test_client_20fps.py
+        if: inputs.suite == 'terminal'
+      - name: Smoke-test fullscreen waterfall and unusual terminal proportions
+        run: python3 scripts/test_client_waterfall.py
+        if: inputs.suite == 'terminal'
+      - name: Smoke-test client binary exports, retries and pipe cancellation
+        run: python3 scripts/test_client_output.py
+        if: inputs.suite == 'terminal'

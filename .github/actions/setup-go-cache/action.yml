@@ -1,0 +1,39 @@
+name: Setup Go with separate module and build caches
+description: Cache compiler inputs per platform, Go version, workload and source; never cache test results or executables.
+inputs:
+  profile:
+    description: Compiler workload (quality, race, fuzz, terminal, packages, browser, windows, endurance or publication)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Setup Go without a shared compiled cache
+      id: go
+      uses: actions/setup-go@v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+    - name: Locate Go input caches
+      id: paths
+      shell: bash
+      env:
+        CACHE_PROFILE: ${{ inputs.profile }}
+      run: |
+        if [[ ! "$CACHE_PROFILE" =~ ^[a-z]+$ ]]; then
+          printf 'Invalid cache profile\n' >&2
+          exit 1
+        fi
+        printf 'modules=%s\n' "$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        printf 'build=%s\n' "$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+    - name: Cache verified module downloads
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.paths.outputs.modules }}
+        key: go-mod-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum') }}
+    - name: Cache compiled inputs for this workload and source
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.paths.outputs.build }}
+        key: go-build-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.profile }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ hashFiles('**/*.go', 'cmd/entropy-server/web/**', 'cmd/entropy-server/internal/wordlist/**', 'Makefile', 'go.mod', '.github/actions/setup-go-cache/**') }}
+        restore-keys: |
+          go-build-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.profile }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum') }}-

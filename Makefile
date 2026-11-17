@@ -25,7 +25,7 @@ endurance:
 
 coverage:
 	mkdir -p $(COVERAGE_DIR)
-	go test -coverpkg=./... -covermode=atomic -coverprofile=$(COVERAGE_DIR)/coverage.out ./...
+	go test -count=1 -coverpkg=./... -covermode=atomic -coverprofile=$(COVERAGE_DIR)/coverage.out ./...
 	go tool cover -func=$(COVERAGE_DIR)/coverage.out -o=$(COVERAGE_DIR)/summary.txt
 	cat $(COVERAGE_DIR)/summary.txt
 	go tool cover -html=$(COVERAGE_DIR)/coverage.out -o=$(COVERAGE_DIR)/coverage.html
