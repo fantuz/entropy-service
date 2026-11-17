@@ -86,7 +86,8 @@ obtains a complete cache listing and checks PR states, then deletes at most
   caches, module downloads and BuildKit caches alone.
 - Other branch refs are retained. API/pagination failures prevent deletion.
 
-Manual maintenance defaults to **dry run**, reports numeric cache IDs and
+Manual maintenance and the script itself default to **dry run**; the CLI
+requires `--apply` to delete. Maintenance reports numeric cache IDs and
 does not print tokens or untrusted cache keys. Cache removal only affects
 future download/compilation time; it never deletes artifacts or reports.
 The new maintenance policy takes effect after this workflow is merged; no

@@ -36,6 +36,10 @@ jobs:
           CLOSED_PR: ${{ github.event.pull_request.number }}
         run: |
           args=(--max-delete 100)
-          if [[ "$EVENT_NAME" == workflow_dispatch && "$DRY_RUN" != false ]]; then args+=(--dry-run); fi
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$DRY_RUN" != false ]]; then
+            args+=(--dry-run)
+          else
+            args+=(--apply)
+          fi
           if [[ "$EVENT_NAME" == pull_request_target ]]; then args+=(--closed-pr "$CLOSED_PR"); fi
           python3 scripts/ci_cache_cleanup.py "${args[@]}"

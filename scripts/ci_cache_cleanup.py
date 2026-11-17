@@ -47,18 +47,27 @@ def list_caches(api):
     """Do not delete anything unless the entire listing is complete and consistent."""
     caches = []
     seen = set()
+    expected_count = None
     for page in range(1, 101):
-        payload = api(f"actions/caches?per_page=100&page={page}")
+        # Restoring a cache changes last_accessed_at. Paginate by creation time
+        # so active CI cannot reshuffle entries between pages during inspection.
+        payload = api(f"actions/caches?per_page=100&page={page}&sort=created_at&direction=asc")
         batch = payload["actions_caches"]
         if not isinstance(batch, list):
             raise ValueError("Invalid cache listing")
+        if expected_count is None:
+            expected_count = payload["total_count"]
+        elif batch and payload["total_count"] != expected_count:
+            raise ValueError("Cache count changed during pagination; retry later")
         for cache in batch:
             if cache["id"] in seen:
                 raise ValueError("Cache listing changed during pagination; retry later")
             seen.add(cache["id"])
             caches.append(cache)
         if len(batch) < 100:
-            if len(caches) != payload["total_count"]:
+            # GitHub returns total_count=0 on the empty terminating page when
+            # the number of caches is exactly divisible by the page size.
+            if len(caches) != expected_count:
                 raise ValueError("Incomplete cache listing; retry later")
             return caches
     raise ValueError("Cache listing exceeded safety bound; nothing deleted")
@@ -68,11 +77,12 @@ class GitHub:
     def __init__(self, repository, token):
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
             raise ValueError("Invalid repository")
-        self.base = f"https://api.github.com/repos/{repository}/"
+        self.base = f"https://api.github.com/repos/{repository}"
         self.token = token
 
     def __call__(self, path, method="GET"):
-        request = Request(self.base + path, method=method, headers={
+        url = self.base + ("/" + path if path else "")
+        request = Request(url, method=method, headers={
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -107,7 +117,9 @@ def cleanup(api, *, dry_run=True, max_delete=100, closed_pr=None, default_ref="r
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", dest="dry_run", action="store_true", default=True)
+    mode.add_argument("--apply", dest="dry_run", action="store_false")
     parser.add_argument("--closed-pr", type=int)
     parser.add_argument("--max-delete", type=int, default=100)
     args = parser.parse_args()
