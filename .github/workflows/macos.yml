@@ -65,13 +65,13 @@ jobs:
         if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success' && steps.bindings.outcome == 'success'
         run: tools/desktop-gui/entropy-gui-macos --python-check scripts/test_macos_gui.py --bin "$RUNNER_TEMP/Entropy portable binaries" --artifacts macos-gui-artifacts
       - name: Test native Go code with race detector
-        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        if: (inputs.full)
         run: go test -race -count=1 -timeout=8m ./...
       - name: Vet native Go code
-        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        if: (inputs.full)
         run: go vet ./...
       - name: Exercise real macOS CLI, TLS, exports, PTY and shutdown
-        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        if: (inputs.full)
         run: python3 scripts/test_macos.py --bin "$RUNNER_TEMP/Entropy portable binaries"
       - name: Collect native Python crash reports
         if: (inputs.full) && always()
@@ -79,7 +79,7 @@ jobs:
         run: |
           mkdir -p macos-gui-artifacts/crashes
           for report in "$HOME"/Library/Logs/DiagnosticReports/[Pp]ython*.ips; do
-            if [[ -f "$report" && "$report" -nt macos-runtime.txt ]]; then
+            if [[ -f "$report" && -f macos-runtime.txt && "$report" -nt macos-runtime.txt ]]; then
               cp "$report" macos-gui-artifacts/crashes/
             fi
           done
