@@ -1,15 +1,15 @@
 # Client capability discovery and performance
 
-These additions follow v2.6.0. Until released, use matching server/client binaries
-and GUI source or the tested PR installer. Linux, Windows and macOS share the
-same flags and desktop controls.
+Available from v2.7.0. Use matching server/client binaries and GUI source or the
+bundled Windows installer. Linux, Windows and macOS share the same flags and
+desktop controls.
 
 ## Discover the selected server's limits
 
 `GET /v1/capabilities` is a small, read-only JSON endpoint. For example:
 
 ```json
-{"schema_version":1,"service":"entropy-service","version":"2.6.0-dev","max_bytes":33554432,"transports":["http","websocket"],"websocket_min_refresh_ms":1,"websocket_max_refresh_ms":60000}
+{"schema_version":1,"service":"entropy-service","version":"2.7.0","max_bytes":33554432,"transports":["http","websocket"],"websocket_min_refresh_ms":1,"websocket_max_refresh_ms":60000}
 ```
 
 `max_bytes` is the operator's actual `-max-bytes`, rather than an assumed 32 MiB.
