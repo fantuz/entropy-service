@@ -10,6 +10,7 @@ from ctypes import wintypes
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -223,6 +224,7 @@ def main():
             return subprocess.Popen(command, stdin=subprocess.DEVNULL)
 
         active = None
+        helpers = []
         try:
             active = launch("1.0.0", "fresh", silent=True)
             assert active.wait(timeout=30) == 0
@@ -248,11 +250,26 @@ def main():
             assert registry_values()["DisplayVersion"] == "1.0.0"
             assert all((installation / name / "obsolete.txt").is_file() for name in MANAGED)
 
+            # Use harmless Windows ping processes with the helper basename.
+            # Only the copy inside this private runtime may be terminated.
+            private_helper = installation / "runtime/bin/gdbus.exe"
+            other_helper = work / "gdbus.exe"
+            for path in (private_helper, other_helper):
+                shutil.copyfile(Path(os.environ["SystemRoot"]) / "System32/ping.exe", path)
+                helpers.append(subprocess.Popen([str(path), "-t", "127.0.0.1"],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NO_WINDOW))
+            time.sleep(1)
+            assert all(child.poll() is None for child in helpers), "Helper fixtures did not stay alive"
+
             active = launch("2.0.0", "upgrade")
             wizard = Wizard()
             wizard.advance(lambda: wizard.button("Finish") is not None)
             wizard.click(wizard.button("Finish"))
             assert active.wait(timeout=30) == 0
+            helpers[0].wait(timeout=10)
+            assert helpers[1].poll() is None, "Setup stopped an unrelated helper with the same name"
+            assert "Closed private GTK runtime helper:" in (artifacts / "upgrade.log").read_text(encoding="utf-8-sig")
             explorer_folder(group, expect_open=True)
             values = registry_values()
             assert values["DisplayVersion"] == "2.0.0" and Path(values["Inno Setup: App Path"]) == installation
@@ -267,6 +284,10 @@ def main():
             assert registry_values()["DisplayVersion"] == "2.0.0"
             assert retained.read_bytes() == b"retain user export"
         finally:
+            for child in helpers:
+                if child.poll() is None:
+                    child.terminate()
+                child.wait(timeout=10)
             if active is not None and active.poll() is None:
                 subprocess.run(["taskkill.exe", "/PID", str(active.pid), "/T", "/F"], check=False, timeout=15,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -285,6 +306,7 @@ def main():
         assert not list(group.glob("*.lnk"))
     (artifacts / "results.json").write_text(json.dumps({"fresh": True, "cancel_preserves_old_version": True,
         "relocation_rejected": True, "upgrade_removes_old_program_files": True, "single_registration": True,
+        "private_helper_stopped_unrelated_helper_retained": True,
         "reinstall": True, "finish_opens_start_menu_folder": True, "silent_does_not_open_explorer": True,
         "uninstall_keeps_user_data": True}, indent=2) + "\n")
     print("Native installer upgrade, cancellation, cleanup, reinstall and Start Menu handoff passed")

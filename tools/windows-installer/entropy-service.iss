@@ -94,9 +94,16 @@ var
   Filename, RuntimeRoot, BinaryRoot, ProcessName: String;
 begin
   Result := 0;
-  if VarIsNull(RuntimeProcess.ExecutablePath) then
+  try
+    if VarIsNull(RuntimeProcess.ExecutablePath) then
+      Exit;
+    Filename := RuntimeProcess.ExecutablePath;
+    ProcessName := RuntimeProcess.Name;
+  except
+    { A process can exit between the WMI snapshot and reading its properties.
+      Skip that stale entry rather than abandoning the remaining live entries. }
     Exit;
-  Filename := RuntimeProcess.ExecutablePath;
+  end;
   if Filename = '' then
     Exit;
   { Normalize existing long/8.3 paths before comparing private roots. }
@@ -106,7 +113,6 @@ begin
   if (CompareText(Copy(Filename, 1, Length(RuntimeRoot)), RuntimeRoot) <> 0) and
      (CompareText(Copy(Filename, 1, Length(BinaryRoot)), BinaryRoot) <> 0) then
     Exit;
-  ProcessName := RuntimeProcess.Name;
   ProcessName := Lowercase(ProcessName);
   if (ProcessName = 'gdbus.exe') or (ProcessName = 'dbus-daemon.exe') then
     Result := 2
