@@ -45,8 +45,8 @@ def port():
         s.bind(('127.0.0.1', 0)); return s.getsockname()[1]
 
 
-def run(command, **kwargs):
-    result = subprocess.run([str(x) for x in command], capture_output=True, timeout=12, **kwargs)
+def run(command, timeout=12, **kwargs):
+    result = subprocess.run([str(x) for x in command], capture_output=True, timeout=timeout, **kwargs)
     assert result.returncode == 0, (command, result.stdout, result.stderr)
     return result
 
@@ -96,7 +96,7 @@ def smoke(folder):
                 except subprocess.TimeoutExpired: process.kill();process.wait();raise
                 assert process.returncode==0,(root/'server.log').read_text()
     # Reuse the existing real Unix PTY suite with the packaged client.
-    run([sys.executable, Path(__file__).with_name('test_client_terminal.py'), '--client', client])
+    run([sys.executable, Path(__file__).with_name('test_client_terminal.py'), '--client', client], timeout=120)
     print('Native macOS OS source, HTTP/WS, TLS rejection, private files, stdout, PTY and shutdown passed')
 
 
