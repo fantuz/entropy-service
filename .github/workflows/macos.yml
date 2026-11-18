@@ -56,6 +56,7 @@ jobs:
           name: macos-cli-archives
           path: macos-downloads
       - name: Check and extract actual release binaries
+        id: archives
         if: (inputs.full)
         env:
           MACOS_ARCH: ${{ matrix.arch }}
@@ -64,12 +65,13 @@ jobs:
         if: (inputs.full)
         run: python3 scripts/test_macos.py --bin "$RUNNER_TEMP/Entropy portable binaries"
       - name: Install Homebrew GTK bindings
-        if: (inputs.full)
+        id: bindings
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
         run: |
           brew install gtk4 pygobject3
           brew list --versions > macos-runtime.txt
       - name: Test GUI models and process lifecycle with Homebrew Python
-        if: (inputs.full)
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success' && steps.bindings.outcome == 'success'
         run: tools/desktop-gui/entropy-gui-macos --python-check scripts/test_macos_gui.py --bin "$RUNNER_TEMP/Entropy portable binaries" --artifacts macos-gui-artifacts
       - name: Preserve macOS qualification evidence
         if: (inputs.full) && always()
