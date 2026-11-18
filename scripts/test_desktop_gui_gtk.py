@@ -40,12 +40,18 @@ def free_port():
 def wait_for(context, predicate, description, timeout=8):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        # Match a real application loop: stop once its condition is met.
+        # AppKit callbacks must not be dispatched after a window was destroyed.
+        if predicate():
+            return
         # A bounded dispatch pass prevents a constantly-ready source from
         # hiding a timeout or starving the actual integration assertions.
         for _ in range(100):
             if not context.pending():
                 break
             context.iteration(False)
+            if predicate():
+                return
         if predicate():
             return
         time.sleep(.01)
