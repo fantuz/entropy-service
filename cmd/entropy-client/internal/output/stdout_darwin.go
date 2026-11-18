@@ -52,7 +52,11 @@ func duplicateStdout(stdout *os.File, text bool) (*Writer, error) {
 	w := &Writer{file: f, pollable: f.SetWriteDeadline(time.Time{}) == nil}
 	if isPipe {
 		// Capture fd, not File.Fd(): Fd can switch a pollable file to blocking.
-		w.cleanup = func() error { return unix.SetNonblock(fd, flags&unix.O_NONBLOCK != 0) }
+		w.cleanup = func() error {
+			_, err := unix.FcntlInt(uintptr(fd), unix.F_SETFL, flags)
+
+			return err
+		}
 	}
 
 	if isPipe && !w.pollable {

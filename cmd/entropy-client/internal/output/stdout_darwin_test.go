@@ -53,7 +53,7 @@ func TestBlockedPipeCancellationAndPartialCounts(t *testing.T) {
 
 	after, err := unix.FcntlInt(fd, unix.F_GETFL, 0)
 	if err != nil || before != after {
-		t.Fatal("stdout flags were not restored", err)
+		t.Fatalf("stdout flags were not restored: before=%#x after=%#x error=%v", before, after, err)
 	}
 
 	if err := original.Close(); err != nil {
