@@ -14,6 +14,8 @@ ALIASES = {
     "entropy-service_linux_arm64.tar.gz": "entropy-service_{{ .Version }}_linux_arm64.tar.gz",
     "entropy-service_linux_armv7.tar.gz": "entropy-service_{{ .Version }}_linux_armv7.tar.gz",
     "entropy-service_windows_amd64.zip": "entropy-service_{{ .Version }}_windows_amd64.zip",
+    "entropy-service_darwin_amd64.tar.gz": "entropy-service_{{ .Version }}_darwin_amd64.tar.gz",
+    "entropy-service_darwin_arm64.tar.gz": "entropy-service_{{ .Version }}_darwin_arm64.tar.gz",
 }
 
 
@@ -45,7 +47,7 @@ def check_contract(config, readme):
     expected = {name: "./dist/" + source for name, source in ALIASES.items()}
     for section in ("release", "checksum"):
         if configured_aliases(config, section) != expected:
-            raise ValueError(f"{section} aliases must map all four stable downloads to canonical archives")
+            raise ValueError(f"{section} aliases must map all {len(ALIASES)} stable downloads to canonical archives")
     links = Links()
     links.feed(readme)
     stable = {href.removeprefix(LATEST) for href in links.hrefs if href.startswith(LATEST)}
@@ -99,7 +101,7 @@ def main():
     args = parser.parse_args()
     check_contract(args.config.read_text(), args.readme.read_text())
     outcomes = check_dist(args.dist) if args.dist is not None else []
-    print(f"Verified four stable README/release/checksum aliases; {len(outcomes)} actual archives checked")
+    print(f"Verified {len(ALIASES)} stable README/release/checksum aliases; {len(outcomes)} actual archives checked")
 
 
 if __name__ == "__main__":

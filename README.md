@@ -11,7 +11,7 @@
   <a href="https://github.com/fantuz/entropy-service/issues"><img src="https://img.shields.io/github/issues/fantuz/entropy-service" alt="Open issues" height="20"></a>
   <a href="https://github.com/fantuz/entropy-service/commits/main"><img src="https://img.shields.io/github/last-commit/fantuz/entropy-service/main" alt="Last commit on main" height="20"></a>
   <br>
-  <a href="docs/windows.md"><img src="https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20x64-507269" alt="Platforms: Linux and Windows x64" height="20"></a>
+  <a href="docs/README.md"><img src="https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS-507269" alt="Platforms: Linux, Windows x64 and macOS" height="20"></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/fantuz/entropy-service?logo=go" alt="Go version" height="20"></a>
   <a href="https://github.com/fantuz/entropy-service/releases/latest"><img src="https://img.shields.io/badge/Install-DEB%2FRPM%20%C2%B7%20amd64%2Farm64%2Farmv7-2e7d32" alt="Linux DEB and RPM packages for amd64, arm64 and ARMv7" height="20"></a>
   <br>
@@ -44,8 +44,16 @@ Entropy Service is a Go server and command-line client for generating, distribut
   <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_windows_amd64.zip"><img src="https://img.shields.io/badge/Download%20for%20Windows-64--bit%20portable%20ZIP-0078D4?style=for-the-badge" alt="Download for Windows — x86-64 (amd64) (zip)" height="28"></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_darwin_amd64.tar.gz"><img src="https://img.shields.io/badge/Download%20for%20macOS-Intel%20TAR.GZ-507269?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Download for macOS — Intel (amd64) (tar.gz)" height="28"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/fantuz/entropy-service/releases/latest/download/entropy-service_darwin_arm64.tar.gz"><img src="https://img.shields.io/badge/Download%20for%20macOS-Apple%20Silicon%20TAR.GZ-507269?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Download for macOS — Apple Silicon (arm64) (tar.gz)" height="28"></a>
+</p>
+
 Each archive contains both `entropy-server` and `entropy-client`.
-[Linux DEB / RPM packages](https://github.com/fantuz/entropy-service/releases/latest) · [SHA-256 checksums](https://github.com/fantuz/entropy-service/releases/latest/download/checksums.txt) · [Windows setup](docs/windows.md).
+[Linux DEB / RPM packages](https://github.com/fantuz/entropy-service/releases/latest) · [SHA-256 checksums](https://github.com/fantuz/entropy-service/releases/latest/download/checksums.txt) · [Windows setup](docs/windows.md) · [macOS CLI and Homebrew GUI](docs/macos.md).
 The buttons track the latest stable release automatically.
 
 **From photons to bytes** describes the project's hardware-origin story: an ID Quantique Quantis PCI card inspired the first demonstration. The same architecture can also be seeded from the operating system CSPRNG. DRBG output is generated from seed material, **not a claim that each output byte is an independent hardware-entropy measurement**.
@@ -568,5 +576,4 @@ These historical screenshots illustrate removed page URLs and earlier layouts; f
 [MIT](LICENSE) · Copyright © 2026 Massimiliano Fantuzzi HB9GUS.
 
 Native macOS CLI and Homebrew GUI support for Intel and Apple Silicon is
-described in the [macOS guide](docs/macos.md), including availability before its
-first release.
+available from v2.6.0; see the [macOS guide](docs/macos.md).

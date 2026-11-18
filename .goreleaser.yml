@@ -150,6 +150,10 @@ release:
       name_template: entropy-service_linux_armv7.tar.gz
     - glob: ./dist/entropy-service_{{ .Version }}_windows_amd64.zip
       name_template: entropy-service_windows_amd64.zip
+    - glob: ./dist/entropy-service_{{ .Version }}_darwin_amd64.tar.gz
+      name_template: entropy-service_darwin_amd64.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_darwin_arm64.tar.gz
+      name_template: entropy-service_darwin_arm64.tar.gz
 
 checksum:
   name_template: checksums.txt
@@ -163,6 +167,10 @@ checksum:
       name_template: entropy-service_linux_armv7.tar.gz
     - glob: ./dist/entropy-service_{{ .Version }}_windows_amd64.zip
       name_template: entropy-service_windows_amd64.zip
+    - glob: ./dist/entropy-service_{{ .Version }}_darwin_amd64.tar.gz
+      name_template: entropy-service_darwin_amd64.tar.gz
+    - glob: ./dist/entropy-service_{{ .Version }}_darwin_arm64.tar.gz
+      name_template: entropy-service_darwin_arm64.tar.gz
 
 changelog:
   sort: asc

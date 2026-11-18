@@ -93,6 +93,23 @@ class WorkflowContracts(unittest.TestCase):
         publication = workflow("container-publish")["jobs"]["publish"]["steps"]
         self.assertTrue(any(step.get("with", {}).get("pattern") == "container-oci-bundles" for step in publication))
 
+    def test_optional_oci_downloads_have_explicit_consumer_directories(self):
+        # download-artifact v8 flattens one pattern match even without
+        # merge-multiple. Pin the destination instead of assuming a name folder.
+        expected = {
+            "container-publish": ["tested-images/container-oci-bundles"],
+            "release-recovery": ["source/bin/oci-release-download/container-oci-bundles",
+                                 "source/tested-images/container-oci-bundles"],
+        }
+        for name, paths in expected.items():
+            downloads = [step["with"] for job in workflow(name)["jobs"].values()
+                         for step in job.get("steps", [])
+                         if step.get("with", {}).get("pattern") == "container-oci-bundles"]
+            with self.subTest(workflow=name):
+                self.assertEqual(paths, [step["path"] for step in downloads])
+                self.assertTrue(all(step.get("merge-multiple") == "true" for step in downloads))
+                self.assertTrue(all("name" not in step for step in downloads))
+
     def test_cache_maintenance_uses_only_default_branch_tools(self):
         document = workflow("cache-maintenance")
         self.assertEqual(["closed"], document["on"]["pull_request_target"]["types"])
