@@ -52,7 +52,11 @@ func TestBlockedPipeCancellationAndPartialCounts(t *testing.T) {
 	}
 
 	after, err := unix.FcntlInt(fd, unix.F_GETFL, 0)
-	if err != nil || before != after {
+	// Darwin exposes the kernel's read-only FWASWRITTEN bit after the first
+	// write (xnu/bsd/sys/fcntl.h). It is history, not a restorable I/O option.
+	const wasWritten = 0x00010000
+
+	if err != nil || before&^wasWritten != after&^wasWritten {
 		t.Fatalf("stdout flags were not restored: before=%#x after=%#x error=%v", before, after, err)
 	}
 
