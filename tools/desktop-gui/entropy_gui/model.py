@@ -102,12 +102,15 @@ def performance_text(state):
     limit = discovery.get("max_bytes")
     server = f"Server capabilities: {status}" + (f" · max {limit:,} bytes" if limit else "")
     sample = state.get("sample", {})
-    record = state.get("summary") or sample
+    performance = state.get("performance") or sample
+    if sample.get("elapsed_ms", 0) > performance.get("elapsed_ms", 0):
+        performance = sample
+    record = state.get("summary") or performance
     if "average_received_fps" not in record:
         return server + "\nPerformance: awaiting measurements"
     rates = (f"FPS: {record['requested_fps']:.2f} requested · {record['effective_target_fps']:.2f} effective · "
              f"{record['average_received_fps']:.2f} average received")
-    timings = (f"Receive wait: {sample.get('receive_wait_ms', 0):.3f} ms · "
+    timings = (f"Receive wait: {performance.get('receive_wait_ms', 0):.3f} ms · "
                f"analysis: {sample.get('analysis_ms', 0):.3f} ms · output: {record['output_ms']:.3f} ms")
     pacing = f"{record['pacing_status']} · interval {record['effective_interval_ms']:.3f} ms"
     return server + "\n" + rates + "\n" + timings + "\n" + pacing
@@ -165,6 +168,7 @@ class StreamModel:
         self._settings = {}
         self._sample = {}
         self._summary = {}
+        self._performance = {}
         self._discovery = {}
         self._revision = 0
 
@@ -174,6 +178,7 @@ class StreamModel:
             self._settings = {}
             self._sample = {}
             self._summary = {}
+            self._performance = {}
             self._discovery = {}
             self._revision += 1
 
@@ -203,12 +208,12 @@ class StreamModel:
                 self._discovery = discovery
                 self._revision += 1
             return
-        if kind not in ("sample", "run_summary"):
+        if kind not in ("sample", "run_summary", "performance"):
             raise ReportError("Unknown report record type")
         _number(record, "received_bytes", integer=True, maximum=(1 << 64) - 1)
         _number(record, "elapsed_ms")
         assessment_key = "shannon_assessment" if kind == "sample" else "last_shannon_assessment"
-        if record.get(assessment_key) not in ("OK", "WARN", "NO_SAMPLE"):
+        if kind != "performance" and record.get(assessment_key) not in ("OK", "WARN", "NO_SAMPLE"):
             raise ReportError("Invalid Shannon assessment")
         row = None
         if kind == "sample":
@@ -226,12 +231,15 @@ class StreamModel:
                     raise ReportError("Waterfall prefix exceeds the analysed sample")
         else:
             _number(record, "received_mib_per_second")
-            if type(record.get("failed")) is not bool:
+            if kind == "run_summary" and type(record.get("failed")) is not bool:
                 raise ReportError("Invalid summary outcome")
-        if "average_received_fps" in record:
+        if kind == "performance" or "average_received_fps" in record:
             for name in ("average_received_fps", "requested_fps", "effective_target_fps", "requested_mib_per_second",
                          "effective_interval_ms", "output_ms", "total_analysis_ms"):
                 _number(record, name)
+            if kind == "performance":
+                _number(record, "receive_wait_ms")
+                _number(record, "analysis_ms")
             if record.get("pacing_status") not in ("warming up", "on target", "below target", "adaptive paced", "adaptive ceiling"):
                 raise ReportError("Invalid pacing status")
         # Keep only scalar values; do not retain encoded-prefix duplicates or
@@ -246,11 +254,13 @@ class StreamModel:
                 self._sample = clean
                 if row:
                     self._rows.appendleft(row)
+            elif kind == "performance":
+                self._performance = clean
             else:
                 self._summary = clean
             self._revision += 1
 
     def snapshot(self):
         with self._lock:
-            return {"discovery": dict(self._discovery), "settings": dict(self._settings), "sample": dict(self._sample),
+            return {"performance": dict(self._performance), "discovery": dict(self._discovery), "settings": dict(self._settings), "sample": dict(self._sample),
                     "summary": dict(self._summary), "rows": tuple(self._rows), "revision": self._revision}

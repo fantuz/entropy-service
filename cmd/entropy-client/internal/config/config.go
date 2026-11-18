@@ -49,6 +49,7 @@ type Config struct {
 	ShannonThreshold    float64
 	Duration            time.Duration
 	ReportPath          string
+	ReportPerformance   bool
 	ReportWaterfall     bool
 	DescribeJSON        bool
 	Headless            bool
@@ -114,6 +115,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.Float64Var(&cfg.ShannonThreshold, "shannon-threshold", diag.DefaultShannonThreshold, "minimum empirical Shannon entropy for OK, in bits/byte (0..8)")
 	flags.DurationVar(&cfg.Duration, "duration", 0, "measurement duration, excluding interactive preflight (0 = until interrupted)")
 	flags.StringVar(&cfg.ReportPath, "report", "", "write JSONL to a new file; - writes to stdout with -headless")
+	flags.BoolVar(&cfg.ReportPerformance, "report-performance", false, "opt in to one-second performance JSONL records independent of statistical sampling; requires -report")
 	flags.BoolVar(&cfg.ReportWaterfall, "report-waterfall", false, "opt in to disclosing up to 256 raw analysed bytes per JSONL sample for a GUI waterfall; requires -report")
 	flags.BoolVar(&cfg.DescribeJSON, "describe-json", false, "print requested configuration as JSON and exit without opening outputs or connecting")
 	flags.BoolVar(&cfg.Headless, "headless", false, "disable terminal output and interactive preflight")
@@ -254,6 +256,10 @@ func (cfg *Config) ValidateAnalysis() error {
 
 	if cfg.ReportPath == "-" && !cfg.Headless {
 		return errors.New("report=- requires -headless to keep stdout valid JSONL")
+	}
+
+	if cfg.ReportPerformance && cfg.ReportPath == "" {
+		return errors.New("report-performance requires -report")
 	}
 
 	if cfg.ReportWaterfall && cfg.ReportPath == "" {

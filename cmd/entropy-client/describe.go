@@ -46,8 +46,9 @@ func writeClientDescription(out io.Writer, cfg *config.Config, endpoint string) 
 		SchemaVersion: reportSchemaVersion, Type: "configuration", Role: "client", Live: false,
 		Settings: clientReportSettings(cfg, endpoint),
 		Features: map[string]bool{
-			"adaptive": cfg.Adaptive,
-			"https":    u.Scheme == descriptionHTTPS || u.Scheme == descriptionWSS, "headless": cfg.Headless,
+			"report_performance": cfg.ReportPerformance,
+			"adaptive":           cfg.Adaptive,
+			"https":              u.Scheme == descriptionHTTPS || u.Scheme == descriptionWSS, "headless": cfg.Headless,
 			"matrix": cfg.ShowMatrix, "writeout": cfg.WriteOut, "output": cfg.OutputEnabled(),
 			"waterfall": cfg.ShowWaterfall, "report": cfg.ReportPath != "", "report_waterfall": cfg.ReportWaterfall,
 		},

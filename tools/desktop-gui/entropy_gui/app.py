@@ -125,6 +125,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.health_ca = health_ca
         self._health_revision = -1
         self._fullscreen = False
+        self._native_fullscreen_pending = None
+        self._fullscreen_source = None
         self._closing = False
         self._destroyed = False
         self._stopping = False
@@ -202,9 +204,15 @@ class DesktopWindow(Gtk.ApplicationWindow):
             body.append(stats)
             self.performance_label = label("Server capabilities and performance appear after Start", "gui-subtitle")
             self.performance_label.set_selectable(True)
-            self.performance_label.set_tooltip_text("Rates are averages over the measured run. Receive wait includes server pacing, generation and transfer; it is not network latency. Timings cover the latest analysed report.")
+            self.performance_label.set_tooltip_text("Rates are averages over the measured run. Receive wait includes server pacing, generation and transfer; it is not network latency. Receive/output timings cover the latest processed frame; analysis covers the latest analysed sample.")
             self.performance_expander = Gtk.Expander(label="Connection & performance", expanded=True)
-            self.performance_expander.set_child(self.performance_label)
+            performance_scroller = Gtk.ScrolledWindow()
+            performance_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            performance_scroller.set_min_content_height(32)
+            performance_scroller.set_max_content_height(112)
+            performance_scroller.set_propagate_natural_height(True)
+            performance_scroller.set_child(self.performance_label)
+            self.performance_expander.set_child(performance_scroller)
             body.append(self.performance_expander)
             self.drawing_area = Gtk.DrawingArea(hexpand=True, vexpand=True)
             self.drawing_area.set_content_width(1)
@@ -557,7 +565,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
         if self.session and self.session.snapshot()["running"]:
             return
         try:
-            self.session = ClientSession(self.binary, self.arguments, self.model)
+            self.session = ClientSession(self.binary, self.arguments, self.model,
+                                         report_performance="report_performance" in self.descriptor["features"])
             self.session.start()
         except (OSError, RuntimeError, ValueError) as error:
             self.session = None
@@ -664,6 +673,12 @@ class DesktopWindow(Gtk.ApplicationWindow):
                 elapsed = sample.get("elapsed_ms", 0) / 1000
                 rate = sample.get("received_bytes", 0) / (1 << 20) / elapsed if elapsed > 0 else 0
                 self.stat_labels["throughput"].set_text(f"{rate:.3f}")
+            performance = state.get("performance", {})
+            if performance:
+                self.stat_labels["throughput"].set_text(f"{performance.get('received_mib_per_second', 0):.3f}")
+            performance = state.get("performance", {})
+            if performance.get("elapsed_ms", 0) >= sample.get("elapsed_ms", 0) and performance:
+                self.stat_labels["throughput"].set_text(f"{performance['received_mib_per_second']:.3f}")
             if summary:
                 self.stat_labels["throughput"].set_text(f"{summary.get('received_mib_per_second', 0):.3f}")
             if state["rows"] != self._rows:
@@ -755,7 +770,41 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.status_label.set_visible(not enabled)
         self.client_log_expander.set_visible(not enabled)
         self.performance_expander.set_visible(not enabled)
-        self.fullscreen() if enabled else self.unfullscreen()
+        if sys.platform == "darwin":
+            self._advance_macos_fullscreen()
+        else:
+            self.fullscreen() if enabled else self.unfullscreen()
+
+    def _advance_macos_fullscreen(self):
+        if self._destroyed:
+            return
+        from .macos import fullscreen_transition_active
+        actual = self.is_fullscreen()
+        pending = self._native_fullscreen_pending
+        if pending is not None:
+            if actual != pending or fullscreen_transition_active(self.get_surface()):
+                self._queue_fullscreen_check()
+                return
+            self._native_fullscreen_pending = None
+        elif fullscreen_transition_active(self.get_surface()):
+            self._queue_fullscreen_check()
+            return
+        desired = False if self._closing else self._fullscreen
+        if actual != desired:
+            self._native_fullscreen_pending = desired
+            self.fullscreen() if desired else self.unfullscreen()
+            self._queue_fullscreen_check()
+        elif self._closing:
+            self._finish_close(native_ready=True)
+
+    def _queue_fullscreen_check(self):
+        if self._fullscreen_source is not None:
+            return
+        def advance():
+            self._fullscreen_source = None
+            self._advance_macos_fullscreen()
+            return GLib.SOURCE_REMOVE
+        self._fullscreen_source = GLib.timeout_add(50, advance)
 
     def _on_key(self, _controller, keyval, _keycode, _state):
         if keyval == Gdk.KEY_F11 and self.role == "client":
@@ -776,10 +825,18 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._finish_close()
         return True
 
-    def _finish_close(self):
+    def _finish_close(self, *, native_ready=False):
         if self._destroyed:
             return
+        if sys.platform == "darwin" and not native_ready:
+            self._advance_macos_fullscreen()
+            return
+        if self._stopping or self.session and self.session.snapshot()["running"]:
+            return
         self._destroyed = True
+        if self._fullscreen_source is not None:
+            GLib.source_remove(self._fullscreen_source)
+            self._fullscreen_source = None
         if self.settings_window is not None:
             self.settings_window.destroy()
             self.settings_window = None
@@ -838,7 +895,10 @@ def run(role, binary, arguments, health_url=None, health_ca=None):
     def quit_after_interrupt():
         nonlocal quit_source
         quit_source = None
-        application.quit()
+        if application.window is not None:
+            application.window.close()
+        else:
+            application.quit()
         return GLib.SOURCE_REMOVE
 
     def interrupt(_signum, _frame):

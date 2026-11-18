@@ -694,6 +694,7 @@ finished.write_text(json.dumps({
     'exit_code': result,
     'handlers_restored': all(signal.getsignal(signum) is handler for signum, handler in before.items()),
     'window_destroyed': window._destroyed,
+    'fullscreen_transition_settled': window._native_fullscreen_pending is None,
     'fullscreen_close_requested': configuration['action'] == 'fullscreen_close',
     'inspection_reaped': not window._inspection_thread.is_alive(),
     'health_stopped': health_stopped,
@@ -753,6 +754,7 @@ raise SystemExit(result)
                     state = json.loads(finished.read_text())
                     assert state["exit_code"] == expected_exit and state["handlers_restored"], state
                     assert state["window_destroyed"] and state["inspection_reaped"] and state["health_stopped"], state
+                    assert state["fullscreen_transition_settled"], state
                     assert state["owned_process_reaped"] and not state["forced_stop"], state
                     assert not state["owned_error"], state
                     if role == "client":

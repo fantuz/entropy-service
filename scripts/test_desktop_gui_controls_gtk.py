@@ -166,6 +166,7 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         assert not window.performance_expander.get_visible()
         window.set_fullscreen(False)
         assert window.performance_expander.get_visible()
+        wait_for(context, lambda: window._native_fullscreen_pending is None, "fullscreen entry/exit settled", timeout=5)
         child = window.session._child
         window.stop_button.emit("clicked")
         wait_for(context, lambda: not window.session.snapshot()["running"] and
@@ -508,6 +509,25 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
             app.quit()
 
 
+def _client_performance_cadence(context, application_type, binary, remote_port):
+    app, window = _window(context, application_type, "client", binary,
+        [f"-url=http://127.0.0.1:{remote_port}/v1/data/random", "-slice=4096", "-refresh=50ms",
+         "-analysis-interval=1h", "-duration=3s"], "PerformanceCadence")
+    try:
+        window.start_button.emit("clicked")
+        wait_for(context, lambda: window.session is not None and
+                 window.session.snapshot().get("performance", {}).get("received_frames", 0) >= 5,
+                 "performance updates independently of statistical analysis")
+        state = window.session.snapshot()
+        assert state["performance"]["analysed_samples"] == 1 and len(state["rows"]) == 1
+        assert state["sample"]["received_frames"] == 1
+        wait_for(context, lambda: "average received" in window.performance_label.get_text(), "independent performance view")
+        return {"rates_update_with_one_hour_analysis_interval": True, "sample_history_not_duplicated": True}
+    finally:
+        close_window(context, window)
+        app.quit()
+
+
 def _client_capability_limit(context, application_type, binary, artifacts):
     """A controlled public contract rejects oversize acquisition visibly."""
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -558,6 +578,7 @@ def controls_and_owned_server(context, application_type, server_binary, client_b
     artifacts.mkdir(parents=True, exist_ok=True)
     return {"client": _client_options(context, application_type, client_binary, remote_port, artifacts),
             "server": _server_options(context, application_type, server_binary, remote_port, artifacts),
+            "performance_cadence": _client_performance_cadence(context, application_type, client_binary, remote_port),
             "capability_limit": _client_capability_limit(context, application_type, client_binary, artifacts),
             "client_failures": _client_failures(context, application_type, client_binary, remote_port, artifacts),
             "features": _server_features(context, application_type, server_binary, remote_port, artifacts)}

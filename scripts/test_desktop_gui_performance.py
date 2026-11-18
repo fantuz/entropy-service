@@ -48,6 +48,21 @@ class PerformanceTests(unittest.TestCase):
             with self.assertRaises(ReportError):
                 StreamModel().consume({**sample_record(), **performance(), **changed})
 
+    def test_performance_updates_do_not_fabricate_statistical_samples(self):
+        model = StreamModel()
+        model.consume(start_record())
+        sample = sample_record()
+        model.consume(sample)
+        update = {"schema_version": 1, "type": "performance", "elapsed_ms": 2000,
+                  "received_bytes": 2097152, "received_mib_per_second": 1.0,
+                  "receive_wait_ms": 20.0, "analysis_ms": 2.0, **performance()}
+        model.consume(update)
+        state = model.snapshot()
+        self.assertEqual(len(state["rows"]), 1)
+        self.assertEqual(state["sample"]["received_bytes"], sample["received_bytes"])
+        self.assertEqual(state["performance"]["received_bytes"], 2097152)
+        self.assertIn("9.80 average received", performance_text(state))
+
     def test_editor_exposes_discovery_and_optional_adaptive_limits(self):
         names = {field.name for field in fields_for("client")}
         self.assertTrue({"capabilities", "adaptive", "adaptive-max-interval"} <= names)

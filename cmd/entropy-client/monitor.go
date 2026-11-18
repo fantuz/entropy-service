@@ -377,8 +377,25 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 	display := time.NewTicker(interval)
 	defer display.Stop()
 
+	var performanceTick <-chan time.Time
+
+	if cfg.ReportPerformance {
+		performanceTicker := time.NewTicker(time.Second)
+		defer performanceTicker.Stop()
+
+		performanceTick = performanceTicker.C
+	}
+
 	for {
 		select {
+		case <-performanceTick:
+			if err := report.performance(ctx, m); err != nil {
+				if report.failure == nil && contextEnded(ctx) {
+					return stopReason(parent), nil
+				}
+
+				return reasonReportError, err
+			}
 		case <-ctx.Done():
 			return stopReason(parent), nil
 		case <-display.C:

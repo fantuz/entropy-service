@@ -143,6 +143,7 @@ type reportSettings struct {
 	Layout              string  `json:"layout"`
 	Retries             int     `json:"retries"`
 	RetryDelay          string  `json:"retry_delay"`
+	ReportPerformance   bool    `json:"report_performance,omitempty"`
 	ReportWaterfall     bool    `json:"report_waterfall,omitempty"`
 	Capabilities        string  `json:"capabilities"`
 	Adaptive            bool    `json:"adaptive"`
@@ -193,7 +194,7 @@ func clientReportSettings(cfg *config.Config, endpoint string) reportSettings {
 		Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
 		WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
 		Layout: cfg.Layout, Retries: cfg.Retries, RetryDelay: cfg.RetryDelay.String(),
-		ReportWaterfall: cfg.ReportWaterfall, Capabilities: cfg.Capabilities, Adaptive: cfg.Adaptive, AdaptiveMaxInterval: cfg.AdaptiveMaxInterval.String(),
+		ReportPerformance: cfg.ReportPerformance, ReportWaterfall: cfg.ReportWaterfall, Capabilities: cfg.Capabilities, Adaptive: cfg.Adaptive, AdaptiveMaxInterval: cfg.AdaptiveMaxInterval.String(),
 	}
 }
 
@@ -309,4 +310,27 @@ func sanitizedEndpoint(endpoint string) (string, error) {
 	u.ForceQuery = false
 
 	return u.String(), nil
+}
+
+// Performance records do not imply a new statistical sample or retain bytes.
+type performanceRecord struct {
+	reportHeader
+	reportCounts
+	performanceValues
+
+	ElapsedMS         float64 `json:"elapsed_ms"`
+	ReceivedMiBPerSec float64 `json:"received_mib_per_second"`
+	ReceiveWaitMS     float64 `json:"receive_wait_ms"`
+	AnalysisMS        float64 `json:"analysis_ms"`
+}
+
+func (r *runReport) performance(ctx context.Context, m *monitorState) error {
+	elapsed := time.Since(m.started)
+
+	var rate float64
+	if elapsed > 0 {
+		rate = float64(m.stats.TotalBytes) / (1 << 20) / elapsed.Seconds()
+	}
+
+	return r.write(ctx, performanceRecord{reportHeader: newReportHeader("performance"), reportCounts: m.counts(), performanceValues: m.performance(time.Now()), ElapsedMS: elapsed.Seconds() * 1000, ReceivedMiBPerSec: rate, ReceiveWaitMS: m.lastReceive.Seconds() * 1000, AnalysisMS: m.analysisTime.Seconds() * 1000})
 }

@@ -91,7 +91,7 @@ _FIELDS = {"client": _CLIENT_FIELDS, "server": _SERVER_FIELDS}
 # kept as opaque option/value pairs, including values beginning with '-'.
 _BOOL_FLAGS = {
     "client": frozenset(("writeout", "debug", "preview", "matrix", "graph", "dashboard", "histogram",
-                         "waterfall", "report-waterfall", "describe-json", "headless", "adaptive")),
+                         "waterfall", "report-waterfall", "report-performance", "describe-json", "headless", "adaptive")),
     "server": frozenset(("describe-json", "lab-allow-remote", "enable-https", "require-device",
                          "rdrand-mix", "cpu-mix", "debug", "cookie")),
 }

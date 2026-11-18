@@ -7,6 +7,7 @@ import (
 
 func TestAnalysisLimits(t *testing.T) {
 	for _, cfg := range []Config{
+		{ReportPerformance: true, DisplayInterval: time.Second},
 		{AnalysisBytes: -1, DisplayInterval: time.Second},
 		{AnalysisBytes: 1<<25 + 1, DisplayInterval: time.Second},
 		{AnalysisInterval: -1, DisplayInterval: time.Second},

@@ -77,6 +77,15 @@ JSONL schema version 1 gains additive scalar fields in `sample` and `run_summary
 public document. Older reports remain usable in the GUI; new fields are optional.
 Preview/history and JSONL record bounds are unchanged.
 
+For progress independent from `-analysis-interval`, opt in with
+`-report-performance` alongside `-report`. This adds a `performance` record on
+a one-second timer, including aggregate frame/byte counts, received throughput
+and timing fields. It does not create an analysed sample or disclose a raw
+prefix. Existing report consumers receive no additional record types by default.
+The GUI enables this option when its selected CLI advertises support, preserving
+compatibility with older companions. Its rate display therefore continues to
+update even when statistics are sampled only occasionally.
+
 ## Optional adaptive HTTP pull pacing
 
 ```sh
@@ -132,3 +141,8 @@ settings and final rates. Controlled slow-response tests separately check bounds
 recovery, byte/analysis accounting, cancellation and preserved generation errors.
 
 ![Linux client using adaptive pacing against an actual CPU backend](images/desktop-gui-client-performance.png)
+
+Native macOS CI also exposed a close-during-fullscreen-animation crash. Shutdown
+now lets GTK/AppKit finish entering and leaving fullscreen before destroying the
+surface, while joining the owned client as before. Ctrl+C follows the same close
+path. Linux and Windows retain their native fullscreen handling.

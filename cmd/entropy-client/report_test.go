@@ -476,3 +476,35 @@ func TestReportPreCanceledWriteDoesNotPoisonSummary(t *testing.T) {
 		t.Fatal(buffer.String())
 	}
 }
+
+func TestPerformanceReportsRemainIndependentFromAnalysisAndRawPrefixes(t *testing.T) {
+	cfg := experimentConfig(modePull, serveExperiment(t, modePull), filepath.Join(t.TempDir(), "progress.jsonl"))
+	cfg.ReportPerformance = true
+	cfg.AnalysisInterval = time.Hour
+
+	cfg.Duration = 1200 * time.Millisecond
+	if err := runConfigured(t.Context(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	var samples, updates int
+
+	for _, raw := range readReport(t, cfg.ReportPath) {
+		header := decodeRecord[reportHeader](t, raw)
+		switch header.Type {
+		case "sample":
+			samples++
+		case "performance":
+			updates++
+
+			record := decodeRecord[performanceRecord](t, raw)
+			if record.AnalysedSamples != 1 || record.ReceivedFrames < 2 || record.AverageReceivedFPS <= 0 || bytes.Contains(raw, []byte("waterfall_prefix")) {
+				t.Fatalf("performance report fabricated samples or bytes: %s", raw)
+			}
+		}
+	}
+
+	if samples != 1 || updates < 1 {
+		t.Fatalf("samples=%d performance=%d", samples, updates)
+	}
+}
