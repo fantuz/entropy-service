@@ -191,8 +191,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="entropy upgrade wizard ") as temporary:
         work = Path(temporary)
         installation = work / "Application with spaces"
-        group_name = "Entropy Service installer test " + str(os.getpid())
-        group = programs_folder() / group_name
+        # The production recipe intentionally disables the group picker and
+        # always uses its DefaultGroupName; /GROUP is ignored in that mode.
+        group = programs_folder() / "Entropy Service"
+        assert not group.exists(), "Refusing to alter an existing non-fixture Start Menu folder"
         setups = {}
         for version in ("1.0.0", "2.0.0"):
             bundle, output = work / ("bundle " + version), work / ("setup " + version)
@@ -215,7 +217,7 @@ def main():
 
         def launch(version, name, *, silent=False, target=installation):
             command = [str(setups[version]), "/SP-", "/NORESTART", "/DIR=" + str(target),
-                       "/GROUP=" + group_name, "/LOG=" + str(artifacts / (name + ".log"))]
+                       "/LOG=" + str(artifacts / (name + ".log"))]
             if silent:
                 command += ["/VERYSILENT", "/SUPPRESSMSGBOXES"]
             return subprocess.Popen(command, stdin=subprocess.DEVNULL)
