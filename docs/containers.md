@@ -33,8 +33,8 @@ the utility directly for graceful shutdown.
 docker pull ghcr.io/fantuz/entropy-service:latest
 docker pull ghcr.io/fantuz/entropy-client:latest
 # Select an explicit application release for controlled deployments.
-docker pull ghcr.io/fantuz/entropy-service:v2.5.0
-docker pull ghcr.io/fantuz/entropy-client:v2.5.0
+docker pull ghcr.io/fantuz/entropy-service:v2.6.0
+docker pull ghcr.io/fantuz/entropy-client:v2.6.0
 ```
 
 Both package pages list available tags:
@@ -288,14 +288,14 @@ when backfilling an older application release. The application revision and
 
 ## Offline OCI downloads
 
-Releases made after this change include two portable OCI image archives:
+Starting with **v2.6.0**, releases include two portable OCI image archives:
 
 - `entropy-service_<version>_linux.oci.tar` (server)
 - `entropy-client_<version>_linux.oci.tar` (client)
 
 Each contains Linux amd64, arm64 and ARMv7. These are container images, not
-native CLI archives. v2.5.0 predates these downloads; until the next release,
-the matching build's `container-oci-bundles` CI artifact provides them.
+native CLI archives. Download them from the [release page](https://github.com/fantuz/entropy-service/releases/latest).
+Matching full CI builds also retain the `container-oci-bundles` artifact.
 
 Verify against the release's `checksums.txt` before transferring to an offline
 host. On Linux, import the matching platform into Docker with Skopeo:

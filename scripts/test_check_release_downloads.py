@@ -28,15 +28,17 @@ def artifacts(root):
 
 
 class ReleaseDownloadsTests(unittest.TestCase):
-    def test_all_four_architectures_have_matching_config_and_readme(self):
+    def test_all_platforms_have_matching_config_and_readme(self):
         check_contract(configuration(), readme())
         for section in ("release", "checksum"):
             broken = configuration().replace(f"{section}:\n", f"wrong-{section}:\n")
             with self.assertRaisesRegex(ValueError, section):
                 check_contract(broken, readme())
-        missing = readme().replace(LATEST + "entropy-service_windows_amd64.zip", LATEST + "not-published.zip")
-        with self.assertRaisesRegex(ValueError, "missing stable"):
-            check_contract(configuration(), missing)
+        for alias in ALIASES:
+            with self.subTest(alias=alias):
+                missing = readme().replace(LATEST + alias, LATEST + "not-published.zip")
+                with self.assertRaisesRegex(ValueError, "missing stable"):
+                    check_contract(configuration(), missing)
 
     def test_source_mapping_must_stay_versioned_and_checksum_covered(self):
         broken = configuration().replace("./dist/entropy-service_{{ .Version }}_linux_amd64.tar.gz", "./dist/wrong.tar.gz", 1)
@@ -47,7 +49,7 @@ class ReleaseDownloadsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             artifacts(root)
-            self.assertEqual(len(check_dist(root)), 4)
+            self.assertEqual(len(check_dist(root)), len(ALIASES))
             source = next(root.glob("*_linux_amd64.tar.gz"))
             source.write_bytes(b"corrupted")
             with self.assertRaisesRegex(ValueError, "actual archive"):

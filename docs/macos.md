@@ -1,14 +1,13 @@
 # macOS CLI and desktop interface
 
 Both utilities support Intel (`darwin_amd64`) and Apple Silicon
-(`darwin_arm64`). Native CI tests macOS 15 on both architectures. v2.5.0
-predates this support; before the first macOS release, use the matching
-`macos-cli-archives` CI artifact or build from this branch.
+(`darwin_arm64`) starting with **v2.6.0**. Native CI tests macOS 15 on both
+architectures. Download the matching release archive or build from source.
 
 ## CLI installation
 
 Download the appropriate `entropy-service_<version>_darwin_<architecture>.tar.gz`
-from a release containing macOS support. It contains both `entropy-server` and
+from [v2.6.0 or newer](https://github.com/fantuz/entropy-service/releases/latest). It contains both `entropy-server` and
 `entropy-client`. Compare the archive with that release's `checksums.txt`:
 
 ```sh
