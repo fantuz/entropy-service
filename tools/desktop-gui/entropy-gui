@@ -1,12 +1,12 @@
 #!/usr/bin/python3
-"""Launch the optional Linux/Windows GTK 4 desktop interface."""
+"""Launch the optional Linux/Windows/macOS GTK 4 desktop interface."""
 import argparse
 from pathlib import Path
 import sys
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Linux/Windows GTK 4 entropy-service GUI. Pass utility startup options after --.")
+    parser = argparse.ArgumentParser(description="Linux/Windows/macOS GTK 4 entropy-service GUI. Pass utility startup options after --.")
     parser.add_argument("--view", choices=("server", "client"), default="server",
                         help="server: Start/Stop a local server or Connect to live health; client: Start/Stop acquisition and the waterfall")
     suffix = ".exe" if sys.platform == "win32" else ""
@@ -20,8 +20,8 @@ def main():
     divider = arguments.index("--") if "--" in arguments else len(arguments)
     options = parser.parse_args(arguments[:divider])
     utility_arguments = arguments[divider + 1:] if divider < len(arguments) else []
-    if sys.platform not in ("linux", "win32"):
-        parser.error("this desktop interface supports Linux and Windows")
+    if sys.platform not in ("linux", "win32", "darwin"):
+        parser.error("this desktop interface supports Linux, Windows and macOS")
     if options.view != "server" and (options.health_url or options.health_ca):
         parser.error("--health-url and --health-ca apply to the server view")
     try:
@@ -30,6 +30,9 @@ def main():
         print("GTK 4 desktop dependencies are unavailable: " + str(error), file=sys.stderr)
         if sys.platform == "win32":
             print("Use MSYS2 UCRT64 Python with mingw-w64-ucrt-x86_64-python-gobject, mingw-w64-ucrt-x86_64-python-cairo and mingw-w64-ucrt-x86_64-gtk4.", file=sys.stderr)
+        elif sys.platform == "darwin":
+            print("Homebrew: brew install gtk4 pygobject3", file=sys.stderr)
+            print("Use tools/desktop-gui/entropy-gui-macos to select a Homebrew Python with GTK bindings.", file=sys.stderr)
         else:
             print("Debian/Ubuntu: sudo apt install python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0", file=sys.stderr)
             print("Use /usr/bin/python3 if a virtual environment hides distribution packages.", file=sys.stderr)

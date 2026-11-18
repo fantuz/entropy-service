@@ -43,6 +43,15 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts -p 'test_check_windows_archive.py'
           python3 scripts/check_windows_archive.py dist/*_windows_amd64.zip
+      - name: Preserve macOS archives for native Intel and Apple Silicon tests
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: macos-cli-archives
+          path: |
+            dist/*_darwin_*.tar.gz
+            dist/checksums.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Preserve Windows release ZIP for native package tests
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:

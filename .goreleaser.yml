@@ -15,6 +15,7 @@ builds:
     goos:
       - linux
       - windows
+      - darwin
     goarch:
       - amd64
       - arm
@@ -22,6 +23,8 @@ builds:
     goarm:
       - "7"
     ignore:
+      - goos: darwin
+        goarch: arm
       - goos: windows
         goarch: arm
       - goos: windows
@@ -37,6 +40,7 @@ builds:
     goos:
       - linux
       - windows
+      - darwin
     goarch:
       - amd64
       - arm
@@ -44,6 +48,8 @@ builds:
     goarm:
       - "7"
     ignore:
+      - goos: darwin
+        goarch: arm
       - goos: windows
         goarch: arm
       - goos: windows
@@ -70,6 +76,7 @@ archives:
       - LICENSE
       - README.md
       - docs/windows.md
+      - docs/macos.md
       - docs/windows-service.md
       - docs/quantis.md
       - docs/hardware-probe.md

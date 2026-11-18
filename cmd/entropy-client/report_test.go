@@ -405,7 +405,7 @@ func TestHeadlessStdoutContainsOnlyJSONL(t *testing.T) {
 }
 
 func TestReportStdoutCancelsBlockedRecord(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != reportWindowsOS {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" && runtime.GOOS != reportWindowsOS {
 		t.Skip("cancellable stdout pipe adapter")
 	}
 

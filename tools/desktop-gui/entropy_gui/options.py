@@ -164,7 +164,7 @@ def initial_values(role, arguments, descriptor=None):
         values = dict(_CLIENT_DEFAULTS)
     else:
         values = dict(_SERVER_DEFAULTS)
-        values["device"] = "windows-csprng" if sys.platform == "win32" else "/dev/qrandom0"
+        values["device"] = "windows-csprng" if sys.platform == "win32" else "macos-csprng" if sys.platform == "darwin" else "/dev/qrandom0"
         values["drbg"] = "chacha20" if platform.machine().lower().startswith(("arm", "aarch", "riscv")) else "aes-256-ctr"
     if descriptor is not None:
         if not isinstance(descriptor, dict):

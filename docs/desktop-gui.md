@@ -453,3 +453,6 @@ explicit CPU experiments. It requires native x64 and advertised RDRAND support;
 the CLI rejects it on unsupported hosts. This mode has CPU-only output trust,
 no software fallback and a restart-required failure latch. See the
 [direct CPU backend guide](experimental-rdrand.md) before selecting it.
+
+macOS Intel and Apple Silicon use the same interface through the
+[Homebrew launcher](macos.md#homebrew-gui).

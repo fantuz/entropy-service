@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 GUI_SOURCE = ROOT / "tools/desktop-gui"
 sys.path.insert(0, str(GUI_SOURCE))
 WINDOWS = sys.platform == "win32"
+DARWIN = sys.platform == "darwin"
+OS_SOURCE = "windows-csprng" if WINDOWS else "macos-csprng" if DARWIN else "/dev/urandom"
 
 
 def free_port():
@@ -168,10 +170,10 @@ def resize_native_window(window, width, height):
 def server_configuration(context, application_type, binary):
     port = free_port()
     missing = "/definitely-not-present/entropy-gui-device"
-    if WINDOWS:
-        # Windows deliberately rejects Linux device paths, even in a startup
+    if WINDOWS or DARWIN:
+        # These platforms deliberately reject Linux device paths, even in a startup
         # description. Missing TLS files instead prove inspection avoids I/O.
-        arguments = [f"-http=127.0.0.1:{port}", "-device=windows-csprng",
+        arguments = [f"-http=127.0.0.1:{port}", "-device="+OS_SOURCE,
                      "-enable-https=true", "-cert-file=missing-gui-certificate.pem",
                      "-key-file=missing-gui-key.pem"]
     else:
@@ -187,9 +189,9 @@ def server_configuration(context, application_type, binary):
     try:
         wait_for(context, lambda: window.descriptor is not None and window.get_mapped(), "server invocation description and window mapping")
         assert_read_only(window)
-        assert window.descriptor["settings"]["seed_source"] == ("windows-csprng" if WINDOWS else missing)
-        assert window.descriptor["features"]["https"] is WINDOWS
-        assert window.descriptor["features"]["require_device"] is (not WINDOWS)
+        assert window.descriptor["settings"]["seed_source"] == (OS_SOURCE if WINDOWS or DARWIN else missing)
+        assert window.descriptor["features"]["https"] is (WINDOWS or DARWIN)
+        assert window.descriptor["features"]["require_device"] is (not WINDOWS and not DARWIN)
         assert window.session is None
         assert window.health_session is None, "Startup inspection must not auto-connect"
         # Description succeeds despite an unreadable device, and the requested
@@ -249,7 +251,7 @@ def entropy_server(binary):
 
     port = free_port()
     with tempfile.TemporaryFile() as log:
-        source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom", "-require-device=true"]
+        source = ["-device="+OS_SOURCE] if WINDOWS or DARWIN else ["-device=/dev/urandom", "-require-device=true"]
         child = spawn_owned([str(binary), f"-http=127.0.0.1:{port}",
                              "-enable-https=false", *source], stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -371,7 +373,7 @@ def missing_local_executables(context, application_type):
 
 def live_server_health(context, application_type, binary, port, artifacts):
     """Fresh state, reseed degradation, disconnection and recovery reach widgets."""
-    source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom"]
+    source = ["-device="+OS_SOURCE]
     arguments = [f"-http=127.0.0.1:{port}", "-enable-https=false", *source]
     base = f"http://127.0.0.1:{port}"
     app = application_type("server", str(binary), arguments, health_url=base)
@@ -700,7 +702,7 @@ raise SystemExit(result)
             name = role + "_owned" if action == "owned_interrupt" else role if action == "interrupt" else role + "_close"
             ready, finished = directory / (name + "-ready.json"), directory / (name + "-finished.json")
             options = directory / (name + "-options.json")
-            arguments = (["-device=windows-csprng" if WINDOWS else "-device=/dev/urandom", "-enable-https=false"]
+            arguments = (["-device="+OS_SOURCE, "-enable-https=false"]
                          if role == "server" else
                          [f"-url=http://127.0.0.1:{port}/v1/data/random", "-slice=4096", "-refresh=50ms",
                           "-analysis-interval=50ms", "-duration=15s"])
@@ -775,8 +777,8 @@ def main():
     args = parser.parse_args()
     GUI_SOURCE = args.gui_source.resolve()
     sys.path.insert(0, str(GUI_SOURCE))
-    if not sys.platform.startswith("linux") and not WINDOWS:
-        parser.error("the GTK smoke test supports Linux and Windows")
+    if not sys.platform.startswith("linux") and not WINDOWS and not DARWIN:
+        parser.error("the GTK smoke test supports Linux, Windows and macOS")
     import gi
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
@@ -785,7 +787,7 @@ def main():
     from entropy_gui.app import DesktopApplication
 
     if not Gtk.init_check() or Gdk.Display.get_default() is None:
-        parser.error("no GTK display; use a Windows desktop session or xvfb-run -a on Linux")
+        parser.error("no GTK display; use a macOS/Windows desktop session or xvfb-run -a on Linux")
     args.artifacts.mkdir(parents=True, exist_ok=True)
     context = GLib.MainContext.default()
     callback_errors = []

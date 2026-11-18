@@ -17,6 +17,13 @@ class StartupOptionsTests(unittest.TestCase):
         self.assertEqual(edited_arguments("server", [], {"drbg": "rdrand-experimental"}),
                          ["-drbg=rdrand-experimental"])
 
+    def test_macos_defaults_match_os_source_and_cpu_architecture(self):
+        for arch, backend in (("arm64", "chacha20"), ("x86_64", "aes-256-ctr")):
+            with mock.patch("entropy_gui.options.sys.platform", "darwin"), mock.patch("entropy_gui.options.platform.machine", return_value=arch):
+                values = initial_values("server", [])
+                self.assertEqual(values["device"], "macos-csprng")
+                self.assertEqual(values["drbg"], backend)
+
     def test_field_allowlists_and_immutable_metadata(self):
         client = fields_for("client")
         self.assertEqual(len({field.name for field in client}), len(client))

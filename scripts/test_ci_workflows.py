@@ -25,7 +25,7 @@ class WorkflowContracts(unittest.TestCase):
         jobs = workflow("build")["jobs"]
         gate = jobs["build"]
         required = {"plan", "docs", "quality", "fuzz", "race", "terminal", "packages",
-                    "containers", "endurance", "windows", "windows-package"}
+                    "containers", "endurance", "windows", "windows-package", "macos"}
         self.assertEqual(required, set(gate["needs"]))
         self.assertEqual("always()", gate["if"])
         command = gate["steps"][-1]["run"]
@@ -71,7 +71,7 @@ class WorkflowContracts(unittest.TestCase):
         jobs = workflow("release")["jobs"]
         self.assertEqual("Validate tagged commit before publishing", jobs["validate"]["name"])
         self.assertEqual({"docs", "quality", "fuzz", "race", "terminal", "packages"}, set(jobs["validate"]["needs"]))
-        self.assertEqual({"validate", "browser", "windows", "windows-package", "endurance", "containers", "gui-installer"},
+        self.assertEqual({"validate", "browser", "windows", "windows-package", "endurance", "containers", "gui-installer", "macos"},
                          set(jobs["release"]["needs"]))
         for name in ("docs", "quality", "fuzz", "race", "terminal", "packages"):
             self.assertEqual("inputs.validated_run_id == ''", jobs[name]["if"])
