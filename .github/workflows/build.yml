@@ -84,6 +84,13 @@ jobs:
     if: always() && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'docs' || needs.packages.result == 'success')
     with:
       full: ${{ needs.plan.outputs.mode == 'full' }}
+  macos:
+    name: Native macOS
+    needs: [plan, packages]
+    if: always() && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'docs' || needs.packages.result == 'success')
+    uses: ./.github/workflows/macos.yml
+    with:
+      full: ${{ needs.plan.outputs.mode == 'full' }}
   build:
     if: always()
     needs:
@@ -98,6 +105,7 @@ jobs:
       - endurance
       - windows
       - windows-package
+      - macos
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
@@ -109,7 +117,7 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
           CI_MODE: ${{ needs.plan.outputs.mode }}
-        run: python3 scripts/ci_gate.py --mode "$CI_MODE" --required plan docs quality fuzz race terminal packages containers endurance windows windows-package --docs-skips quality fuzz
+        run: python3 scripts/ci_gate.py --mode "$CI_MODE" --required plan docs quality fuzz race terminal packages containers endurance windows windows-package macos --docs-skips quality fuzz
           race terminal packages
   publish-containers:
     name: Publish validated main images

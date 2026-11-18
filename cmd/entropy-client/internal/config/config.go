@@ -162,7 +162,7 @@ func (cfg *Config) NormalizeMode() error {
 func (cfg *Config) ValidatePlatform() error {
 	// Keep Windows capability dispatch out of non-Windows release binaries,
 	// even when the larger policy helper exceeds the compiler's inline budget.
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		return nil
 	}
 
@@ -170,6 +170,10 @@ func (cfg *Config) ValidatePlatform() error {
 }
 
 func (cfg *Config) validatePlatform(goos string) error {
+	if goos == "darwin" && (cfg.WriteOut || cfg.OutputDevice != "") {
+		return errors.New("device output and -writeout are unavailable on macOS; use file, stdout or network output")
+	}
+
 	if goos != "windows" {
 		return nil
 	}

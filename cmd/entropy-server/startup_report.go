@@ -24,6 +24,10 @@ func serverInvocation(out io.Writer, cfg *config.Config) *console.Report {
 		r.Value("Windows capabilities", "Windows OS CSPRNG (crypto/rand); Go socket defaults; direct QRNG/device access and custom socket tuning unavailable")
 	}
 
+	if runtime.GOOS == "darwin" {
+		r.Value("macOS capabilities", "OS CSPRNG; HTTP/HTTPS/WebSocket; native USB/PCI adapters unavailable")
+	}
+
 	r.Value("HTTP address", cfg.HTTPAddr)
 	r.Value("HTTPS enabled", cfg.EnableHTTPS)
 	r.Value("HTTPS address", cfg.HTTPSAddr)

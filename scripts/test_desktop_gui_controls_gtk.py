@@ -213,7 +213,7 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
 
 def _server_options(context, application_type, binary, remote_port, artifacts):
     old_port, local_port = free_port(), free_port()
-    source = "windows-csprng" if sys.platform == "win32" else "/dev/urandom"
+    source = "windows-csprng" if sys.platform == "win32" else "macos-csprng" if sys.platform == "darwin" else "/dev/urandom"
     health_url = f"http://127.0.0.1:{remote_port}"
     arguments = [f"-http=127.0.0.1:{old_port}", "-enable-https=false", "-device=" + source,
                  "-words=3"]

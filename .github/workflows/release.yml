@@ -67,6 +67,11 @@ jobs:
     needs:
       - packages
     uses: ./.github/workflows/windows-package.yml
+  macos:
+    name: Validate macOS before publishing
+    if: inputs.validated_run_id == ''
+    needs: [packages]
+    uses: ./.github/workflows/macos.yml
   validate:
     name: Validate tagged commit before publishing
     if: always() && (inputs.validated_run_id == '')
@@ -107,6 +112,7 @@ jobs:
       - endurance
       - containers
       - gui-installer
+      - macos
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

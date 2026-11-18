@@ -566,3 +566,7 @@ These historical screenshots illustrate removed page URLs and earlier layouts; f
 ## License
 
 [MIT](LICENSE) · Copyright © 2026 Massimiliano Fantuzzi HB9GUS.
+
+Native macOS CLI and Homebrew GUI support for Intel and Apple Silicon is
+described in the [macOS guide](docs/macos.md), including availability before its
+first release.

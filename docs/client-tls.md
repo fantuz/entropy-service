@@ -97,3 +97,13 @@ Linux server and client executables on a separate loopback IPv4 address. It uses
 a replacement identity and verifies failed runs export zero bytes. Build and
 release CI both run this smoke test. These fixtures do not test an external host
 or establish trust for an operator's deployment.
+
+## Trust a deployment on macOS
+
+Go uses the native macOS trust store for both HTTPS and WSS. Use a publicly
+trusted certificate or import the operator's verified **public** CA/certificate
+through Keychain Access and apply the appropriate trust setting. Do not copy a
+private key to clients. `SSL_CERT_FILE` is not the Linux-style trust override on
+macOS. The CLI retains certificate and hostname/IP verification; there is no
+insecure verification bypass. GUI health polling can separately use an explicit
+`--health-ca` public PEM file. See [macOS installation](macos.md).

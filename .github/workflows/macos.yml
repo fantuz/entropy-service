@@ -1,0 +1,95 @@
+name: Native macOS CLI and Homebrew GUI
+on:
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: true
+permissions:
+  contents: read
+jobs:
+  macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ inputs.full && matrix.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: amd64
+          - runner: macos-15
+            arch: arm64
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      TMPDIR: /tmp
+      GSK_RENDERER: cairo
+      GDK_BACKEND: macos
+    steps:
+      - name: Checkout matching source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Report documentation fast path
+        if: ${{ !(inputs.full) }}
+        run: python3 scripts/check_release_downloads.py
+      - name: Setup fixture Python
+        if: (inputs.full)
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Setup Go and workload input caches
+        if: (inputs.full)
+        uses: ./.github/actions/setup-go-cache
+        with:
+          profile: macos
+      - name: Download same-run macOS archives
+        if: (inputs.full)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: macos-cli-archives
+          path: macos-downloads
+      - name: Check and extract actual release binaries
+        id: archives
+        if: (inputs.full)
+        env:
+          MACOS_ARCH: ${{ matrix.arch }}
+        run: python3 scripts/test_macos.py --prepare macos-downloads --output "$RUNNER_TEMP/Entropy portable binaries"
+      - name: Install Homebrew GTK bindings
+        id: bindings
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        run: |
+          brew install gtk4 pygobject3
+          brew list --versions > macos-runtime.txt
+      - name: Test GUI models and process lifecycle with Homebrew Python
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success' && steps.bindings.outcome == 'success'
+        run: tools/desktop-gui/entropy-gui-macos --python-check scripts/test_macos_gui.py --bin "$RUNNER_TEMP/Entropy portable binaries" --artifacts macos-gui-artifacts
+      - name: Test native Go code with race detector
+        if: (inputs.full)
+        run: go test -race -count=1 -timeout=8m ./...
+      - name: Vet native Go code
+        if: (inputs.full)
+        run: go vet ./...
+      - name: Exercise real macOS CLI, TLS, exports, PTY and shutdown
+        if: (inputs.full)
+        run: python3 scripts/test_macos.py --bin "$RUNNER_TEMP/Entropy portable binaries"
+      - name: Collect native Python crash reports
+        if: (inputs.full) && always()
+        shell: bash
+        run: |
+          mkdir -p macos-gui-artifacts/crashes
+          for report in "$HOME"/Library/Logs/DiagnosticReports/[Pp]ython*.ips; do
+            if [[ -f "$report" && -f macos-runtime.txt && "$report" -nt macos-runtime.txt ]]; then
+              cp "$report" macos-gui-artifacts/crashes/
+            fi
+          done
+      - name: Preserve macOS qualification evidence
+        if: (inputs.full) && always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: macos-${{ matrix.arch }}-evidence
+          path: |
+            macos-runtime.txt
+            macos-gui-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

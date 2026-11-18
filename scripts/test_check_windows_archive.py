@@ -48,6 +48,7 @@ class WindowsArchiveTests(unittest.TestCase):
             {"missing": "quantis-usb.md"},
             {"missing": "chaoskey.md"},
             {"missing": "windows-service.md"},
+            {"missing": "macos.md"},
             {"missing": "entropy-client.exe"},
             {"machine": 0xaa64},
             {"extra": "../unexpected"},

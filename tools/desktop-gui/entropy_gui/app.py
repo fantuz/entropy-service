@@ -140,7 +140,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.header = Gtk.HeaderBar()
         title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         title.append(label(f"Entropy {role.title()}", "gui-heading"))
-        title.append(label(f"{'Windows' if sys.platform == 'win32' else 'Linux'} desktop interface", "gui-subtitle"))
+        title.append(label(f"{ {'win32': 'Windows', 'darwin': 'macOS'}.get(sys.platform, 'Linux') } desktop interface", "gui-subtitle"))
         self.header.set_title_widget(title)
         self.set_titlebar(self.header)
         self.start_button = Gtk.Button(label="Start", sensitive=False)

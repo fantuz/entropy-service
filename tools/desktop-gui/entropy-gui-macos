@@ -1,0 +1,26 @@
+#!/bin/sh
+# Select Homebrew's GTK-enabled Python without changing the user's PATH/Python.
+set -eu
+if [ "$(uname -s)" != Darwin ]; then
+    printf '%s\n' 'This launcher requires macOS; use entropy-gui on Linux/Windows.' >&2
+    exit 2
+fi
+if ! command -v brew >/dev/null 2>&1; then
+    printf '%s\n' 'Install Homebrew, then: brew install gtk4 pygobject3' >&2
+    exit 2
+fi
+prefix=$(brew --prefix)
+script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd -P)
+for candidate in "$prefix/bin/python3" "$prefix"/opt/python@*/bin/python3.*; do
+    [ -x "$candidate" ] || continue
+    case "${candidate##*/}" in python3|python3.[0-9]|python3.[0-9][0-9]) ;; *) continue ;; esac
+    if "$candidate" -c 'import gi, cairo; gi.require_version("Gtk", "4.0"); from gi.repository import Gtk' >/dev/null 2>&1; then
+        if [ "${1:-}" = --python-check ]; then
+            shift
+            exec "$candidate" "$@"
+        fi
+        exec "$candidate" "$script_dir/entropy-gui" "$@"
+    fi
+done
+printf '%s\n' 'No Homebrew Python with GTK 4/PyGObject found. Run: brew install gtk4 pygobject3' >&2
+exit 2

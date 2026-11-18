@@ -58,6 +58,7 @@ def observe_fetch(url, **options):
 class Fixture:
     def __init__(self, tls=None):
         self.mode = "ready"
+        self.delay = .15
         self.requests = []
         self.entered, self.release = threading.Event(), threading.Event()
         fixture = self
@@ -82,7 +83,7 @@ class Fixture:
                     return
                 ready_path = self.path.endswith("/ready")
                 if mode == "delayed":
-                    time.sleep(.15)
+                    time.sleep(fixture.delay)
                 if mode == "hold" and ready_path:
                     fixture.entered.set()
                     fixture.release.wait(3)
@@ -160,6 +161,12 @@ class HealthTests(_HealthBase):
             self.assertFalse(failed["ready"] or failed["health"]["generation_allowed"])
             self.assertEqual(failed["health"]["reseed_failures_total"], 3)
 
+    def test_plain_http_does_not_initialize_unused_tls_roots(self):
+        with Fixture() as fixture, mock.patch("ssl.create_default_context", side_effect=AssertionError("unexpected TLS initialization")) as create:
+            value = fetch_health(fixture.url)
+            self.assertTrue(value["fresh"] and value["ready"], value)
+            create.assert_not_called()
+
     def test_invalid_and_oversized_responses_never_show_ready(self):
         with Fixture() as fixture:
             for mode in ("wrong-type", "malformed", "oversized"):
@@ -216,7 +223,10 @@ class HealthTests(_HealthBase):
     def test_each_healthy_endpoint_can_use_its_own_io_budget(self):
         with Fixture() as fixture:
             fixture.mode = "delayed"
-            value = fetch_health(fixture.url, timeout=.25)
+            # Combined response delays exceed one budget; each individual
+            # response fits with enough scheduling margin on native Mac CI.
+            fixture.delay = .6
+            value = fetch_health(fixture.url, timeout=1)
             self.assertTrue(value["fresh"] and value["ready"], value)
             self.assertEqual(fixture.requests, ["/live", "/ready"])
 
@@ -339,9 +349,12 @@ class HealthTLSTests(_HealthBase):
         root = Path(cls.directory.name)
         cls.cert, cls.key = root / "cert.pem", root / "key.pem"
         cls.extra_cert, cls.extra_key = root / "extra-cert.pem", root / "extra-key.pem"
-        server = ROOT / ("bin/entropy-server.exe" if sys.platform == "win32" else "bin/entropy-server")
+        default_server = ROOT / ("bin/entropy-server.exe" if sys.platform == "win32" else "bin/entropy-server")
+        server = Path(os.environ.get("ENTROPY_GUI_TEST_SERVER", str(default_server)))
         if not server.is_file():
             cls.directory.cleanup()
+            if "ENTROPY_GUI_TEST_SERVER" in os.environ:
+                raise RuntimeError("Selected health-test server is missing: " + str(server))
             raise unittest.SkipTest("Build entropy-server before the health TLS tests")
         subprocess.run([str(server), "generate-cert", f"-cert-file={cls.cert}", f"-key-file={cls.key}",
                         "-hosts=localhost", "-valid-for=1h"], check=True, stdout=subprocess.DEVNULL,

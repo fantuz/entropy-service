@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import shlex
 import socket
 import subprocess
 import sys
@@ -26,6 +27,8 @@ ROOT = Path(__file__).resolve().parents[1]
 GUI_SOURCE = ROOT / "tools/desktop-gui"
 sys.path.insert(0, str(GUI_SOURCE))
 WINDOWS = sys.platform == "win32"
+DARWIN = sys.platform == "darwin"
+OS_SOURCE = "windows-csprng" if WINDOWS else "macos-csprng" if DARWIN else "/dev/urandom"
 
 
 def free_port():
@@ -168,10 +171,10 @@ def resize_native_window(window, width, height):
 def server_configuration(context, application_type, binary):
     port = free_port()
     missing = "/definitely-not-present/entropy-gui-device"
-    if WINDOWS:
-        # Windows deliberately rejects Linux device paths, even in a startup
+    if WINDOWS or DARWIN:
+        # These platforms deliberately reject Linux device paths, even in a startup
         # description. Missing TLS files instead prove inspection avoids I/O.
-        arguments = [f"-http=127.0.0.1:{port}", "-device=windows-csprng",
+        arguments = [f"-http=127.0.0.1:{port}", "-device="+OS_SOURCE,
                      "-enable-https=true", "-cert-file=missing-gui-certificate.pem",
                      "-key-file=missing-gui-key.pem"]
     else:
@@ -187,9 +190,9 @@ def server_configuration(context, application_type, binary):
     try:
         wait_for(context, lambda: window.descriptor is not None and window.get_mapped(), "server invocation description and window mapping")
         assert_read_only(window)
-        assert window.descriptor["settings"]["seed_source"] == ("windows-csprng" if WINDOWS else missing)
-        assert window.descriptor["features"]["https"] is WINDOWS
-        assert window.descriptor["features"]["require_device"] is (not WINDOWS)
+        assert window.descriptor["settings"]["seed_source"] == (OS_SOURCE if WINDOWS or DARWIN else missing)
+        assert window.descriptor["features"]["https"] is (WINDOWS or DARWIN)
+        assert window.descriptor["features"]["require_device"] is (not WINDOWS and not DARWIN)
         assert window.session is None
         assert window.health_session is None, "Startup inspection must not auto-connect"
         # Description succeeds despite an unreadable device, and the requested
@@ -213,9 +216,9 @@ def close_during_inspection(context, application_type):
     with tempfile.TemporaryDirectory(prefix="entropy-gui-inspection-") as directory:
         inspector = Path(directory) / "hung-inspector"
         pid_file = inspector.with_suffix(".pid")
-        inspector.write_text("#!/usr/bin/python3\nimport os,time\nfrom pathlib import Path\n"
-                             "Path(__file__).with_suffix('.pid').write_text(str(os.getpid()))\n"
-                             "time.sleep(30)\n")
+        # A POSIX shell avoids Apple's developer-tools Python shim and tests
+        # exactly one owned PID: exec replaces the shell with the sleeping tool.
+        inspector.write_text("#!/bin/sh\nprintf '%s\\n' \"$$\" > " + shlex.quote(str(pid_file)) + "\nexec /bin/sleep 30\n")
         inspector.chmod(0o700)
         app = application_type("server", str(inspector), [])
         app.set_application_id("org.entropyservice.LinuxPoC.TestInspectionClose")
@@ -223,7 +226,9 @@ def close_during_inspection(context, application_type):
         app.activate()
         window = app.window
         try:
-            wait_for(context, pid_file.exists, "owned configuration inspector to start")
+            wait_for(context, lambda: pid_file.exists() or window.inspection_error_label is not None,
+                     "owned configuration inspector to start")
+            assert pid_file.exists(), window.inspection_error_label.get_text()
             pid = int(pid_file.read_text())
             began = time.monotonic()
             close_window(context, window)
@@ -249,7 +254,7 @@ def entropy_server(binary):
 
     port = free_port()
     with tempfile.TemporaryFile() as log:
-        source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom", "-require-device=true"]
+        source = ["-device="+OS_SOURCE] if WINDOWS or DARWIN else ["-device=/dev/urandom", "-require-device=true"]
         child = spawn_owned([str(binary), f"-http=127.0.0.1:{port}",
                              "-enable-https=false", *source], stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -371,7 +376,7 @@ def missing_local_executables(context, application_type):
 
 def live_server_health(context, application_type, binary, port, artifacts):
     """Fresh state, reseed degradation, disconnection and recovery reach widgets."""
-    source = ["-device=windows-csprng"] if WINDOWS else ["-device=/dev/urandom"]
+    source = ["-device="+OS_SOURCE]
     arguments = [f"-http=127.0.0.1:{port}", "-enable-https=false", *source]
     base = f"http://127.0.0.1:{port}"
     app = application_type("server", str(binary), arguments, health_url=base)
@@ -572,10 +577,11 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         app.quit()
 
 
-def fullscreen_outcomes(context, application_type, gdk, binary, port):
+def fullscreen_outcomes(context, application_type, gdk, binary, port, outcomes=("Duration", "Failure")):
     """Transport termination must expose status instead of a frozen full screen."""
     results = {}
-    for outcome, target in (("Duration", port), ("Failure", free_port())):
+    for outcome in outcomes:
+        target = port if outcome == "Duration" else free_port()
         arguments = [f"-url=http://127.0.0.1:{target}/v1/data/random", "-slice=4096",
                      "-refresh=50ms", "-analysis-interval=50ms", "-duration=400ms"]
         app = application_type("client", str(binary), arguments)
@@ -611,7 +617,8 @@ def terminal_interrupts(context, server_binary, client_binary, port, artifacts):
     """Real terminal interruption quits GTK and reaps only its owned client."""
     from entropy_gui.process import _signal, spawn_owned
 
-    probe = '''import http.client, json, signal, sys
+    probe = '''import faulthandler, http.client, json, signal, sys
+faulthandler.enable()
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from gi.repository import GLib
@@ -660,7 +667,9 @@ class ProbeApplication(original):
             if not window.health_session.snapshot()['fresh']:
                 return GLib.SOURCE_CONTINUE
         ready.write_text(json.dumps({'ready': True}))
-        if configuration['action'] == 'close':
+        if configuration['action'] == 'fullscreen_close':
+            window.set_fullscreen(True)
+        if configuration['action'] in ('close', 'fullscreen_close'):
             window.close()
         return GLib.SOURCE_REMOVE
 
@@ -679,6 +688,7 @@ finished.write_text(json.dumps({
     'exit_code': result,
     'handlers_restored': all(signal.getsignal(signum) is handler for signum, handler in before.items()),
     'window_destroyed': window._destroyed,
+    'fullscreen_close_requested': configuration['action'] == 'fullscreen_close',
     'inspection_reaped': not window._inspection_thread.is_alive(),
     'health_stopped': health_stopped,
     'owned_process_reaped': state is None or window.session._child.poll() is not None,
@@ -693,14 +703,17 @@ raise SystemExit(result)
         directory = Path(directory)
         script = directory / "interrupt_probe.py"
         script.write_text(probe)
-        for role, binary, action in (("server", server_binary, "interrupt"),
-                                     ("server", server_binary, "owned_interrupt"),
-                                     ("client", client_binary, "interrupt"),
-                                     ("client", client_binary, "close")):
-            name = role + "_owned" if action == "owned_interrupt" else role if action == "interrupt" else role + "_close"
+        cases = [("server", server_binary, "interrupt"),
+                 ("server", server_binary, "owned_interrupt"),
+                 ("client", client_binary, "interrupt"),
+                 ("client", client_binary, "close")]
+        if DARWIN:
+            cases.append(("client", client_binary, "fullscreen_close"))
+        for role, binary, action in cases:
+            name = role + "_owned" if action == "owned_interrupt" else role if action == "interrupt" else role + "_" + action
             ready, finished = directory / (name + "-ready.json"), directory / (name + "-finished.json")
             options = directory / (name + "-options.json")
-            arguments = (["-device=windows-csprng" if WINDOWS else "-device=/dev/urandom", "-enable-https=false"]
+            arguments = (["-device="+OS_SOURCE, "-enable-https=false"]
                          if role == "server" else
                          [f"-url=http://127.0.0.1:{port}/v1/data/random", "-slice=4096", "-refresh=50ms",
                           "-analysis-interval=50ms", "-duration=15s"])
@@ -717,7 +730,7 @@ raise SystemExit(result)
                     wait_for(context, lambda: ready.is_file() or child.poll() is not None,
                              role + " GUI interruption readiness", timeout=12)
                     assert ready.is_file(), role + " GUI exited before interruption"
-                    if action == "close":
+                    if action in ("close", "fullscreen_close"):
                         expected_exit = 0
                     elif WINDOWS:
                         # CTRL_C cannot target an owned process group. The run()
@@ -747,7 +760,7 @@ raise SystemExit(result)
                     finally:
                         connection.close()
                     results[name] = {**state, "separate_server_still_live": True,
-                                     "signal": "window close" if action == "close" else
+                                     "signal": "window close" if action in ("close", "fullscreen_close") else
                                      "targeted CTRL_BREAK" if WINDOWS else "SIGINT"}
                 finally:
                     if child.poll() is None:
@@ -772,11 +785,14 @@ def main():
     parser.add_argument("--client", "--client-binary", type=Path, default=ROOT / ("bin/entropy-client" + suffix))
     parser.add_argument("--gui-source", type=Path, default=GUI_SOURCE)
     parser.add_argument("--artifacts", type=Path, default=ROOT / "gui-artifacts")
+    fullscreen = parser.add_mutually_exclusive_group()
+    fullscreen.add_argument("--fullscreen-outcome", choices=("Duration", "Failure"))
+    fullscreen.add_argument("--skip-fullscreen-outcomes", action="store_true")
     args = parser.parse_args()
     GUI_SOURCE = args.gui_source.resolve()
     sys.path.insert(0, str(GUI_SOURCE))
-    if not sys.platform.startswith("linux") and not WINDOWS:
-        parser.error("the GTK smoke test supports Linux and Windows")
+    if not sys.platform.startswith("linux") and not WINDOWS and not DARWIN:
+        parser.error("the GTK smoke test supports Linux, Windows and macOS")
     import gi
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
@@ -785,7 +801,7 @@ def main():
     from entropy_gui.app import DesktopApplication
 
     if not Gtk.init_check() or Gdk.Display.get_default() is None:
-        parser.error("no GTK display; use a Windows desktop session or xvfb-run -a on Linux")
+        parser.error("no GTK display; use a macOS/Windows desktop session or xvfb-run -a on Linux")
     args.artifacts.mkdir(parents=True, exist_ok=True)
     context = GLib.MainContext.default()
     callback_errors = []
@@ -795,19 +811,34 @@ def main():
         old_hook(kind, error, traceback)
     sys.excepthook = observe_callback_error
     try:
-        result = {"platform": sys.platform,
-                  "server": server_configuration(context, DesktopApplication, args.server.resolve())}
-        result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
-        result["inspection_close"] = close_during_inspection(context, DesktopApplication)
-        with entropy_server(args.server.resolve()) as port:
-            from test_desktop_gui_controls_gtk import controls_and_owned_server
-            result["controls"] = controls_and_owned_server(context, DesktopApplication, args.server.resolve(),
-                                                          args.client.resolve(), port, args.artifacts)
-            result["terminal_interrupts"] = terminal_interrupts(context, args.server.resolve(), args.client.resolve(),
-                                                                port, args.artifacts)
-            result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)
-            result["client"] = client_waterfall(context, DesktopApplication, Gdk, args.client.resolve(), port, args.artifacts)
-            result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk, args.client.resolve(), port)
+        if args.fullscreen_outcome:
+            result = {"platform": sys.platform}
+            with entropy_server(args.server.resolve()) as port:
+                result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk,
+                    args.client.resolve(), port, outcomes=(args.fullscreen_outcome,))
+        else:
+            print("Native GTK: server configuration", flush=True)
+            result = {"platform": sys.platform,
+                      "server": server_configuration(context, DesktopApplication, args.server.resolve())}
+            print("Native GTK: missing_local_executables", flush=True)
+            result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
+            print("Native GTK: inspection_close", flush=True)
+            result["inspection_close"] = close_during_inspection(context, DesktopApplication)
+            with entropy_server(args.server.resolve()) as port:
+                from test_desktop_gui_controls_gtk import controls_and_owned_server
+                print("Native GTK: controls", flush=True)
+                result["controls"] = controls_and_owned_server(context, DesktopApplication, args.server.resolve(),
+                                                              args.client.resolve(), port, args.artifacts)
+                print("Native GTK: terminal_interrupts", flush=True)
+                result["terminal_interrupts"] = terminal_interrupts(context, args.server.resolve(), args.client.resolve(),
+                                                                    port, args.artifacts)
+                print("Native GTK: live_health", flush=True)
+                result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)
+                print("Native GTK: client", flush=True)
+                result["client"] = client_waterfall(context, DesktopApplication, Gdk, args.client.resolve(), port, args.artifacts)
+                if not args.skip_fullscreen_outcomes:
+                    print("Native GTK: fullscreen_outcomes", flush=True)
+                    result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk, args.client.resolve(), port)
     finally:
         sys.excepthook = old_hook
     assert not callback_errors, callback_errors
