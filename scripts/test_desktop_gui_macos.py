@@ -30,7 +30,7 @@ class MacLauncherTests(unittest.TestCase):
             result=subprocess.run(['/bin/sh',str(launcher),*arguments],env=dict(os.environ,PATH=str(commands)+os.pathsep+os.defpath,
                                    TEST_BREW_PREFIX=str(prefix)),capture_output=True,timeout=5)
             self.assertEqual(result.returncode,0,result.stderr)
-            self.assertEqual(json.loads(log.read_text()),[str(app/'entropy-gui'),*arguments])
+            self.assertEqual(json.loads(log.read_text()),[str((app/'entropy-gui').resolve()),*arguments])
 
     def test_non_macos_failure_is_actionable(self):
         if sys.platform=='darwin':self.skipTest('checks unsupported host')
