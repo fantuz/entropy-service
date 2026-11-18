@@ -40,6 +40,7 @@ class Wizard:
         self.user.EnumWindows.argtypes = [self.callback, wintypes.LPARAM]
         self.user.EnumChildWindows.argtypes = [wintypes.HWND, self.callback, wintypes.LPARAM]
         self.user.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        self.user.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
         self.user.IsWindowVisible.argtypes = [wintypes.HWND]
         self.user.IsWindowEnabled.argtypes = [wintypes.HWND]
         self.user.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
@@ -47,9 +48,12 @@ class Wizard:
         self.user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
         self.user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
         self.user.PostMessageW.restype = wintypes.BOOL
-        self.handle = wait_for(lambda: next((handle for handle in self.windows()
-            if self.text(handle) == "Setup - Entropy Service" and self.user.IsWindowVisible(handle)), None),
-            "Entropy Service setup wizard")
+        try:
+            self.handle = wait_for(self.find_wizard, "Entropy Service setup wizard")
+        except AssertionError:
+            print("Visible native windows:", [(self.class_name(handle), self.text(handle))
+                  for handle in self.windows() if self.user.IsWindowVisible(handle)], flush=True)
+            raise
         self.pid = wintypes.DWORD()
         self.user.GetWindowThreadProcessId(self.handle, ctypes.byref(self.pid))
 
@@ -66,6 +70,19 @@ class Wizard:
         buffer = ctypes.create_unicode_buffer(8192)
         self.user.GetWindowTextW(handle, buffer, len(buffer))
         return buffer.value
+
+    def class_name(self, handle):
+        buffer = ctypes.create_unicode_buffer(256)
+        self.user.GetClassNameW(handle, buffer, len(buffer))
+        return buffer.value
+
+    def find_wizard(self):
+        # Inno's caption includes version/localization details; its native
+        # wizard class is stable. Never choose between ambiguous installers.
+        matches = [handle for handle in self.windows()
+                   if self.class_name(handle) == "TWizardForm" and self.user.IsWindowVisible(handle)]
+        assert len(matches) <= 1, "More than one native setup wizard is open"
+        return matches[0] if matches else None
 
     def controls(self):
         return [(handle, self.text(handle)) for handle in self.windows(self.handle)
@@ -92,7 +109,11 @@ class Wizard:
             if button:
                 self.click(button)
             return False
-        wait_for(step, "requested installer page", timeout=30)
+        try:
+            wait_for(step, "requested installer page", timeout=30)
+        except AssertionError:
+            print("Visible wizard controls:", self.controls(), flush=True)
+            raise
 
     def cancel(self, process):
         self.click(self.button("Cancel"))
