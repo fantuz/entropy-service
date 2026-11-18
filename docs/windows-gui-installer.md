@@ -7,14 +7,13 @@ CLI ZIP and does not change Linux packaging.
 
 Starting with **v2.4.1**, download the Windows GUI setup `.exe` from the
 [latest release](https://github.com/fantuz/entropy-service/releases/latest).
-For example, v2.6.0 provides `entropy-service_2.6.0_windows_amd64_gui_setup.exe`.
+For example, v2.7.0 provides `entropy-service_2.7.0_windows_amd64_gui_setup.exe`.
 Download `checksums.txt` from the same release to verify it. The versioned
-`entropy-service_2.6.0_windows_amd64_gui_sources.zip` contains matching runtime
+`entropy-service_2.7.0_windows_amd64_gui_sources.zip` contains matching runtime
 sources; it is a separate download and is not needed to run the application.
 
-The replacement notice and Finish-page Start Menu option described below were
-added after v2.6.0. Until a release includes them, use the matching branch's
-tested `windows-gui-installer-and-sources` CI artifact.
+The replacement notice and Finish-page Start Menu option described below are
+available from v2.7.0.
 
 PR/manual workflow builds remain development artifacts. Their installer, sources
 and checksum manifest are available together as the

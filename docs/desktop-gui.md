@@ -206,8 +206,8 @@ for these Go builds.
 ## Edit startup options
 
 The LAB/debug editor additions, **Edit features…** shortcut and expanded client
-diagnostics were added after v2.6.0. Use the source revision containing this
-guide or its corresponding tested installer until a release includes them.
+diagnostics are available from v2.7.0. Use the matching source revision or
+bundled installer for these controls.
 
 Click **Options** while the process owned by that window is stopped. Select
 its local executable with **Browse**, change the fields you need, then use
