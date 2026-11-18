@@ -84,9 +84,17 @@ def smoke(folder):
                          '-slice=65536','-refresh=50ms','-analysis-bytes=256','-output='+str(target),'-output-bytes=65536','-report='+str(report)])
                     assert target.stat().st_size==65536 and target.stat().st_mode&0o077==0
                     assert not json.loads(report.read_text().splitlines()[-1])['failed']
-                rejected=subprocess.run([str(client),'-headless','-mode=pull',f'-url=https://127.0.0.1:{tls_port}/v1/data/random',
-                                         '-duration=1s','-retries=1'],capture_output=True,timeout=5)
-                assert rejected.returncode!=0 and b'certificate' in rejected.stderr.lower(),rejected.stderr
+                # Cold macOS system-trust initialization may exceed one second.
+                # Require an actual TLS rejection, never count a duration expiry
+                # with no bytes as successful certificate verification testing.
+                for mode,scheme,flag,route in [('pull','https','url','/v1/data/random'),('push','wss','wsurl','/stream')]:
+                    target=root/('untrusted-'+mode+'.bin');report=root/('untrusted-'+mode+'.jsonl')
+                    rejected=subprocess.run([str(client),'-headless','-mode='+mode,f'-{flag}={scheme}://127.0.0.1:{tls_port}{route}',
+                                             '-duration=8s','-retries=1','-retry-delay=1ms','-output='+str(target),'-report='+str(report)],
+                                            capture_output=True,timeout=12)
+                    summary=json.loads(report.read_text().splitlines()[-1])
+                    assert rejected.returncode!=0 and b'certificate' in rejected.stderr.lower(),(rejected.returncode,rejected.stderr,summary)
+                    assert summary['failed'] and summary['received_bytes']==0 and target.stat().st_size==0,summary
                 raw=run([client,'-headless','-mode=pull',f'-url=http://127.0.0.1:{http_port}/v1/data/random',
                          '-slice=4096','-output=-','-output-bytes=4096'])
                 assert len(raw.stdout)==4096
