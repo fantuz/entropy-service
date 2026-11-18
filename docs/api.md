@@ -207,3 +207,20 @@ include its payload bytes/messages. TCP/Unix reads now return available bytes
 up to the selected limit, rather than waiting to fill a sample.
 
 [Back to README](../README.md) · [Technical reference index](README.md)
+
+### Experimental direct CPU output
+
+With `-drbg=rdrand-experimental`, `X-RNG-DRBG` identifies
+`RDRAND (experimental; direct CPU)` and `X-RNG-Output-Mode` is `direct-cpu`.
+The mode header is `seeded-stream` for software backends. `X-RNG-Source` still
+identifies the external **policy** source; it does not claim those bytes seed
+or condition CPU output.
+
+Readiness JSON adds `output_mode`, `backend_failures_total` and, after a direct
+CPU failure, `backend_error`. A latched CPU failure sets both `ready` and
+`generation_allowed` false. `rng_backend_failures_total` counts the shared
+root latch (0 or 1 until restart); seed-mixing failures are not included.
+Readiness/metrics remain available. New generation requests receive 503;
+a binary HTTP response already in progress is truncated without appending an
+error body, and affected WebSockets close. No software output is substituted.
+See [trust, retry and timing boundaries](experimental-rdrand.md).

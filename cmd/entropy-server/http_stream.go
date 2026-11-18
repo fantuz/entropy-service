@@ -38,7 +38,7 @@ func (r requestEntropyReader) Read(p []byte) (int, error) {
 // streamEntropyResponse generates exactly count bytes on success, without
 // allocating a response-sized buffer. A failed stream may already have sent
 // headers/body; callers must log errors rather than invoke http.Error. A seed
-// policy denial before the first write is translated to 503 here.
+// policy denial or CPU backend failure before the first write becomes 503.
 func streamEntropyResponse(w http.ResponseWriter, r *http.Request, source io.Reader, count int) error {
 	if count <= 0 {
 		return errors.New("entropy response size must be positive")
@@ -54,8 +54,8 @@ func streamEntropyResponse(w http.ResponseWriter, r *http.Request, source io.Rea
 	output := &entropyStreamWriter{target: w}
 
 	_, err := io.CopyN(output, requestEntropyReader{check: r.Context().Err, source: source}, int64(count))
-	if errors.Is(err, drbg.ErrSeedUnavailable) && !output.started {
-		writeGenerationUnavailable(w)
+	if (errors.Is(err, drbg.ErrSeedUnavailable) || errors.Is(err, drbg.ErrCPUBackendFailed)) && !output.started {
+		writeGenerationError(w, err, "Generation unavailable")
 	}
 
 	return err

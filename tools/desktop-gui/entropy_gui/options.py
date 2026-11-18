@@ -43,7 +43,8 @@ _CLIENT_FIELDS = (
 _SERVER_FIELDS = (
     OptionField("device", "Seed source", "Seed and DRBG",
                 hint="OS source, device path or a supported hardware selector."),
-    OptionField("drbg", "DRBG algorithm", "Seed and DRBG", "choice", ("aes-256-ctr", "chacha20")),
+    OptionField("drbg", "Output backend", "Seed and DRBG", "choice", ("aes-256-ctr", "chacha20", "rdrand-experimental"),
+                "RDRAND is experimental direct CPU output: native x64 only, CPU-only trust, no software fallback."),
     OptionField("require-device", "Require selected seed device", "Seed and DRBG", "bool"),
     OptionField("cpu-mix", "CPU mixing", "Seed and DRBG", "bool"),
     OptionField("rdrand-mix", "RDRAND mixing", "Seed and DRBG", "bool"),

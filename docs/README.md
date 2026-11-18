@@ -10,6 +10,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [v2.4.0 release notes](releases/v2.4.0.md) | Native Windows Service lifecycle, dedicated account, protected state and certificates. |
 | [v2.3.1 release notes](releases/v2.3.1.md) | Container distribution, readiness, image maintenance and retry/export test reliability. |
 | [DRBG construction](drbg-construction.md) | Byte-level root/child state transitions, reseed diagram, and limits of the cryptographic assurance claim. |
+| [Experimental direct RDRAND](experimental-rdrand.md) | Native x64 CPU output, trust and failure boundaries, Linux/Windows examples and repeatable timings. |
 | [Experimental Barzakh-521](experimental-barzakh.md) | Opt-in original Go scalar backend, build instructions, exact mapping, tests and licensing/patent boundary. |
 | [Process-memory hardening](process-memory-hardening.md) | Opt-in systemd protection, core-dump caveats and host security checklist. |
 | [DRBG lifecycle benchmarks](drbg-lifecycle-benchmarks.md) | Reproducible microbenchmark suite, before/after comparison, and interpretation. |

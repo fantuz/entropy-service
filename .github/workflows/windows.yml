@@ -41,6 +41,9 @@ jobs:
       - name: Test shared code and Windows adapters
         run: go test -count=1 -timeout=5m ./...
         if: (inputs.full)
+      - name: Test unsupported pure-Go CPU backend selection
+        run: go test -count=1 -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand ./cmd/entropy-server/internal/config
+        if: (inputs.full)
       - name: Vet Windows code
         run: go vet ./...
         if: (inputs.full)

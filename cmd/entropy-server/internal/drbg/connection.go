@@ -37,6 +37,19 @@ func (c *ConnectionReader) Read(p []byte) (int, error) {
 		return 0, nil
 	}
 
+	if c.parent.cpu != nil {
+		if c.child == nil {
+			child, err := NewConnectionDRBG(c.parent)
+			if err != nil {
+				return 0, err
+			}
+
+			c.child = &child
+		}
+
+		return c.child.Read(p)
+	}
+
 	if uint64(len(p)) > maxBytesPerKey {
 		return 0, errors.New("connection read exceeds DRBG per-key output limit")
 	}

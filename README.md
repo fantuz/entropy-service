@@ -323,6 +323,12 @@ Barzakh-521 scalar construction is available with the
 It uses variable-time arithmetic and is unsuitable for secrets; see
 [experimental build instructions, provenance and patent limitations](docs/experimental-barzakh.md).
 
+For CPU experiments, native x64 builds also support
+`-drbg=rdrand-experimental`: direct RDRAND output with bounded instruction
+retries, no software fallback and a shared failure latch. External seeds do not
+condition these bytes. See [CPU backend boundaries, examples and measured
+performance](docs/experimental-rdrand.md). Existing defaults are unchanged.
+
 ## Architecture
 
 ```mermaid
@@ -336,7 +342,7 @@ flowchart TD
     G --> B["Binary HTTP and WebSocket consumers"]
 ```
 
-The service creates **one root DRBG**, seeded from a full 64-byte startup read and refreshed by one reseed loop. This root serves all generation endpoints and seeds their private generators. The former reference root, background producer, software ring buffer and experimental generator-pool path are no longer active.
+In the default software mode, the service creates **one root DRBG**, seeded from a full 64-byte startup read and refreshed by one reseed loop. This root serves all generation endpoints and seeds their private generators. The former reference root, background producer, software ring buffer and experimental generator-pool path are no longer active.
 
 `/v1/data/random` creates a private generator per request. Each entropy WebSocket creates its own generator lazily on the first output read, then refreshes it after a parent reseed or before exceeding the 256 GiB per-key output limit. Child seeds come from the serving DRBG; they are not additional hardware reads. `/v1/data/test` and the other generated HTTP representations read the serving root directly.
 

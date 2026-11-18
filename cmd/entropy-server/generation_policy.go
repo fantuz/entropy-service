@@ -48,7 +48,12 @@ func registerGenerationRoutes(mux *http.ServeMux, root *drbg.DRBG, cfg *config.C
 	for path, handler := range routes {
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 			if err := root.CheckGeneration(); err != nil {
-				writeGenerationUnavailable(w)
+				if errors.Is(err, drbg.ErrCPUBackendFailed) {
+					writeGenerationError(w, err, "Generation unavailable")
+				} else {
+					writeGenerationUnavailable(w)
+				}
+
 				return
 			}
 
@@ -66,6 +71,15 @@ func writeGenerationUnavailable(w http.ResponseWriter) {
 }
 
 func writeGenerationError(w http.ResponseWriter, err error, fallback string) {
+	if errors.Is(err, drbg.ErrCPUBackendFailed) {
+		w.Header().Del("Content-Length")
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		http.Error(w, drbg.ErrCPUBackendFailed.Error(), http.StatusServiceUnavailable)
+
+		return
+	}
+
 	if errors.Is(err, drbg.ErrSeedUnavailable) {
 		writeGenerationUnavailable(w)
 		return
@@ -75,6 +89,11 @@ func writeGenerationError(w http.ResponseWriter, err error, fallback string) {
 }
 
 func closeUnavailableGeneration(conn *websocket.Conn, err error) {
+	if errors.Is(err, drbg.ErrCPUBackendFailed) {
+		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "CPU backend failed; operator restart required"), time.Now().Add(time.Second))
+		return
+	}
+
 	if errors.Is(err, drbg.ErrSeedUnavailable) {
 		_ = conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "Seed unavailable; reconnect after a successful reseed"),

@@ -1,0 +1,24 @@
+goos: linux
+goarch: amd64
+pkg: github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg
+cpu: AMD EPYC 9V74 80-Core Processor                
+BenchmarkOutputBackends/aes-256-ctr/65536         	   33838	     11392 ns/op	5752.56 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/65536         	   30570	     11686 ns/op	5608.06 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/65536         	   33003	     12377 ns/op	5295.03 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/1048576       	    1934	    186295 ns/op	5628.57 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/1048576       	    2098	    179457 ns/op	5843.04 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/1048576       	    1998	    178049 ns/op	5889.24 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/65536            	    3295	    108144 ns/op	 606.01 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/65536            	    2929	    114566 ns/op	 572.04 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/65536            	    3111	    113257 ns/op	 578.65 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/1048576          	     192	   1949556 ns/op	 537.85 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/1048576          	     216	   1897459 ns/op	 552.62 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/1048576          	     205	   1795159 ns/op	 584.11 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/65536 	    1753	    211656 ns/op	 309.63 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/65536 	    1461	    222993 ns/op	 293.89 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/65536 	    1730	    209312 ns/op	 313.10 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/1048576         	     106	   3515019 ns/op	 298.31 MB/s	       1 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/1048576         	     100	   3363176 ns/op	 311.78 MB/s	       1 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/1048576         	     100	   3420641 ns/op	 306.54 MB/s	       1 B/op	       0 allocs/op
+PASS
+ok  	github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg	7.899s

@@ -3,6 +3,9 @@
 This baseline describes normal AES/ChaCha builds. The opt-in
 [experimental Barzakh-521 mapping](experimental-barzakh.md) uses the same
 outer seed/reseed lifecycle with a different, variable-time generator.
+The [experimental direct RDRAND backend](experimental-rdrand.md) is a separate
+output path: this document's SHA-512 seed/key mapping, software child-stream
+independence and per-key byte budget do not describe it.
 
 > **Status:** descriptive specification of the current Entropy Service
 > construction, reviewed against `main` at `b183df363b3e75cd9863a0a9a24c28bb68720fd9`.

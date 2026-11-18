@@ -120,7 +120,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.KeyFile, "key-file", "key.pem", "TLS private key PEM file matching cert-file; keep owner-only")
 	flags.DurationVar(&cfg.SourceTimeout, "source-timeout", 3*time.Second, "Deadline for each complete startup/reseed read (1ms..5m); hardware must support nonblocking read deadlines")
 	flags.StringVar(&cfg.DevicePath, "device", defaultDeviceForOS(runtime.GOOS), "Seed source: Linux device path; Windows windows-csprng or experimental quantis-pci:0; experimental quantis-usb:0 or chaoskey-usb:0 on Linux/Windows (see hardware list)")
-	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "DRBG backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; barzakh-521-experimental requires -tags=experimental_barzakh")
+	flags.StringVar(&cfg.DRBG, "drbg", defaultDRBGForArch(runtime.GOARCH), "Output backend: aes-256-ctr by default, chacha20 on ARM/RISC-V; rdrand-experimental is direct CPU output (native amd64); barzakh-521-experimental requires -tags=experimental_barzakh")
 	flags.IntVar(&cfg.RefreshRateMs, "refresh-ms", 5000, "Default /bytes WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.RefreshColorMs, "refresh-colors-ms", 1500, "Default /stream, /colors and /words WebSocket interval in milliseconds")
 	flags.IntVar(&cfg.PageRefreshMs, "refresh", 5000, "Word page refresh in milliseconds (HTML rounds up to whole seconds)")

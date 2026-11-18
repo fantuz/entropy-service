@@ -1,0 +1,12 @@
+goos: linux
+goarch: amd64
+pkg: github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg
+cpu: AMD EPYC 9V74 80-Core Processor                
+BenchmarkOutputBackends/rdrand-experimental/65536         	    2092	    212707 ns/op	 308.10 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/65536         	    2248	    215009 ns/op	 304.81 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/65536         	    2245	    212275 ns/op	 308.73 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/1048576       	     147	   3322645 ns/op	 315.58 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/1048576       	     146	   3501189 ns/op	 299.49 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/rdrand-experimental/1048576       	     141	   3323465 ns/op	 315.51 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg	3.951s

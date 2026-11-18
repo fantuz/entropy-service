@@ -1,4 +1,4 @@
-// Package rdrand provides optional CPU randomness for seed mixing.
+// Package rdrand provides CPU randomness for seed mixing and experimental direct output.
 package rdrand
 
 import (
