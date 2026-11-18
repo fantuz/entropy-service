@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 
 from oci_bundle import Archive
+from container_identity import PLATFORMS
 
 
 def main():
@@ -24,7 +25,10 @@ def main():
             raise ValueError('Expected exactly the requested platform')
         image_id = archive.images[args.platform]['config_digest']
     target = f'entropy-service/{args.role}:{args.platform}'
-    subprocess.run(['skopeo', 'copy', 'oci-archive:'+str(args.archive.resolve()), 'docker-daemon:'+target], check=True)
+    arch, variant = PLATFORMS[args.platform]
+    selection = ['--override-os=linux', '--override-arch='+arch]
+    if variant: selection.append('--override-variant='+variant)
+    subprocess.run(['skopeo', *selection, 'copy', 'oci-archive:'+str(args.archive.resolve()), 'docker-daemon:'+target], check=True)
     info = json.loads(subprocess.check_output(['docker', 'image', 'inspect', target]))[0]
     if info['Id'] != image_id:
         raise ValueError('Runtime image config differs from authoritative OCI export')
