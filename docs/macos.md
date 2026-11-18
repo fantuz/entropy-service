@@ -73,6 +73,11 @@ tools/desktop-gui/entropy-gui-macos --view client \
   -mode=push -wsurl=ws://127.0.0.1:8080/stream
 ```
 
+For a private HTTPS health endpoint, pass `--health-ca /absolute/path/public-ca.pem`
+before `--` (and select its `--health-url`). The Go CLI uses macOS Keychain trust;
+Homebrew Python uses its OpenSSL trust configuration, which can differ. Supply
+only the public CA/certificate, never the server's private key.
+
 Click **Start** in each view. The launcher selects a Homebrew Python that can
 import GTK/PyGObject/Cairo; it does not replace the system Python or change the
 user's global environment. Install dependencies using Homebrew's supported

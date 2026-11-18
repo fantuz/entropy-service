@@ -349,9 +349,12 @@ class HealthTLSTests(_HealthBase):
         root = Path(cls.directory.name)
         cls.cert, cls.key = root / "cert.pem", root / "key.pem"
         cls.extra_cert, cls.extra_key = root / "extra-cert.pem", root / "extra-key.pem"
-        server = ROOT / ("bin/entropy-server.exe" if sys.platform == "win32" else "bin/entropy-server")
+        default_server = ROOT / ("bin/entropy-server.exe" if sys.platform == "win32" else "bin/entropy-server")
+        server = Path(os.environ.get("ENTROPY_GUI_TEST_SERVER", str(default_server)))
         if not server.is_file():
             cls.directory.cleanup()
+            if "ENTROPY_GUI_TEST_SERVER" in os.environ:
+                raise RuntimeError("Selected health-test server is missing: " + str(server))
             raise unittest.SkipTest("Build entropy-server before the health TLS tests")
         subprocess.run([str(server), "generate-cert", f"-cert-file={cls.cert}", f"-key-file={cls.key}",
                         "-hosts=localhost", "-valid-for=1h"], check=True, stdout=subprocess.DEVNULL,
