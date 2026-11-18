@@ -44,6 +44,11 @@ def validate(run, jobs, tag, sha, now):
     if len(names) != len(set(names)) or not REQUIRED <= set(names):
         raise ValueError("required release validation jobs are missing or ambiguous")
     for job in jobs:
+        # A normal tag push never invokes the manual recovery-only wrapper.
+        # All actual validation jobs, including newly added ones, remain strict.
+        if (job["name"] == "recover-publication" and job["status"] == "completed"
+                and job["conclusion"] == "skipped"):
+            continue
         if job["name"] not in PUBLICATION and (job["status"] != "completed" or job["conclusion"] != "success"):
             raise ValueError("release validation did not pass: " + job["name"])
 

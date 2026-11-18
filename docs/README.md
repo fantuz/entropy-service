@@ -21,7 +21,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Maintenance change report, November 13](maintenance-review-2026-11-13.md) | Removed/rephrased claims, implementation evidence and unused-source cleanup inventory. |
 | [Security boundaries & threat model](security-boundaries.md) | Trust boundaries, seed failure modes, adversaries, explicit non-guarantees and prioritized threat register. |
 | [Configuration](configuration.md) | Server and client flags, timing semantics, source selection and client analysis settings. |
-| [Containers and GHCR](containers.md) | Server/client Linux images, Docker/Compose, TLS, persistent exports, hardware access and tested-image publication. |
+| [Containers and GHCR](containers.md) | Server/client Linux images, Docker/Compose, TLS, persistent exports, hardware access, offline OCI downloads and registry fault tests. |
 | [Optional Windows port](windows.md) | Native x64 builds, OS randomness, capability limits, private ACL files, console output and validation. |
 | [Experimental Quantis PCI adapter](quantis.md) | Windows legacy PCI driver interface, explicit hardware seeding, validation limits and Linux device integration. |
 | [Hardware discovery and probe](hardware-probe.md) | Read-only inventory, driver binding, explicit source checks, JSON reports and limits of hardware assurance. |

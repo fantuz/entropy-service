@@ -286,6 +286,82 @@ The standalone probe is built from the maintained container recipe, including
 when backfilling an older application release. The application revision and
 `io.entropy-service.recipe.revision` label identify these two sources separately.
 
+## Offline OCI downloads
+
+Releases made after this change include two portable OCI image archives:
+
+- `entropy-service_<version>_linux.oci.tar` (server)
+- `entropy-client_<version>_linux.oci.tar` (client)
+
+Each contains Linux amd64, arm64 and ARMv7. These are container images, not
+native CLI archives. v2.5.0 predates these downloads; until the next release,
+the matching build's `container-oci-bundles` CI artifact provides them.
+
+Verify against the release's `checksums.txt` before transferring to an offline
+host. On Linux, import the matching platform into Docker with Skopeo:
+
+```sh
+sha256sum --check checksums.txt --ignore-missing
+skopeo --override-os linux --override-arch amd64 copy \
+  oci-archive:entropy-service_<version>_linux.oci.tar \
+  docker-daemon:entropy-service:offline
+skopeo --override-os linux --override-arch amd64 copy \
+  oci-archive:entropy-client_<version>_linux.oci.tar \
+  docker-daemon:entropy-client:offline
+```
+
+Use `--override-arch arm64` or `--override-arch arm --override-variant v7`
+for other hosts. Run the imported images using the same volume, listener,
+non-root and TLS options documented above, replacing the GHCR image name with
+`entropy-service:offline` or `entropy-client:offline`. Docker Desktop still
+runs Linux containers; these archives do not install Windows or macOS services.
+
+For an internal registry, copy all platforms without rebuilding:
+
+```sh
+skopeo copy --all --preserve-digests \
+  oci-archive:entropy-service_<version>_linux.oci.tar \
+  docker://registry.example.org/team/entropy-service:<version>
+```
+
+Use the registry's usual authentication and TLS trust. Each offline archive's
+root index digest equals its corresponding versioned GHCR index digest. CI
+combines the exact runtime-tested/scanned manifests and blobs; it does not
+rebuild or recompress them. SBOMs remain available through GHCR referrers and
+CI security artifacts; an offline image copy alone does not copy referrers.
+The `oci-images.json` CI metadata records index/platform/config digests.
+
+## Registry publication fault tests
+
+Every full container build exercises a digest-pinned, disposable Distribution
+registry bound only to loopback. The real publisher uploads both roles and six
+SPDX attachments, checks all manifest/config digests, and repeats publication
+to verify idempotency. A local fault proxy injects HTTP 503, a missing-blob
+response and permanent denial. Transient faults must recover through bounded
+retries; denial must fail immediately while public channel/platform aliases
+remain unchanged. These tests never publish to GHCR.
+
+Both role graphs and their SBOMs are staged before consumer aliases move.
+Registry APIs cannot atomically update two repositories: a failure during the
+final alias updates can still leave a partial promotion. Re-running publication
+is idempotent and repairs that state. Stable `latest` reconciliation retains
+its existing cross-run lock and current-release checks.
+
+To reproduce against the same-run downloaded native artifacts:
+
+```sh
+python3 scripts/oci_release.py build --artifacts tested-images \
+  --output tested-images/container-oci-bundles --source-sha <full-commit> \
+  --version edge
+python3 scripts/test_registry_publication.py --artifacts tested-images \
+  --source-sha <full-commit> --version edge
+```
+
+Install Docker, Skopeo and ORAS first. Native artifacts must include their
+actual scan reports, SPDX files and checksums. `registry-publication-evidence`
+records the tested source and cases. Historical Docker archives remain
+readable for recovery of older validated publication runs.
+
 ## Image maintenance and SBOMs
 
 Every image platform is scanned with pinned Trivy before publication. The scan
