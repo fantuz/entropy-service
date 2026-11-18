@@ -67,8 +67,6 @@ def client_failure_text(error, diagnostics):
         hint = "The direct CPU backend reports a hardware-read failure. Check server logs/readiness; an operator restart is required."
     elif "server returned 400" in detail or "server returned 413" in detail:
         hint = "Check Bytes per response against the server's configured maximum and the reported request error."
-    elif "server returned 400" in detail or "server returned 413" in detail:
-        hint = "Check Bytes per response against the server's configured maximum."
     elif "timed out" in detail or "timeout" in detail or "deadline exceeded" in detail:
         hint = "A request timed out. Try a smaller payload or lower frame rate and check server/network timing."
     elif "unexpected eof" in detail or "connection reset" in detail or "closed with code 1006" in detail:
