@@ -43,12 +43,6 @@ jobs:
         uses: ./.github/actions/setup-go-cache
         with:
           profile: macos
-      - name: Test native Go code with race detector
-        if: (inputs.full)
-        run: go test -race -count=1 -timeout=8m ./...
-      - name: Vet native Go code
-        if: (inputs.full)
-        run: go vet ./...
       - name: Download same-run macOS archives
         if: (inputs.full)
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
@@ -61,9 +55,6 @@ jobs:
         env:
           MACOS_ARCH: ${{ matrix.arch }}
         run: python3 scripts/test_macos.py --prepare macos-downloads --output "$RUNNER_TEMP/Entropy portable binaries"
-      - name: Exercise real macOS CLI, TLS, exports, PTY and shutdown
-        if: (inputs.full)
-        run: python3 scripts/test_macos.py --bin "$RUNNER_TEMP/Entropy portable binaries"
       - name: Install Homebrew GTK bindings
         id: bindings
         if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
@@ -73,6 +64,25 @@ jobs:
       - name: Test GUI models and process lifecycle with Homebrew Python
         if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success' && steps.bindings.outcome == 'success'
         run: tools/desktop-gui/entropy-gui-macos --python-check scripts/test_macos_gui.py --bin "$RUNNER_TEMP/Entropy portable binaries" --artifacts macos-gui-artifacts
+      - name: Test native Go code with race detector
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        run: go test -race -count=1 -timeout=8m ./...
+      - name: Vet native Go code
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        run: go vet ./...
+      - name: Exercise real macOS CLI, TLS, exports, PTY and shutdown
+        if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success'
+        run: python3 scripts/test_macos.py --bin "$RUNNER_TEMP/Entropy portable binaries"
+      - name: Collect native Python crash reports
+        if: (inputs.full) && always()
+        shell: bash
+        run: |
+          mkdir -p macos-gui-artifacts/crashes
+          for report in "$HOME"/Library/Logs/DiagnosticReports/[Pp]ython*.ips; do
+            if [[ -f "$report" && "$report" -nt macos-runtime.txt ]]; then
+              cp "$report" macos-gui-artifacts/crashes/
+            fi
+          done
       - name: Preserve macOS qualification evidence
         if: (inputs.full) && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

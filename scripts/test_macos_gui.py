@@ -20,7 +20,7 @@ def main():
     for pattern in ('test_desktop_gui*.py','test_gui_health.py'):
         result=subprocess.run([sys.executable,'-m','unittest','discover','-s','scripts','-p',pattern],check=False,env=environment)
         if result.returncode:failures.append(pattern)
-    subprocess.run([sys.executable,'scripts/test_desktop_gui_gtk.py','--server',str(args.bin/'entropy-server'),
+    subprocess.run([sys.executable,'-X','faulthandler','scripts/test_desktop_gui_gtk.py','--server',str(args.bin/'entropy-server'),
                     '--client',str(args.bin/'entropy-client'),'--artifacts',str(args.artifacts)],check=True,timeout=240)
     evidence=json.loads((args.artifacts/'results.json').read_text())
     assert evidence['passed'] and evidence['platform']=='darwin',evidence
