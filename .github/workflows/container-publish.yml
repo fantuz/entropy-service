@@ -33,6 +33,15 @@ jobs:
         with:
           pattern: container-images-*
           path: tested-images
+      - name: Download offline bundles when produced by this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: container-oci-bundles
+          path: tested-images
+      - name: Install exact OCI publication transport
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo
       - name: Set up Buildx for image indexes
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Install the OCI artifact client for SBOM attachments

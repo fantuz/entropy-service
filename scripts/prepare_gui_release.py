@@ -98,6 +98,8 @@ def main():
     commands.add_parser("version")
     prepare = commands.add_parser("prepare")
     prepare.add_argument("--artifacts", type=Path, required=True)
+    prepare.add_argument("--oci-artifacts", type=Path)
+    prepare.add_argument("--repository", default="fantuz/entropy-service")
     prepare.add_argument("--version", required=True)
     prepare.add_argument("--source-sha", required=True)
     prepare.add_argument("--config", type=Path, default=Path(".goreleaser.yml"))
@@ -111,6 +113,10 @@ def main():
         print("Installer version:", version)
     else:
         files = verify_artifacts(args.artifacts, args.version, args.source_sha)
+        if args.oci_artifacts is not None:
+            from oci_release import verify, names_for
+            verify(args.oci_artifacts, args.source_sha, args.version, args.repository)
+            files.extend(args.oci_artifacts/name for name in names_for(args.version).values())
         args.output.write_text(release_config(args.config.read_text(), files))
         print("Verified tagged GUI installer and runtime sources:", *(p.name for p in files))
 

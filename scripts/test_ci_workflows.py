@@ -78,6 +78,21 @@ class WorkflowContracts(unittest.TestCase):
             self.assertEqual("${{ github.ref_name }}", jobs[name]["with"]["release_tag"])
         self.assertEqual("./.github/workflows/release-recovery.yml", jobs["recover-publication"]["uses"])
 
+    def test_offline_bundles_gate_publication_and_use_exact_exports(self):
+        jobs = workflow("container-build")["jobs"]
+        self.assertEqual("images", jobs["bundles"]["needs"])
+        builds = [step for step in jobs["images"]["steps"] if step.get("uses", "").startswith("docker/build-push-action@")]
+        self.assertEqual(2, len(builds))
+        for step in builds:
+            self.assertNotIn("load", step["with"])
+            self.assertTrue(step["with"]["outputs"].startswith("type=oci,dest="))
+        self.assertEqual("container-oci-bundles", jobs["bundles"]["steps"][-1]["with"]["name"])
+        release = workflow("release")["jobs"]["release"]["steps"]
+        self.assertTrue(any(step.get("with", {}).get("name") == "container-oci-bundles" for step in release))
+        self.assertTrue(any("--oci-artifacts bin/oci-release" in step.get("run", "") for step in release))
+        publication = workflow("container-publish")["jobs"]["publish"]["steps"]
+        self.assertTrue(any(step.get("with", {}).get("pattern") == "container-oci-bundles" for step in publication))
+
     def test_cache_maintenance_uses_only_default_branch_tools(self):
         document = workflow("cache-maintenance")
         self.assertEqual(["closed"], document["on"]["pull_request_target"]["types"])
