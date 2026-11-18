@@ -8,12 +8,62 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+import time
 
 from check_container_scan import check_report
 
 
 PLATFORMS = {"linux-amd64": ("amd64", ""), "linux-arm64": ("arm64", ""), "linux-armv7": ("arm", "v7")}
 VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?")
+REGISTRY_ATTEMPTS = 4
+REGISTRY_TIMEOUT = 120
+
+
+def transient_registry_error(output):
+    message = output.decode("utf-8", errors="replace").lower()
+    # Never turn authentication/authorization or invalid-content failures into
+    # retries, even when another diagnostic contains a transient status code.
+    if any(detail in message for detail in ("unauthorized", "authentication required", "forbidden",
+                                             "denied", "insufficient_scope", "invalid reference",
+                                             "digest invalid", "manifest invalid")):
+        return False
+    return bool(re.search(r"\b(?:429|500|502|503|504)\b", message)) or any(
+        detail in message for detail in ("unknown blob", "blob unknown", "blob_unknown", "manifest unknown",
+                                        "too many requests", "toomanyrequests", "connection reset",
+                                        "connection refused", "connection timed out", "i/o timeout",
+                                        "tls handshake timeout", "unexpected eof", "service unavailable"))
+
+
+def registry_command(command, *, capture=False, cwd=None):
+    """Retry an idempotent registry operation, never builds or validation.
+
+    Keep failed-command diagnostics visible without mixing them into captured
+    JSON. Each attempt is time-bounded; permanent/unknown errors fail at once.
+    """
+    for attempt in range(REGISTRY_ATTEMPTS):
+        try:
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    cwd=cwd, timeout=REGISTRY_TIMEOUT, check=False)
+        except subprocess.TimeoutExpired as error:
+            if attempt == REGISTRY_ATTEMPTS - 1:
+                raise
+            output = (error.stdout or b"") + (error.stderr or b"")
+            sys.stderr.write(output.decode("utf-8", errors="replace"))
+        else:
+            if result.returncode == 0:
+                if result.stderr:
+                    sys.stderr.write(result.stderr.decode("utf-8", errors="replace"))
+                if not capture:
+                    sys.stdout.write(result.stdout.decode("utf-8", errors="replace"))
+                return result.stdout if capture else None
+            output = result.stdout + result.stderr
+            sys.stderr.write(output.decode("utf-8", errors="replace"))
+            if attempt == REGISTRY_ATTEMPTS - 1 or not transient_registry_error(output):
+                result.check_returncode()
+        delay = 2 ** (attempt + 1)
+        print(f"Transient registry failure; retry {attempt + 2}/{REGISTRY_ATTEMPTS} in {delay}s", file=sys.stderr, flush=True)
+        time.sleep(delay)
 
 
 def validate_request(repository, tag, source_sha, latest):
@@ -82,6 +132,8 @@ def verify_security_reports(directory, role, image_id):
 
 
 def docker(*args, capture=False):
+    if args[:2] == ("image", "push") or args[:2] == ("buildx", "imagetools"):
+        return registry_command(["docker", *args], capture=capture)
     result = subprocess.run(["docker", *args], check=True, stdout=subprocess.PIPE if capture else None)
     return result.stdout if capture else None
 
@@ -100,7 +152,7 @@ def main():
     destinations = {"server": "ghcr.io/" + repository, "client": f"ghcr.io/{owner}/entropy-client"}
 
     # Validate all archives and all six loaded images before the first push.
-    sboms = {}
+    sboms, image_ids = {}, {}
     for platform in PLATFORMS:
         directory = args.artifacts / ("container-images-" + platform)
         archive = verify_archive(directory)
@@ -110,8 +162,11 @@ def main():
             info = json.loads(docker("image", "inspect", source, capture=True))[0]
             verify_image(info, role, platform, args.repository, args.source_sha, version)
             sboms[platform, role] = verify_security_reports(directory, role, info["Id"])
+            image_ids[platform, role] = info["Id"]
 
-    references = []
+    # Stage every platform of BOTH roles before either consumer-facing index
+    # changes. A failed client upload must not already advance the server tag.
+    staged = {}
     for role, destination in destinations.items():
         parts = []
         for platform in PLATFORMS:
@@ -124,17 +179,26 @@ def main():
             digest = descriptor["digest"]
             if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
                 raise ValueError("invalid published platform digest")
+            immutable = destination + "@" + digest
+            manifest = json.loads(docker("buildx", "imagetools", "inspect", "--raw", immutable, capture=True))
+            if manifest.get("config", {}).get("digest") != image_ids[platform, role]:
+                raise ValueError("published image config differs from the exact tested image")
             sbom = sboms[platform, role]
-            subprocess.run(["oras", "attach", "--artifact-type", "application/spdx+json",
-                            destination + "@" + digest, sbom.name + ":application/spdx+json"],
-                           cwd=sbom.parent, check=True, timeout=120)
-            parts.append(destination_part)
+            registry_command(["oras", "attach", "--artifact-type", "application/spdx+json",
+                              immutable, sbom.name + ":application/spdx+json"], cwd=sbom.parent)
+            parts.append(immutable)
+        staged[destination] = parts
+
+    references = []
+    for destination, parts in staged.items():
         reference = f"{destination}:{args.tag}"
         docker("buildx", "imagetools", "create", "--tag", reference, *parts)
         index = json.loads(docker("buildx", "imagetools", "inspect", "--raw", reference, capture=True))
         platforms = {(m["platform"]["os"], m["platform"]["architecture"], m["platform"].get("variant", "")) for m in index["manifests"]}
         if {("linux", "amd64", ""), ("linux", "arm", "v7")} - platforms or not any(p[:2] == ("linux", "arm64") for p in platforms) or len(platforms) != 3:
             raise ValueError("published image index does not contain the three tested platforms")
+        if len(index["manifests"]) != 3 or {m["digest"] for m in index["manifests"]} != {part.split("@", 1)[1] for part in parts}:
+            raise ValueError("published image index differs from the three tested platform digests")
         references.append(reference)
     print("Published tested images:\n" + "\n".join(references))
     if os.environ.get("GITHUB_STEP_SUMMARY"):
