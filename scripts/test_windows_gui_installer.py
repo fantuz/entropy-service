@@ -65,6 +65,21 @@ def main():
                 obsolete.write_bytes(b"remove obsolete bundled runtime files")
                 retained = installation / "user sample.bin"
                 retained.write_bytes(b"retain unowned user files")
+                active = subprocess.Popen([str(python), "-I", "-B", "-u", "-c",
+                    "import time; print('ready', flush=True); time.sleep(60)"], env=environment,
+                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                try:
+                    assert active.stdout.readline().strip() == b"ready"
+                    blocked = subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                        "/NORESTART", "/SP-", "/DIR=" + str(installation),
+                        "/LOG=" + str(artifacts / "active-process.log")], check=False, timeout=60)
+                    assert blocked.returncode != 0 and active.poll() is None
+                    assert obsolete.exists() and retained.read_bytes() == b"retain unowned user files"
+                finally:
+                    active.terminate()
+                    active.wait(timeout=10)
+                    active.stdout.close()
+                    active.stderr.close()
                 subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
                                 "/DIR=" + str(installation), "/LOG=" + str(artifacts / "upgrade.log")], check=True, timeout=180)
                 assert not obsolete.exists()

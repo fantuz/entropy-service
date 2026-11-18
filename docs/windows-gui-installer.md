@@ -81,6 +81,12 @@ The separate `%LOCALAPPDATA%\Entropy Service` data directory, certificates,
 exports and other unowned files are retained. Setup does not restart programs
 automatically after replacement.
 
+Replacement waits for GUI windows and local utilities from this installation
+to close. Once they are closed, setup stops leftover `gdbus`/`dbus-daemon`
+helpers only when their executable belongs to this private runtime. It does
+not force-close the GUI/CLI or unrelated system D-Bus processes. Windows'
+normal file-in-use checks remain enabled.
+
 An upgrade uses the existing installation folder. To relocate it, uninstall
 through Windows Apps first, then choose a new location; a conflicting `/DIR`
 is rejected before replacing files. Silent upgrades use the same replacement
@@ -119,7 +125,9 @@ access to the original MSYS2 UCRT64 prefix, strips build-time search paths and
 uses the installed runtime to exercise both GTK views, acquisition/fullscreen,
 owned-process controls and shutdown. It upgrades that installed bundle and
 repeats the GUI checks with the original runtime still unavailable, verifying
-obsolete-file removal and preservation of user data, then uninstalls. Successful
+obsolete-file removal and preservation of user data, then uninstalls. It also
+checks that an active runtime process blocks replacement without being killed.
+Successful
 installer/source artifacts and diagnostic evidence
 are retained for 14 days. PR builds do not publish releases.
 

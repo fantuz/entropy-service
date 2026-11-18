@@ -89,6 +89,71 @@ begin
   Result := (PageID = ReplacementPage.ID) and not ReplacingInstallation;
 end;
 
+function PrivateProcessKind(RuntimeProcess: Variant): Integer;
+var
+  Filename, RuntimeRoot, BinaryRoot, ProcessName: String;
+begin
+  Result := 0;
+  Filename := VarToStr(RuntimeProcess.ExecutablePath);
+  if Filename = '' then
+    Exit;
+  { Normalize existing long/8.3 paths before comparing private roots. }
+  Filename := GetShortName(Filename);
+  RuntimeRoot := AddBackslash(GetShortName(PreviousDirectory + '\runtime'));
+  BinaryRoot := AddBackslash(GetShortName(PreviousDirectory + '\bin'));
+  if (CompareText(Copy(Filename, 1, Length(RuntimeRoot)), RuntimeRoot) <> 0) and
+     (CompareText(Copy(Filename, 1, Length(BinaryRoot)), BinaryRoot) <> 0) then
+    Exit;
+  ProcessName := Lowercase(VarToStr(RuntimeProcess.Name));
+  if (ProcessName = 'gdbus.exe') or (ProcessName = 'dbus-daemon.exe') then
+    Result := 2
+  else
+    Result := 1;
+end;
+
+function ClosePrivateRuntimeHelpers: String;
+var
+  Locator, Services, Processes, RuntimeProcess: Variant;
+  Index, Status: Integer;
+begin
+  Result := '';
+  try
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Services := Locator.ConnectServer('', 'root\CIMV2');
+    Processes := Services.ExecQuery('SELECT * FROM Win32_Process');
+    { Check every live application first: never kill a GUI, CLI or unrelated
+      process merely because it maps one of the runtime DLLs. }
+    for Index := 0 to Processes.Count - 1 do
+    begin
+      RuntimeProcess := Processes.ItemIndex(Index);
+      if PrivateProcessKind(RuntimeProcess) = 1 then
+      begin
+        Result := 'Close the Entropy Service GUI windows and local utilities using this installation, then retry setup.';
+        Exit;
+      end;
+    end;
+    for Index := 0 to Processes.Count - 1 do
+    begin
+      RuntimeProcess := Processes.ItemIndex(Index);
+      if PrivateProcessKind(RuntimeProcess) = 2 then
+      begin
+        Status := RuntimeProcess.Terminate(0);
+        if (Status <> 0) and (Status <> 9) then
+        begin
+          Result := 'A private GTK background helper could not be stopped. Close it and retry setup before replacing the runtime.';
+          Exit;
+        end;
+        Log('Closed private GTK runtime helper: ' + VarToStr(RuntimeProcess.ExecutablePath));
+        Sleep(100);
+      end;
+    end;
+  except
+    { Windows' normal Restart Manager remains the fallback when WMI access is
+      disabled by policy. Do not weaken file-in-use checks or force-close apps. }
+    Log('Private GTK helper inspection unavailable: ' + GetExceptionMessage);
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
@@ -96,4 +161,6 @@ begin
      (CompareText(AddBackslash(ExpandFileName(WizardDirValue)), AddBackslash(ExpandFileName(PreviousDirectory))) <> 0) then
     Result := 'An Entropy Service installation already exists at ' + PreviousDirectory + '.' + #13#10 +
       'Upgrade in that location, or uninstall it through Windows Apps before choosing a different folder.';
+  if (Result = '') and ReplacingInstallation then
+    Result := ClosePrivateRuntimeHelpers;
 end;
