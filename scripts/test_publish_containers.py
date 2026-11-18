@@ -111,7 +111,8 @@ class RegistryRetryTests(unittest.TestCase):
     @patch.object(publication.subprocess, "run")
     def test_permanent_or_unclassified_errors_fail_without_retry(self, run, sleep):
         for output in (b"unauthorized 503", b"denied: requested access", b"invalid reference format",
-                       b"manifest invalid", b"digest invalid", b"unexpected permanent error"):
+                       b"manifest invalid", b"digest invalid", b"MANIFEST_INVALID status 503",
+                       b"uploaded 500 bytes\nunexpected permanent error", b"unexpected permanent error"):
             with self.subTest(output=output):
                 run.reset_mock()
                 run.return_value = subprocess.CompletedProcess(self.command, 1, b"", output)

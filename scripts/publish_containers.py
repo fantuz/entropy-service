@@ -26,13 +26,15 @@ def transient_registry_error(output):
     # retries, even when another diagnostic contains a transient status code.
     if any(detail in message for detail in ("unauthorized", "authentication required", "forbidden",
                                              "denied", "insufficient_scope", "invalid reference",
-                                             "digest invalid", "manifest invalid")):
+                                             "digest invalid", "digest_invalid", "manifest invalid", "manifest_invalid")):
         return False
-    return bool(re.search(r"\b(?:429|500|502|503|504)\b", message)) or any(
+    status = re.search(r"\b(?:http(?:/\d(?:\.\d)?)?(?:\s+status)?|status(?:\s+code)?)\s*[:=]?\s*(?:429|500|502|503|504)\b", message)
+    return bool(status) or any(
         detail in message for detail in ("unknown blob", "blob unknown", "blob_unknown", "manifest unknown",
                                         "too many requests", "toomanyrequests", "connection reset",
                                         "connection refused", "connection timed out", "i/o timeout",
-                                        "tls handshake timeout", "unexpected eof", "service unavailable"))
+                                        "tls handshake timeout", "unexpected eof", "service unavailable",
+                                        "bad gateway", "internal server error", "gateway timeout"))
 
 
 def registry_command(command, *, capture=False, cwd=None):
