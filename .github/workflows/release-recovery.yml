@@ -62,7 +62,8 @@ jobs:
           pattern: container-oci-bundles
           run-id: ${{ inputs.validated_run_id }}
           github-token: ${{ github.token }}
-          path: source/bin/oci-release-download
+          path: source/bin/oci-release-download/container-oci-bundles
+          merge-multiple: true
       - name: Verify exact GUI bytes and prepare relative publication globs
         env:
           RELEASE_VERSION: ${{ steps.validation.outputs.version }}
@@ -104,7 +105,8 @@ jobs:
           pattern: container-oci-bundles
           run-id: ${{ inputs.validated_run_id }}
           github-token: ${{ github.token }}
-          path: source/tested-images
+          path: source/tested-images/container-oci-bundles
+          merge-multiple: true
       - name: Install OCI publication transport
         run: |
           sudo apt-get update
