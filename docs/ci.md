@@ -76,7 +76,7 @@ all browser suites and failure artifacts remain enabled.
 `Bound CI input caches` runs weekly and when a PR closes. It executes only
 tools checked out from the repository's default branch, including on
 `pull_request_target`; it never checks out or executes PR code. It first
-obtains a complete cache listing and checks PR states, then deletes at most
+obtains a validated cache inventory and checks PR states, then deletes at most
 100 entries per run:
 
 - Caches scoped to confirmed closed PR refs can be removed. Open and
@@ -84,7 +84,32 @@ obtains a complete cache listing and checks PR states, then deletes at most
 - On the default branch, keep the two newest `go-build-v2` snapshots for
   each OS/architecture/workload/Go-version group. Leave other default-branch
   caches, module downloads and BuildKit caches alone.
-- Other branch refs are retained. API/pagination failures prevent deletion.
+- Other branch refs are retained. Listing/deletion permission errors, malformed
+  responses and safety-bound violations remain failures.
+
+Closing a PR queries only its exact `refs/pull/N/merge` and `refs/pull/N/head`
+cache scopes. Unrelated main/PR builds can continue creating caches without
+changing those filtered counts. Scheduled/manual repository-wide maintenance
+still handles closed PRs missed by an event and excess main compiler snapshots.
+
+GitHub cache pagination is not an atomic snapshot: concurrent saves and quota
+or retention evictions can change counts or shift IDs between pages. A changed
+count, repeated ID or incomplete pass restarts the whole inventory from page
+one, up to three attempts with short bounded backoff. No deletion plan is made
+from a partial attempt. If all three attempts observe churn, maintenance emits
+a warning and a **deferred, zero deletions** step summary and exits successfully;
+the weekly schedule or a later manual run can try again. This is distinct from
+completed cleanup and does not hide listing/authentication errors. A cache that
+is already gone when its DELETE runs (HTTP 404) is counted separately and does
+not fail the remaining cleanup. Other deletion errors still stop the job.
+
+The cache-maintenance failure in run `44415201783` occurred after PR #113 closed:
+the repository-wide cache count changed while it was paginating. Its guard
+aborted before any DELETE, so the failure did not invalidate the merged build
+or remove artifacts. The targeted inventory, bounded retries, explicit deferral
+and concurrent-eviction tests address that failure mode. The failed
+attempt remains in run history. A rerun can use the fix once it is on the default
+branch; a retry alone does not add concurrency handling.
 
 Manual maintenance and the script itself default to **dry run**; the CLI
 requires `--apply` to delete. Maintenance reports numeric cache IDs and

@@ -5,8 +5,11 @@ import argparse
 from collections import defaultdict
 import json
 import os
+from pathlib import Path
 import re
+import time
 from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
@@ -16,6 +19,10 @@ BUILD_KEY = re.compile(
     r"(quality|fuzz|race|terminal|packages|browser|windows|endurance|publication)-"
     r"([0-9]+\.[0-9]+\.[0-9]+)-[0-9a-f]{64}-[0-9a-f]{64}\Z"
 )
+
+
+class CacheInventoryChanged(ValueError):
+    """Concurrent cache saves/evictions prevented a complete inventory."""
 
 
 def candidates(caches, pr_state, default_ref="refs/heads/main", closed_pr=None, keep=2):
@@ -43,34 +50,68 @@ def candidates(caches, pr_state, default_ref="refs/heads/main", closed_pr=None, 
     return sorted(doomed, key=lambda cache: (cache["created_at"], cache["id"]))
 
 
-def list_caches(api):
-    """Do not delete anything unless the entire listing is complete and consistent."""
+def list_caches(api, ref=None):
+    """Complete one pass, rejecting observed count/ID changes before planning writes."""
     caches = []
     seen = set()
     expected_count = None
     for page in range(1, 101):
         # Restoring a cache changes last_accessed_at. Paginate by creation time
         # so active CI cannot reshuffle entries between pages during inspection.
-        payload = api(f"actions/caches?per_page=100&page={page}&sort=created_at&direction=asc")
+        query = f"per_page=100&page={page}&sort=created_at&direction=asc"
+        if ref is not None:
+            query += "&" + urlencode({"ref": ref})
+        payload = api("actions/caches?" + query)
         batch = payload["actions_caches"]
-        if not isinstance(batch, list):
+        count = payload["total_count"]
+        if not isinstance(batch, list) or len(batch) > 100 or type(count) is not int or count < 0:
             raise ValueError("Invalid cache listing")
         if expected_count is None:
-            expected_count = payload["total_count"]
-        elif batch and payload["total_count"] != expected_count:
-            raise ValueError("Cache count changed during pagination; retry later")
+            expected_count = count
+        elif count != expected_count and (batch or count != 0):
+            raise CacheInventoryChanged("Cache count changed during pagination")
         for cache in batch:
+            if type(cache["id"]) is not int or cache["id"] < 1:
+                raise ValueError("Invalid cache ID")
+            if ref is not None and cache["ref"] != ref:
+                raise ValueError("Cache listing did not match the requested ref")
             if cache["id"] in seen:
-                raise ValueError("Cache listing changed during pagination; retry later")
+                raise CacheInventoryChanged("Cache IDs changed during pagination")
             seen.add(cache["id"])
             caches.append(cache)
         if len(batch) < 100:
             # GitHub returns total_count=0 on the empty terminating page when
             # the number of caches is exactly divisible by the page size.
             if len(caches) != expected_count:
-                raise ValueError("Incomplete cache listing; retry later")
+                raise CacheInventoryChanged("Incomplete cache listing")
             return caches
     raise ValueError("Cache listing exceeded safety bound; nothing deleted")
+
+
+def inventory(api, closed_pr=None):
+    """Retry whole inventories, never turn a partial page into a deletion plan."""
+    refs = [None] if closed_pr is None else [f"refs/pull/{closed_pr}/merge", f"refs/pull/{closed_pr}/head"]
+    for attempt in range(3):
+        try:
+            caches = []
+            for ref in refs:
+                caches.extend(list_caches(api, ref))
+            return caches
+        except CacheInventoryChanged:
+            if attempt == 2:
+                raise
+            print(f"Cache inventory changed; retrying from page one ({attempt + 1}/3)")
+            time.sleep(0.25 * (attempt + 1))
+    raise AssertionError("Unreachable cache inventory state")
+
+
+def outcome(message):
+    """Make deferred maintenance distinguishable from completed cleanup."""
+    print(message)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with Path(summary).open("a", encoding="utf-8") as output:
+            output.write("### CI cache maintenance\n\n" + message + "\n")
 
 
 class GitHub:
@@ -103,15 +144,32 @@ class GitHub:
 def cleanup(api, *, dry_run=True, max_delete=100, closed_pr=None, default_ref="refs/heads/main"):
     if not 1 <= max_delete <= 200:
         raise ValueError("Deletion bound must be between 1 and 200")
-    caches = list_caches(api)
+    if closed_pr is not None and (type(closed_pr) is not int or closed_pr < 1):
+        raise ValueError("Closed PR must be a positive number")
+    try:
+        caches = inventory(api, closed_pr)
+    except CacheInventoryChanged:
+        print("::warning::Cache inventory kept changing; cleanup deferred without deleting any caches.")
+        outcome("Deferred after three changing inventories; deleted 0 caches. Retry maintenance later.")
+        return 0
     planned = candidates(caches, api.pr_state, default_ref, closed_pr)
     chosen = planned[:max_delete]
     print(f"Inspected {len(caches)} caches; eligible {len(planned)}; selected {len(chosen)}; dry_run={dry_run}")
+    removed = missing = 0
     for cache in chosen:
         # Report only the immutable numeric ID, not untrusted cache keys or refs.
         print(f"{'Would delete' if dry_run else 'Deleting'} cache {int(cache['id'])}")
         if not dry_run:
-            api(f"actions/caches/{int(cache['id'])}", method="DELETE")
+            try:
+                api(f"actions/caches/{int(cache['id'])}", method="DELETE")
+                removed += 1
+            except HTTPError as error:
+                if error.code != 404:
+                    raise
+                missing += 1
+                print(f"Cache {int(cache['id'])} was already removed; continuing")
+    outcome(f"Completed: inspected {len(caches)}, eligible {len(planned)}, selected {len(chosen)}, "
+            f"deleted {removed}, already removed {missing}; dry_run={dry_run}.")
     return len(chosen)
 
 
