@@ -95,3 +95,7 @@ The default GUI binary paths then resolve to `bin/entropy-server` and
 `bin/entropy-client`. Ordinary unit tests are GTK-independent; native CI also
 exercises real GTK windows, client acquisition, server health, options,
 fullscreen, resizing and joined process shutdown on both Mac architectures.
+
+Native fullscreen completion/failure checks run in separate application processes
+to match AppKit’s process-wide application lifecycle. Qualification also closes
+a running fullscreen client and checks that its owned process is reaped.

@@ -20,11 +20,24 @@ def main():
     for pattern in ('test_desktop_gui*.py','test_gui_health.py'):
         result=subprocess.run([sys.executable,'-m','unittest','discover','-s','scripts','-p',pattern],check=False,env=environment)
         if result.returncode:failures.append(pattern)
-    subprocess.run([sys.executable,'-X','faulthandler','scripts/test_desktop_gui_gtk.py','--server',str(args.bin/'entropy-server'),
-                    '--client',str(args.bin/'entropy-client'),'--artifacts',str(args.artifacts)],check=True,timeout=240)
+    command=[sys.executable,'-X','faulthandler','scripts/test_desktop_gui_gtk.py',
+             '--server',str(args.bin/'entropy-server'),'--client',str(args.bin/'entropy-client')]
+    # AppKit has one native application lifecycle per process. Avoid carrying
+    # pending fullscreen/native-window callbacks between GtkApplication objects.
+    subprocess.run([*command,'--skip-fullscreen-outcomes','--artifacts',str(args.artifacts)],check=True,timeout=240)
     evidence=json.loads((args.artifacts/'results.json').read_text())
     assert evidence['passed'] and evidence['platform']=='darwin',evidence
-    assert {'server','controls','terminal_interrupts','live_health','client','fullscreen_outcomes','inspection_close'} <= evidence.keys(),evidence
+    assert {'server','controls','terminal_interrupts','live_health','client','inspection_close'} <= evidence.keys(),evidence
+    assert evidence['terminal_interrupts']['client_fullscreen_close']['fullscreen_close_requested'],evidence
+    evidence['fullscreen_outcomes']={}
+    for outcome in ('Duration','Failure'):
+        folder=args.artifacts/('fullscreen-'+outcome.lower())
+        subprocess.run([*command,'--fullscreen-outcome',outcome,'--artifacts',str(folder)],check=True,timeout=60)
+        selected=json.loads((folder/'results.json').read_text())
+        assert selected['passed'] and selected['platform']=='darwin',selected
+        assert set(selected['fullscreen_outcomes'])=={outcome.lower()},selected
+        evidence['fullscreen_outcomes'].update(selected['fullscreen_outcomes'])
+    (args.artifacts/'results.json').write_text(json.dumps(evidence,indent=2)+'\n')
     if failures:raise RuntimeError('GUI model tests failed: '+', '.join(failures))
 
 
