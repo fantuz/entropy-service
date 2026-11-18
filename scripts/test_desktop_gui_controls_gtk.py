@@ -109,6 +109,9 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         assert window.session is None, "Opening the client GUI must not start acquisition"
         editor = _options(context, window)
         assert editor.get_value("url") == displayed_endpoint, "Saved endpoint secrets were displayed"
+        editor.set_value("capabilities", "required")
+        editor.set_value("adaptive", True)
+        editor.set_value("adaptive-max-interval", "5s")
         editor.set_value("slice", "8192")
         editor.set_value("analysis-bytes", "8192")
         editor.set_value("shannon-threshold", "6.123456")
@@ -154,6 +157,15 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         state = window.session.snapshot()
         assert state["sample"]["sample_bytes"] == 8192, state
         assert window.stat_labels["threshold"].get_text() == "6.123456"
+        wait_for(context, lambda: "average received" in window.performance_label.get_text(), "native performance view")
+        assert state["discovery"]["status"] == "available" and state["discovery"]["max_bytes"] == 33554432
+        assert state["settings"]["adaptive"] is True and state["sample"]["effective_interval_ms"] >= 50
+        assert "33,554,432" in window.performance_label.get_text()
+        capture_window(context, window, artifacts / "client-performance.png")
+        window.set_fullscreen(True)
+        assert not window.performance_expander.get_visible()
+        window.set_fullscreen(False)
+        assert window.performance_expander.get_visible()
         child = window.session._child
         window.stop_button.emit("clicked")
         wait_for(context, lambda: not window.session.snapshot()["running"] and
@@ -230,6 +242,7 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
                 "frozen_assessment_preserved_when_next_threshold_changes": True,
                 "next_run_uses_new_threshold": True,
                 "32_MiB_received_and_fully_analysed": True,
+                "server_capabilities_and_performance_visible": True, "adaptive_pull_editor_and_acquisition": True,
                 "saved_endpoint_credentials_and_query_hidden": True,
                 "unmodified_query_and_advanced_flags_preserved": True,
                 "editing_disabled_while_running": True, "screenshot": screenshot}
@@ -495,11 +508,56 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
             app.quit()
 
 
+def _client_capability_limit(context, application_type, binary, artifacts):
+    """A controlled public contract rejects oversize acquisition visibly."""
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def do_GET(self):
+            if self.path == "/v1/capabilities":
+                body = json.dumps({"schema_version": 1, "service": "entropy-service", "version": "fixture",
+                    "max_bytes": 64, "transports": ["http", "websocket"],
+                    "websocket_min_refresh_ms": 1, "websocket_max_refresh_ms": 60000}).encode()
+            else:
+                self.server.generation_requests += 1
+                body = bytes(128)
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    fixture = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    fixture.generation_requests = 0
+    thread = threading.Thread(target=fixture.serve_forever, daemon=True)
+    thread.start()
+    app = window = None
+    try:
+        app, window = _window(context, application_type, "client", binary,
+            [f"-url=http://127.0.0.1:{fixture.server_address[1]}/v1/data/random", "-slice=128", "-duration=2s"], "CapabilityLimit")
+        window.start_button.emit("clicked")
+        wait_for(context, lambda: window.session is not None and not window.session.snapshot()["running"] and
+                 "server maximum of 64" in window.status_label.get_text() and
+                 "max 64 bytes" in window.performance_label.get_text(), "visible server capability size rejection")
+        assert not window.model.snapshot()["sample"] and fixture.generation_requests == 0
+        return {"discovered_operator_limit_visible": True, "oversize_stopped_before_acquisition": True,
+                "screenshot": capture_window(context, window, artifacts / "client-capability-limit.png")}
+    finally:
+        if window is not None and window.get_visible():
+            close_window(context, window)
+        if app is not None:
+            app.quit()
+        fixture.shutdown()
+        fixture.server_close()
+        thread.join(timeout=2)
+
+
 def controls_and_owned_server(context, application_type, server_binary, client_binary, remote_port, artifacts):
     """Validate edited options and exercise only the processes this GUI owns."""
     artifacts = Path(artifacts)
     artifacts.mkdir(parents=True, exist_ok=True)
     return {"client": _client_options(context, application_type, client_binary, remote_port, artifacts),
             "server": _server_options(context, application_type, server_binary, remote_port, artifacts),
+            "capability_limit": _client_capability_limit(context, application_type, client_binary, artifacts),
             "client_failures": _client_failures(context, application_type, client_binary, remote_port, artifacts),
             "features": _server_features(context, application_type, server_binary, remote_port, artifacts)}

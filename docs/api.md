@@ -224,3 +224,7 @@ Readiness/metrics remain available. New generation requests receive 503;
 a binary HTTP response already in progress is truncated without appending an
 error body, and affected WebSockets close. No software output is substituted.
 See [trust, retry and timing boundaries](experimental-rdrand.md).
+
+## Acquisition capabilities
+
+`GET /v1/capabilities` returns the public schema/version, configured sample maximum, acquisition transports and raw WebSocket interval range. It is read-only and independent from generation readiness. See [the contract and client behavior](client-capabilities-performance.md).

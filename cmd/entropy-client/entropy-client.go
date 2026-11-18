@@ -64,7 +64,7 @@ func run(ctx context.Context) error {
 }
 
 // Interactive preflight is separate from the measured experiment.
-func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl string) error {
+func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl string, discoveries ...discoveryResult) error {
 	profile := terminal.Detect(cfg.Color)
 	fmt.Print(profile.Clear())
 
@@ -77,7 +77,7 @@ func showPreflight(ctx context.Context, cfg *config.Config, refhttpurl, refwsurl
 		return fmt.Errorf("sample entropy: %w", err)
 	}
 
-	printPreflight(os.Stdout, cfg, refhttpurl, refwsurl, testdata, profile)
+	printPreflight(os.Stdout, cfg, refhttpurl, refwsurl, testdata, profile, discoveries...)
 
 	if !waitContext(ctx, 3*time.Second) {
 		return ctx.Err()

@@ -1,0 +1,40 @@
+{
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "virtualized_cpu": true,
+  "duration_seconds_per_cli_case": 4,
+  "payload_bytes": 33554432,
+  "requested_interval_ms": 50,
+  "backend": "rdrand-experimental",
+  "observations": [
+    {
+      "adaptive": false,
+      "received_frames": 24,
+      "requested_fps": 20,
+      "effective_target_fps": 20,
+      "average_received_fps": 5.95146769877694,
+      "received_mib_per_second": 190.44698435420742,
+      "effective_interval_ms": 50,
+      "pacing_status": "below target",
+      "failed": false
+    },
+    {
+      "adaptive": true,
+      "received_frames": 20,
+      "requested_fps": 20,
+      "effective_target_fps": 4.995982281009435,
+      "average_received_fps": 4.984618530185748,
+      "received_mib_per_second": 159.5078120877525,
+      "effective_interval_ms": 200.160838,
+      "pacing_status": "adaptive paced",
+      "failed": false
+    },
+    {
+      "native_gui_performance": "Server capabilities: available \u00b7 max 33,554,432 bytes\nFPS: 20.00 requested \u00b7 4.82 effective \u00b7 4.68 average received\nReceive wait: 141.341 ms \u00b7 analysis: 3.421 ms \u00b7 output: 0.000 ms\nadaptive paced \u00b7 interval 207.582 ms"
+    }
+  ],
+  "source_base": "ce80b008862c2d1070b728b7d95609a3a0be1192",
+  "go_version": "go1.26.11",
+  "analysis_prefix_bytes": 1048576,
+  "analysis_interval_ms": 250,
+  "adaptive_max_interval_ms": 5000
+}

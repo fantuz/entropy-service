@@ -17,7 +17,7 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Pango", "1.0")
 from gi.repository import Gdk, Gio, GLib, GObject, Gtk, Pango
 
-from .model import StreamModel, client_failure_text, safe_text
+from .model import StreamModel, client_failure_text, performance_text, safe_text
 from .process import ClientSession, describe
 from .health import HealthSession
 from .controls import SettingsWindow
@@ -200,6 +200,12 @@ class DesktopWindow(Gtk.ApplicationWindow):
                 stats.attach(value, column, 1, 1, 1)
                 self.stat_labels[key] = value
             body.append(stats)
+            self.performance_label = label("Server capabilities and performance appear after Start", "gui-subtitle")
+            self.performance_label.set_selectable(True)
+            self.performance_label.set_tooltip_text("Rates are averages over the measured run. Receive wait includes server pacing, generation and transfer; it is not network latency. Timings cover the latest analysed report.")
+            self.performance_expander = Gtk.Expander(label="Connection & performance", expanded=True)
+            self.performance_expander.set_child(self.performance_label)
+            body.append(self.performance_expander)
             self.drawing_area = Gtk.DrawingArea(hexpand=True, vexpand=True)
             self.drawing_area.set_content_width(1)
             self.drawing_area.set_content_height(120)
@@ -644,6 +650,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.options_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
         if state["revision"] != self._revision:
             self._revision = state["revision"]
+            self.performance_label.set_text(performance_text(state))
             sample, settings, summary = state["sample"], state["settings"], state["summary"]
             if settings:
                 self.stat_labels["threshold"].set_text(f"{settings['shannon_threshold_bits_per_byte']:.6f}")
@@ -747,6 +754,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.controls.set_visible(not enabled)
         self.status_label.set_visible(not enabled)
         self.client_log_expander.set_visible(not enabled)
+        self.performance_expander.set_visible(not enabled)
         self.fullscreen() if enabled else self.unfullscreen()
 
     def _on_key(self, _controller, keyval, _keycode, _state):

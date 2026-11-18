@@ -1303,6 +1303,7 @@ func runServer(ctx context.Context, cfg *config.Config, ready func()) error {
 	mux.Handle("/", staticAssets)
 	registerWordUI(mux, cfg.WantsCookie)
 
+	mux.HandleFunc("GET /v1/capabilities", capabilitiesHandler(cfg.MaxBytes))
 	mux.HandleFunc("/live", livenessHandler)
 	mux.HandleFunc("/ready", healthHandler(&root, maxReseedAge))
 

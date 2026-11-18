@@ -78,6 +78,41 @@ def client_failure_text(error, diagnostics):
     return reason + "\n" + hint
 
 
+def _discovery(value):
+    if value is None:
+        return {"status": "not reported"}
+    if not isinstance(value, dict) or value.get("status") not in ("available", "unavailable", "off", "custom endpoint; skipped"):
+        raise ReportError("Invalid capability discovery status")
+    result = {"status": value["status"]}
+    if value["status"] == "available":
+        document = value.get("document")
+        if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document.get("schema_version") != 1 or document.get("service") != "entropy-service":
+            raise ReportError("Invalid server capabilities")
+        maximum = _number(document, "max_bytes", integer=True, maximum=33554432)
+        if not maximum:
+            raise ReportError("Invalid server sample maximum")
+        result["max_bytes"] = maximum
+    return result
+
+
+def performance_text(state):
+    """Compact, scalar-only presentation; old companions may omit these fields."""
+    discovery = state.get("discovery", {})
+    status = discovery.get("status", "not reported")
+    limit = discovery.get("max_bytes")
+    server = f"Server capabilities: {status}" + (f" · max {limit:,} bytes" if limit else "")
+    sample = state.get("sample", {})
+    record = state.get("summary") or sample
+    if "average_received_fps" not in record:
+        return server + "\nPerformance: awaiting measurements"
+    rates = (f"FPS: {record['requested_fps']:.2f} requested · {record['effective_target_fps']:.2f} effective · "
+             f"{record['average_received_fps']:.2f} average received")
+    timings = (f"Receive wait: {sample.get('receive_wait_ms', 0):.3f} ms · "
+               f"analysis: {sample.get('analysis_ms', 0):.3f} ms · output: {record['output_ms']:.3f} ms")
+    pacing = f"{record['pacing_status']} · interval {record['effective_interval_ms']:.3f} ms"
+    return server + "\n" + rates + "\n" + timings + "\n" + pacing
+
+
 def _settings(value):
     if not isinstance(value, dict):
         raise ReportError("Missing configuration settings")
@@ -130,6 +165,7 @@ class StreamModel:
         self._settings = {}
         self._sample = {}
         self._summary = {}
+        self._discovery = {}
         self._revision = 0
 
     def reset(self):
@@ -138,6 +174,7 @@ class StreamModel:
             self._settings = {}
             self._sample = {}
             self._summary = {}
+            self._discovery = {}
             self._revision += 1
 
     def feed_line(self, data):
@@ -160,8 +197,10 @@ class StreamModel:
         if kind == "run_start":
             settings = _settings(record.get("settings"))
             _number(settings, "shannon_threshold_bits_per_byte", maximum=8)
+            discovery = _discovery(record.get("discovery"))
             with self._lock:
                 self._settings = settings
+                self._discovery = discovery
                 self._revision += 1
             return
         if kind not in ("sample", "run_summary"):
@@ -189,6 +228,12 @@ class StreamModel:
             _number(record, "received_mib_per_second")
             if type(record.get("failed")) is not bool:
                 raise ReportError("Invalid summary outcome")
+        if "average_received_fps" in record:
+            for name in ("average_received_fps", "requested_fps", "effective_target_fps", "requested_mib_per_second",
+                         "effective_interval_ms", "output_ms", "total_analysis_ms"):
+                _number(record, name)
+            if record.get("pacing_status") not in ("warming up", "on target", "below target", "adaptive paced", "adaptive ceiling"):
+                raise ReportError("Invalid pacing status")
         # Keep only scalar values; do not retain encoded-prefix duplicates or
         # arbitrary nested report payloads alongside the bounded pixel history.
         clean = {key: safe_text(value) if isinstance(value, str) else value
@@ -207,5 +252,5 @@ class StreamModel:
 
     def snapshot(self):
         with self._lock:
-            return {"settings": dict(self._settings), "sample": dict(self._sample),
+            return {"discovery": dict(self._discovery), "settings": dict(self._settings), "sample": dict(self._sample),
                     "summary": dict(self._summary), "rows": tuple(self._rows), "revision": self._revision}

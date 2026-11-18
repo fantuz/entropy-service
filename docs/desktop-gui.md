@@ -508,3 +508,17 @@ no software fallback and a restart-required failure latch. See the
 
 macOS Intel and Apple Silicon use the same interface through the
 [Homebrew launcher](macos.md#homebrew-gui).
+
+## Server limits and acquisition performance
+
+Client Options now includes **Server capability discovery**, **Adaptive HTTP pull
+pacing**, and its maximum interval. Start checks advertised operator limits
+before acquisition; oversized requests report the actual server maximum without
+changing the requested sample. Discovery is automatic for recognized routes,
+optional for legacy/custom servers, and remains separate from offline validation.
+
+**Connection & performance** displays discovery results, requested/effective and
+average received FPS, receive/analysis/output timings and pacing status. Collapse
+it to give the waterfall more space. Fullscreen hides it. Older CLI reports can
+omit this information. See [the shared CLI/GUI guide](client-capabilities-performance.md)
+for interpretation, compatibility and the HTTP-only adaptive policy.

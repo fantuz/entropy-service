@@ -121,41 +121,45 @@ func (r *runReport) close() error {
 }
 
 type reportSettings struct {
-	Mode             string  `json:"mode"`
-	Endpoint         string  `json:"endpoint"`
-	PayloadBytes     int64   `json:"payload_bytes"`
-	Refresh          string  `json:"refresh"`
-	AnalysisBytes    int     `json:"analysis_bytes"`
-	AnalysisInterval string  `json:"analysis_interval"`
-	DisplayInterval  string  `json:"display_interval"`
-	ShannonThreshold float64 `json:"shannon_threshold_bits_per_byte"`
-	Duration         string  `json:"duration"`
-	Headless         bool    `json:"headless"`
-	Matrix           bool    `json:"matrix"`
-	WriteOut         bool    `json:"writeout"`
-	OutputKind       string  `json:"output_kind"`
-	OutputLimit      int64   `json:"output_limit_bytes"`
-	Waterfall        bool    `json:"waterfall"`
-	WaterfallMode    string  `json:"waterfall_mode"`
-	WaterfallColumns int     `json:"waterfall_columns"`
-	WaterfallRows    int     `json:"waterfall_rows"`
-	Color            string  `json:"color"`
-	Layout           string  `json:"layout"`
-	Retries          int     `json:"retries"`
-	RetryDelay       string  `json:"retry_delay"`
-	ReportWaterfall  bool    `json:"report_waterfall,omitempty"`
+	Mode                string  `json:"mode"`
+	Endpoint            string  `json:"endpoint"`
+	PayloadBytes        int64   `json:"payload_bytes"`
+	Refresh             string  `json:"refresh"`
+	AnalysisBytes       int     `json:"analysis_bytes"`
+	AnalysisInterval    string  `json:"analysis_interval"`
+	DisplayInterval     string  `json:"display_interval"`
+	ShannonThreshold    float64 `json:"shannon_threshold_bits_per_byte"`
+	Duration            string  `json:"duration"`
+	Headless            bool    `json:"headless"`
+	Matrix              bool    `json:"matrix"`
+	WriteOut            bool    `json:"writeout"`
+	OutputKind          string  `json:"output_kind"`
+	OutputLimit         int64   `json:"output_limit_bytes"`
+	Waterfall           bool    `json:"waterfall"`
+	WaterfallMode       string  `json:"waterfall_mode"`
+	WaterfallColumns    int     `json:"waterfall_columns"`
+	WaterfallRows       int     `json:"waterfall_rows"`
+	Color               string  `json:"color"`
+	Layout              string  `json:"layout"`
+	Retries             int     `json:"retries"`
+	RetryDelay          string  `json:"retry_delay"`
+	ReportWaterfall     bool    `json:"report_waterfall,omitempty"`
+	Capabilities        string  `json:"capabilities"`
+	Adaptive            bool    `json:"adaptive"`
+	AdaptiveMaxInterval string  `json:"adaptive_max_interval"`
 }
 
 type startRecord struct {
 	reportHeader
 
-	Settings  reportSettings `json:"settings"`
-	GoVersion string         `json:"go_version"`
-	GOOS      string         `json:"goos"`
-	GOARCH    string         `json:"goarch"`
+	Settings  reportSettings  `json:"settings"`
+	Discovery discoveryResult `json:"discovery"`
+	GoVersion string          `json:"go_version"`
+	GOOS      string          `json:"goos"`
+	GOARCH    string          `json:"goarch"`
 }
 
-func (r *runReport) start(ctx context.Context, cfg *config.Config, endpoint string) error {
+func (r *runReport) start(ctx context.Context, cfg *config.Config, endpoint string, discoveries ...discoveryResult) error {
 	if r == nil {
 		return nil
 	}
@@ -165,9 +169,15 @@ func (r *runReport) start(ctx context.Context, cfg *config.Config, endpoint stri
 		return fmt.Errorf("report endpoint: %w", err)
 	}
 
+	discovery := discoveryResult{Status: discoveryOff}
+	if len(discoveries) > 0 {
+		discovery = discoveries[0]
+	}
+
 	return r.write(ctx, startRecord{
 		reportHeader: newReportHeader("run_start"),
 		Settings:     clientReportSettings(cfg, endpoint),
+		Discovery:    discovery,
 		GoVersion:    runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
 	})
 }
@@ -183,7 +193,7 @@ func clientReportSettings(cfg *config.Config, endpoint string) reportSettings {
 		Waterfall: cfg.ShowWaterfall, WaterfallMode: cfg.WaterfallMode,
 		WaterfallColumns: cfg.WaterfallColumns, WaterfallRows: cfg.WaterfallRows, Color: cfg.Color,
 		Layout: cfg.Layout, Retries: cfg.Retries, RetryDelay: cfg.RetryDelay.String(),
-		ReportWaterfall: cfg.ReportWaterfall,
+		ReportWaterfall: cfg.ReportWaterfall, Capabilities: cfg.Capabilities, Adaptive: cfg.Adaptive, AdaptiveMaxInterval: cfg.AdaptiveMaxInterval.String(),
 	}
 }
 
@@ -213,6 +223,7 @@ func (m *monitorState) counts() reportCounts {
 }
 
 type sampleRecord struct {
+	performanceValues
 	reportHeader
 	reportCounts
 
@@ -238,8 +249,9 @@ func (r *runReport) sample(ctx context.Context, m *monitorState) error {
 
 	return r.write(ctx, sampleRecord{
 		reportHeader: newReportHeader("sample"), reportCounts: m.counts(),
-		ElapsedMS:  time.Since(m.started).Seconds() * 1000,
-		FrameBytes: m.sampleBytes, SampleBytes: m.latest.N,
+		performanceValues: m.performance(time.Now()),
+		ElapsedMS:         time.Since(m.started).Seconds() * 1000,
+		FrameBytes:        m.sampleBytes, SampleBytes: m.latest.N,
 		Shannon: m.latest.Shannon, ShannonAssessment: diag.ShannonAssessment(&m.latest, m.cfg.ShannonThreshold),
 		ChiSquare: m.latest.Chi2, ChiSquareP: m.latest.Chi2P,
 		MonobitP: m.latest.MonobitP, SerialCorrelation: m.latest.SerialR, SerialP: m.latest.SerialP,
@@ -249,6 +261,7 @@ func (r *runReport) sample(ctx context.Context, m *monitorState) error {
 }
 
 type summaryRecord struct {
+	performanceValues
 	reportHeader
 	reportCounts
 
@@ -278,7 +291,8 @@ func (r *runReport) summary(ctx context.Context, m *monitorState, began time.Tim
 
 	return r.write(ctx, summaryRecord{
 		reportHeader: newReportHeader("run_summary"), reportCounts: m.counts(),
-		Termination: reason, Failed: failed, MeasurementBegan: !m.started.IsZero(),
+		performanceValues: m.performance(time.Now()),
+		Termination:       reason, Failed: failed, MeasurementBegan: !m.started.IsZero(),
 		ElapsedMS: elapsed.Seconds() * 1000, TotalElapsedMS: time.Since(began).Seconds() * 1000,
 		ReceivedMiBPerSec: rate, ShannonAssessment: diag.ShannonAssessment(&m.latest, m.cfg.ShannonThreshold),
 	})

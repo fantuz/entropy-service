@@ -33,7 +33,7 @@ func (b *retryBudget) next(err error) (time.Duration, bool) {
 	return max(delay, hint), true
 }
 
-func receiveFrames(ctx context.Context, cfg *config.Config, httpURL, wsURL string, out chan<- client.StreamFrame, failures chan<- error) {
+func receiveFramesWithPacing(ctx context.Context, cfg *config.Config, httpURL, wsURL string, out chan<- client.StreamFrame, failures chan<- error, pacing *acquisitionPacing) {
 	defer close(out)
 
 	budget := retryBudget{limit: cfg.Retries, delay: cfg.RetryDelay}
@@ -52,7 +52,7 @@ func receiveFrames(ctx context.Context, cfg *config.Config, httpURL, wsURL strin
 		if cfg.Mode == modeStream {
 			err = client.ReceiveEntropy(ctx, wsURL, deliver)
 		} else {
-			err = pullFramesUntilError(ctx, cfg, httpURL, out)
+			err = pullFramesWithPacing(ctx, cfg, httpURL, out, pacing)
 		}
 
 		if contextEnded(ctx) {

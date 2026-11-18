@@ -28,6 +28,11 @@ _CLIENT_FIELDS = (
                 hint="Only used in pull mode. Unchanged URL credentials and query parameters are retained."),
     OptionField("wsurl", "WebSocket endpoint (push)", "Connection",
                 hint="Only used in push mode."),
+    OptionField("capabilities", "Server capability discovery", "Connection", "choice", ("auto", "off", "required"),
+                "Auto checks recognized entropy-service routes once before acquisition; required fails if discovery is unavailable."),
+    OptionField("adaptive", "Adaptive HTTP pull pacing", "Sampling", "bool",
+                hint="Opt in: slow requests under load, then recover gradually. Payload, analysis and failure policies are preserved; unavailable in push mode."),
+    OptionField("adaptive-max-interval", "Maximum adaptive interval", "Sampling", hint="Go duration from the request interval to 1m; default 5s."),
     OptionField("slice", "Bytes per response", "Sampling", hint="1–33554432 bytes (32 MiB), subject to the server's configured maximum."),
     OptionField("refresh", "Request interval", "Sampling", hint="Go duration, for example 50ms or 1s."),
     OptionField("analysis-bytes", "Analysis prefix bytes", "Sampling", hint="0 analyses the full frame; up to 33554432 bytes (32 MiB)."),
@@ -86,12 +91,13 @@ _FIELDS = {"client": _CLIENT_FIELDS, "server": _SERVER_FIELDS}
 # kept as opaque option/value pairs, including values beginning with '-'.
 _BOOL_FLAGS = {
     "client": frozenset(("writeout", "debug", "preview", "matrix", "graph", "dashboard", "histogram",
-                         "waterfall", "report-waterfall", "describe-json", "headless")),
+                         "waterfall", "report-waterfall", "describe-json", "headless", "adaptive")),
     "server": frozenset(("describe-json", "lab-allow-remote", "enable-https", "require-device",
                          "rdrand-mix", "cpu-mix", "debug", "cookie")),
 }
 
 _CLIENT_DEFAULTS = {
+    "capabilities": "auto", "adaptive": False, "adaptive-max-interval": "5s",
     "mode": "pull", "url": "http://127.0.0.1:8080/v1/data/random", "wsurl": "ws://127.0.0.1:8080/stream",
     "slice": "2097152", "refresh": "1s", "analysis-bytes": "1048576", "analysis-interval": "250ms",
     "shannon-threshold": "7.999", "waterfall-mode": "byte", "duration": "0s", "retries": "0", "retry-delay": "1s",
@@ -105,7 +111,7 @@ _SERVER_DEFAULTS = {
     "source-timeout": "3s", "max-bytes": "33554432",
 }
 _DESCRIPTION_SETTINGS = {
-    "client": {"mode": "mode", "slice": "payload_bytes", "refresh": "refresh", "analysis-bytes": "analysis_bytes",
+    "client": {"capabilities":"capabilities", "adaptive":"adaptive", "adaptive-max-interval":"adaptive_max_interval", "mode": "mode", "slice": "payload_bytes", "refresh": "refresh", "analysis-bytes": "analysis_bytes",
                "analysis-interval": "analysis_interval", "shannon-threshold": "shannon_threshold_bits_per_byte",
                "duration": "duration", "retries": "retries", "retry-delay": "retry_delay", "waterfall-mode": "waterfall_mode"},
     "server": {"device": "seed_source", "drbg": "drbg", "http": "http_address", "https": "https_address",

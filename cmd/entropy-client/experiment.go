@@ -87,7 +87,8 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 		startCtx, startCancel = context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	}
 
-	err = report.start(startCtx, cfg, endpoint)
+	discovery, discoveryErr := discoverCapabilities(ctx, cfg, endpoint)
+	err = report.start(startCtx, cfg, endpoint, discovery)
 
 	startCancel()
 
@@ -123,6 +124,15 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 
 		return err
 	}
+
+	if discoveryErr != nil {
+		if ctx.Err() != nil {
+			return finish(reasonInterrupted, nil)
+		}
+
+		return finish(reasonStartupError, discoveryErr)
+	}
+
 	if cfg.OutputEnabled() {
 		m.writeout, err = openDevice()
 		if err != nil {
@@ -132,7 +142,7 @@ func runConfiguredWithWriteout(ctx context.Context, cfg *config.Config, openDevi
 	}
 
 	if !cfg.Headless {
-		if err := showPreflight(ctx, cfg, httpURL, wsURL); err != nil {
+		if err := showPreflight(ctx, cfg, httpURL, wsURL, discovery); err != nil {
 			reason := reasonStartupError
 			if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 				reason, err = reasonInterrupted, nil

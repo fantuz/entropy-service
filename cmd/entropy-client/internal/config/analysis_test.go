@@ -24,3 +24,27 @@ func TestAnalysisLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestAdaptivePacingAndCapabilityFlagsAreExplicit(t *testing.T) {
+	cfg, err := parseConfig([]string{"-mode=http", "-adaptive", "-refresh=50ms", "-adaptive-max-interval=2s", "-capabilities=required"}, nil)
+	if err != nil || cfg.ValidateAnalysis() != nil {
+		t.Fatal("valid pull pacing rejected", err)
+	}
+
+	for _, change := range []func(){
+		func() { cfg.Mode = "push" },
+		func() { cfg.AdaptiveMaxInterval = time.Millisecond },
+		func() { cfg.AdaptiveMaxInterval = 2 * time.Minute },
+		func() { cfg.Capabilities = "guess" },
+	} {
+		saved := *cfg
+
+		change()
+
+		if cfg.ValidateAnalysis() == nil {
+			t.Fatal("invalid adaptive/discovery configuration accepted")
+		}
+
+		*cfg = saved
+	}
+}

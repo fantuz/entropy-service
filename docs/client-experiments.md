@@ -9,6 +9,8 @@ source; substitute your device and deployment URLs when appropriate:
   -drbg=chacha20 -enable-https=false -http=127.0.0.1:8080
 ```
 
+See [capability discovery and client performance](client-capabilities-performance.md) for startup limit checks, requested/achieved FPS and optional adaptive HTTP pacing. Discovery time is excluded from the measured duration.
+
 ## Shannon entropy and its assessment
 
 For one analysed sample of `n` bytes, let `c[b]` be the count of byte value

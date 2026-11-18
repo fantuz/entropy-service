@@ -15,50 +15,56 @@ import (
 )
 
 type Config struct {
-	MaxWords         int
-	RefreshRate      int
-	Refresh          time.Duration
-	HTTPUrl          string
-	WSUrl            string
-	Mode             string
-	CertFile         string
-	KeyFile          string
-	WriteOut         bool
-	OutputPath       string
-	OutputDevice     string
-	OutputBytes      int64
-	ShowDebug        bool
-	ShowPreview      bool
-	ShowGraph        bool
-	ShowMatrix       bool
-	ShowDashboard    bool
-	ShowHistogram    bool
-	ShowWaterfall    bool
-	WaterfallMode    string
-	WaterfallColumns int
-	WaterfallRows    int
-	Color            string
-	Layout           string
-	Slice            int64
-	AnalysisBytes    int
-	AnalysisInterval time.Duration
-	DisplayInterval  time.Duration
-	ShannonThreshold float64
-	Duration         time.Duration
-	ReportPath       string
-	ReportWaterfall  bool
-	DescribeJSON     bool
-	Headless         bool
-	Retries          int
-	RetryDelay       time.Duration
+	Capabilities        string
+	Adaptive            bool
+	AdaptiveMaxInterval time.Duration
+	MaxWords            int
+	RefreshRate         int
+	Refresh             time.Duration
+	HTTPUrl             string
+	WSUrl               string
+	Mode                string
+	CertFile            string
+	KeyFile             string
+	WriteOut            bool
+	OutputPath          string
+	OutputDevice        string
+	OutputBytes         int64
+	ShowDebug           bool
+	ShowPreview         bool
+	ShowGraph           bool
+	ShowMatrix          bool
+	ShowDashboard       bool
+	ShowHistogram       bool
+	ShowWaterfall       bool
+	WaterfallMode       string
+	WaterfallColumns    int
+	WaterfallRows       int
+	Color               string
+	Layout              string
+	Slice               int64
+	AnalysisBytes       int
+	AnalysisInterval    time.Duration
+	DisplayInterval     time.Duration
+	ShannonThreshold    float64
+	Duration            time.Duration
+	ReportPath          string
+	ReportWaterfall     bool
+	DescribeJSON        bool
+	Headless            bool
+	Retries             int
+	RetryDelay          time.Duration
 }
 
 const (
-	ModePull         = "pull"
-	ModeStream       = "stream"
-	MaxRetryDelay    = 30 * time.Second
-	defaultColorMode = "auto"
-	noColorMode      = "never"
+	CapabilitiesAuto     = "auto"
+	CapabilitiesOff      = "off"
+	CapabilitiesRequired = "required"
+	ModePull             = "pull"
+	ModeStream           = "stream"
+	MaxRetryDelay        = 30 * time.Second
+	defaultColorMode     = "auto"
+	noColorMode          = "never"
 )
 
 func ParseConfig() *Config {
@@ -98,6 +104,9 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.Color, "color", defaultColorMode, "terminal colors: auto|always|never|256|truecolor; auto respects NO_COLOR, TERM and redirected stdout")
 	flags.StringVar(&cfg.Layout, "layout", terminal.LayoutAuto, "terminal layout: auto|compact|full|waterfall; waterfall fills the viewport with one status line")
 
+	flags.StringVar(&cfg.Capabilities, "capabilities", CapabilitiesAuto, "server limit discovery: auto|off|required; auto probes recognized entropy-service routes once")
+	flags.BoolVar(&cfg.Adaptive, "adaptive", false, "opt in to adaptive HTTP pull pacing; keeps payload, analysis and failure policies unchanged")
+	flags.DurationVar(&cfg.AdaptiveMaxInterval, "adaptive-max-interval", 5*time.Second, "maximum adaptive request interval (refresh..1m)")
 	flags.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
 	flags.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
 	flags.DurationVar(&cfg.AnalysisInterval, "analysis-interval", 250*time.Millisecond, "minimum interval between analysed frames; 0 analyses every frame")
@@ -189,6 +198,20 @@ func (cfg *Config) validatePlatform(goos string) error {
 }
 
 func (cfg *Config) ValidateAnalysis() error {
+	if cfg.Capabilities != "" && cfg.Capabilities != CapabilitiesAuto && cfg.Capabilities != CapabilitiesOff && cfg.Capabilities != CapabilitiesRequired {
+		return errors.New("capabilities must be auto, off or required")
+	}
+
+	if cfg.Adaptive {
+		if cfg.Mode != "pull" && cfg.Mode != "http" {
+			return errors.New("adaptive pacing requires HTTP pull mode; WebSocket cadence is controlled by the server")
+		}
+
+		if cfg.AdaptiveMaxInterval < cfg.Refresh || cfg.AdaptiveMaxInterval > time.Minute || cfg.AdaptiveMaxInterval < time.Millisecond {
+			return errors.New("adaptive-max-interval must be between refresh and 1m")
+		}
+	}
+
 	if cfg.Retries < 0 || cfg.Retries > 100 {
 		return errors.New("retries must be between 0 and 100")
 	}
