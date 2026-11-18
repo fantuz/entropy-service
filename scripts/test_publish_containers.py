@@ -87,7 +87,7 @@ class PublicationTests(unittest.TestCase):
 class RegistryRetryTests(unittest.TestCase):
     command = ["docker", "image", "push", "ghcr.io/fantuz/entropy-client:edge-linux-arm64"]
 
-    @patch.object(publication.time, "sleep")
+    @patch.object(publication, "retry_sleep")
     @patch.object(publication.subprocess, "run")
     def test_unknown_blob_retry_preserves_captured_json(self, run, sleep):
         run.side_effect = [subprocess.CompletedProcess(self.command, 1, b"layer already exists\n", b"unknown blob\n"),
@@ -98,7 +98,7 @@ class RegistryRetryTests(unittest.TestCase):
         self.assertEqual(run.call_args_list[0], run.call_args_list[1])
         self.assertEqual(run.call_args.kwargs["timeout"], 120)
 
-    @patch.object(publication.time, "sleep")
+    @patch.object(publication, "retry_sleep")
     @patch.object(publication.subprocess, "run")
     def test_retry_exhaustion_is_failure_not_success(self, run, sleep):
         run.return_value = subprocess.CompletedProcess(self.command, 1, b"", b"unknown blob")
@@ -107,7 +107,7 @@ class RegistryRetryTests(unittest.TestCase):
         self.assertEqual(run.call_count, 4)
         self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8])
 
-    @patch.object(publication.time, "sleep")
+    @patch.object(publication, "retry_sleep")
     @patch.object(publication.subprocess, "run")
     def test_permanent_or_unclassified_errors_fail_without_retry(self, run, sleep):
         for output in (b"unauthorized 503", b"denied: requested access", b"invalid reference format",
@@ -121,7 +121,7 @@ class RegistryRetryTests(unittest.TestCase):
                 run.assert_called_once()
                 sleep.assert_not_called()
 
-    @patch.object(publication.time, "sleep")
+    @patch.object(publication, "retry_sleep")
     @patch.object(publication.subprocess, "run")
     def test_timeout_is_bounded_and_exhaustion_raises(self, run, sleep):
         run.side_effect = subprocess.TimeoutExpired(self.command, 120)
@@ -136,7 +136,7 @@ class RegistryRetryTests(unittest.TestCase):
             with self.subTest(output=output):
                 self.assertTrue(publication.transient_registry_error(output))
 
-    @patch.object(publication.time, "sleep")
+    @patch.object(publication, "retry_sleep")
     def test_real_subprocess_retries_same_operation_and_returns_clean_output(self, sleep):
         with tempfile.TemporaryDirectory() as directory:
             counter = Path(directory)/"attempts"

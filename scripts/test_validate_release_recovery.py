@@ -23,6 +23,14 @@ class RecoveryTests(unittest.TestCase):
         run, jobs = evidence()
         validate(run, jobs, "v2.4.1", SHA, NOW)
 
+    def test_only_unused_recovery_wrapper_may_be_skipped(self):
+        run, jobs = evidence()
+        jobs.append({"name": "recover-publication", "status": "completed", "conclusion": "skipped"})
+        validate(run, jobs, "v2.4.1", SHA, NOW)
+        jobs[-1]["name"] = "New required validation"
+        with self.assertRaises(ValueError):
+            validate(run, jobs, "v2.4.1", SHA, NOW)
+
     def test_failed_missing_cancelled_or_additional_failed_validation_rejected(self):
         for change in ("missing", "failure", "cancelled", "extra", "duplicate"):
             with self.subTest(change=change):

@@ -26,7 +26,10 @@ def main():
         (project / ".gitignore").write_text("/bin/\n/dist/\n")
         assets = project / "bin/gui-release"
         assets.mkdir(parents=True)
-        files = [assets / "setup.exe", assets / "sources.zip"]
+        offline = project / "bin/oci-release"
+        offline.mkdir(parents=True)
+        files = [assets / "setup.exe", assets / "sources.zip",
+                 offline / "entropy-service_2.5.1_linux.oci.tar", offline / "entropy-client_2.5.1_linux.oci.tar"]
         for file in files:
             file.write_bytes(b"unchanged extra release bytes")
         base = '''version: 2

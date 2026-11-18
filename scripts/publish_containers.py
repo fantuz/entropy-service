@@ -9,12 +9,11 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import time
+from time import sleep as retry_sleep
 
-from check_container_scan import check_report
+from container_identity import PLATFORMS, verify_image
+from container_security import verify_security_reports
 
-
-PLATFORMS = {"linux-amd64": ("amd64", ""), "linux-arm64": ("arm64", ""), "linux-armv7": ("arm", "v7")}
 VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?")
 REGISTRY_ATTEMPTS = 4
 REGISTRY_TIMEOUT = 120
@@ -65,7 +64,7 @@ def registry_command(command, *, capture=False, cwd=None):
                 result.check_returncode()
         delay = 2 ** (attempt + 1)
         print(f"Transient registry failure; retry {attempt + 2}/{REGISTRY_ATTEMPTS} in {delay}s", file=sys.stderr, flush=True)
-        time.sleep(delay)
+        retry_sleep(delay)
 
 
 def validate_request(repository, tag, source_sha, latest):
@@ -77,24 +76,6 @@ def validate_request(repository, tag, source_sha, latest):
         raise ValueError("an immutable full source SHA is required")
     if latest and (tag == "edge" or "-" in tag):
         raise ValueError("only a stable release may update latest")
-
-
-def verify_image(info, role, platform, repository, source_sha, version):
-    config = info["Config"]
-    labels = config.get("Labels") or {}
-    expected_arch, expected_variant = PLATFORMS[platform]
-    if info["Os"] != "linux" or info["Architecture"] != expected_arch:
-        raise ValueError("image platform does not match its tested artifact")
-    if expected_variant and info.get("Variant") != expected_variant:
-        raise ValueError("image ARM variant does not match its tested artifact")
-    if config["User"] != "65532:65532" or config["Entrypoint"] != ["/usr/local/bin/entropy-" + role]:
-        raise ValueError("unexpected image identity or entrypoint")
-    if labels.get("org.opencontainers.image.revision") != source_sha:
-        raise ValueError("image source differs from the validated source commit")
-    if labels.get("org.opencontainers.image.version") != version:
-        raise ValueError("image version differs from the requested channel/release")
-    if labels.get("org.opencontainers.image.source", "").lower() != "https://github.com/" + repository.lower():
-        raise ValueError("image is not linked to the requested source repository")
 
 
 def verify_archive(directory):
@@ -110,29 +91,6 @@ def verify_archive(directory):
     return archive
 
 
-def verify_security_reports(directory, role, image_id):
-    expected = {r + suffix for r in ("server", "client") for suffix in (".spdx.json", ".vulnerabilities.json")}
-    entries = {}
-    for line in (directory / "security-checksums.txt").read_text().splitlines():
-        match = re.fullmatch(r"([0-9a-f]{64})  ([a-z.]+)", line)
-        if not match or match[2] not in expected or match[2] in entries:
-            raise ValueError("invalid image-security checksum manifest")
-        entries[match[2]] = match[1]
-    if set(entries) != expected:
-        raise ValueError("missing image-security reports")
-    for name, digest in entries.items():
-        if hashlib.sha256((directory / name).read_bytes()).hexdigest() != digest:
-            raise ValueError("image-security report checksum mismatch")
-    report = json.loads((directory / (role + ".vulnerabilities.json")).read_text())
-    if check_report(report, image_id):
-        raise ValueError("image has fixable HIGH/CRITICAL vulnerabilities")
-    sbom = directory / (role + ".spdx.json")
-    document = json.loads(sbom.read_text())
-    if document.get("SPDXID") != "SPDXRef-DOCUMENT" or not document.get("spdxVersion", "").startswith("SPDX-") or not document.get("packages"):
-        raise ValueError("invalid or empty image SBOM")
-    return sbom
-
-
 def docker(*args, capture=False):
     if args[:2] == ("image", "push") or args[:2] == ("buildx", "imagetools"):
         return registry_command(["docker", *args], capture=capture)
@@ -146,8 +104,19 @@ def main():
     parser.add_argument("--tag", required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
+    parser.add_argument('--registry', default='ghcr.io')
+    parser.add_argument('--local-registry', action='store_true', help='Explicit loopback-only HTTP test registry')
+    parser.add_argument('--authfile', type=Path)
     args = parser.parse_args()
     validate_request(args.repository, args.tag, args.source_sha, False)
+    if (args.artifacts/'container-oci-bundles').exists():
+        from publish_oci import publish
+        publish(args, registry_command)
+        return
+    if args.local_registry or args.registry != 'ghcr.io':
+        raise ValueError('Local registry integration tests require the validated OCI bundle format')
+    # Retain the Docker-archive reader for recovery of already-tested older
+    # release runs. New builds use the verified OCI path above.
     version = args.tag.removeprefix("v")
     repository = args.repository.lower()
     owner = repository.split("/", 1)[0]

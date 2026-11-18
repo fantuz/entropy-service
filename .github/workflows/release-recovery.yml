@@ -56,6 +56,13 @@ jobs:
           run-id: ${{ inputs.validated_run_id }}
           github-token: ${{ github.token }}
           path: source/bin/gui-release
+      - name: Download original offline OCI bundles when available
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: container-oci-bundles
+          run-id: ${{ inputs.validated_run_id }}
+          github-token: ${{ github.token }}
+          path: source/bin/oci-release-download
       - name: Verify exact GUI bytes and prepare relative publication globs
         env:
           RELEASE_VERSION: ${{ steps.validation.outputs.version }}
@@ -64,7 +71,11 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test "$(cat VERSION)" = "$RELEASE_VERSION"
-          python3 ../tools/scripts/prepare_gui_release.py prepare --artifacts bin/gui-release \
+          oci_options=()
+          if [[ -f scripts/oci_release.py ]]; then
+            oci_options=(--oci-artifacts bin/oci-release-download/container-oci-bundles --repository "$GITHUB_REPOSITORY")
+          fi
+          python3 ../tools/scripts/prepare_gui_release.py prepare --artifacts bin/gui-release "${oci_options[@]}" \
             --version "$RELEASE_VERSION" --source-sha "$SOURCE_SHA" --output "$RUNNER_TEMP/goreleaser-recovery.yml"
           test -z "$(git status --porcelain)"
       - name: Setup matching Go
@@ -87,6 +98,17 @@ jobs:
           run-id: ${{ inputs.validated_run_id }}
           github-token: ${{ github.token }}
           path: source/tested-images
+      - name: Download original OCI publication bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: container-oci-bundles
+          run-id: ${{ inputs.validated_run_id }}
+          github-token: ${{ github.token }}
+          path: source/tested-images
+      - name: Install OCI publication transport
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo
       - name: Set up image-index publication
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Install OCI source/SBOM attachment client
