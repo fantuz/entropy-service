@@ -94,7 +94,9 @@ var
   Filename, RuntimeRoot, BinaryRoot, ProcessName: String;
 begin
   Result := 0;
-  Filename := VarToStr(RuntimeProcess.ExecutablePath);
+  if VarIsNull(RuntimeProcess.ExecutablePath) then
+    Exit;
+  Filename := RuntimeProcess.ExecutablePath;
   if Filename = '' then
     Exit;
   { Normalize existing long/8.3 paths before comparing private roots. }
@@ -104,7 +106,8 @@ begin
   if (CompareText(Copy(Filename, 1, Length(RuntimeRoot)), RuntimeRoot) <> 0) and
      (CompareText(Copy(Filename, 1, Length(BinaryRoot)), BinaryRoot) <> 0) then
     Exit;
-  ProcessName := Lowercase(VarToStr(RuntimeProcess.Name));
+  ProcessName := RuntimeProcess.Name;
+  ProcessName := Lowercase(ProcessName);
   if (ProcessName = 'gdbus.exe') or (ProcessName = 'dbus-daemon.exe') then
     Result := 2
   else
@@ -115,6 +118,7 @@ function ClosePrivateRuntimeHelpers: String;
 var
   Locator, Services, Processes, RuntimeProcess: Variant;
   Index, Status: Integer;
+  HelperPath: String;
 begin
   Result := '';
   try
@@ -137,13 +141,14 @@ begin
       RuntimeProcess := Processes.ItemIndex(Index);
       if PrivateProcessKind(RuntimeProcess) = 2 then
       begin
+        HelperPath := RuntimeProcess.ExecutablePath;
         Status := RuntimeProcess.Terminate(0);
         if (Status <> 0) and (Status <> 9) then
         begin
           Result := 'A private GTK background helper could not be stopped. Close it and retry setup before replacing the runtime.';
           Exit;
         end;
-        Log('Closed private GTK runtime helper: ' + VarToStr(RuntimeProcess.ExecutablePath));
+        Log('Closed private GTK runtime helper: ' + HelperPath);
         Sleep(100);
       end;
     end;
