@@ -5,6 +5,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | Document | Contents |
 | --- | --- |
 | [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
+| [GUI validation and load observations](desktop-gui-validation.md) | Large-frame investigation, failure diagnostics, native settings checks and remaining manual coverage. |
 | [Windows Service](windows-service.md) | Native SCM installation, account/state policy, certificates, stop/restart, logs and upgrades. |
 | [macOS CLI and GUI](macos.md) | Intel/Apple Silicon binaries, Homebrew GTK launcher, OS source and platform limits. |
 | [v2.6.0 release notes](releases/v2.6.0.md) | Linux/Windows/macOS downloads, Homebrew GUI and offline OCI distribution. |

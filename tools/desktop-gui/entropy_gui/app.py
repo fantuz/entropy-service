@@ -15,9 +15,9 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Pango", "1.0")
-from gi.repository import Gdk, Gio, GLib, Gtk, Pango
+from gi.repository import Gdk, Gio, GLib, GObject, Gtk, Pango
 
-from .model import StreamModel, safe_text
+from .model import StreamModel, client_failure_text, safe_text
 from .process import ClientSession, describe
 from .health import HealthSession
 from .controls import SettingsWindow
@@ -116,6 +116,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._inspection_thread = None
         self.inspection_error_label = None
         self.feature_checks = {}
+        self.feature_options_button = None
+        self.client_log_expander = None
+        self._client_log_text = ""
         self.stat_labels = {}
         self.health_session = None
         self.health_labels = {}
@@ -169,6 +172,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.status_label = label("Inspecting local startup options…", "gui-status")
         self.status_label.set_lines(3)
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.status_label.set_selectable(True)
         self.binary_label = label(f"Local {role} executable: {safe_text(str(binary))}", "gui-subtitle")
         self.binary_label.set_selectable(True)
         self.binary_label.set_lines(2)
@@ -211,7 +215,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self.palette_dropdown = Gtk.DropDown.new_from_strings(["Byte hue", "RGB triplets", "Grayscale"])
             self.palette_dropdown.connect("notify::selected", self._select_palette)
             self.controls.append(self.palette_dropdown)
-            self.controls.append(label("Newest first · 256 bytes/sample · 128 rows · F11 / Escape", "gui-subtitle"))
+            self.controls.append(label("Preview · 256 bytes/sample · 128 rows · F11 / Escape", "gui-subtitle"))
             body.append(self.controls)
             self.settings_expander = Gtk.Expander(label="Startup options · read only")
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -224,6 +228,18 @@ class DesktopWindow(Gtk.ApplicationWindow):
             settings_scroller.set_child(self.settings_box)
             self.settings_expander.set_child(settings_scroller)
             body.append(self.settings_expander)
+        if role == "client":
+            self.client_log_view = Gtk.TextView(editable=False, monospace=True, cursor_visible=False)
+            self.client_log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+            diagnostics = Gtk.ScrolledWindow()
+            diagnostics.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            diagnostics.set_min_content_height(80)
+            diagnostics.set_max_content_height(160)
+            diagnostics.set_propagate_natural_height(True)
+            diagnostics.set_child(self.client_log_view)
+            self.client_log_expander = Gtk.Expander(label="Client diagnostics")
+            self.client_log_expander.set_child(diagnostics)
+            body.append(self.client_log_expander)
         body.append(self.status_label)
         self._tick_id = GLib.timeout_add(50, self._tick)
         # Inspection is bounded by describe(). Keep its cleanup alive if the
@@ -245,7 +261,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.server_log_expander.set_child(scroller)
         body.append(box)
 
-    def open_options(self):
+    def open_options(self, focus_field=None):
         if self._closing or self._inspection_busy or self._stopping:
             return
         if self.session and self.session.snapshot()["running"]:
@@ -259,6 +275,13 @@ class DesktopWindow(Gtk.ApplicationWindow):
                 return
             self.settings_window.connect("close-request", self._settings_closed)
         self.settings_window.present()
+        if focus_field in self.settings_window.controls:
+            editor = self.settings_window
+            def focus_option():
+                if editor.get_visible():
+                    editor.controls[focus_field].grab_focus()
+                return GLib.SOURCE_REMOVE
+            GLib.idle_add(focus_option)
 
     def _settings_closed(self, _window):
         self.settings_window = None
@@ -476,7 +499,18 @@ class DesktopWindow(Gtk.ApplicationWindow):
             features.append(check)
         feature_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         feature_box.add_css_class("gui-card")
-        feature_box.append(label("Validated startup features", "gui-heading"))
+        feature_heading = Gtk.Box(spacing=12)
+        feature_title = label("Validated startup features", "gui-heading")
+        feature_title.set_hexpand(True)
+        feature_heading.append(feature_title)
+        if self.role == "server":
+            self.feature_options_button = Gtk.Button(label="Edit features…")
+            self.feature_options_button.set_tooltip_text("Edit LAB, debug, cookies and other settings for the next local server run.")
+            self.feature_options_button.connect("clicked", lambda _button: self.open_options("cookie"))
+            self.options_button.bind_property("sensitive", self.feature_options_button, "sensitive",
+                                             GObject.BindingFlags.SYNC_CREATE)
+            feature_heading.append(self.feature_options_button)
+        feature_box.append(feature_heading)
         feature_box.append(features)
         if self.role == "server":
             self.settings_box.append(self.server_log_expander)
@@ -598,6 +632,13 @@ class DesktopWindow(Gtk.ApplicationWindow):
             # Keep its statistical assessment, but reveal the status message.
             self.set_fullscreen(False)
         self._was_running, self._last_error = state["running"], state["error"]
+        diagnostic_text = state["stderr"]
+        if state["error"]:
+            diagnostic_text = client_failure_text(state["error"], state["stderr"]) + "\n\nCLI output:\n" + diagnostic_text
+            self.client_log_expander.set_expanded(True)
+        if diagnostic_text != self._client_log_text:
+            self.client_log_view.get_buffer().set_text(diagnostic_text)
+            self._client_log_text = diagnostic_text
         self.start_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
         self.stop_button.set_sensitive(state["running"] and not self._stopping)
         self.options_button.set_sensitive(not state["running"] and not self._stopping and not self._inspection_busy)
@@ -625,12 +666,16 @@ class DesktopWindow(Gtk.ApplicationWindow):
                 self.drawing_area.queue_draw()
         if not self._stopping:
             if state["error"]:
-                self.status_label.set_text("Client error: " + state["error"])
+                message = "Client error: " + client_failure_text(state["error"], state["stderr"])
+                self.status_label.set_text(message)
+                self.status_label.set_tooltip_text(message)
             elif not state["running"]:
+                self.status_label.set_tooltip_text(None)
                 final = state["summary"].get("termination", "process exited")
                 detail = state["stderr"].strip().splitlines()
                 self.status_label.set_text(f"Stopped · {final}" + (" · " + detail[-1] if state["returncode"] and detail else ""))
             elif state["sample"]:
+                self.status_label.set_tooltip_text(None)
                 sample = state["sample"]
                 self.status_label.set_text(f"Receiving · {sample.get('received_frames', 0):,} frames · {sample.get('received_bytes', 0) / (1 << 20):.2f} MiB · statistics cover the latest analysed sample")
         return GLib.SOURCE_CONTINUE
@@ -701,6 +746,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.settings_expander.set_visible(not enabled)
         self.controls.set_visible(not enabled)
         self.status_label.set_visible(not enabled)
+        self.client_log_expander.set_visible(not enabled)
         self.fullscreen() if enabled else self.unfullscreen()
 
     def _on_key(self, _controller, keyval, _keycode, _state):

@@ -28,9 +28,9 @@ _CLIENT_FIELDS = (
                 hint="Only used in pull mode. Unchanged URL credentials and query parameters are retained."),
     OptionField("wsurl", "WebSocket endpoint (push)", "Connection",
                 hint="Only used in push mode."),
-    OptionField("slice", "Bytes per response", "Sampling", hint="1–33554432 bytes."),
+    OptionField("slice", "Bytes per response", "Sampling", hint="1–33554432 bytes (32 MiB), subject to the server's configured maximum."),
     OptionField("refresh", "Request interval", "Sampling", hint="Go duration, for example 50ms or 1s."),
-    OptionField("analysis-bytes", "Analysis prefix bytes", "Sampling", hint="0 analyses the full frame."),
+    OptionField("analysis-bytes", "Analysis prefix bytes", "Sampling", hint="0 analyses the full frame; up to 33554432 bytes (32 MiB)."),
     OptionField("analysis-interval", "Analysis interval", "Sampling",
                 hint="Go duration; 0 analyses every frame."),
     OptionField("shannon-threshold", "Shannon threshold (bits/byte)", "Assessment", hint="0–8 bits/byte."),
@@ -56,7 +56,19 @@ _SERVER_FIELDS = (
     OptionField("key-file", "TLS private key file", "Listeners and TLS", "path",
                 hint="Matching private key PEM; only its path is edited here."),
     OptionField("cookie", "Remember HTTP preferences", "Listeners and TLS", "bool",
-                hint="Browser cookie persistence requires HTTPS."),
+                hint="Remember byte/word counts, refresh and word language in Secure, HttpOnly cookies. Browser persistence requires HTTPS."),
+    OptionField("debug", "Enable local debug / pprof listener", "Listeners and TLS", "bool",
+                hint="Available on Linux, Windows and macOS at http://127.0.0.1:6060/debug/pprof/. Takes effect on Start; loopback only."),
+    OptionField("lab-sources", "LAB source registry JSON", "LAB sources and access", "path",
+                hint="Optional operator registry file. Empty disables registered sources; browser-local LAB tools remain available. Read when the server starts, not during validation."),
+    OptionField("lab-allow-remote", "Allow remote access to registered LAB sources", "LAB sources and access", "bool",
+                hint="Off keeps registered bridges restricted to loopback clients and trusted Host names. Enable only for intended remote clients."),
+    OptionField("lab-allowed-hosts", "Trusted LAB Host names", "LAB sources and access",
+                hint="Optional comma-separated exact names/IPs, without ports or wildcards. Does not enable remote peers."),
+    OptionField("lab-max-connections", "Maximum LAB bridges", "LAB sources and access",
+                hint="Positive integer; shared by registered source bridges."),
+    OptionField("lab-memory-mib", "LAB memory budget (MiB)", "LAB sources and access",
+                hint="Positive integer; estimated bridge working memory, not a process RSS limit."),
     OptionField("reseed-ms", "Reseed interval (ms)", "Reseed policy", hint="Plain integer from 1 to 60000."),
     OptionField("max-reseed-age", "Maximum seed age (ms)", "Reseed policy",
                 hint="0 chooses the CLI's automatic age limit."),
@@ -64,7 +76,7 @@ _SERVER_FIELDS = (
                 "Stop pauses generation on failed/stale reseeds; continue permits old-state output."),
     OptionField("buffer-reseed", "Bytes per reseed", "Reseed policy", hint="32–1048576 bytes."),
     OptionField("source-timeout", "Source read timeout", "Reseed policy", hint="Go duration from 1ms to 5m."),
-    OptionField("max-bytes", "Maximum sample bytes", "Resource limits", hint="Also bounds LAB samples."),
+    OptionField("max-bytes", "Maximum sample bytes", "Resource limits", hint="Up to 33554432 bytes (32 MiB), the server default. Also bounds LAB samples."),
 )
 
 _FIELDS = {"client": _CLIENT_FIELDS, "server": _SERVER_FIELDS}
@@ -87,6 +99,8 @@ _CLIENT_DEFAULTS = {
 _SERVER_DEFAULTS = {
     "http": ":8080", "enable-https": True, "https": ":8443", "cert-file": "cert.pem", "key-file": "key.pem",
     "require-device": False, "cpu-mix": False, "rdrand-mix": False, "cookie": False,
+    "debug": False, "lab-sources": "", "lab-allow-remote": False, "lab-allowed-hosts": "",
+    "lab-max-connections": "8", "lab-memory-mib": "32",
     "reseed-ms": "15000", "max-reseed-age": "0", "on-reseed-failure": "stop", "buffer-reseed": "256",
     "source-timeout": "3s", "max-bytes": "33554432",
 }
@@ -97,10 +111,12 @@ _DESCRIPTION_SETTINGS = {
     "server": {"device": "seed_source", "drbg": "drbg", "http": "http_address", "https": "https_address",
                "reseed-ms": "reseed_interval_ms", "max-reseed-age": "max_reseed_age_ms",
                "on-reseed-failure": "reseed_failure_policy", "buffer-reseed": "reseed_bytes",
-               "source-timeout": "source_timeout", "max-bytes": "max_bytes"},
+               "source-timeout": "source_timeout", "max-bytes": "max_bytes",
+               "lab-max-connections": "lab_max_connections", "lab-memory-mib": "lab_memory_mib"},
 }
 _DESCRIPTION_FEATURES = {"enable-https": "https", "require-device": "require_device", "cpu-mix": "cpu_mix",
-                         "rdrand-mix": "rdrand_mix", "cookie": "cookie"}
+                         "rdrand-mix": "rdrand_mix", "cookie": "cookie", "debug": "debug",
+                         "lab-allow-remote": "lab_allow_remote"}
 
 
 def fields_for(role):

@@ -205,6 +205,10 @@ for these Go builds.
 
 ## Edit startup options
 
+The LAB/debug editor additions, **Edit features…** shortcut and expanded client
+diagnostics were added after v2.6.0. Use the source revision containing this
+guide or its corresponding tested installer until a release includes them.
+
 Click **Options** while the process owned by that window is stopped. Select
 its local executable with **Browse**, change the fields you need, then use
 **Validate and apply**. Validation runs the CLI's `-describe-json` path and
@@ -213,6 +217,11 @@ Invalid settings stay in the editor with an explanation. Successful edits
 become the options used by the next **Start**; they do not reconfigure a
 running process or the server being monitored at the health URL.
 
+The checkboxes under **Validated startup features** show the last validated
+startup values. Select **Edit features…** beside them to configure LAB, debug
+and cookie options; these controls also require the GUI-owned server to be
+stopped. The same editor is used on Linux, Windows and macOS.
+
 | Client options | Server options |
 | --- | --- |
 | Pull/push transport and separate HTTP/WebSocket endpoints | Seed source and DRBG |
@@ -220,6 +229,8 @@ running process or the server being monitored at the health URL.
 | Request/analysis intervals and Shannon threshold | Existing TLS certificate and private-key paths |
 | Duration, retries and retry delay | Reseed interval, maximum age, policy and reseed bytes |
 | Waterfall mapping: byte hue, RGB or grayscale | Source timeout, maximum sample size, required device and optional CPU/cookie flags |
+| Up to 32 MiB per response; 0 analyses the full frame | LAB registry file, trusted Host names, remote-access opt-in, bridge and memory limits |
+| Automatically opened failure diagnostics | Local debug/pprof listener and HTTPS browser-preference cookies |
 
 [![Client options editor](images/desktop-gui-client-options.png)](images/desktop-gui-client-options.png)
 [![Server options editor](images/desktop-gui-server-options.png)](images/desktop-gui-server-options.png)
@@ -234,6 +245,47 @@ as described in [TLS certificates](tls-certificates.md). The Options editor
 does not generate a certificate or read its private-key contents. An
 inspection success confirms valid option syntax, not that files, listeners
 or hardware are available; those are checked when the server actually starts.
+
+**LAB sources and access** selects an operator-prepared registry JSON file.
+Clear its path to disable registered sources; browser-local LAB tools remain
+available. Registry contents are read only at server startup. Registered
+bridges stay loopback-only by default; additional trusted Host names do not
+enable remote peers. Remote access is a separate explicit option. Hardware
+adapters still follow each OS's supported capabilities; choosing a registry
+does not add a missing Windows/macOS device driver.
+
+**Enable local debug / pprof listener** starts the existing debug service at
+`http://127.0.0.1:6060/debug/pprof/` with the owned server. It is available on
+Linux, Windows and macOS and remains loopback-only. A port already in use is
+reported in local server logs. Stop closes that listener with the owned process.
+
+**Remember HTTP preferences** controls Secure, HttpOnly browser cookies for
+byte/word counts, refresh and word language. Use HTTPS for browser persistence.
+It does not persist GUI startup options or change a separately monitored server.
+
+### Large samples and client failures
+
+**Bytes per response** accepts up to 33,554,432 bytes (32 MiB), matching the
+server's default maximum; the operator can configure a lower limit. The 2 MiB
+receive default and 1 MiB analysis prefix are configurable defaults, not GUI
+ceilings. Set **Analysis prefix bytes** to `0` for whole-frame analysis.
+The waterfall shows a bounded preview of each analysed sample, keeping GUI
+memory independent of payload size.
+
+An interval of 100 ms requests up to 10 frames/s; it cannot guarantee
+320 MiB/s for 32 MiB frames. Generation, analysis and transport may run slower,
+especially with direct RDRAND output. The server can remain healthy while an
+individual connection times out or closes. Readiness does not measure the
+client connection or promise a requested throughput.
+
+On failure, the client reveals the reported cause and opens **Client
+diagnostics**, with bounded, selectable CLI output and URL credentials/query
+values hidden. EOFs/connection resets, timeouts, rejected sample sizes and
+reported CPU-backend failures have different guidance. Check server logs and
+compare a smaller sample before attributing a problem to the GUI. An explicitly
+reported sticky RDRAND hardware failure requires an operator restart; changing
+refresh does not reset it. See the [load checks and coverage notes](desktop-gui-validation.md)
+for measured results and the remaining qualification gaps.
 
 Additional CLI arguments supplied after the launcher's `--` are retained.
 Editing one supported field replaces that flag without discarding unrelated

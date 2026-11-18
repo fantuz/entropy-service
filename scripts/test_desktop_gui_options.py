@@ -95,10 +95,39 @@ class StartupOptionsTests(unittest.TestCase):
                          ["--url", url, "-display-interval", "55ms", "-preview=false", "-slice=300"])
         self.assertEqual(arguments, original)
 
-    def test_unexposed_option_values_that_look_like_flags_stay_opaque(self):
+    def test_scalar_option_values_that_look_like_flags_stay_opaque(self):
         arguments = ["-lab-sources", "-http=literal-registry-name.json", "--http", "127.0.0.1:8000", "-lab-memory-mib=16"]
         expected = ["-lab-sources", "-http=literal-registry-name.json", "-lab-memory-mib=16", "-http=127.0.0.1:9000"]
         self.assertEqual(edited_arguments("server", arguments, {"http": "127.0.0.1:9000"}), expected)
+
+    def test_lab_debug_and_cookie_edits_preserve_private_paths_and_unrelated_flags(self):
+        arguments = ["-lab-sources", "C:/Private registries/lab sources.json", "-lab-allowed-hosts=lab.example",
+                     "-debug", "-cookie=false", "--debug=false", "-lab-allow-remote", "-words=3"]
+        values = initial_values("server", arguments, {
+            "settings": {"lab_max_connections": 2, "lab_memory_mib": 4},
+            "features": {"debug": True, "cookie": True, "lab_allow_remote": False},
+        })
+        self.assertFalse(values["debug"])
+        self.assertFalse(values["cookie"])
+        self.assertTrue(values["lab-allow-remote"])
+        self.assertEqual(values["lab-max-connections"], "2")
+        self.assertEqual(values["lab-memory-mib"], "4")
+        self.assertEqual(values["lab-sources"], arguments[1])
+        self.assertEqual(edited_arguments("server", arguments, {"debug": True, "cookie": True}),
+                         ["-lab-sources", arguments[1], "-lab-allowed-hosts=lab.example",
+                          "-lab-allow-remote", "-words=3", "-debug=true", "-cookie=true"])
+        self.assertEqual(edited_arguments("server", arguments, {"lab-sources": "", "lab-allow-remote": False})[-2:],
+                         ["-lab-sources=", "-lab-allow-remote=false"])
+
+    def test_optional_server_feature_defaults_are_portable_and_explicit_reports_win(self):
+        for target in ("linux", "win32", "darwin"):
+            with self.subTest(platform=target), mock.patch("entropy_gui.options.sys.platform", target):
+                values = initial_values("server", [])
+                self.assertFalse(values["debug"] or values["cookie"] or values["lab-allow-remote"])
+                self.assertEqual(values["lab-sources"], "")
+                configured = initial_values("server", [], {"settings": {},
+                    "features": {"debug": True, "cookie": True, "lab_allow_remote": True}})
+                self.assertTrue(configured["debug"] and configured["cookie"] and configured["lab-allow-remote"])
 
     def test_bare_boolean_flags_never_consume_the_following_option(self):
         arguments = ["-enable-https", "-http", "127.0.0.1:8000", "-lab-allow-remote", "-cpu-mix=false"]
