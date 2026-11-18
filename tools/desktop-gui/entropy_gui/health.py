@@ -336,6 +336,11 @@ def _opener(control, context):
             return self.do_open(lambda host, **kw: connection(Connection, host, **kw), request)
 
     class HTTPS(urllib.request.HTTPSHandler):
+        def __init__(self):
+            # Python 3.13+ otherwise loads an implicit system trust context here,
+            # even for HTTP polls. TLS uses our already initialized/reused context.
+            urllib.request.AbstractHTTPHandler.__init__(self)
+
         def https_open(self, request):
             return self.do_open(lambda host, **kw: connection(TLSConnection, host, **kw), request,
                                 context=context)

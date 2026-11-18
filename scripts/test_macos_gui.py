@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run existing GUI model and actual GTK/owned-process checks on native macOS."""
 import argparse
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -16,7 +17,10 @@ def main():
         result=subprocess.run([sys.executable,'-m','unittest','discover','-s','scripts','-p',pattern],check=False)
         if result.returncode:failures.append(pattern)
     subprocess.run([sys.executable,'scripts/test_desktop_gui_gtk.py','--server',str(args.bin/'entropy-server'),
-                    '--client',str(args.bin/'entropy-client'),'--artifacts',str(args.artifacts)],check=True)
+                    '--client',str(args.bin/'entropy-client'),'--artifacts',str(args.artifacts)],check=True,timeout=240)
+    evidence=json.loads((args.artifacts/'results.json').read_text())
+    assert evidence['passed'] and evidence['platform']=='darwin',evidence
+    assert {'server','controls','terminal_interrupts','live_health','client','fullscreen_outcomes','inspection_close'} <= evidence.keys(),evidence
     if failures:raise RuntimeError('GUI model tests failed: '+', '.join(failures))
 
 

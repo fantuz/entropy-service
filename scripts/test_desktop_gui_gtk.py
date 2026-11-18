@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import shlex
 import socket
 import subprocess
 import sys
@@ -215,9 +216,9 @@ def close_during_inspection(context, application_type):
     with tempfile.TemporaryDirectory(prefix="entropy-gui-inspection-") as directory:
         inspector = Path(directory) / "hung-inspector"
         pid_file = inspector.with_suffix(".pid")
-        inspector.write_text("#!/usr/bin/python3\nimport os,time\nfrom pathlib import Path\n"
-                             "Path(__file__).with_suffix('.pid').write_text(str(os.getpid()))\n"
-                             "time.sleep(30)\n")
+        # A POSIX shell avoids Apple's developer-tools Python shim and tests
+        # exactly one owned PID: exec replaces the shell with the sleeping tool.
+        inspector.write_text("#!/bin/sh\nprintf '%s\\n' \"$$\" > " + shlex.quote(str(pid_file)) + "\nexec /bin/sleep 30\n")
         inspector.chmod(0o700)
         app = application_type("server", str(inspector), [])
         app.set_application_id("org.entropyservice.LinuxPoC.TestInspectionClose")
@@ -225,7 +226,9 @@ def close_during_inspection(context, application_type):
         app.activate()
         window = app.window
         try:
-            wait_for(context, pid_file.exists, "owned configuration inspector to start")
+            wait_for(context, lambda: pid_file.exists() or window.inspection_error_label is not None,
+                     "owned configuration inspector to start")
+            assert pid_file.exists(), window.inspection_error_label.get_text()
             pid = int(pid_file.read_text())
             began = time.monotonic()
             close_window(context, window)
@@ -797,18 +800,26 @@ def main():
         old_hook(kind, error, traceback)
     sys.excepthook = observe_callback_error
     try:
+        print("Native GTK: server configuration", flush=True)
         result = {"platform": sys.platform,
                   "server": server_configuration(context, DesktopApplication, args.server.resolve())}
+        print("Native GTK: missing_local_executables", flush=True)
         result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
+        print("Native GTK: inspection_close", flush=True)
         result["inspection_close"] = close_during_inspection(context, DesktopApplication)
         with entropy_server(args.server.resolve()) as port:
             from test_desktop_gui_controls_gtk import controls_and_owned_server
+            print("Native GTK: controls", flush=True)
             result["controls"] = controls_and_owned_server(context, DesktopApplication, args.server.resolve(),
                                                           args.client.resolve(), port, args.artifacts)
+            print("Native GTK: terminal_interrupts", flush=True)
             result["terminal_interrupts"] = terminal_interrupts(context, args.server.resolve(), args.client.resolve(),
                                                                 port, args.artifacts)
+            print("Native GTK: live_health", flush=True)
             result["live_health"] = live_server_health(context, DesktopApplication, args.server.resolve(), port, args.artifacts)
+            print("Native GTK: client", flush=True)
             result["client"] = client_waterfall(context, DesktopApplication, Gdk, args.client.resolve(), port, args.artifacts)
+            print("Native GTK: fullscreen_outcomes", flush=True)
             result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk, args.client.resolve(), port)
     finally:
         sys.excepthook = old_hook
