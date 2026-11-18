@@ -227,8 +227,14 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
                  window.descriptor["settings"]["payload_bytes"] == 33554432,
                  "server-maximum sample size accepted by the GUI")
         window.start_button.emit("clicked")
-        wait_for(context, lambda: window.session.snapshot()["sample"].get("sample_bytes") == 33554432,
-                 "full 32 MiB acquisition and analysis", timeout=15)
+        try:
+            wait_for(context, lambda: window.session.snapshot()["sample"].get("sample_bytes") == 33554432,
+                     "full 32 MiB acquisition and analysis", timeout=15)
+        except AssertionError as error:
+            failure = {key: value for key, value in window.session.snapshot().items() if key != "rows"}
+            failure["visible_status"] = window.status_label.get_text()
+            (artifacts / "client-max-size-failure.json").write_text(json.dumps(failure, indent=2))
+            raise AssertionError("Maximum-size acquisition failed: " + json.dumps(failure)) from error
         maximum = window.session.snapshot()
         assert maximum["sample"]["frame_bytes"] == 33554432 and maximum["sample"]["analysed_bytes"] >= 33554432
         assert len(window.model.snapshot()["rows"]) <= 128
