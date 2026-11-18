@@ -3,17 +3,24 @@ package drbg
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/chacha20"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
 )
 
-// Algorithm selects the stream used by the existing seed/reseed construction.
+// Algorithm selects a seeded software stream or explicit direct CPU output.
 type Algorithm string
+
+const OutputModeDirectCPU = "direct-cpu"
 
 const (
 	ChaCha20  Algorithm = "chacha20"
 	AES256CTR Algorithm = "aes-256-ctr"
+	// RDRAND is direct CPU output, not an application-seeded DRBG.
+	RDRAND Algorithm = "rdrand-experimental"
 	// Barzakh521 is available only with the experimental_barzakh build tag.
 	Barzakh521 Algorithm = "barzakh-521-experimental"
 )
@@ -23,6 +30,12 @@ func ParseAlgorithm(name string) (Algorithm, error) {
 	switch algorithm {
 	case ChaCha20, AES256CTR:
 		return algorithm, nil
+	case RDRAND:
+		if !rdrand.Available() {
+			return "", fmt.Errorf("backend %q requires native amd64 with CPU RDRAND support (unavailable in purego builds): %w", name, rdrand.ErrUnsupported)
+		}
+
+		return algorithm, nil
 	case Barzakh521:
 		if !barzakhEnabled {
 			return "", fmt.Errorf("DRBG %q requires a build with -tags=experimental_barzakh", name)
@@ -30,7 +43,7 @@ func ParseAlgorithm(name string) (Algorithm, error) {
 
 		return algorithm, nil
 	default:
-		return "", fmt.Errorf("unsupported DRBG %q: use chacha20 or aes-256-ctr", name)
+		return "", fmt.Errorf("unsupported DRBG %q: use chacha20, aes-256-ctr or rdrand-experimental", name)
 	}
 }
 
@@ -42,6 +55,8 @@ func (a Algorithm) String() string {
 		return "AES-256-CTR"
 	case Barzakh521:
 		return "Barzakh-521 (experimental)"
+	case RDRAND:
+		return "RDRAND (experimental; direct CPU)"
 	default:
 		return string(a)
 	}
@@ -49,7 +64,7 @@ func (a Algorithm) String() string {
 
 // Experimental reports whether this backend is intended only for research.
 func (a Algorithm) Experimental() bool {
-	return a == Barzakh521
+	return a == Barzakh521 || a == RDRAND
 }
 
 func newCipherStream(algorithm Algorithm, key *[32]byte, nonce *[aes.BlockSize]byte) (cipher.Stream, error) {
@@ -65,6 +80,8 @@ func newCipherStream(algorithm Algorithm, key *[32]byte, nonce *[aes.BlockSize]b
 		return cipher.NewCTR(block, nonce[:]), nil
 	case Barzakh521:
 		return newBarzakhStream(key, nonce)
+	case RDRAND:
+		return nil, errors.New("direct CPU output does not use a cipher stream")
 	default:
 		return nil, fmt.Errorf("unsupported DRBG algorithm %q", algorithm)
 	}
@@ -76,4 +93,13 @@ func clearStreamState(stream cipher.Stream) {
 	if state, ok := stream.(interface{ clear() }); ok {
 		state.clear()
 	}
+}
+
+// OutputMode distinguishes deterministic expansion from direct CPU words.
+func (a Algorithm) OutputMode() string {
+	if a == RDRAND {
+		return OutputModeDirectCPU
+	}
+
+	return "seeded-stream"
 }

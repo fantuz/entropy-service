@@ -447,3 +447,9 @@ Wayland/HiDPI behavior can depend on the desktop compositor. The
 [Windows Service commands](windows-service.md) are separate from GUI process
 controls. macOS, signing and GUI integration with operating-system services
 remain follow-ups.
+
+The server's Output backend selector also offers `rdrand-experimental` for
+explicit CPU experiments. It requires native x64 and advertised RDRAND support;
+the CLI rejects it on unsupported hosts. This mode has CPU-only output trust,
+no software fallback and a restart-required failure latch. See the
+[direct CPU backend guide](experimental-rdrand.md) before selecting it.

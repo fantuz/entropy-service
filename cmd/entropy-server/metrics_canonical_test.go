@@ -37,13 +37,13 @@ func TestCanonicalMetricsHaveUniqueFamiliesAndBaseUnits(t *testing.T) {
 		families[family] = name
 	}
 
-	for _, name := range []string{"rng_bytes_generated_total", "rng_reseeds_total", "rng_reseed_age_seconds", "wss_payloads_total", "http_requests_total"} {
+	for _, name := range []string{"rng_bytes_generated_total", "rng_backend_failures_total", "rng_reseeds_total", "rng_reseed_age_seconds", "wss_payloads_total", "http_requests_total"} {
 		if _, exists := values[name]; !exists {
 			t.Fatalf("canonical metric missing: %s", name)
 		}
 	}
 
-	for _, detail := range []string{"not bytes served or physical entropy", "excludes debug listener", "excludes control frames", "not process RSS"} {
+	for _, detail := range []string{"not bytes served or a physical entropy estimate", "excludes seed mixing failures", "excludes debug listener", "excludes control frames", "not process RSS"} {
 		if !strings.Contains(response.Body.String(), detail) {
 			t.Fatalf("metric scope is unclear: missing %q", detail)
 		}

@@ -101,6 +101,10 @@ func (d *DRBG) generationErrorLocked(now time.Time) error {
 		return io.ErrClosedPipe
 	}
 
+	if d.cpu != nil && d.cpu.failed.Load() {
+		return ErrCPUBackendFailed
+	}
+
 	if d.failurePolicy == ReseedStop && (d.lastReseedError != "" || now.Sub(d.Reseeded) > d.maxReseedAge) {
 		return ErrSeedUnavailable
 	}
@@ -114,7 +118,7 @@ func (d *DRBG) notifyGenerationLocked() {
 	}
 
 	// Only serving roots configured with a freshness policy need notifications.
-	if d.maxReseedAge > 0 {
+	if d.maxReseedAge > 0 || d.cpu != nil {
 		d.generationChanged = make(chan struct{})
 	}
 }

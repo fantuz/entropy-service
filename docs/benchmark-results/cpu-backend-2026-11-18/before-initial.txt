@@ -1,0 +1,18 @@
+goos: linux
+goarch: amd64
+pkg: github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg
+cpu: AMD EPYC 9V74 80-Core Processor                
+BenchmarkOutputBackends/aes-256-ctr/65536         	   33925	     11035 ns/op	5938.93 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/65536         	   30922	     10700 ns/op	6125.03 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/65536         	   34354	     10719 ns/op	6114.20 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/1048576       	    2110	    182549 ns/op	5744.07 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/1048576       	    2061	    178124 ns/op	5886.76 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/aes-256-ctr/1048576       	    2089	    184530 ns/op	5682.41 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/65536            	    3633	     98124 ns/op	 667.89 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/65536            	    3775	     98252 ns/op	 667.02 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/65536            	    3049	     99493 ns/op	 658.70 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/1048576          	     218	   1608743 ns/op	 651.80 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/1048576          	     212	   1775608 ns/op	 590.54 MB/s	       0 B/op	       0 allocs/op
+BenchmarkOutputBackends/chacha20/1048576          	     225	   1599575 ns/op	 655.53 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg	5.273s

@@ -11,6 +11,12 @@ from entropy_gui.options import edited_arguments, fields_for, initial_values
 
 
 class StartupOptionsTests(unittest.TestCase):
+    def test_explicit_experimental_cpu_backend_is_preserved(self):
+        field = next(field for field in fields_for("server") if field.name == "drbg")
+        self.assertIn("rdrand-experimental", field.choices)
+        self.assertEqual(edited_arguments("server", [], {"drbg": "rdrand-experimental"}),
+                         ["-drbg=rdrand-experimental"])
+
     def test_field_allowlists_and_immutable_metadata(self):
         client = fields_for("client")
         self.assertEqual(len({field.name for field in client}), len(client))

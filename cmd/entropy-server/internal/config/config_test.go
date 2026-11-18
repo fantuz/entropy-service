@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
 )
 
 func TestExperimentalDRBGSelection(t *testing.T) {
@@ -278,5 +279,20 @@ func TestReseedIntervalExtendedBoundsAndReadinessAge(t *testing.T) {
 		if _, err := parseConfig([]string{"-reseed-ms=" + value}, io.Discard); err == nil {
 			t.Errorf("unexpectedly accepted reseed-ms=%s", value)
 		}
+	}
+}
+
+func TestDirectCPUBackendSelection(t *testing.T) {
+	cfg, err := parseConfig([]string{"-drbg=rdrand-experimental"}, io.Discard)
+	if !rdrand.Available() {
+		if !errors.Is(err, rdrand.ErrUnsupported) {
+			t.Fatalf("unsupported CPU/build accepted: %v", err)
+		}
+
+		return
+	}
+
+	if err != nil || cfg.DRBG != string(drbg.RDRAND) {
+		t.Fatalf("direct CPU backend selection: %+v, %v", cfg, err)
 	}
 }

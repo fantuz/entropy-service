@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-18",
+  "baseline_commit": "5a4199791129946fb74701b682b56cd9d588f0b6",
+  "feature_source": "implementation in this PR",
+  "cpu": "AMD EPYC 9V74 80-Core Processor (virtualized; hypervisor flag set)",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "go": "go1.26.11 linux/amd64",
+  "cpu_affinity": "lowest allowed logical CPU for pinned runs",
+  "gomaxprocs": 1,
+  "harness_sha256": "5ea3bed576ac7f52d13d537dd6e8b20d6af679379bad0d72c99f5d360b51308b",
+  "units": "MB/s is decimal; MiB is binary",
+  "software": [
+    {
+      "case": "aes-256-ctr/65536",
+      "before": {
+        "n": 6,
+        "median_MB_per_second": 6152.865,
+        "min_MB_per_second": 5958.2,
+        "max_MB_per_second": 6364.32
+      },
+      "after": {
+        "n": 6,
+        "median_MB_per_second": 6173.58,
+        "min_MB_per_second": 5339.74,
+        "max_MB_per_second": 6406.92
+      },
+      "median_delta_percent": 0.33667242821027177
+    },
+    {
+      "case": "aes-256-ctr/1048576",
+      "before": {
+        "n": 6,
+        "median_MB_per_second": 6092.764999999999,
+        "min_MB_per_second": 5829.11,
+        "max_MB_per_second": 6285.59
+      },
+      "after": {
+        "n": 6,
+        "median_MB_per_second": 6070.91,
+        "min_MB_per_second": 5774.85,
+        "max_MB_per_second": 6156.75
+      },
+      "median_delta_percent": -0.35870413515045607
+    },
+    {
+      "case": "chacha20/65536",
+      "before": {
+        "n": 6,
+        "median_MB_per_second": 638.575,
+        "min_MB_per_second": 606.1,
+        "max_MB_per_second": 662.32
+      },
+      "after": {
+        "n": 6,
+        "median_MB_per_second": 649.4549999999999,
+        "min_MB_per_second": 625.34,
+        "max_MB_per_second": 658.19
+      },
+      "median_delta_percent": 1.703793602944037
+    },
+    {
+      "case": "chacha20/1048576",
+      "before": {
+        "n": 6,
+        "median_MB_per_second": 638.26,
+        "min_MB_per_second": 620.24,
+        "max_MB_per_second": 650.72
+      },
+      "after": {
+        "n": 6,
+        "median_MB_per_second": 639.085,
+        "min_MB_per_second": 616.43,
+        "max_MB_per_second": 648.59
+      },
+      "median_delta_percent": 0.129257669288374
+    }
+  ],
+  "direct_cpu": [
+    {
+      "bytes": 65536,
+      "n": 3,
+      "median_MB_per_second": 308.1,
+      "median_ns_per_read": 212707.0,
+      "allocations_per_read": 0
+    },
+    {
+      "bytes": 1048576,
+      "n": 3,
+      "median_MB_per_second": 315.51,
+      "median_ns_per_read": 3323465.0,
+      "allocations_per_read": 0
+    }
+  ],
+  "limitations": [
+    "Single virtualized AMD host; no Intel/Windows/physical qualification or independent entropy claim.",
+    "Initial unrestricted runs were noisy; report retains them and uses six alternating pinned pairs for software comparison.",
+    "Not a network, multi-client contention, worst-case retry, renderer or analysis benchmark.",
+    "No rigorous statistical proof that small regressions are absent."
+  ]
+}

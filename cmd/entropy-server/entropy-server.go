@@ -1149,8 +1149,13 @@ func runServer(ctx context.Context, cfg *config.Config, ready func()) error {
 		return err
 	}
 
-	if algorithm.Experimental() {
+	switch algorithm {
+	case drbg.ChaCha20, drbg.AES256CTR:
+	// Standard software backends need no experimental warning.
+	case drbg.Barzakh521:
 		log.Print("EXPERIMENTAL Barzakh-521: variable-time arithmetic, no independent security audit; use for local research only")
+	case drbg.RDRAND:
+		log.Print("EXPERIMENTAL direct RDRAND: CPU-only output trust; external seeds do not condition output; hardware failure stops all generation until restart")
 	}
 
 	maxReseedAge := time.Duration(cfg.MaxReseedAgeMs) * time.Millisecond
@@ -1263,7 +1268,20 @@ func runServer(ctx context.Context, cfg *config.Config, ready func()) error {
 		return fmt.Errorf("configure generation freshness policy: %w", err)
 	}
 
-	startup.Check("Root DRBG", "OK", "initialized; metadata set")
+	if algorithm == drbg.RDRAND {
+		var probe [64]byte
+
+		_, probeErr := root.Read(probe[:])
+		clear(probe[:])
+
+		if probeErr != nil {
+			return fmt.Errorf("CPU output startup probe: %w", probeErr)
+		}
+
+		startup.Check("CPU output", "OK", "RDRAND64 probe passed; not a hardware security certification")
+	}
+
+	startup.Check("Root generator", "OK", "initialized; metadata set")
 
 	wsBudget := newWebSocketBudget(cfg.WSMaxConnections, cfg.WSMemoryMiB*(1<<20))
 	httpBudget := newHTTPRequestBudget(cfg.HTTPMaxRequests, cfg.HTTPMemoryMiB*(1<<20))

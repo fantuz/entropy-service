@@ -34,7 +34,12 @@ func serverInvocation(out io.Writer, cfg *config.Config) *console.Report {
 	r.Section("Source & reseeding")
 	r.Value("Requested source", cfg.DevicePath)
 	r.Value("Require device", cfg.RequireDevice)
-	r.Value("DRBG backend", cfg.DRBG)
+	r.Value("Output backend", cfg.DRBG)
+
+	if cfg.DRBG == string(drbg.RDRAND) {
+		r.Check("Direct CPU output", "WARN", "external seeds only gate freshness; no output conditioning, no software fallback; restart after hardware failure")
+	}
+
 	r.Value("CPU / RDRAND mixing", fmt.Sprintf("%t / %t (CPU takes precedence)", cfg.MixCPU, cfg.MixRDRAND))
 	r.Value("Source read timeout", cfg.SourceTimeout)
 	r.Value("Reseed size", fmt.Sprintf("%d bytes", cfg.ReseedSize))

@@ -13,12 +13,19 @@ Server millisecond flags accept **plain integer milliseconds**, without a unit s
 
 ### Source and reseeding
 
+The experimental [direct CPU backend](experimental-rdrand.md) is selected with
+`-drbg=rdrand-experimental`. It uses RDRAND instead of a software stream,
+requires CPU support in a native amd64 build, and never falls back. The
+configured source still supplies startup/freshness-policy reads, but does not
+seed or condition CPU output. A CPU output failure stays latched until restart,
+even with `-on-reseed-failure=continue`.
+
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `-device` | Linux `/dev/qrandom0`; Windows `windows-csprng` | Linux character-device path, Windows OS source or Windows `quantis-pci:N`; Linux/Windows `quantis-usb:N` or `chaoskey-usb:N`. Explicit USB/Windows hardware selectors never fall back. See [hardware examples](hardware-examples.md). |
 | `-require-device` | `false` | Fail startup if the requested device is unavailable. |
 | `-source-timeout` | `3s` | Complete startup/reseed read budget: Go duration from `1ms` to `5m`. Native OS/driver calls still require a conforming implementation; see [source I/O](source-io.md). |
-| `-drbg` | `aes-256-ctr` on non-ARM/non-RISC-V; `chacha20` on ARM/RISC-V | Backend: `chacha20` or `aes-256-ctr`. An explicit flag always overrides the platform default. |
+| `-drbg` | `aes-256-ctr` on non-ARM/non-RISC-V; `chacha20` on ARM/RISC-V | Backend: `chacha20` or `aes-256-ctr`; native x64 also offers opt-in `rdrand-experimental` direct CPU output. An explicit flag always overrides the platform default. |
 | `-cpu-mix` | `false` | Supplement seed reads with RDSEED/RDRAND on supported amd64 CPUs. |
 | `-rdrand-mix` | `false` | RDRAND-only mode; requires CPU support. |
 | `-reseed-ms` | `15000` | Root reseed interval: 1–60000 ms. |

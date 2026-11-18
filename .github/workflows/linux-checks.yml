@@ -78,7 +78,7 @@ jobs:
         run: python3 scripts/test_client_tls.py
         if: inputs.suite == 'quality'
       - name: Test pure-Go DRBG and CPU-random fallback
-        run: go test -count=1 -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand
+        run: go test -count=1 -tags=purego ./cmd/entropy-server/internal/drbg ./cmd/entropy-server/internal/rdrand ./cmd/entropy-server/internal/config
         if: inputs.suite == 'quality'
       - name: Validate monitoring configuration and alert behavior
         run: bash scripts/test-monitoring.sh

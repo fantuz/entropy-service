@@ -20,7 +20,8 @@ type Reader interface {
 	Read(p []byte) (n int, err error)
 }
 
-// DRBG represents a deterministic random byte generator with observability metadata.
+// DRBG hosts seeded streams or experimental direct CPU output with shared
+// lifecycle and observability. The direct CPU mode is not deterministic.
 type DRBG struct {
 	mu sync.RWMutex
 
@@ -40,6 +41,7 @@ type DRBG struct {
 	key             [32]byte
 	nonce           [aes.BlockSize]byte
 	cipher          cipher.Stream
+	cpu             *cpuBackend
 	algorithm       Algorithm
 	closed          bool
 	counted         bool // True until Close releases the constructor's instance count.
@@ -78,6 +80,9 @@ type Metadata struct {
 	LastReseedError      string
 	ReseedFailurePolicy  ReseedFailurePolicy
 	GenerationAllowed    bool
+	OutputMode           string
+	BackendError         string
+	BackendFailuresTotal uint64
 }
 
 // HealthInfo contains all info needed to generate JSON.
@@ -99,7 +104,8 @@ var (
 )
 
 // ChaCha20 has 2^32 blocks of 64 bytes per key. Use the same operational
-// ceiling for all backends; this is not a Barzakh security bound.
+// ceiling for software backends; this is not a Barzakh security bound.
+// Direct CPU output has no application key or per-key byte budget.
 // Reseeding resets the byte budget.
 const maxBytesPerKey uint64 = 1 << 38
 
@@ -123,6 +129,7 @@ func NewDRBG(seed []byte) (DRBG, error) {
 
 // NewDRBGWithAlgorithm preserves the existing SHA-512 seed construction.
 // AES-CTR here is a stream backend, not a NIST CTR_DRBG implementation.
+// RDRAND ignores seed contents; external seed reads remain a serving policy.
 func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 	return newDRBGWithRoot(seed, algorithm, nil)
 }
@@ -130,6 +137,10 @@ func NewDRBGWithAlgorithm(seed []byte, algorithm Algorithm) (DRBG, error) {
 func newDRBGWithRoot(seed []byte, algorithm Algorithm, root *DRBG) (DRBG, error) {
 	if _, err := ParseAlgorithm(string(algorithm)); err != nil {
 		return DRBG{}, err
+	}
+
+	if algorithm == RDRAND {
+		return newCPUGenerator(root)
 	}
 
 	if len(seed) < 32 {
@@ -154,14 +165,7 @@ func newDRBGWithRoot(seed []byte, algorithm Algorithm, root *DRBG) (DRBG, error)
 		return DRBG{}, err
 	}
 
-	active := activeDRBG.Add(1)
-
-	for {
-		peak := peakDRBG.Load()
-		if active <= peak || peakDRBG.CompareAndSwap(peak, active) {
-			break
-		}
-	}
+	trackInstance()
 
 	return DRBG{
 		key:           key,
@@ -176,10 +180,36 @@ func newDRBGWithRoot(seed []byte, algorithm Algorithm, root *DRBG) (DRBG, error)
 	}, nil
 }
 
-// NewConnectionDRBG derives an independent child with its parent's backend.
+func trackInstance() {
+	active := activeDRBG.Add(1)
+
+	for {
+		peak := peakDRBG.Load()
+		if active <= peak || peakDRBG.CompareAndSwap(peak, active) {
+			break
+		}
+	}
+}
+
+// NewConnectionDRBG derives a private software stream. Direct CPU children
+// share the hardware failure latch and do not consume unused child seeds.
 func NewConnectionDRBG(d *DRBG) (DRBG, error) {
 	if d == nil {
 		return DRBG{}, errors.New("nil parent generator")
+	}
+
+	if d.cpu != nil {
+		if err := d.CheckGeneration(); err != nil {
+			return DRBG{}, err
+		}
+
+		if root := d.freshnessRoot; root != nil {
+			if err := root.CheckGeneration(); err != nil {
+				return DRBG{}, err
+			}
+		}
+
+		return newCPUGenerator(d.servingRoot())
 	}
 
 	// Keep child seed material in an owned fixed-size buffer and discard it
@@ -219,6 +249,12 @@ func (d *DRBG) Reseed(seed []byte) error {
 		return errors.New("reseed requires at least 32 input bytes")
 	}
 
+	if d.cpu != nil {
+		// This refreshes the external-source policy only, never the CPU DRNG.
+		d.recordSuccessfulReseedLocked()
+		return nil
+	}
+
 	// Streaming SHA-512 has the same digest as Sum512(append(oldKey, seed...)),
 	// without allocating an old-key-plus-seed concatenation.
 	h := sha512.New()
@@ -252,14 +288,18 @@ func (d *DRBG) Reseed(seed []byte) error {
 	d.key = key
 	d.nonce = nonce
 	d.cipher = c
+	d.recordSuccessfulReseedLocked()
+
+	return nil
+}
+
+func (d *DRBG) recordSuccessfulReseedLocked() {
 	d.generated = 0
 	d.Reseeded = time.Now()
 	d.reseeds++
 	d.lastReseedError = ""
 	d.reseedEpoch.Add(1)
 	d.notifyGenerationLocked()
-
-	return nil
 }
 
 // Close clears the DRBG key/nonce fields we own, releases the cipher
@@ -295,8 +335,12 @@ func (d *DRBG) Close() error {
 	return nil
 }
 
-// Read fills p with pseudo-random bytes.
+// Read fills p with software-expanded or direct CPU bytes.
 func (d *DRBG) Read(p []byte) (int, error) {
+	if d.cpu != nil {
+		defer d.publishCPUFailure()
+	}
+
 	if root := d.freshnessRoot; root != nil {
 		root.policyMu.RLock()
 		defer root.policyMu.RUnlock()
@@ -307,6 +351,10 @@ func (d *DRBG) Read(p []byte) (int, error) {
 
 	if root := d.freshnessRoot; root != nil {
 		if err := root.generationErrorLocked(time.Now()); err != nil {
+			if d.cpu != nil {
+				clear(p)
+			}
+
 			return 0, err
 		}
 	}
@@ -317,15 +365,26 @@ func (d *DRBG) Read(p []byte) (int, error) {
 // readLocked requires d.mu; seed derivation also snapshots the reseed epoch.
 func (d *DRBG) readLocked(p []byte) (int, error) {
 	if err := d.generationErrorLocked(time.Now()); err != nil {
+		if d.cpu != nil {
+			clear(p)
+		}
+
 		return 0, err
 	}
 
-	if uint64(len(p)) > maxBytesPerKey-d.generated {
+	if d.cpu == nil && uint64(len(p)) > maxBytesPerKey-d.generated {
 		return 0, errors.New("DRBG output limit reached: reseed required")
 	}
 
-	clear(p)
-	d.cipher.XORKeyStream(p, p)
+	if d.cpu != nil {
+		if err := d.cpu.fill(p); err != nil {
+			return 0, err
+		}
+	} else {
+		clear(p)
+		d.cipher.XORKeyStream(p, p)
+	}
+
 	d.generated += uint64(len(p))
 	metrics.AddBytesGenerated(len(p))
 
@@ -365,6 +424,7 @@ func (d *DRBG) WriteHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-RNG-Version", meta.Version)
 	w.Header().Set("X-RNG-Source", meta.Source)
 	w.Header().Set("X-RNG-DRBG", meta.DRBG)
+	w.Header().Set("X-RNG-Output-Mode", meta.OutputMode)
 	w.Header().Set("X-RNG-Reseed-Age-ms", strconv.FormatInt(meta.ReseedAge.Milliseconds(), 10))
 	w.Header().Set("X-RNG-Reseed-Interval-ms", strconv.FormatInt(meta.ReseedIntervalMs, 10))
 	w.Header().Set("X-RNG-Reseed-Size-bits", strconv.Itoa(meta.ReseedSizeBits))
@@ -391,7 +451,15 @@ func (d *DRBG) GetMetadata() Metadata {
 
 	now := time.Now()
 
+	backendError := d.backendError()
+
+	var backendFailures uint64
+	if backendError != "" {
+		backendFailures = 1
+	}
+
 	return Metadata{
+		OutputMode: d.algorithm.OutputMode(), BackendError: backendError, BackendFailuresTotal: backendFailures,
 		Version:             d.version,
 		Source:              d.source,
 		DRBG:                d.algo,
