@@ -85,6 +85,10 @@ def synchronise_latest(repository):
             if published != digest:
                 raise ValueError("latest does not resolve to the validated release index")
         else:
+            # A retry of the last registry write may outlive a newly published
+            # release. Reconcile again instead of returning with stale aliases.
+            if latest_release(repository) != release:
+                continue
             print("latest now follows", release[0], "at", release[1])
             return
     raise RuntimeError("latest release kept changing; retry promotion")

@@ -33,8 +33,8 @@ the utility directly for graceful shutdown.
 docker pull ghcr.io/fantuz/entropy-service:latest
 docker pull ghcr.io/fantuz/entropy-client:latest
 # Select an explicit application release for controlled deployments.
-docker pull ghcr.io/fantuz/entropy-service:v2.3.0
-docker pull ghcr.io/fantuz/entropy-client:v2.3.0
+docker pull ghcr.io/fantuz/entropy-service:v2.5.0
+docker pull ghcr.io/fantuz/entropy-client:v2.5.0
 ```
 
 Both package pages list available tags:
@@ -47,6 +47,21 @@ Validated merges publish `edge` after the main build, native Windows/package and
 endurance checks plus all three container-platform checks pass. Subsequent
 release tags publish containers after the full release validation and binary
 release. Publishing promotes the exact tested image archives without rebuilding.
+
+Transient registry errors (including GHCR `unknown blob`, throttling, service
+errors and connection failures) receive up to four attempts with 2/4/8-second
+backoff. Each registry command has a 120-second attempt limit; the enclosing
+workflow also has its own timeout. Authentication/authorization, invalid
+content, failed validation and unclassified errors fail immediately. Exhausted
+retries fail the job; they never convert missing images into success.
+
+All six platform images, their remote config digests and SBOM attachments are
+staged before either role's consumer-facing version/edge index is updated.
+Indexes use immutable platform digests, and the published index must contain
+exactly those three digests. A failed client upload therefore cannot first
+advance the server channel. Final server/client channel writes remain separate
+registry operations; rerun a failed publication to reconcile a partially
+completed pair. No rollback or cross-repository atomicity is implied.
 
 For an existing release such as **v2.3.0**, open **Actions → Publish containers
 for an existing release → Run workflow**, choose `main`, and enter `v2.3.0`.

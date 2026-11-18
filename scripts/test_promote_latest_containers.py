@@ -41,12 +41,24 @@ class LatestPromotionTests(unittest.TestCase):
     @patch.object(promotion, "prepare_images")
     @patch.object(promotion, "latest_release")
     def test_release_changed_during_preflight_never_promotes_old_image(self, latest, prepare, docker, inspect):
-        latest.side_effect = [self.old, self.new, self.new, self.new, self.new, self.new]
+        latest.side_effect = [self.old] + [self.new] * 6
         prepare.return_value = self.images
         inspect.side_effect = [(digest, {}) for _, digest in self.images]
         promotion.synchronise_latest(self.repository)
         self.assertEqual(prepare.call_args_list, [call(self.repository, self.old), call(self.repository, self.new)])
         self.assertEqual(docker.call_count, 2)
+
+    @patch.object(promotion, "inspect_index")
+    @patch.object(promotion, "docker")
+    @patch.object(promotion, "prepare_images")
+    @patch.object(promotion, "latest_release")
+    def test_release_changes_during_last_registry_write_is_reconciled(self, latest, prepare, docker, inspect):
+        latest.side_effect = [self.old] * 4 + [self.new] * 6
+        prepare.return_value = self.images
+        inspect.side_effect = [(digest, {}) for _, digest in self.images] * 2
+        promotion.synchronise_latest(self.repository)
+        self.assertEqual(prepare.call_args_list, [call(self.repository, self.old), call(self.repository, self.new)])
+        self.assertEqual(docker.call_count, 4)
 
     @patch.object(promotion, "docker")
     @patch.object(promotion, "prepare_images", side_effect=ValueError("wrong source label"))
