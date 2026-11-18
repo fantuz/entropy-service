@@ -62,3 +62,5 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 The reference pages retain the detailed descriptions formerly contained in the README; measurements and API conventions are not rewritten as new guarantees.
 
 [Entropy source I/O deadlines and driver migration](source-io.md).
+
+[Client capability discovery, performance and optional adaptive pacing](client-capabilities-performance.md) describes operator limit discovery, rate/timing interpretation and HTTP-only adaptation.

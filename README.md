@@ -383,6 +383,7 @@ The homepage at `/` is the interactive entry point. Common API routes include:
 | `WS /stream?bytes=4096&refresh=500` | Continuous raw binary frames. |
 | `WS /bytes` / `WS /colors` / `WS /words` | Framed bytes, colour/hash, or word streams. |
 | `POST /files` | JSON statistics about an uploaded binary file. |
+| `GET /v1/capabilities` | Discover configured acquisition limits and supported transports. |
 | `GET /ready` / `GET /metrics` | Readiness and Prometheus metrics. |
 
 The stream and upload labs share analysis windows up to 1 MiB, FFTs up to 65,536 points, labelled plots, paused byte inspection, optional bit-position rates and a historical colour waterfall, with desktop/mobile layouts. The [file workspace](docs/browser-ui.md#shared-file-analysis-workspace) adds bounded local seeking/playback while preserving server upload analysis and full-file SHA-256. See [controls and mathematics](docs/browser-ui.md#stream-analysis-shared-window-and-controls). Normal shutdown prints a [served-traffic executive summary](docs/operations.md#shutdown-executive-summary).

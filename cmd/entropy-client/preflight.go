@@ -11,7 +11,7 @@ import (
 	"github.com/fantuz/entropy-service/internal/console"
 )
 
-func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, data []byte, profile terminal.Profile) {
+func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, data []byte, profile terminal.Profile, discoveries ...discoveryResult) {
 	r := console.New(out, "entropy-client | Startup invocation report")
 	r.Section("Connection & reception")
 	r.Value("Build / platform", fmt.Sprintf("%s / %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH))
@@ -24,6 +24,17 @@ func printPreflight(out io.Writer, cfg *config.Config, httpURL, wsURL string, da
 	r.Value("HTTP endpoint", displayEndpoint(httpURL))
 	r.Value("WebSocket endpoint", displayEndpoint(wsURL))
 	r.Value("Frame size", fmt.Sprintf("%d bytes", cfg.Slice))
+	r.Value("Capability discovery", cfg.Capabilities)
+
+	if len(discoveries) > 0 {
+		r.Value("Discovery result", discoveries[0].Status)
+
+		if discoveries[0].Document != nil {
+			r.Value("Server maximum", fmt.Sprintf("%d sample bytes", discoveries[0].Document.MaxBytes))
+		}
+	}
+
+	r.Value("Adaptive HTTP pacing", fmt.Sprintf("%t; ceiling %s", cfg.Adaptive, cfg.AdaptiveMaxInterval))
 	r.Value("Refresh interval", fmt.Sprintf("%s (%.2f frames/s)", cfg.Refresh, 1/cfg.Refresh.Seconds()))
 	r.Value("Transport retries", fmt.Sprintf("%d total; initial delay %s; cap 30s", cfg.Retries, cfg.RetryDelay))
 	r.Value("Requested rate", fmt.Sprintf("%.3f MiB/s (payload target)", float64(cfg.Slice)/cfg.Refresh.Seconds()/(1<<20)))

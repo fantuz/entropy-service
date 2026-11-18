@@ -18,6 +18,9 @@ import (
 )
 
 type monitorState struct {
+	pacing        *acquisitionPacing
+	outputTime    time.Duration
+	totalAnalysis time.Duration
 	cfg           *config.Config
 	stats         Stats
 	latest        diag.Diagnostics
@@ -151,6 +154,7 @@ func (m *monitorState) observe(frame client.StreamFrame, now time.Time) bool {
 	started := time.Now()
 	m.latest = analysePayload(frame.Data, m.cfg)
 	m.analysisTime = time.Since(started)
+	m.totalAnalysis += m.analysisTime
 	m.sampleAt = now
 	m.nextAnalysis = now.Add(m.cfg.AnalysisInterval)
 	m.samples++
@@ -218,12 +222,29 @@ func (m *monitorState) renderTo(out io.Writer, profile terminal.Profile) {
 
 	drawUI(&summary, &m.latest, m.cfg.ShannonThreshold, profile)
 	fmt.Fprintf(&summary, "Received           : %d frames, %.3f MiB\n", m.frames, float64(m.stats.TotalBytes)/(1<<20))
-	fmt.Fprintf(&summary, "Average received   : %.3f MiB/s\n", m.stats.Rate/(1<<20))
+	p := m.performance(time.Now())
+
+	rateLine := fmt.Sprintf("Average received   : %.3f MiB/s | %.2f / %.2f FPS (received/target)", m.stats.Rate/(1<<20), p.AverageReceivedFPS, p.EffectiveTargetFPS)
+	if profile.Interactive {
+		rateLine = terminal.Fit(rateLine, profile.Columns)
+	}
+
+	fmt.Fprintln(&summary, rateLine)
 	fmt.Fprintf(&summary, "Analysis samples   : %d / %d received frames\n", m.samples, m.frames)
 	fmt.Fprintf(&summary, "Analysed prefix    : %d / %d frame bytes\n", m.latest.N, m.sampleBytes)
 	fmt.Fprintf(&summary, "Analysed total     : %.3f MiB\n", float64(m.analysedBytes)/(1<<20))
 	fmt.Fprintf(&summary, "Sample age         : %.3f ms\n", time.Since(m.sampleAt).Seconds()*1000)
 	fmt.Fprintln(&summary, "Statistics cover the last analysed sample.")
+
+	if !profile.Interactive || profile.Rows == 0 || profile.Rows >= 34 {
+		for line := range strings.SplitSeq(strings.TrimSuffix(m.performanceText(), "\n"), "\n") {
+			if profile.Interactive {
+				line = terminal.Fit(line, profile.Columns)
+			}
+
+			fmt.Fprintln(&summary, line)
+		}
+	}
 
 	if m.cfg.WriteOut {
 		fmt.Fprintf(&summary, "Device mixed       : %d frames, %.3f MiB (%d errors)\n", m.deviceFrames, float64(m.deviceBytes)/(1<<20), m.deviceErrors)
@@ -307,7 +328,9 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 	frames := make(chan client.StreamFrame, 1)
 
 	failures := make(chan error, 1)
-	go receiveFrames(ctx, cfg, httpURL, wsURL, frames, failures)
+
+	m.pacing = newAcquisitionPacing(cfg)
+	go receiveFramesWithPacing(ctx, cfg, httpURL, wsURL, frames, failures, m.pacing)
 
 	defer func() {
 		cancel()
@@ -354,8 +377,25 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 	display := time.NewTicker(interval)
 	defer display.Stop()
 
+	var performanceTick <-chan time.Time
+
+	if cfg.ReportPerformance {
+		performanceTicker := time.NewTicker(time.Second)
+		defer performanceTicker.Stop()
+
+		performanceTick = performanceTicker.C
+	}
+
 	for {
 		select {
+		case <-performanceTick:
+			if err := report.performance(ctx, m); err != nil {
+				if report.failure == nil && contextEnded(ctx) {
+					return stopReason(parent), nil
+				}
+
+				return reasonReportError, err
+			}
 		case <-ctx.Done():
 			return stopReason(parent), nil
 		case <-display.C:
@@ -382,8 +422,12 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 				return stopReason(parent), nil
 			}
 
-			analysed := m.observe(frame, time.Now())
+			processingStarted := time.Now()
+			analysed := m.observe(frame, processingStarted)
+			outputStarted := time.Now()
 			writeErr := m.writeFrame(ctx, frame.Data)
+			m.outputTime = time.Since(outputStarted)
+
 			frame.Release()
 
 			if analysed {
@@ -395,6 +439,10 @@ func runMonitor(parent context.Context, m *monitorState, report *runReport, http
 						return reasonReportError, errors.Join(err, writeErr)
 					}
 				}
+			}
+
+			if cfg.Adaptive {
+				m.pacing.observe(frame.ReceiveWait + time.Since(processingStarted))
 			}
 
 			if writeErr != nil {
@@ -431,20 +479,30 @@ func contextEnded(ctx context.Context) bool {
 	return ok && !time.Now().Before(deadline)
 }
 
-func pullFramesUntilError(ctx context.Context, cfg *config.Config, endpoint string, out chan<- client.StreamFrame) error {
+func pullFramesWithPacing(ctx context.Context, cfg *config.Config, endpoint string, out chan<- client.StreamFrame, pacing *acquisitionPacing) error {
 	ticker := time.NewTicker(cfg.Refresh)
 	defer ticker.Stop()
+
+	previousStart := time.Now()
 
 	for {
 		cycleStarted := time.Now()
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
+		if cfg.Adaptive && pacing != nil {
+			interval := time.Duration(pacing.interval.Load())
+			if !waitContext(ctx, max(0, interval-time.Since(previousStart))) {
+				return ctx.Err()
+			}
+		} else {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ticker.C:
+			}
 		}
 
 		started := time.Now()
+		previousStart = started
 		requestCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		data, err := client.FetchEntropy(requestCtx, endpoint, cfg.Slice)
 		wait := time.Since(started)

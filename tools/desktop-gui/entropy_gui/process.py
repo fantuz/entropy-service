@@ -12,7 +12,7 @@ from .model import MAX_RECORD_BYTES, ReportError, StreamModel, configuration, sa
 
 MAX_STDERR_BYTES = 8192
 _INSPECT_RESERVED = {"h", "help", "describe-json"}
-_CLIENT_RESERVED = _INSPECT_RESERVED | {"headless", "report", "report-waterfall", "debug",
+_CLIENT_RESERVED = _INSPECT_RESERVED | {"headless", "report", "report-waterfall", "report-performance", "debug",
                                           "output", "output-device", "output-bytes", "writeout"}
 _CONSOLE_LOCK = threading.Lock()
 _WINDOWS_API = None
@@ -266,7 +266,8 @@ def describe(binary, args, role):
 class ClientSession:
     """One owned child, one pipe pump, and bounded snapshots for a UI timer."""
 
-    def __init__(self, binary, args, model=None):
+    def __init__(self, binary, args, model=None, *, report_performance=False):
+        self.report_performance = report_performance
         self.binary = str(binary)
         self.args = _arguments(args, _CLIENT_RESERVED)
         self.model = model if model is not None else StreamModel()
@@ -287,8 +288,9 @@ class ClientSession:
         try:
             if self._thread and self._thread.is_alive():
                 raise RuntimeError("The previous client is still stopping")
+            performance_flags = ["-report-performance=true"] if self.report_performance else []
             child = _spawn_utility(self.binary,
-                                   [*self.args, "-headless=true", "-report=-", "-report-waterfall=true"],
+                                   [*self.args, "-headless=true", "-report=-", "-report-waterfall=true", *performance_flags],
                                    "client")
             self.model.reset()
             with self._lock:

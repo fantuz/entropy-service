@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
+	"github.com/fantuz/entropy-service/internal/capabilities"
 )
 
 // Descriptions contain requested configuration only. They do not prove that an
@@ -31,7 +32,7 @@ func writeClientDescription(out io.Writer, cfg *config.Config, endpoint string) 
 		return errors.New("describe endpoint requires a complete HTTP(S) or WebSocket URL")
 	}
 
-	if (cfg.Mode == modePull && u.Scheme != "http" && u.Scheme != descriptionHTTPS) ||
+	if (cfg.Mode == modePull && u.Scheme != capabilities.TransportHTTP && u.Scheme != descriptionHTTPS) ||
 		(cfg.Mode == modeStream && u.Scheme != "ws" && u.Scheme != descriptionWSS) {
 		return errors.New("describe endpoint scheme must match the selected transport")
 	}
@@ -45,7 +46,9 @@ func writeClientDescription(out io.Writer, cfg *config.Config, endpoint string) 
 		SchemaVersion: reportSchemaVersion, Type: "configuration", Role: "client", Live: false,
 		Settings: clientReportSettings(cfg, endpoint),
 		Features: map[string]bool{
-			"https": u.Scheme == descriptionHTTPS || u.Scheme == descriptionWSS, "headless": cfg.Headless,
+			"report_performance": cfg.ReportPerformance,
+			"adaptive":           cfg.Adaptive,
+			"https":              u.Scheme == descriptionHTTPS || u.Scheme == descriptionWSS, "headless": cfg.Headless,
 			"matrix": cfg.ShowMatrix, "writeout": cfg.WriteOut, "output": cfg.OutputEnabled(),
 			"waterfall": cfg.ShowWaterfall, "report": cfg.ReportPath != "", "report_waterfall": cfg.ReportWaterfall,
 		},
