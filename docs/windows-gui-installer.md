@@ -35,6 +35,13 @@ Run setup normally. It installs for your current user under
   health from a separately started server.
 - **Entropy Client**: Options, Start/Stop acquisition and fullscreen waterfall.
 
+On the last setup page, **Open the Entropy Service Start Menu folder** is
+checked by default. Leave it checked and select **Finish** to open the folder
+containing both shortcuts and the GUI guide. Setup uses Windows' current-user
+Start Menu location, including redirected profiles; the usual path is
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Entropy Service`.
+Silent installations do not open Explorer.
+
 The server shortcut starts with the local demonstration settings: loopback HTTP
 `127.0.0.1:8080`, HTTPS disabled. Click **Start** to launch it. Use Options to
 configure HTTPS and certificate paths before remote deployment. This shortcut
@@ -54,9 +61,31 @@ permanent binary location and the [service guide](windows-service.md). A per-use
 GUI installation is unsuitable as the executable location of a persistent
 administrator-installed service.
 
-Close the GUI windows before upgrading or uninstalling. Use Windows Apps or the
-installed uninstaller. Application/runtime files and shortcuts are removed;
-user exports, certificates and data outside the installation are retained.
+### Upgrade or reinstall
+
+Setup detects previous bundled installations for the current user through the
+existing Windows Apps registration. It adds one **Existing installation found**
+page showing the installed version, setup version and installation folder.
+This also applies to reinstalling the same version. Cancel before installation
+to keep the existing copy unchanged; continuing replaces the old application
+and bundled runtime without a separate manual uninstall or a second Apps entry.
+
+Close the GUI windows before continuing. The installer-owned `app`, `bin`,
+`runtime`, `runtime-package-metadata` and `docs` trees are replaced, including
+obsolete DLLs/Python files. Keep custom files outside those program trees.
+The separate `%LOCALAPPDATA%\Entropy Service` data directory, certificates,
+exports and other unowned files are retained. Setup does not restart programs
+automatically after replacement.
+
+An upgrade uses the existing installation folder. To relocate it, uninstall
+through Windows Apps first, then choose a new location; a conflicting `/DIR`
+is rejected before replacing files. Silent upgrades use the same replacement
+policy and omit the interactive notice. Portable ZIP copies, other users'
+installations and separately installed Windows Services are not managed by
+this per-user installer.
+
+Use Windows Apps or the installed uninstaller to remove the program. Application
+and runtime files and shortcuts are removed; separate user data is retained.
 
 ## Runtime provenance and source
 
@@ -78,11 +107,16 @@ trust-store edits, firewall exceptions or signing credentials are bundled.
 
 The `windows-gui-installer.yml` workflow builds both Go companions from the same
 revision, stages Python/GTK and complete source packages, and compiles an Inno
-Setup 6 per-user installer. It installs into a path containing spaces, removes
+Setup 6 per-user installer. A small native fixture first exercises the actual
+upgrade notice, cancellation, old-file cleanup, location guard, reinstall,
+uninstall and Explorer handoff using the production installer recipe. The full
+bundle then installs into a path containing spaces, removes
 access to the original MSYS2 UCRT64 prefix, strips build-time search paths and
 uses the installed runtime to exercise both GTK views, acquisition/fullscreen,
-owned-process controls and shutdown. It then uninstalls and checks that user
-data is retained. Successful installer/source artifacts and diagnostic evidence
+owned-process controls and shutdown. It upgrades that installed bundle and
+repeats the GUI checks with the original runtime still unavailable, verifying
+obsolete-file removal and preservation of user data, then uninstalls. Successful
+installer/source artifacts and diagnostic evidence
 are retained for 14 days. PR builds do not publish releases.
 
 Tagged releases require the installer build/install tests before publication.

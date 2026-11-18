@@ -50,14 +50,28 @@ def main():
                 subprocess.run([str(python), "-I", "-B", str(installation / "app/gui_bootstrap.py"), "--help"], env=environment, check=True, timeout=30)
                 bootstrap = installation / "app/gui_bootstrap.py"
                 script = ROOT / "scripts/test_desktop_gui_gtk.py"
-                code = ("import importlib.util,runpy,sys; "
-                        f"spec=importlib.util.spec_from_file_location('bundle_bootstrap',{str(bootstrap)!r}); "
-                        "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
-                        f"module.configure_runtime({str(installation)!r},{str(state)!r}); "
-                        f"sys.path.insert(0,{str(ROOT / 'scripts')!r}); "
-                        f"sys.argv={[str(script), '--gui-source', str(installation / 'app'), '--server', str(installation / 'bin/entropy-server.exe'), '--client', str(installation / 'bin/entropy-client.exe'), '--artifacts', str(artifacts / 'gtk')]!r}; "
-                        f"runpy.run_path({str(script)!r},run_name='__main__')")
-                subprocess.run([str(python), "-I", "-B", "-c", code], env=environment, check=True, timeout=180)
+                def test_installed_gui(name):
+                    code = ("import importlib.util,runpy,sys; "
+                            f"spec=importlib.util.spec_from_file_location('bundle_bootstrap',{str(bootstrap)!r}); "
+                            "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
+                            f"module.configure_runtime({str(installation)!r},{str(state)!r}); "
+                            f"sys.path.insert(0,{str(ROOT / 'scripts')!r}); "
+                            f"sys.argv={[str(script), '--gui-source', str(installation / 'app'), '--server', str(installation / 'bin/entropy-server.exe'), '--client', str(installation / 'bin/entropy-client.exe'), '--artifacts', str(artifacts / name)]!r}; "
+                            f"runpy.run_path({str(script)!r},run_name='__main__')")
+                    subprocess.run([str(python), "-I", "-B", "-c", code], env=environment, check=True, timeout=180)
+
+                test_installed_gui("gtk")
+                obsolete = installation / "runtime/obsolete-upgrade-fixture.dll"
+                obsolete.write_bytes(b"remove obsolete bundled runtime files")
+                retained = installation / "user sample.bin"
+                retained.write_bytes(b"retain unowned user files")
+                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+                                "/DIR=" + str(installation), "/LOG=" + str(artifacts / "upgrade.log")], check=True, timeout=180)
+                assert not obsolete.exists()
+                assert retained.read_bytes() == b"retain unowned user files"
+                assert sentinel.read_text() == "retain user data"
+                assert json.loads((installation / "bundle-manifest.json").read_text()) == manifest
+                test_installed_gui("gtk-upgraded")
             finally:
                 hidden.rename(prefix)
         finally:

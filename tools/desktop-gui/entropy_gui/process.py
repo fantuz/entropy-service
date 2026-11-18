@@ -275,6 +275,7 @@ class ClientSession:
         self._child = None
         self._thread = None
         self._stderr = bytearray()
+        self._stderr_partial = False
         self._error = ""
         self._revision = 0
         self._stopping = False
@@ -293,6 +294,7 @@ class ClientSession:
             with self._lock:
                 self._child = child
                 self._stderr.clear()
+                self._stderr_partial = False
                 self._error = ""
                 self._stopping = False
                 self._forced_stop = False
@@ -348,7 +350,10 @@ class ClientSession:
                         if pipe is child.stderr:
                             with self._lock:
                                 self._stderr.extend(chunk)
-                                del self._stderr[:-MAX_STDERR_BYTES]
+                                excess = len(self._stderr) - MAX_STDERR_BYTES
+                                if excess > 0:
+                                    self._stderr_partial = self._stderr[excess - 1] != 10
+                                    del self._stderr[:excess]
                                 self._revision += 1
                             continue
                         if failed:
@@ -409,9 +414,14 @@ class ClientSession:
             # The last report must be drained before Start can reuse the model.
             # A dead process with a live pump is still part of this session.
             active = child and (returncode is None or self._thread and self._thread.is_alive())
+            diagnostics = bytes(self._stderr)
+            if self._stderr_partial:
+                _fragment, _separator, diagnostics = diagnostics.partition(b"\n")
+            if active:
+                diagnostics = diagnostics[:diagnostics.rfind(b"\n") + 1]
             result.update(running=bool(active), process_running=bool(child and returncode is None),
                           stopping=bool(active and self._stopping), forced_stop=self._forced_stop,
                           returncode=returncode,
-                          stderr=safe_text(bytes(self._stderr).decode("utf-8", "replace")), error=self._error)
+                          stderr=safe_text(diagnostics.decode("utf-8", "replace")), error=self._error)
             result["revision"] += self._revision
         return result

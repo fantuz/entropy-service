@@ -6,9 +6,16 @@ server. This module deliberately has no standalone fixtures or GUI imports at
 module load, so the core unittest discovery can import it without GTK.
 """
 import http.client
+import http.server
+from http.cookies import SimpleCookie
+import json
 from pathlib import Path
 import socket
+import ssl
+import subprocess
 import sys
+import tempfile
+import threading
 
 from test_desktop_gui_gtk import capture_window, close_window, free_port, wait_for
 
@@ -196,12 +203,33 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         wait_for(context, lambda: not window.session.snapshot()["running"] and not window._stopping,
                  "threshold-adjusted client clean shutdown", timeout=5)
         assert restarted.poll() is not None and not window.session.snapshot()["forced_stop"]
+        wait_for(context, lambda: window.options_button.get_sensitive(), "options ready for a maximum-size run")
+        editor = _options(context, window)
+        editor.set_value("slice", "33554432")
+        editor.set_value("analysis-bytes", "0")
+        editor.set_value("refresh", "1s")
+        editor.set_value("duration", "10s")
+        editor.apply_button.emit("clicked")
+        wait_for(context, lambda: not editor.get_visible() and
+                 window.descriptor["settings"]["payload_bytes"] == 33554432,
+                 "server-maximum sample size accepted by the GUI")
+        window.start_button.emit("clicked")
+        wait_for(context, lambda: window.session.snapshot()["sample"].get("sample_bytes") == 33554432,
+                 "full 32 MiB acquisition and analysis", timeout=15)
+        maximum = window.session.snapshot()
+        assert maximum["sample"]["frame_bytes"] == 33554432 and maximum["sample"]["analysed_bytes"] >= 33554432
+        assert len(window.model.snapshot()["rows"]) <= 128
+        window.stop_button.emit("clicked")
+        wait_for(context, lambda: not window.session.snapshot()["running"] and not window._stopping,
+                 "maximum-size client clean shutdown", timeout=5)
+        assert not window.session.snapshot()["forced_stop"]
         assert _live_status(remote_port) == 200, "Client settings or Stop affected the independent server"
         return {"validated_payload_bytes": 8192, "validated_threshold": 6.123456,
                 "actual_sample_bytes": state["sample"]["sample_bytes"],
                 "invalid_edits_preserve_last_configuration": True,
                 "frozen_assessment_preserved_when_next_threshold_changes": True,
                 "next_run_uses_new_threshold": True,
+                "32_MiB_received_and_fully_analysed": True,
                 "saved_endpoint_credentials_and_query_hidden": True,
                 "unmodified_query_and_advanced_flags_preserved": True,
                 "editing_disabled_while_running": True, "screenshot": screenshot}
@@ -286,9 +314,192 @@ def _server_options(context, application_type, binary, remote_port, artifacts):
         app.quit()
 
 
+def _client_failures(context, application_type, binary, remote_port, artifacts):
+    """Controlled transport faults leave the independent real server healthy."""
+    class FailureHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format, *_args):
+            pass
+
+        def do_GET(self):
+            if self.server.case == "truncated":
+                self.send_response(200)
+                self.send_header("Content-Length", str(32 << 20))
+                self.end_headers()
+                self.wfile.write(bytes(4096))
+                self.close_connection = True
+            else:
+                body = (b"RDRAND backend stopped after hardware failure; restart required. "
+                        b"Details https://operator:secret@example.org/diagnostic?token=private\n")
+                self.send_response(503)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+    fixture = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FailureHandler)
+    thread = threading.Thread(target=fixture.serve_forever, daemon=True)
+    thread.start()
+    results = {}
+    try:
+        for case, cause in (("truncated", "unexpected EOF"), ("backend", "RDRAND backend stopped")):
+            fixture.case = case
+            app, window = _window(context, application_type, "client", binary,
+                [f"-url=http://127.0.0.1:{fixture.server_address[1]}/v1/data/random", "-slice=33554432",
+                 "-refresh=50ms", "-analysis-bytes=0", "-duration=10s", "-retries=0"], "Failure" + case)
+            try:
+                window.start_button.emit("clicked")
+                wait_for(context, lambda: window.session is not None and not window.session.snapshot()["running"] and
+                         cause in window.status_label.get_text() and window.client_log_expander.get_expanded(),
+                         "visible client failure cause: " + case)
+                state = window.session.snapshot()
+                assert state["returncode"] and state["summary"]["failed"] and not state["forced_stop"]
+                buffer = window.client_log_view.get_buffer()
+                text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
+                assert cause in text and "CLI output" in text
+                assert "secret" not in text and "private" not in text
+                assert cause in window.status_label.get_tooltip_text()
+                assert _live_status(remote_port) == 200
+                results[case] = {"actual_cause_visible": True, "diagnostics_opened": True,
+                    "credentials_redacted": True, "real_server_still_healthy": True,
+                    "controlled_fault": True,
+                    "screenshot": capture_window(context, window, artifacts / ("client-failure-" + case + ".png"))}
+            finally:
+                if window.get_visible():
+                    close_window(context, window)
+                app.quit()
+    finally:
+        fixture.shutdown()
+        fixture.server_close()
+        thread.join(timeout=2)
+    return results
+
+
+def _server_features(context, application_type, binary, remote_port, artifacts):
+    """Apply the same LAB/debug/cookie controls on all native GUI platforms."""
+    assert not _listener_open(6060), "The fixed loopback debug port is already occupied"
+    http_port, https_port = free_port(), free_port()
+    source = "windows-csprng" if sys.platform == "win32" else "macos-csprng" if sys.platform == "darwin" else "/dev/urandom"
+    with tempfile.TemporaryDirectory(prefix="entropy GUI features ") as temporary:
+        work = Path(temporary)
+        cert, key, registry = work / "cert.pem", work / "key.pem", work / "lab sources.json"
+        subprocess.run([str(binary), "generate-cert", "-cert-file=" + str(cert), "-key-file=" + str(key),
+                        "-hosts=localhost,127.0.0.1", "-valid-for=1h"], check=True, timeout=20,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        trust = ssl.create_default_context(cafile=str(cert))
+        app, window = _window(context, application_type, "server", binary,
+                              [f"-http=127.0.0.1:{http_port}", "-enable-https=false", "-device=" + source],
+                              "Features", f"http://127.0.0.1:{remote_port}")
+
+        def request(port, path, *, host=None, secure=False):
+            connection = (http.client.HTTPSConnection("127.0.0.1", port, context=trust, timeout=2) if secure else
+                          http.client.HTTPConnection("127.0.0.1", port, timeout=2))
+            try:
+                connection.request("GET", path, headers={"Host": host} if host else {})
+                response = connection.getresponse()
+                return response.status, response.read(65536), response.getheaders()
+            finally:
+                connection.close()
+
+        def stop():
+            child = window.session._child
+            window.stop_button.emit("clicked")
+            wait_for(context, lambda: not window.session.snapshot()["running"] and not window._stopping and
+                     window.options_button.get_sensitive(),
+                     "feature-enabled server joined shutdown", timeout=5)
+            assert child.poll() is not None and not window.session.snapshot()["forced_stop"]
+            assert not any(_listener_open(port) for port in (http_port, https_port, 6060))
+
+        try:
+            window.feature_options_button.emit("clicked")
+            wait_for(context, lambda: window.settings_window is not None and window.settings_window.get_mapped(),
+                     "Edit features opens the native options editor")
+            editor = window.settings_window
+            for name, value in {"enable-https": True, "https": f"127.0.0.1:{https_port}",
+                                "cert-file": str(cert), "key-file": str(key), "cookie": True, "debug": True,
+                                "lab-sources": str(registry), "lab-allow-remote": False,
+                                "lab-allowed-hosts": "lab-gui.test", "lab-max-connections": "2",
+                                "lab-memory-mib": "4"}.items():
+                editor.set_value(name, value)
+            screenshot = capture_window(context, editor, artifacts / "server-features-options.png")
+            editor.apply_button.emit("clicked")
+            assert not window.feature_options_button.get_sensitive()
+            wait_for(context, lambda: not editor.get_visible() and window.feature_options_button.get_sensitive(),
+                     "LAB/debug/cookie options validated")
+            assert all(window.feature_checks[name].get_active() for name in ("https", "cookie", "debug", "lab_registry"))
+            assert not window.feature_checks["lab_allow_remote"].get_active()
+            assert not registry.exists(), "Startup inspection unexpectedly created/read a registry"
+            assert not any(_listener_open(port) for port in (http_port, https_port, 6060))
+
+            arguments = list(window.arguments)
+            editor = _options(context, window)
+            editor.set_value("lab-max-connections", "0")
+            editor.apply_button.emit("clicked")
+            wait_for(context, lambda: editor.apply_button.get_sensitive() and bool(editor.status_label.get_text()),
+                     "invalid LAB limits rejected")
+            assert "lab" in editor.status_label.get_text().lower()
+            assert window.arguments == arguments and window.descriptor["settings"]["lab_max_connections"] == 2
+            editor.close()
+            wait_for(context, lambda: not editor.get_visible(), "invalid LAB edit closed")
+
+            window.start_button.emit("clicked")
+            wait_for(context, lambda: window.session is not None and not window.session.snapshot()["running"] and
+                     "lab" in window.session.snapshot()["logs"].lower() and window.start_button.get_sensitive(),
+                     "missing registry reported at actual startup", timeout=8)
+            assert window.session._child.poll() is not None
+            assert not any(_listener_open(port) for port in (http_port, https_port, 6060))
+            registry.write_text(json.dumps({"sources": [{"id": "gui-http", "kind": "http", "max_bytes": 64,
+                "endpoint": f"http://127.0.0.1:{remote_port}/v1/data/random?bytes=64"}]}))
+
+            window.start_button.emit("clicked")
+            wait_for(context, lambda: window.session.snapshot()["running"] and
+                     all(_listener_open(port) for port in (http_port, https_port, 6060)),
+                     "GUI starts public, TLS and local debug listeners", timeout=8)
+            assert not window.feature_options_button.get_sensitive()
+            status, body, _headers = request(http_port, "/lab/sources", host="lab-gui.test")
+            assert status == 200 and json.loads(body)["sources"][0]["id"] == "gui-http", (status, body)
+            assert request(http_port, "/lab/sources", host="outside.invalid")[0] == 403
+            status, body, _headers = request(6060, "/debug/pprof/")
+            assert status == 200 and b"/debug/pprof/" in body
+            status, _body, headers = request(https_port, "/v1/meta/random?bytes=64&words=2&refresh=250&lang=it", secure=True)
+            cookies = SimpleCookie()
+            for name, value in headers:
+                if name.lower() == "set-cookie":
+                    cookies.load(value)
+            assert status == 200 and len(cookies) == 1
+            cookie = next(iter(cookies.values()))
+            assert cookie["secure"] and cookie["httponly"], headers
+            stop()
+
+            editor = _options(context, window)
+            for name, value in {"debug": False, "cookie": False, "lab-sources": "", "lab-allow-remote": True}.items():
+                editor.set_value(name, value)
+            editor.apply_button.emit("clicked")
+            wait_for(context, lambda: not editor.get_visible() and not window.feature_checks["debug"].get_active(),
+                     "optional features disabled for the next run")
+            window.start_button.emit("clicked")
+            wait_for(context, lambda: window.session.snapshot()["running"] and _live_status(http_port) == 200,
+                     "server restarted with edited feature flags")
+            assert not _listener_open(6060)
+            status, body, _headers = request(http_port, "/lab/sources", host="outside.invalid")
+            assert status == 200 and json.loads(body)["sources"] == [], (status, body)
+            status, _body, headers = request(https_port, "/v1/meta/random?bytes=64", secure=True)
+            assert status == 200 and not any(name.lower() == "set-cookie" for name, _value in headers)
+            stop()
+            assert _live_status(remote_port) == 200
+            return {"LAB_registry_and_limits": True, "trusted_host_policy_and_remote_opt_in": True,
+                    "HTTPS_secure_httponly_cookies": True, "debug_on_off_and_listener_cleanup": True,
+                    "invalid_limit_keeps_last_valid_settings": True, "missing_registry_startup_recovers": True,
+                    "validation_opens_no_files_or_listeners": True, "screenshot": screenshot}
+        finally:
+            if window.get_visible():
+                close_window(context, window)
+            app.quit()
+
+
 def controls_and_owned_server(context, application_type, server_binary, client_binary, remote_port, artifacts):
     """Validate edited options and exercise only the processes this GUI owns."""
     artifacts = Path(artifacts)
     artifacts.mkdir(parents=True, exist_ok=True)
     return {"client": _client_options(context, application_type, client_binary, remote_port, artifacts),
-            "server": _server_options(context, application_type, server_binary, remote_port, artifacts)}
+            "server": _server_options(context, application_type, server_binary, remote_port, artifacts),
+            "client_failures": _client_failures(context, application_type, client_binary, remote_port, artifacts),
+            "features": _server_features(context, application_type, server_binary, remote_port, artifacts)}

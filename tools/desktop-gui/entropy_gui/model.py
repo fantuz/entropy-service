@@ -57,6 +57,29 @@ def safe_text(value):
     return re.sub(r"(?:https?|wss?)://[^\s<>]+", lambda match: safe_endpoint(match.group()), value, flags=re.IGNORECASE)
 
 
+def client_failure_text(error, diagnostics):
+    """Explain reported failures without guessing the backend's actual state."""
+    error, diagnostics = safe_text(error), safe_text(diagnostics)
+    lines = diagnostics.strip().splitlines()
+    reason = lines[-1] if lines and error.startswith("entropy-client exited with status ") else error
+    detail = (error + "\n" + diagnostics).lower()
+    if "rdrand backend stopped" in detail or "cpu backend failed" in detail:
+        hint = "The direct CPU backend reports a hardware-read failure. Check server logs/readiness; an operator restart is required."
+    elif "server returned 400" in detail or "server returned 413" in detail:
+        hint = "Check Bytes per response against the server's configured maximum and the reported request error."
+    elif "server returned 400" in detail or "server returned 413" in detail:
+        hint = "Check Bytes per response against the server's configured maximum."
+    elif "timed out" in detail or "timeout" in detail or "deadline exceeded" in detail:
+        hint = "A request timed out. Try a smaller payload or lower frame rate and check server/network timing."
+    elif "unexpected eof" in detail or "connection reset" in detail or "closed with code 1006" in detail:
+        hint = "The connection ended before a complete response. With large frames, transport deadlines can expire while the server remains healthy. Try a smaller sample and inspect server logs."
+    elif "server returned 503" in detail:
+        hint = "The server declined generation. Check its readiness and logs for the reported backend or reseed failure."
+    else:
+        hint = "See Client diagnostics for the complete CLI message."
+    return reason + "\n" + hint
+
+
 def _settings(value):
     if not isinstance(value, dict):
         raise ReportError("Missing configuration settings")
