@@ -201,6 +201,12 @@ def main():
             raise ValueError("published image index does not contain the three tested platforms")
         if len(index["manifests"]) != 3 or {m["digest"] for m in index["manifests"]} != {part.split("@", 1)[1] for part in parts}:
             raise ValueError("published image index differs from the three tested platform digests")
+        expected_platforms = {part.split("@", 1)[1]: PLATFORMS[platform] for platform, part in zip(PLATFORMS, parts)}
+        for manifest in index["manifests"]:
+            arch, variant = expected_platforms[manifest["digest"]]
+            platform = manifest["platform"]
+            if platform["architecture"] != arch or (variant and platform.get("variant") != variant):
+                raise ValueError("published image index assigns a tested digest to the wrong platform")
         references.append(reference)
     print("Published tested images:\n" + "\n".join(references))
     if os.environ.get("GITHUB_STEP_SUMMARY"):

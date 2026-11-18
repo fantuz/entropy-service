@@ -154,7 +154,7 @@ class StagedPublicationTests(unittest.TestCase):
     sha = "a" * 40
     image_id = "sha256:" + "b" * 64
 
-    def publish(self, *, failed_push=0, wrong_config=False, wrong_index=False):
+    def publish(self, *, failed_push=0, wrong_config=False, wrong_index=False, swapped_platforms=False):
         events, parts = [], {}
         def docker(*args, capture=False):
             events.append(args)
@@ -176,6 +176,8 @@ class StagedPublicationTests(unittest.TestCase):
                     digest = parts[f"{destination}:v2.5.0-{platform}"]
                     manifests.append({"digest": "sha256:"+"f"*64 if wrong_index else digest,
                                       "platform": {"os": "linux", "architecture": arch, "variant": variant}})
+                if swapped_platforms:
+                    manifests[0]["platform"], manifests[1]["platform"] = manifests[1]["platform"], manifests[0]["platform"]
                 return json.dumps({"manifests": manifests}).encode()
         with tempfile.TemporaryDirectory() as directory, \
              patch.dict(publication.os.environ, {"GITHUB_STEP_SUMMARY": ""}), \
@@ -214,6 +216,11 @@ class StagedPublicationTests(unittest.TestCase):
     def test_index_cannot_substitute_untested_platform_digests(self):
         _, error = self.publish(wrong_index=True)
         self.assertIsInstance(error, ValueError)
+
+    def test_index_cannot_swap_architecture_labels_between_tested_digests(self):
+        _, error = self.publish(swapped_platforms=True)
+        self.assertIsInstance(error, ValueError)
+        self.assertIn("wrong platform", str(error))
 
 
 if __name__ == "__main__":
