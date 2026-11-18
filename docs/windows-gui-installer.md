@@ -12,6 +12,10 @@ Download `checksums.txt` from the same release to verify it. The versioned
 `entropy-service_2.6.0_windows_amd64_gui_sources.zip` contains matching runtime
 sources; it is a separate download and is not needed to run the application.
 
+The replacement notice and Finish-page Start Menu option described below were
+added after v2.6.0. Until a release includes them, use the matching branch's
+tested `windows-gui-installer-and-sources` CI artifact.
+
 PR/manual workflow builds remain development artifacts. Their installer, sources
 and checksum manifest are available together as the
 `windows-gui-installer-and-sources` CI artifact. Verify the setup checksum before

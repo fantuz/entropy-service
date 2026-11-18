@@ -90,7 +90,7 @@ class Wizard:
 
     def button(self, caption):
         return next((handle for handle, text in self.controls()
-                     if text.replace("&", "") == caption and self.user.IsWindowEnabled(handle)), None)
+                     if text.replace("&", "").rstrip(" >") == caption and self.user.IsWindowEnabled(handle)), None)
 
     def click(self, handle):
         assert handle
@@ -105,7 +105,7 @@ class Wizard:
             accept = self.button("I accept the agreement")
             if accept:
                 self.click(accept)
-            button = self.button("Next >") or self.button("Install")
+            button = self.button("Next") or self.button("Install")
             if button:
                 self.click(button)
             return False
