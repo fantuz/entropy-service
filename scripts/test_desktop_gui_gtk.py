@@ -765,6 +765,8 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         resized_width = window.drawing_area.get_width()
         wait_for(context, lambda: any(width == resized_width and drawn for width, _height, drawn in draws),
                  "Cairo repaint at resized allocation")
+        from test_desktop_gui_keys_x11 import focused_divider_keys
+        native_keys = focused_divider_keys(context, window, wait_for)
         divider_positions = [paned.get_position() for paned in (window.workspace_paned, window.details_paned)]
         normal_height = window.drawing_area.get_height()
         assert window._on_key(None, gdk.KEY_F11, 0, 0)
@@ -830,6 +832,7 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
                 "frozen_palettes": ["byte", "rgb", "gray"],
                 "stop_and_close_cleanup": True,
                 "layout": layout,
+                "native_fullscreen_keys": native_keys,
                 "screenshot": screenshot,
                 "fullscreen_note": "GTK fullscreen requested; a window manager applies compositor state"}
     finally:

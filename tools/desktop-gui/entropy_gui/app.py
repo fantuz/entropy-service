@@ -179,6 +179,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
             fullscreen.connect("clicked", lambda _button: self.set_fullscreen(not self._fullscreen))
             self.header.pack_end(fullscreen)
         keys = Gtk.EventControllerKey()
+        # Fullscreen Escape must run before a focused divider's own cancel
+        # shortcut. Other keys still reach GTK's native handle bindings.
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self._on_key)
         self.add_controller(keys)
 
