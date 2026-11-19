@@ -5,6 +5,9 @@ on:
     paths:
       - 'tools/windows-installer/**'
       - 'tools/desktop-gui/**'
+      - 'cmd/entropy-server/**'
+      - 'go.mod'
+      - 'go.sum'
       - 'scripts/*windows_gui*.py'
       - 'scripts/*prepare_gui_release.py'
       - 'scripts/test_desktop_gui*.py'
@@ -47,6 +50,8 @@ jobs:
           python -m unittest discover -s scripts -p 'test_windows_gui_bootstrap.py'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s scripts -p 'test_build_windows_gui_bundle.py'
       - name: Test the real upgrade wizard and Start Menu handoff before bundling
         run: python scripts/test_windows_gui_upgrade.py --compiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' --artifacts gui-installer-evidence/upgrade
       - name: Setup Go
@@ -58,7 +63,7 @@ jobs:
       - name: Build matching companion executables
         shell: pwsh
         run: |
-          go build -ldflags="-s -w -X main.appVersion=$env:BUNDLE_VERSION" -o bin/entropy-server.exe ./cmd/entropy-server
+          go build -tags=external_ui_locales -ldflags="-s -w -X main.appVersion=$env:BUNDLE_VERSION" -o bin/entropy-server.exe ./cmd/entropy-server
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -ldflags='-s -w' -o bin/entropy-client.exe ./cmd/entropy-client
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

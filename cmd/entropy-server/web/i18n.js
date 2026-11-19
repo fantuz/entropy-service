@@ -7,8 +7,11 @@
     // The static handler replaces this token with the catalog content digest.
     // A changed deployment gets a new URL; unchanged catalogs reuse HTTP cache.
     const catalogVersion = "__ENTROPY_UI_CATALOG_VERSION__";
-    const languages = {en: "English", fr: "Français", de: "Deutsch", es: "Español", cs: "Čeština",
-        ru: "Русский", pl: "Polski", el: "Ελληνικά", it: "Italiano"};
+    const installedLanguages = "__ENTROPY_UI_LANGUAGES__".split(",");
+    const languages = Object.fromEntries(Object.entries({en: "English", fr: "Français", de: "Deutsch", es: "Español", cs: "Čeština",
+        ru: "Русский", pl: "Polski", el: "Ελληνικά", it: "Italiano", nl: "Nederlands",
+        "pt-PT": "Português (Portugal)", "pt-BR": "Português (Brasil)", ja: "日本語", ar: "العربية"})
+        .filter(([code]) => code === "en" || installedLanguages.includes(code)));
     const supported = value => typeof value === "string" && Object.hasOwn(languages, value);
     const textBindings = new WeakMap(), attributeBindings = new WeakMap();
     const catalogs = new Map([["en", Object.freeze({})]]);
@@ -67,8 +70,11 @@
     }
     function detectedLanguage() {
         for (const language of navigator.languages || [navigator.language || "en"]) {
-            const code = String(language).toLowerCase().split("-")[0];
-            if (supported(code)) return code;
+            try {
+                const locale = new Intl.Locale(String(language).replaceAll("_", "-"));
+                const code = locale.language === "pt" ? (locale.region === "BR" ? "pt-BR" : "pt-PT") : locale.language;
+                if (supported(code)) return code;
+            } catch { /* Ignore malformed browser language tags. */ }
         }
         return "en";
     }
@@ -122,6 +128,7 @@
             const changed = active !== selected || initial;
             active = selected; requested = selected; catalog = catalogs.get(active); initial = false;
             root.lang = active; root.dataset.uiLanguage = active;
+            root.dir = active === "ar" ? "rtl" : "ltr";
             syncSelectors(active);
             translate();
             if (changed) window.dispatchEvent(new Event("entropylanguagechange"));
@@ -134,7 +141,7 @@
     function sync() { void useLanguage(preference()); }
     function controls() {
         const toolbar = document.querySelector(".site-toolbar");
-        if (!toolbar || toolbar.querySelector("[data-ui-language]")) return;
+        if (!toolbar || Object.keys(languages).length === 1 || toolbar.querySelector("[data-ui-language]")) return;
         const label = document.createElement("label"), caption = document.createElement("span"), select = document.createElement("select");
         label.className = "ui-language-control";
         select.id = "ui-language"; select.setAttribute("data-ui-language", "");
@@ -151,7 +158,7 @@
     window.EntropyI18n = Object.freeze({t, set, attr, translate, useLanguage, languages: Object.freeze(languages), get language() { return active; }});
     // Initialize from a saved choice/browser preference while HTML is parsed.
     // The body retains English fallback until its selected catalog is ready.
-    root.lang = "en"; root.dataset.uiLanguage = "en";
+    root.lang = "en"; root.dataset.uiLanguage = "en"; root.dir = "ltr";
     document.addEventListener("DOMContentLoaded", () => { controls(); translate(); sync(); }, {once: true});
     window.addEventListener("storage", event => { if (event.key === storageKey || event.key === null) sync(); });
     window.addEventListener("pageshow", sync);

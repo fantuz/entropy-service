@@ -69,7 +69,10 @@ Intel/Apple Silicon**. Client capability discovery checks server limits before
 acquisition; the performance view separates requested, effective and received
 rates. Optional [adaptive HTTP pull](docs/client-capabilities-performance.md)
 adjusts scheduling without changing sample size or statistical thresholds.
-The web interface offers nine UI languages and three graph palettes.
+The web interface offers [14 UI languages](docs/web-interface-languages.md),
+including regional Portuguese, Japanese and Arabic, and three graph palettes.
+Windows setup can install only the web translations you select; random-word
+dictionaries remain fully available.
 [LAB platform support](docs/lab-platforms.md) distinguishes shared browser/network
 tools from browser permissions, FFmpeg and OS-specific devices.
 

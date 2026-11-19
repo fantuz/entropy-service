@@ -61,6 +61,8 @@ CSS = b"""
 .gui-heading { font-weight: bold; margin-bottom: 8px; }
 .gui-number { font-family: monospace; font-size: 20px; font-weight: bold; }
 .gui-status { padding: 4px 0; }
+.gui-workspace > separator { min-height: 10px; background: alpha(@theme_fg_color, 0.12); border-radius: 4px; }
+.gui-workspace > separator:hover, .gui-workspace > separator:focus { background: alpha(@theme_fg_color, 0.3); }
 .status-ok { color: #238636; }
 .status-warn { color: #da3633; }
 """
@@ -144,9 +146,14 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._pixels = None
         self._rows = ()
         self._palette = "byte"
+        self._pane_defaults_pending = True
+        self._pane_default_geometry = None
+        self._normal_pane_positions = None
+        self._restore_dividers = False
+        self._restore_geometry = None
         self.set_title(f"Entropy {role.title()}")
         self.set_default_size(1100, 760)
-        self.set_size_request(640, 640 if role == "server" else 480)
+        self.set_size_request(640, 480)
         self.connect("close-request", self._on_close)
 
         self.header = Gtk.HeaderBar()
@@ -172,6 +179,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
             fullscreen.connect("clicked", lambda _button: self.set_fullscreen(not self._fullscreen))
             self.header.pack_end(fullscreen)
         keys = Gtk.EventControllerKey()
+        # Fullscreen Escape must run before a focused divider's own cancel
+        # shortcut. Other keys still reach GTK's native handle bindings.
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self._on_key)
         self.add_controller(keys)
 
@@ -189,15 +199,17 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.binary_label.set_tooltip_text(safe_text(str(binary)))
         if role == "server":
             self._build_local_server_panel(body)
-            self._build_health_panel(body, health_url)
-            body.append(label("Requested startup configuration", "gui-title"))
-            body.append(label("Options edits local startup settings. Start launches a new local server; Connect monitors the selected endpoint independently.", "gui-subtitle"))
-            body.append(self.binary_label)
+            health_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self._build_health_panel(health_box, health_url)
+            self.top_pane = self._pane_scroller(health_box)
+            startup_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            startup_box.append(label("Requested startup configuration", "gui-title"))
+            startup_box.append(label("Options edits local startup settings. Start launches a new local server; Connect monitors the selected endpoint independently.", "gui-subtitle"))
+            startup_box.append(self.binary_label)
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-            scroller = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
-            scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            scroller.set_child(self.settings_box)
-            body.append(scroller)
+            startup_box.append(self.settings_box)
+            self.middle_pane = self._pane_scroller(startup_box)
+            self.bottom_pane = self._pane_scroller(self.server_log_expander)
         else:
             stats = Gtk.Grid(column_spacing=24, row_spacing=4)
             for column, (key, heading, initial) in enumerate((
@@ -213,54 +225,61 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self.performance_label.set_selectable(True)
             self.performance_label.set_tooltip_text("Rates are averages over the measured run. Receive wait includes server pacing, generation and transfer; it is not network latency. Receive/output timings cover the latest processed frame; analysis covers the latest analysed sample.")
             self.performance_expander = Gtk.Expander(label="Connection & performance", expanded=True)
-            performance_scroller = Gtk.ScrolledWindow()
-            performance_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            performance_scroller.set_min_content_height(32)
-            performance_scroller.set_max_content_height(112)
-            performance_scroller.set_propagate_natural_height(True)
-            performance_scroller.set_child(self.performance_label)
-            self.performance_expander.set_child(performance_scroller)
-            body.append(self.performance_expander)
+            self.performance_expander.set_child(self.performance_label)
+            self.top_pane = self._pane_scroller(self.performance_expander)
             self.drawing_area = Gtk.DrawingArea(hexpand=True, vexpand=True)
             self.drawing_area.set_content_width(1)
-            self.drawing_area.set_content_height(120)
+            self.drawing_area.set_content_height(1)
             self.drawing_area.set_draw_func(self._draw_waterfall)
             overlay = Gtk.Overlay(hexpand=True, vexpand=True)
             overlay.set_child(self.drawing_area)
             self.placeholder = Gtk.Label(label="Start the client to view analysed sample prefixes")
             self.placeholder.set_can_target(False)
             overlay.add_overlay(self.placeholder)
-            body.append(overlay)
+            self.middle_pane = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, hexpand=True, vexpand=True)
+            self.middle_pane.append(overlay)
             self.controls = Gtk.Box(spacing=10)
             self.controls.append(label("Waterfall"))
             self.palette_dropdown = Gtk.DropDown.new_from_strings(["Byte hue", "RGB triplets", "Grayscale"])
             self.palette_dropdown.connect("notify::selected", self._select_palette)
             self.controls.append(self.palette_dropdown)
             self.controls.append(label("Preview · 256 bytes/sample · 128 rows · F11 / Escape", "gui-subtitle"))
-            body.append(self.controls)
+            self.middle_pane.append(self.controls)
             self.settings_expander = Gtk.Expander(label="Startup options · read only")
             self.settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             self.settings_box.append(label("Options edits the next run. Start uses headless JSONL reporting for the GUI.", "gui-subtitle"))
             self.settings_box.append(self.binary_label)
             settings_scroller = Gtk.ScrolledWindow()
             settings_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            settings_scroller.set_max_content_height(220)
-            settings_scroller.set_propagate_natural_height(True)
+            settings_scroller.set_min_content_height(60)
+            settings_scroller.set_vexpand(True)
             settings_scroller.set_child(self.settings_box)
             self.settings_expander.set_child(settings_scroller)
-            body.append(self.settings_expander)
+            self.settings_expander.connect("notify::expanded", lambda widget, _prop: widget.set_vexpand(widget.get_expanded()))
+            details_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, vexpand=True)
+            details_box.append(self.settings_expander)
         if role == "client":
             self.client_log_view = Gtk.TextView(editable=False, monospace=True, cursor_visible=False)
             self.client_log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
             diagnostics = Gtk.ScrolledWindow()
             diagnostics.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
             diagnostics.set_min_content_height(80)
-            diagnostics.set_max_content_height(160)
-            diagnostics.set_propagate_natural_height(True)
+            diagnostics.set_vexpand(True)
             diagnostics.set_child(self.client_log_view)
             self.client_log_expander = Gtk.Expander(label="Client diagnostics")
+            self.client_log_expander.connect("notify::expanded", lambda widget, _prop: widget.set_vexpand(widget.get_expanded()))
             self.client_log_expander.set_child(diagnostics)
-            body.append(self.client_log_expander)
+            details_box.append(self.client_log_expander)
+            self.bottom_pane = self._pane_scroller(details_box)
+        self.details_paned = self._vertical_split(self.middle_pane, self.bottom_pane,
+            "Resize startup configuration and logs" if role == "server" else "Resize waterfall and startup/diagnostic details")
+        self.workspace_paned = self._vertical_split(self.top_pane, self.details_paned,
+            "Resize live health and startup configuration" if role == "server" else "Resize performance details and waterfall")
+        # Keep the top band stable when the window grows; give new space to
+        # configuration/waterfall while retaining a useful lower details band.
+        self.workspace_paned.set_resize_start_child(False)
+        self.details_paned.set_resize_end_child(False)
+        body.append(self.workspace_paned)
         self.web_application_box = Gtk.Box(spacing=12)
         self.web_application_note = label("Web interface · graphs, LAB and service status", "gui-subtitle")
         self.web_application_note.set_hexpand(True)
@@ -277,6 +296,69 @@ class DesktopWindow(Gtk.ApplicationWindow):
         # Inspection is bounded by describe(). Keep its cleanup alive if the
         # window closes before the short-lived description child has exited.
         self._start_inspection(self.binary, self.arguments)
+
+    @staticmethod
+    def _pane_scroller(child):
+        scroller = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_min_content_height(0)
+        scroller.set_child(child)
+        return scroller
+
+    @staticmethod
+    def _vertical_split(start, end, description):
+        paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL, hexpand=True, vexpand=True)
+        paned.add_css_class("gui-workspace")
+        paned.set_wide_handle(True)
+        paned.set_shrink_start_child(True)
+        paned.set_shrink_end_child(True)
+        paned.set_start_child(start)
+        paned.set_end_child(end)
+        paned.set_focusable(True)
+        help_text = "Drag up or down to resize. F8 focuses the divider; use arrow keys to adjust it."
+        paned.update_property([Gtk.AccessibleProperty.LABEL, Gtk.AccessibleProperty.DESCRIPTION],
+                              [description, help_text])
+        # GtkPaned owns the native separator and its keyboard/accessibility
+        # behavior. Give that handle a tooltip without covering child content.
+        handle = paned.get_first_child()
+        while handle is not None:
+            if handle != start and handle != end:
+                handle.set_tooltip_text(description + ". " + help_text)
+            handle = handle.get_next_sibling()
+        return paned
+
+    def _maintain_pane_layout(self):
+        if self._pane_defaults_pending and not self._fullscreen:
+            height = self.workspace_paned.get_height()
+            if height > 0:
+                top_share, bottom_share = (.45, .12) if self.role == "server" else (.20, .14)
+                geometry = (self.workspace_paned.get_width(), height,
+                            self.details_paned.get_height(), self.workspace_paned.get_position())
+                if geometry != self._pane_default_geometry:
+                    self.workspace_paned.set_position(round(height * top_share))
+                    self._pane_default_geometry = geometry
+                    return
+                # Set the inner divider only after its outer allocation has
+                # settled; otherwise GTK preserves a stale lower-pane size.
+                self.details_paned.set_position(max(0, self.details_paned.get_height() - round(height * bottom_share) - 10))
+                self._pane_defaults_pending = False
+                self._pane_default_geometry = None
+        if (self._restore_dividers and not self._fullscreen and not self.is_fullscreen()
+                and self._native_fullscreen_pending is None):
+            if self._normal_pane_positions is not None:
+                main, details = self._normal_pane_positions
+                geometry = (self.workspace_paned.get_width(), self.workspace_paned.get_height(),
+                            self.details_paned.get_height(), self.workspace_paned.get_position())
+                # Outer allocation happens after set_position(). Restoring the
+                # inner handle against its old height would move it again when
+                # GTK preserves the lower child's size during the outer resize.
+                if geometry != self._restore_geometry:
+                    self.workspace_paned.set_position(main)
+                    self._restore_geometry = geometry
+                    return
+                self.details_paned.set_position(details)
+            self._restore_dividers = False
+            self._restore_geometry = None
 
     def _web_application_target(self):
         try:
@@ -312,12 +394,10 @@ class DesktopWindow(Gtk.ApplicationWindow):
         box.append(self.process_state_label)
         self.server_log_view = Gtk.TextView(editable=False, monospace=True, cursor_visible=False)
         self.server_log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-        scroller = Gtk.ScrolledWindow(hexpand=True)
+        scroller = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         scroller.set_min_content_height(90)
-        scroller.set_max_content_height(140)
-        scroller.set_propagate_natural_height(True)
         scroller.set_child(self.server_log_view)
-        self.server_log_expander = Gtk.Expander(label="Local server logs")
+        self.server_log_expander = Gtk.Expander(label="Local server logs", expanded=True, vexpand=True)
         self.server_log_expander.set_child(scroller)
         body.append(box)
 
@@ -556,6 +636,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
         settings = descriptor["settings"]
         features = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=3, row_spacing=6, column_spacing=16)
         for key, enabled in descriptor["features"].items():
+            if key == "external_ui_locales":
+                continue  # Build metadata, not an editable startup option.
             check = Gtk.CheckButton(label=LABELS.get(key, key.replace("_", " ").capitalize()), active=enabled, sensitive=False)
             check.set_tooltip_text("Validated startup value. Use Options to edit the next run; live health is separate.")
             self.feature_checks[key] = check
@@ -587,7 +669,6 @@ class DesktopWindow(Gtk.ApplicationWindow):
             feature_box.append(shortcuts)
             feature_box.append(label("LAB browser tools are available on Linux, Windows and macOS. A registry adds server-side sources.", "gui-subtitle"))
             feature_box.append(label("Enable Debug / pprof for the next Start to listen at http://127.0.0.1:6060/debug/pprof/ on the server host.", "gui-subtitle"))
-            self.settings_box.append(self.server_log_expander)
             self.settings_box.append(feature_box)
             if not self.health_url_entry.get_text().strip():
                 self.health_url_entry.set_text(default_health_url(descriptor))
@@ -694,6 +775,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
     def _tick(self):
         if self._closing:
             return GLib.SOURCE_CONTINUE
+        self._maintain_pane_layout()
         if self.role == "server":
             self._tick_health()
             self._tick_server()
@@ -824,13 +906,20 @@ class DesktopWindow(Gtk.ApplicationWindow):
     def set_fullscreen(self, enabled):
         if self.role != "client":
             return
+        if enabled and not self._fullscreen:
+            if not self._restore_dividers and not self._pane_defaults_pending:
+                self._normal_pane_positions = (self.workspace_paned.get_position(), self.details_paned.get_position())
+            self._restore_dividers = False
+            self._restore_geometry = None
+        elif not enabled and self._fullscreen:
+            self._restore_dividers = True
+            self._restore_geometry = None
         self._fullscreen = bool(enabled)
         self.header.set_visible(not enabled)
-        self.settings_expander.set_visible(not enabled)
+        self.top_pane.set_visible(not enabled)
+        self.bottom_pane.set_visible(not enabled)
         self.controls.set_visible(not enabled)
         self.status_label.set_visible(not enabled)
-        self.client_log_expander.set_visible(not enabled)
-        self.performance_expander.set_visible(not enabled)
         self.web_application_box.set_visible(not enabled)
         if sys.platform == "darwin":
             self._advance_macos_fullscreen()

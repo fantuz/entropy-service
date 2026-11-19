@@ -1,5 +1,5 @@
 .page-certificates .certificate-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.page-certificates label { display: block; text-align: left; }
+.page-certificates label { display: block; text-align: start; }
 .page-certificates label > span { display: block; margin-bottom: .4rem; }
 .page-certificates input, .page-certificates textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: .7rem; background: var(--surface-raised); }
 .page-certificates textarea { resize: vertical; }

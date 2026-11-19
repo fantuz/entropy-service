@@ -38,11 +38,15 @@ def qualify_machine_service(installer, artifacts):
     binary = installation / "bin/entropy-server.exe"
     artifacts.mkdir(parents=True, exist_ok=True)
 
-    def setup(name, tasks=None, target=installation, mode="/ALLUSERS", expected=0):
+    def setup(name, tasks=None, target=installation, mode="/ALLUSERS", expected=0, install_type=None, components=None):
         command = [str(installer), mode, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
                    "/DIR=" + str(target), "/LOG=" + str(artifacts / (name + ".log"))]
         if tasks is not None:
             command.append("/TASKS=" + tasks)
+        if install_type is not None:
+            command.append("/TYPE=" + install_type)
+        if components is not None:
+            command.append("/COMPONENTS=" + components)
         result = subprocess.run(command, timeout=240)
         assert (result.returncode == 0) == (expected == 0), (name, result.returncode)
 
@@ -71,9 +75,11 @@ def qualify_machine_service(installer, artifacts):
         setup("nested-service-location", "server_service", installation / "nested", expected=1)
         assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY)
         assert not installation.exists(), "Rejected service setup created an unverified program tree"
-        setup("machine-default-off")
+        setup("machine-default-off", install_type="english", components="core")
         assert registry_present(winreg.HKEY_LOCAL_MACHINE, UNINSTALL_KEY)
         assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY), "Service installed without explicit selection"
+        from test_windows_gui_installer import verify_installed_web_languages
+        verify_installed_web_languages(installation, ("en",), artifacts, "ui-locales-english-only")
         setup("desktop-service-promotion-rejected", "server_service", expected=1)
         assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY), "Desktop directory adopted for a privileged service"
         setup("scope-switch-rejected", target=artifacts / "per-user replacement", mode="/CURRENTUSER", expected=1)

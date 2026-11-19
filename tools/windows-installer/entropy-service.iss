@@ -31,14 +31,51 @@ WizardStyle=modern
 DisableWelcomePage=no
 DisableProgramGroupPage=yes
 UsePreviousAppDir=yes
+UsePreviousSetupType=yes
 DisableDirPage=auto
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayIcon={app}\runtime\bin\pythonw.exe
 LicenseFile={#BundleDir}\LICENSE
 
+[Types]
+Name: "full"; Description: "Full installation"
+Name: "english"; Description: "English web interface only"
+Name: "custom"; Description: "Custom installation"; Flags: iscustom
+
+[Components]
+Name: "core"; Description: "Core application and all random-word dictionaries"; Types: full english custom; Flags: fixed
+Name: "web_locales"; Description: "Additional web interface languages"; Types: full
+Name: "web_locales\fr"; Description: "French"; Types: full
+Name: "web_locales\de"; Description: "German"; Types: full
+Name: "web_locales\es"; Description: "Spanish"; Types: full
+Name: "web_locales\cs"; Description: "Czech"; Types: full
+Name: "web_locales\ru"; Description: "Russian"; Types: full
+Name: "web_locales\pl"; Description: "Polish"; Types: full
+Name: "web_locales\el"; Description: "Greek"; Types: full
+Name: "web_locales\it"; Description: "Italian"; Types: full
+Name: "web_locales\nl"; Description: "Dutch"; Types: full
+Name: "web_locales\pt_pt"; Description: "Portuguese (Portugal)"; Types: full
+Name: "web_locales\pt_br"; Description: "Portuguese (Brazil)"; Types: full
+Name: "web_locales\ja"; Description: "Japanese"; Types: full
+Name: "web_locales\ar"; Description: "Arabic"; Types: full
+
 [Files]
-Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleDir}\*"; DestDir: "{app}"; Excludes: "bin\ui-locales\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleDir}\bin\ui-locales\en.json"; DestDir: "{app}\bin\ui-locales"; Components: core; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\fr.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\fr; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\de.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\de; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\es.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\es; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\cs.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\cs; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\ru.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\ru; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\pl.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\pl; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\el.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\el; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\it.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\it; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\nl.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\nl; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\pt-PT.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\pt_pt; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\pt-BR.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\pt_br; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\ja.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\ja; Flags: ignoreversion
+Source: "{#BundleDir}\bin\ui-locales\ar.json"; DestDir: "{app}\bin\ui-locales"; Components: web_locales\ar; Flags: ignoreversion
 
 [Tasks]
 Name: "server_service"; Description: "Install entropy-server as a Windows Service"; GroupDescription: "Optional machine-wide service:"; Flags: unchecked checkablealone; Check: IsAdminInstallMode
@@ -79,9 +116,13 @@ procedure InitializeWizard;
 var
   PreviousVersion, LicenseText: String;
 begin
-  WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
+  { Keep this within the standard welcome label's measured bounds. Appending
+    paragraphs to Inno's fixed-height default label can silently hide its end. }
+  WizardForm.WelcomeLabel2.Caption := 'Install Entropy Service {#AppVersion} and its desktop applications.' + #13#10#13#10 +
     ProjectCredit + #13#10#13#10 + 'Released under the MIT License, shown on the next page.' + #13#10#13#10 +
-    'For an optional Windows server service, choose the all-users installation mode. The current-user GUI installation does not need administrator rights.';
+    'Current-user setup needs no administrator rights. Choose all-users setup to enable the optional Windows Service.';
+  WizardForm.SelectComponentsLabel.Caption :=
+    'Choose additional web interface languages. English and all random-word dictionaries are always installed.';
   { Reflow display paragraphs rather than retaining the plain-text file's
     printing-width line breaks. The installed LICENSE is kept verbatim. }
   LicenseText := WizardForm.LicenseMemo.Lines.Text;

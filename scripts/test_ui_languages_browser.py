@@ -16,7 +16,7 @@ from test_sources_browser import free_port, serve_process
 from test_stream_browser import wait_paint
 
 
-LANGUAGES = ("en", "fr", "de", "es", "cs", "ru", "pl", "el", "it")
+LANGUAGES = ("en", "fr", "de", "es", "cs", "ru", "pl", "el", "it", "nl", "pt-PT", "pt-BR", "ja", "ar")
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = [
     ("/", "#explore-title", "Explore in your browser"),
@@ -56,6 +56,7 @@ def choose_language(page, language):
     page.locator("select[data-ui-language]").select_option(language)
     expect(page.locator("html")).to_have_attribute("lang", language)
     expect(page.locator("html")).to_have_attribute("data-ui-language", language)
+    expect(page.locator("html")).to_have_attribute("dir", "rtl" if language == "ar" else "ltr")
     expect(page.locator("select[data-ui-language]")).to_have_value(language)
     wait_paint(page)
 
@@ -107,7 +108,7 @@ def page_coverage(page, base, catalog, artifacts):
 
     results = []
     # Cover every main page and every locale without multiplying the full page
-    # matrix by all nine languages. Long-script mobile checks follow separately.
+    # matrix by all languages. Long-script mobile checks follow separately.
     for index, (path, selector, key) in enumerate(PAGES):
         language = LANGUAGES[1:][index % (len(LANGUAGES)-1)]
         checkpoint(artifacts, "page-translation", path=path, language=language)
@@ -150,6 +151,7 @@ def frozen_data_checks(page, base, catalog, artifacts):
         choose_language(page, language)
         assert selected_hash(page) == raw_hash
         expect(page.locator("#file-sha256")).to_have_text(raw_hash)
+        assert page.locator("#file-sha256").evaluate("e=>getComputedStyle(e).direction") == "ltr"
         assert filename in page.locator("#file-entropy").inner_text()
         assert page.locator("#file-entropy b").count() == 0
         expect(page.locator("#upload-status")).to_have_text(expected(catalog, language, "Analysis complete"))
@@ -223,7 +225,7 @@ def word_data_checks(browser, base, catalog, artifacts):
         description = page.locator("p[data-i18n-param-list]")
         description_key = description.get_attribute("data-i18n")
         parameters = {name: description.get_attribute("data-i18n-param-" + name) for name in ("list", "size", "bits")}
-        for language in ("de", "el", "fr"):
+        for language in ("de", "el", "ar", "pt-BR", "fr"):
             choose_language(page, language)
             expect(page.locator("h1")).to_have_text(expected(catalog, language, "Random Words"))
             expect(description).to_have_text(expected(catalog, language, description_key, parameters))
@@ -286,7 +288,7 @@ def mobile_checks(page, base, catalog, artifacts):
 
     page.set_viewport_size({"width": 320, "height": 900})
     results = []
-    for language in ("de", "ru", "el"):
+    for language in ("de", "ru", "el", "ja", "ar"):
         page.evaluate("language=>localStorage.setItem('entropy-ui-language',language)", language)
         for path, selector, key in PAGES:
             checkpoint(artifacts, "mobile-page", language=language, path=path)
@@ -296,10 +298,32 @@ def mobile_checks(page, base, catalog, artifacts):
             assert_selector(page, catalog, language)
             assert not page.evaluate("document.documentElement.scrollWidth>innerWidth"), (language, path)
             settle_workers(page)
-            if (language, path) in (("de", "/"), ("ru", "/api-sources.html"), ("el", "/api-gallery.html")):
+            if (language, path) in (("de", "/"), ("ru", "/api-sources.html"), ("el", "/api-gallery.html"), ("ja", "/"), ("ar", "/")):
                 page.screenshot(path=str(artifacts / f"mobile-{language}-{path.strip('/').replace('.html','') or 'home'}.png"))
             results.append({"language": language, "path": path, "width": 320})
     page.set_viewport_size({"width": 1440, "height": 1000})
+    return results
+
+
+def direction_checks(page, base, artifacts):
+    from playwright.sync_api import expect
+
+    page.evaluate("localStorage.setItem('entropy-ui-language','ar')")
+    results = []
+    for path, selectors in (
+        ("/", (".path", "code")),
+        ("/api-bytes.html", ("#hex", "#base64", "#hash")),
+        ("/api-socket.html", ("#lab-url", "input[name='endpoint']", "textarea[name='urls']", "#registration-json", "canvas")),
+        ("/api-certificates.html", ("#certificate-names", "#certificate-pem")),
+    ):
+        checkpoint(artifacts, "arabic-data-direction", path=path)
+        page.goto(base + path)
+        expect(page.locator("html")).to_have_attribute("lang", "ar")
+        expect(page.locator("html")).to_have_attribute("dir", "rtl")
+        for selector in selectors:
+            assert page.locator(selector).first.evaluate("e=>getComputedStyle(e).direction") == "ltr", (path, selector)
+        results.append({"path": path, "interface": "rtl", "literal_data": "ltr", "selectors": selectors})
+        settle_workers(page)
     return results
 
 
@@ -325,6 +349,7 @@ def run_browser(base, artifacts, engine, chromium):
                        "frozen_data": frozen_data_checks(page, base, catalog, artifacts),
                        "words": word_data_checks(browser, base, catalog, artifacts),
                        "preferences": preference_checks(context, page, base, catalog, artifacts),
+                       "direction": direction_checks(page, base, artifacts),
                        "mobile": mobile_checks(page, base, catalog, artifacts)}
             assert not errors, errors
             return {"browser": engine, **results, "browser_errors": errors}
@@ -365,7 +390,7 @@ def main():
             process = serve_process(Path(args.binary).resolve(), port, log, extra=("-cookie=true", "-refresh=60000"))
             results = run_browser(f"http://127.0.0.1:{port}", artifacts, args.browser, args.chromium)
             (artifacts / "results.json").write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
-            print(f"{args.browser}: nine UI languages, main pages, payload/dictionary isolation, preferences and mobile layouts passed")
+            print(f"{args.browser}: {len(LANGUAGES)} UI languages, main pages, payload/dictionary isolation, preferences and mobile layouts passed")
         finally:
             if process and process.poll() is None:
                 process.send_signal(signal.SIGINT)

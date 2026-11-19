@@ -150,6 +150,11 @@ jobs:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_ui_languages_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/languages
         if: needs.plan.outputs.mode == 'full'
+      - name: Test installed interface language subsets and removal fallback
+        env:
+          DEBUG: pw:browser
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_installed_ui_locales_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/installed-ui-locales
+        if: needs.plan.outputs.mode == 'full'
       - name: Test compressed static assets and versioned catalog cache reuse
         env:
           DEBUG: pw:browser

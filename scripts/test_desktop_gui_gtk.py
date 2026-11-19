@@ -61,7 +61,8 @@ def wait_for(context, predicate, description, timeout=8):
 
 def assert_read_only(window):
     assert window.descriptor["live"] is False
-    features = window.descriptor["features"]
+    features = {name: enabled for name, enabled in window.descriptor["features"].items()
+                if name != "external_ui_locales"}
     assert features and window.feature_checks.keys() == features.keys()
     for name, check in window.feature_checks.items():
         assert not check.get_sensitive(), name
@@ -110,11 +111,41 @@ def capture_window(context, window, path):
 
 
 def resize_native_window(window, width, height):
-    """Request a real user-style resize, including an already mapped Win32 HWND."""
+    """Resize this owned window, including mapped Win32 and AppKit windows."""
     assert window.get_resizable(), "The GUI must permit user window resizing"
     window.unfullscreen()
     window.unmaximize()
     window.set_default_size(width, height)
+    if DARWIN:
+        # Changing GTK's default is not a reliable resize of a mapped AppKit
+        # window. Use its public content-size API on GTK's own native window,
+        # on the main thread, without another GUI package or process lookup.
+        import ctypes
+        import gi
+
+        assert threading.current_thread() is threading.main_thread()
+        gi.require_version("GdkMacos", "4.0")
+        from gi.repository import GdkMacos
+
+        surface = window.get_surface()
+        assert surface is not None and window.get_mapped(), "No owned macOS surface to resize"
+        native = GdkMacos.MacosSurface.get_native_window(surface)
+        assert native, "GTK did not expose its owned native window"
+        objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        selector = objc.sel_registerName(b"setContentSize:")
+        responds = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p,
+                                   ctypes.c_void_p)(("objc_msgSend", objc))
+        assert responds(native, objc.sel_registerName(b"respondsToSelector:"), selector)
+
+        class ContentSize(ctypes.Structure):
+            _fields_ = [("width", ctypes.c_double), ("height", ctypes.c_double)]
+
+        resize = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p,
+                                  ContentSize)(("objc_msgSend", objc))
+        resize(native, selector, ContentSize(width, height))
+        return "macos-owned-window-content-size"
     if not WINDOWS:
         return "gtk-default-size"
 
@@ -175,6 +206,143 @@ def resize_native_window(window, width, height):
     return "win32-owned-window-position"
 
 
+def divider_layout(context, window):
+    """Native Paned handles resize real allocations without hiding controls."""
+    from gi.repository import Gtk
+
+    wait_for(context, lambda: not window._pane_defaults_pending, window.role + " initial divider positions")
+    splitters = (window.workspace_paned, window.details_paned)
+    original_size = (window.get_width(), window.get_height())
+    original_positions = [paned.get_position() for paned in splitters]
+    workspace_height = window.workspace_paned.get_height()
+    if workspace_height >= 300:
+        # Catch queued outer/inner allocation races before test movements can
+        # repair them: initial settings/waterfall must have useful space.
+        middle_share = .25 if window.role == "server" else .45
+        wait_for(context, lambda: window.middle_pane.get_height() >= workspace_height * middle_share
+                 and 0 < window.bottom_pane.get_height() <= workspace_height * .25,
+                 window.role + " useful default panel allocations")
+    initial_heights = [pane.get_height() for pane in (window.top_pane, window.middle_pane, window.bottom_pane)]
+    evidence = []
+    for name, paned in zip(("workspace", "details"), splitters):
+        assert isinstance(paned, Gtk.Paned)
+        assert paned.get_orientation() == Gtk.Orientation.VERTICAL
+        assert paned.get_wide_handle(), name
+        start, end = paned.get_start_child(), paned.get_end_child()
+        wait_for(context, lambda: start.get_height() > 0 and end.get_height() > 0,
+                 window.role + " " + name + " divider allocation")
+        minimum, maximum = paned.get_property("min-position"), paned.get_property("max-position")
+        span = maximum - minimum
+        assert span >= 64, (window.role, name, minimum, maximum)
+        allocations = []
+        for fraction in (.35, .65):
+            position = minimum + round(span * fraction)
+            previous = (start.get_height(), end.get_height())
+            paned.set_position(position)
+            wait_for(context, lambda: (start.get_height(), end.get_height()) != previous,
+                     window.role + " " + name + " native divider movement")
+            allocations.append([start.get_height(), end.get_height()])
+        assert allocations[1][0] > allocations[0][0] + 12, (name, allocations)
+        assert allocations[1][1] < allocations[0][1] - 12, (name, allocations)
+        # Invoke GTK's standard arrow-key action while its native handle owns
+        # focus. No backend-specific synthetic pointer/key injection is needed.
+        assert paned.grab_focus(), (window.role, name, "handle focus")
+        previous = start.get_height()
+        assert paned.emit("move-handle", Gtk.ScrollType.STEP_UP), (window.role, name, "keyboard action")
+        wait_for(context, lambda: start.get_height() < previous, window.role + " " + name + " keyboard resize")
+        evidence.append({"divider": name, "positions": [minimum, maximum],
+                         "child_heights": allocations, "native_wide_handle": True, "keyboard_resize": True})
+    window.start_button.grab_focus()
+
+    # Both roles keep Start/Stop and final status outside their scrollable
+    # bands. Real narrow-window allocations must keep those controls visible.
+    resize_native_window(window, 640, 480)
+    wait_for(context, lambda: window.get_width() <= 700,
+             window.role + " narrow native window")
+    # A deliberately low divider from a taller window can collapse a band on
+    # shrink. Native handles must still recover usable space at the new size.
+    window.workspace_paned.set_position(round(window.workspace_paned.get_height() * .25))
+    wait_for(context, lambda: window.details_paned.get_height() > window.workspace_paned.get_height() * .6,
+             window.role + " narrow outer divider recovery")
+    window.details_paned.set_position(round(window.details_paned.get_height() * .5))
+    wait_for(context, lambda: window.middle_pane.get_height() > 32 and window.bottom_pane.get_height() > 32,
+             window.role + " narrow middle and log bands")
+    for widget in (window.start_button, window.stop_button, window.status_label):
+        wait_for(context, lambda: widget.get_mapped() and widget.get_width() > 0 and widget.get_height() > 0,
+                 window.role + " pinned Start/Stop/status")
+        valid, bounds = widget.compute_bounds(window)
+        assert valid and bounds.get_x() >= -1 and bounds.get_y() >= -1, window.role
+        assert bounds.get_x() + bounds.get_width() <= window.get_width() + 1, window.role
+        assert bounds.get_y() + bounds.get_height() <= window.get_height() + 1, window.role
+
+    # A long diagnostic buffer forces actual scrolling in the log view. Restore
+    # its prior contents so this layout fixture never replaces application logs.
+    expander = window.client_log_expander if window.role == "client" else window.server_log_expander
+    log_view = window.client_log_view if window.role == "client" else window.server_log_view
+    buffer = log_view.get_buffer()
+    original_text = buffer.get_text(*buffer.get_bounds(), True)
+    expanded = expander.get_expanded()
+    try:
+        buffer.set_text("\n".join(f"Divider allocation fixture {line}" for line in range(100)))
+        expander.set_expanded(True)
+        if isinstance(window.bottom_pane, Gtk.ScrolledWindow):
+            outer = window.bottom_pane.get_vadjustment()
+            wait_for(context, lambda: outer.get_page_size() > 0, window.role + " details viewport")
+            outer.set_value(max(0, outer.get_upper() - outer.get_page_size()))
+        scroller = log_view.get_parent()
+        while scroller is not None and not isinstance(scroller, Gtk.ScrolledWindow):
+            scroller = scroller.get_parent()
+        assert scroller is not None, window.role
+        adjustment = scroller.get_vadjustment()
+        wait_for(context, lambda: adjustment.get_page_size() > 0 and
+                 adjustment.get_upper() > adjustment.get_page_size(), window.role + " scrollable diagnostics")
+        # TextView initially reports an estimated upper bound while its new
+        # buffer and the expanded nested viewport await a frame allocation.
+        clock = window.get_frame_clock()
+        for _ in range(2):
+            frame = clock.get_frame_counter()
+            window.queue_draw()
+            wait_for(context, lambda: clock.get_frame_counter() > frame, window.role + " diagnostic layout paint")
+        buffer.place_cursor(buffer.get_end_iter())
+        mark = buffer.create_mark(None, buffer.get_end_iter(), False)
+        try:
+            # A mark survives TextView's deferred line-height validation;
+            # scroll_to_iter can run before those wrapped lines are laid out.
+            log_view.scroll_to_mark(mark, 0, True, 0, 1)
+            adjustment.set_value(adjustment.get_upper() - adjustment.get_page_size())
+            def last_line_visible():
+                line = log_view.get_iter_location(buffer.get_end_iter())
+                visible = log_view.get_visible_rect()
+                return visible.height > 0 and line.y >= visible.y - 1 and line.y + line.height <= visible.y + visible.height + 1
+            wait_for(context, last_line_visible, window.role + " last diagnostic line reachable")
+        finally:
+            buffer.delete_mark(mark)
+        # The outer details viewport must also let users reach an expanded log
+        # below startup options, rather than growing the window past its limits.
+        if isinstance(window.bottom_pane, Gtk.ScrolledWindow):
+            outer = window.bottom_pane.get_vadjustment()
+            wait_for(context, lambda: outer.get_page_size() > 0, window.role + " details viewport")
+            outer.set_value(max(0, outer.get_upper() - outer.get_page_size()))
+            assert outer.get_value() <= outer.get_upper() - outer.get_page_size() + 1
+    finally:
+        buffer.set_text(original_text)
+        expander.set_expanded(expanded)
+        resize_native_window(window, *original_size)
+        def original_width_restored():
+            # GTK reports content dimensions; resize requests also include
+            # platform/CSD frames (10 logical pixels on the Linux fixture).
+            return abs(window.get_width() - original_size[0]) <= 32
+        try:
+            wait_for(context, original_width_restored, window.role + " restored native window width")
+        except AssertionError as error:
+            raise AssertionError(f"{window.role} resize restoration: requested={original_size}, "
+                                 f"observed={(window.get_width(), window.get_height())}") from error
+        for paned, position in zip(splitters, original_positions):
+            paned.set_position(position)
+    return {"dividers": evidence, "initial_band_heights": initial_heights, "narrow_window_controls_visible": True,
+            "diagnostic_scroll_reaches_end": True}
+
+
 def server_configuration(context, application_type, binary):
     port = free_port()
     missing = "/definitely-not-present/entropy-gui-device"
@@ -207,8 +375,10 @@ def server_configuration(context, application_type, binary):
         with socket.socket() as probe:
             probe.settimeout(.2)
             assert probe.connect_ex(("127.0.0.1", port)) != 0
+        layout = divider_layout(context, window)
         return {"read_only_features": len(window.feature_checks), "server_started": False,
-                "runtime_resources_opened": False, "health_auto_connected": False}
+                "runtime_resources_opened": False, "health_auto_connected": False,
+                "layout": layout}
     finally:
         close_window(context, window)
         app.quit()
@@ -561,6 +731,23 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         wait_for(context, lambda: len(window.model.snapshot()["rows"]) >= 16, "populated native waterfall screenshot")
         screenshot = capture_window(context, window, artifacts / "client-window.png")
 
+        session, model = window.session, window.model
+        before_layout = model.snapshot()
+        child_pid = session._child.pid
+        with mock.patch.object(model, "reset", wraps=model.reset) as reset:
+            layout = divider_layout(context, window)
+            wait_for(context, lambda: model.snapshot()["sample"]["received_bytes"] >
+                     before_layout["sample"]["received_bytes"], "acquisition continues across divider changes")
+            reset.assert_not_called()
+        after_layout = model.snapshot()
+        assert window.session is session and window.model is model and session._child.pid == child_pid
+        assert session.snapshot()["running"]
+        assert after_layout["settings"] == before_layout["settings"]
+        assert len(after_layout["rows"]) >= len(before_layout["rows"])
+        layout["same_acquisition_session"] = True
+        layout["received_bytes_before"] = before_layout["sample"]["received_bytes"]
+        layout["received_bytes_after"] = after_layout["sample"]["received_bytes"]
+
         # Real GTK allocation and paint must respond to resize, independent of
         # source arrival or a second byte-acquisition implementation.
         first_width = window.drawing_area.get_width()
@@ -578,14 +765,33 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         resized_width = window.drawing_area.get_width()
         wait_for(context, lambda: any(width == resized_width and drawn for width, _height, drawn in draws),
                  "Cairo repaint at resized allocation")
+        from test_desktop_gui_keys_x11 import focused_divider_keys
+        native_keys = focused_divider_keys(context, window, wait_for)
+        divider_positions = [paned.get_position() for paned in (window.workspace_paned, window.details_paned)]
+        normal_height = window.drawing_area.get_height()
         assert window._on_key(None, gdk.KEY_F11, 0, 0)
         assert window._fullscreen and not window.header.get_visible()
         assert not window.controls.get_visible() and not window.status_label.get_visible()
         assert not window.web_application_box.get_visible()
+        assert not window.top_pane.get_visible() and not window.bottom_pane.get_visible()
+        wait_for(context, lambda: window.drawing_area.get_height() > normal_height + 20,
+                 "fullscreen waterfall uses the released pane space")
+        assert window.drawing_area.get_mapped()
+        assert window.drawing_area.get_height() >= window.workspace_paned.get_height() * .8
         assert window._on_key(None, gdk.KEY_Escape, 0, 0)
         assert not window._fullscreen and window.header.get_visible()
         assert window.controls.get_visible() and window.status_label.get_visible()
         assert window.web_application_box.get_visible()
+        assert window.top_pane.get_visible() and window.bottom_pane.get_visible()
+        wait_for(context, lambda: [paned.get_position() for paned in
+                 (window.workspace_paned, window.details_paned)] == divider_positions and
+                 not window._restore_dividers,
+                 "fullscreen restores both divider positions")
+        clock = window.get_frame_clock()
+        frame = clock.get_frame_counter()
+        window.queue_draw()
+        wait_for(context, lambda: clock.get_frame_counter() > frame, "restored divider paint")
+        assert [paned.get_position() for paned in (window.workspace_paned, window.details_paned)] == divider_positions
 
         owned_child = window.session._child
         window.stop_button.emit("clicked")
@@ -625,6 +831,8 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
                 "resized_canvas_width": resized_width, "fullscreen_shortcuts": True,
                 "frozen_palettes": ["byte", "rgb", "gray"],
                 "stop_and_close_cleanup": True,
+                "layout": layout,
+                "native_fullscreen_keys": native_keys,
                 "screenshot": screenshot,
                 "fullscreen_note": "GTK fullscreen requested; a window manager applies compositor state"}
     finally:

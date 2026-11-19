@@ -40,6 +40,7 @@ type serverDescriptionSettings struct {
 }
 
 type serverDescriptionFeatures struct {
+	ExternalUILocales     bool `json:"external_ui_locales"`
 	HTTPS                 bool `json:"https"`
 	RequireDevice         bool `json:"require_device"`
 	CPUMix                bool `json:"cpu_mix"`
@@ -66,7 +67,8 @@ func writeServerDescription(out io.Writer, cfg *config.Config) error {
 			HTTPMaxRequests: cfg.HTTPMaxRequests, HTTPMemoryMiB: cfg.HTTPMemoryMiB,
 		},
 		Features: serverDescriptionFeatures{
-			HTTPS: cfg.EnableHTTPS, RequireDevice: cfg.RequireDevice,
+			ExternalUILocales: externalUILocales,
+			HTTPS:             cfg.EnableHTTPS, RequireDevice: cfg.RequireDevice,
 			CPUMix: cfg.MixCPU, RDRANDMix: cfg.MixRDRAND, Debug: cfg.ShowDebug,
 			Cookie: cfg.WantsCookie, Lab: true, LabRegistry: cfg.LabSources != "",
 			LabAllowRemote:        cfg.LabAllowRemote,

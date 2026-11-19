@@ -165,9 +165,9 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         assert "33,554,432" in window.performance_label.get_text()
         capture_window(context, window, artifacts / "client-performance.png")
         window.set_fullscreen(True)
-        assert not window.performance_expander.get_visible()
+        assert not window.performance_expander.is_visible()
         window.set_fullscreen(False)
-        assert window.performance_expander.get_visible()
+        assert window.performance_expander.is_visible()
         wait_for(context, lambda: window._native_fullscreen_pending is None, "fullscreen entry/exit settled", timeout=5)
         child = window.session._child
         window.stop_button.emit("clicked")

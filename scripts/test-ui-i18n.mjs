@@ -7,7 +7,9 @@ const source = readFileSync(new URL("i18n.js", web), "utf8");
 const preferenceKey = "entropy-ui-language";
 const catalogVersionToken = "__ENTROPY_UI_CATALOG_VERSION__", catalogVersion = "a".repeat(64);
 assert.equal(source.split(catalogVersionToken).length, 2, "The server must have exactly one catalog-version token to replace");
-const languages = ["en", "fr", "de", "es", "cs", "ru", "pl", "el", "it"];
+const installedLanguagesToken = "__ENTROPY_UI_LANGUAGES__";
+assert.equal(source.split(installedLanguagesToken).length, 2, "The server must have exactly one installed-language token to replace");
+const languages = ["en", "fr", "de", "es", "cs", "ru", "pl", "el", "it", "nl", "pt-PT", "pt-BR", "ja", "ar"];
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const response = value => ({ok: true, text: async () => JSON.stringify(value)});
 function deferred() {
@@ -144,7 +146,8 @@ function harness(options = {}) {
             requests.push({url, ...init});
             return options.fetch ? options.fetch(url, init) : Promise.resolve(response(fixtures[new URL(url, "https://entropy.test").pathname.slice(9, -5)] || {}));
         }});
-    vm.runInContext(source.replace(catalogVersionToken, options.catalogVersion || catalogVersion), context, {filename: "i18n.js"});
+    vm.runInContext(source.replace(catalogVersionToken, options.catalogVersion || catalogVersion)
+        .replace(installedLanguagesToken, (options.installedLanguages || languages).join(",")), context, {filename: "i18n.js"});
     const api = window.EntropyI18n;
     return {api, saved, writes, requests, root, document, window, body, toolbar, node, timers,
         heading, live, title, placeholder, image, rawWords, rawHash, field, template, brand, themeButton,
@@ -182,6 +185,34 @@ assert.equal(view.document.querySelectorAll("select[data-ui-language]").length, 
 const reload = harness({saved, navigator: {languages: ["el-GR"]}});
 await reload.start(); assert.equal(reload.api.language, "it");
 
+// Installed UI languages are independent of passphrase dictionaries and saved
+// browser preferences. Removing a catalog must not fetch it or lose the user's
+// choice when they later visit a deployment that still offers that language.
+const removedPreference = new Map([[preferenceKey, "ru"]]);
+const englishOnly = harness({installedLanguages: ["en"], saved: removedPreference,
+    navigator: {languages: ["fr-FR"]}});
+await englishOnly.start();
+assert.equal(englishOnly.api.language, "en");
+assert.deepEqual(Object.keys(englishOnly.api.languages), ["en"]);
+assert.equal(englishOnly.picker(), null, "A sole mandatory language needs no picker");
+assert.equal(await englishOnly.api.useLanguage("fr"), "en");
+assert.equal(englishOnly.requests.length, 0);
+assert.equal(removedPreference.get(preferenceKey), "ru");
+assert.equal(englishOnly.field.value, "ru");
+assert.equal(englishOnly.rawWords.textContent, "Random words");
+assert.equal(englishOnly.document.cookie, beforeCookie);
+const partial = harness({installedLanguages: ["en", "fr", "de"], navigator: {languages: ["ru-RU", "de-DE"]}});
+await partial.start();
+assert.equal(partial.api.language, "de");
+assert.deepEqual(Object.keys(partial.api.languages), ["en", "fr", "de"]);
+assert.deepEqual(Array.from(partial.picker().children, option => option.value), ["en", "fr", "de"]);
+await partial.api.useLanguage("fr", true);
+assert.equal(partial.heading.textContent, "Démarrer");
+assert.ok(partial.requests.every(request => /\/(?:fr|de)\.json\?/.test(request.url)));
+const restored = harness({saved: removedPreference});
+await restored.start();
+assert.equal(restored.api.language, "ru", "Reinstalling a catalog restores the saved choice");
+
 // Catalog bytes belong to a content-versioned HTTP namespace across documents.
 // A deployment changes that namespace without changing the user's saved choice.
 const upgraded = harness({saved, catalogVersion: "b".repeat(64)});
@@ -194,18 +225,30 @@ assert.deepEqual([...upgraded.saved], [...saved], "No catalog bytes or cache met
 // Browser language matching uses supported primary tags; invalid stored values
 // safely fall back to English instead of becoming a URL or a selector value.
 for (const [options, expected] of [
-    [{navigator: {languages: ["pt-BR", "DE-at", "fr"]}}, "de"],
-    [{navigator: {languages: ["pt-BR", "fr-CA"]}}, "fr"],
+    [{navigator: {languages: ["sv-SE", "DE-at", "fr"]}}, "de"],
+    [{navigator: {languages: ["sv-SE", "fr-CA"]}}, "fr"],
     [{navigator: {language: "el-GR"}}, "el"],
-    [{navigator: {languages: ["pt-BR", "ja-JP"]}}, "en"],
+    [{navigator: {languages: ["sv-SE", "ko-KR"]}}, "en"],
+    [{navigator: {languages: ["pt-BR"]}}, "pt-BR"],
+    [{navigator: {languages: ["pt-Latn-BR"]}}, "pt-BR"],
+    [{navigator: {languages: ["pt"]}}, "pt-PT"],
+    [{navigator: {languages: ["PT_pt"]}}, "pt-PT"],
+    [{navigator: {languages: ["pt-PT-u-nu-latn"]}}, "pt-PT"],
+    [{navigator: {languages: ["pt-BR-u-hc-h23"]}}, "pt-BR"],
+    [{navigator: {languages: ["pt-PT-x-br"]}}, "pt-PT"],
+    [{navigator: {languages: ["ja-JP"]}}, "ja"],
+    [{navigator: {languages: ["ar-EG"]}}, "ar"],
+    [{navigator: {languages: ["ar-EG-u-nu-arab"]}}, "ar"],
+    [{navigator: {languages: ["../../private", "ja-JP"]}}, "ja"],
     [{saved: {[preferenceKey]: "../../private"}, navigator: {languages: ["fr"]}}, "en"],
 ]) {
     const test = harness(options); await test.start();
     assert.equal(test.api.language, expected);
     assert.equal(test.picker().value, expected);
+    assert.equal(test.root.dir, expected === "ar" ? "rtl" : "ltr");
     assert.ok(test.requests.every(request => {
         const url = new URL(request.url, "https://entropy.test");
-        return /^\/locales\/(?:fr|de|es|cs|ru|pl|el|it)\.json$/.test(url.pathname) && url.search === "?v=" + catalogVersion;
+        return /^\/locales\/(?:fr|de|es|cs|ru|pl|el|it|nl|pt-PT|pt-BR|ja|ar)\.json$/.test(url.pathname) && url.search === "?v=" + catalogVersion;
     }));
 }
 

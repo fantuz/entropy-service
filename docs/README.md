@@ -44,6 +44,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Adaptive client terminal](client-terminal.md) | Compact/full layouts, sizing, bounded history, screenshots and display-cost trade-offs. |
 | [Certificate tools](certificate-bootstrap-design.md) | Browser-local self-signed certificates, server/browser entropy, TLS test uses, provisioning and trust limits. |
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
+| [Web interface languages](web-interface-languages.md) | 14 interface translations, optional Windows language components, Arabic direction and independent random-word preferences. |
 | [Visual diagnostics](visual-diagnostics.md) | Optional dependence/transition/local-block plots, spectral history and explicit PCM audio/notch comparison. |
 | [Graph colour palettes](graph-palettes.md) | Three graph palettes, persistence, contrast and colour-independent cues. |
 | [Stale material review, November 13](stale-material-review-2026-11-13.md) | Proposed cleanup candidates and stale wording, with evidence; no removals performed. |
