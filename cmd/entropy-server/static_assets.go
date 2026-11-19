@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 
 const (
 	uiCatalogVersionPlaceholder = "__ENTROPY_UI_CATALOG_VERSION__"
+	uiLanguagesPlaceholder      = "__ENTROPY_UI_LANGUAGES__"
 	staticIndexAsset            = "index.html"
 	staticGzipEncoding          = "gzip"
 )
@@ -50,6 +52,12 @@ type staticAssetHandler struct {
 // hashing nor compression occurs on requests. The root must remain immutable for
 // the handler lifetime; dynamic routes never use this handler.
 func newStaticAssetHandler(root fs.FS) (http.Handler, error) {
+	return newStaticAssetHandlerWithCatalogs(root, nil)
+}
+
+// Installed catalogs have already been bounded and validated. Their immutable
+// snapshots are retained here; no request opens the installation directory.
+func newStaticAssetHandlerWithCatalogs(root fs.FS, catalogs map[string][]byte) (http.Handler, error) {
 	bodies := make(map[string][]byte)
 
 	if err := fs.WalkDir(root, ".", func(name string, entry fs.DirEntry, err error) error {
@@ -73,14 +81,36 @@ func newStaticAssetHandler(root fs.FS) (http.Handler, error) {
 		return nil, fmt.Errorf("load public assets: %w", err)
 	}
 
-	version := staticCatalogVersion(bodies)
-	if body, ok := bodies["i18n.js"]; ok {
-		placeholder := []byte(uiCatalogVersionPlaceholder)
-		if bytes.Count(body, placeholder) != 1 {
-			return nil, errors.New("public i18n.js must contain exactly one catalog-version placeholder")
+	for name, body := range catalogs {
+		if !staticLocaleName(name) || !slices.Contains(uiLanguageCodes()[1:], strings.TrimSuffix(path.Base(name), ".json")) {
+			return nil, errors.New("installed interface catalog name is not allowlisted")
 		}
 
-		bodies["i18n.js"] = bytes.Replace(body, placeholder, []byte(version), 1)
+		bodies[name] = bytes.Clone(body)
+	}
+
+	version := staticCatalogVersion(bodies)
+	if body, ok := bodies["i18n.js"]; ok {
+		languages := []string{"en"}
+
+		for _, code := range uiLanguageCodes()[1:] {
+			if _, exists := bodies["locales/"+code+".json"]; exists {
+				languages = append(languages, code)
+			}
+		}
+
+		for placeholder, value := range map[string]string{
+			uiCatalogVersionPlaceholder: version,
+			uiLanguagesPlaceholder:      strings.Join(languages, ","),
+		} {
+			if bytes.Count(body, []byte(placeholder)) != 1 {
+				return nil, errors.New("public i18n.js must contain exactly one catalog-version and language-list placeholder")
+			}
+
+			body = bytes.Replace(body, []byte(placeholder), []byte(value), 1)
+		}
+
+		bodies["i18n.js"] = body
 	}
 
 	files := http.FS(root)
@@ -113,7 +143,7 @@ func newStaticAssetHandler(root fs.FS) (http.Handler, error) {
 
 		// Keep original embedded data in its filesystem, rather than retaining a
 		// second raw copy. Only the patched script needs an owned identity body.
-		if name != "i18n.js" {
+		if _, installed := catalogs[name]; name != "i18n.js" && !installed {
 			asset.identity.body = nil
 		}
 

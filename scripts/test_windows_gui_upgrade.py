@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{C5571481-03FA-4233-92FC-B0EF9BA76A44}_is1"
 MANAGED = ("app", "bin", "runtime", "runtime-package-metadata", "docs")
 PROJECT_CREDIT = "Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi"
+UI_LANGUAGES = ("en", "it", "fr", "nl", "de", "es", "el", "ru", "pt-PT", "pt-BR", "cs", "pl", "ja", "ar")
+COMPONENT_HELP = "Choose additional web interface languages. English and all random-word dictionaries are always installed."
 
 
 def wait_for(predicate, description, timeout=20):
@@ -53,6 +55,21 @@ class Wizard:
         self.user.SendMessageTimeoutW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
             wintypes.LPARAM, wintypes.UINT, wintypes.UINT, ctypes.POINTER(ctypes.c_size_t)]
         self.user.SendMessageTimeoutW.restype = ctypes.c_ssize_t
+        self.user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        self.user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        self.user.GetParent.argtypes = [wintypes.HWND]
+        self.user.GetParent.restype = wintypes.HWND
+        self.user.GetDpiForWindow.argtypes = [wintypes.HWND]
+        self.user.GetDpiForWindow.restype = wintypes.UINT
+        self.user.GetDC.argtypes = [wintypes.HWND]
+        self.user.GetDC.restype = wintypes.HDC
+        self.user.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+        self.user.DrawTextW.argtypes = [wintypes.HDC, wintypes.LPCWSTR, ctypes.c_int,
+                                      ctypes.POINTER(wintypes.RECT), wintypes.UINT]
+        self.gdi = ctypes.WinDLL("gdi32", use_last_error=True)
+        self.gdi.SelectObject.argtypes = [wintypes.HDC, wintypes.HANDLE]
+        self.gdi.SelectObject.restype = wintypes.HANDLE
+        self.layout = []
         try:
             self.handle = wait_for(self.find_wizard, "Entropy Service setup wizard")
         except AssertionError:
@@ -166,8 +183,60 @@ class Wizard:
                      ENTROPY_WIZARD_RECT=','.join(map(str, (rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top)))),
             check=True, timeout=15, capture_output=True)
 
+    def verify_wrapped_text_fits(self, handle, description):
+        """Measure what Windows can draw, not merely the stored caption string."""
+        client, bounds, parent = wintypes.RECT(), wintypes.RECT(), wintypes.RECT()
+        assert self.user.GetClientRect(handle, ctypes.byref(client))
+        assert self.user.GetWindowRect(handle, ctypes.byref(bounds))
+        assert self.user.GetWindowRect(self.user.GetParent(handle), ctypes.byref(parent))
+        width, height = client.right - client.left, client.bottom - client.top
+        assert width > 0 and height > 0, (description, width, height)
+        assert parent.left <= bounds.left < bounds.right <= parent.right, description
+        assert parent.top <= bounds.top < bounds.bottom <= parent.bottom, description
+        font = ctypes.c_size_t()
+        assert self.user.SendMessageTimeoutW(handle, 0x0031, 0, 0, 2, 1000, ctypes.byref(font))  # WM_GETFONT.
+        assert font.value, "Cannot measure the actual native font for " + description
+        context = self.user.GetDC(handle)
+        assert context
+        previous = self.gdi.SelectObject(context, font.value)
+        try:
+            measured = wintypes.RECT(0, 0, width, 0)
+            # Use the control's actual font/width at its current DPI. These
+            # flags match multiline static text without accelerator stripping.
+            assert self.user.DrawTextW(context, self.text(handle), -1, ctypes.byref(measured),
+                                      0x0400 | 0x0010 | 0x0800)  # CALCRECT | WORDBREAK | NOPREFIX.
+        finally:
+            self.gdi.SelectObject(context, previous)
+            self.user.ReleaseDC(handle, context)
+        required = measured.bottom - measured.top
+        result = {"description": description, "width": width, "height": height,
+                  "required_height": required, "dpi": self.user.GetDpiForWindow(handle), "text": self.text(handle)}
+        assert required <= height + 1, "Clipped native caption: " + repr(result)
+        self.layout.append(result)
+        return result
+
+    def verify_components_page(self, artifacts=None):
+        self.advance(lambda: any(text == COMPONENT_HELP for _, text in self.controls()))
+        helpers = [handle for handle, text in self.controls() if text == COMPONENT_HELP]
+        assert len(helpers) == 1
+        self.verify_wrapped_text_fits(helpers[0], "component selection explanation")
+        lists = [handle for handle, _ in self.controls() if self.class_name(handle) == "TNewCheckListBox"]
+        assert len(lists) == 1, "No visible standard component checklist"
+        count = ctypes.c_size_t()
+        assert self.user.SendMessageTimeoutW(lists[0], 0x018B, 0, 0, 2, 1000, ctypes.byref(count))  # LB_GETCOUNT.
+        assert count.value == len(UI_LANGUAGES) + 1, "Expected core, language group and every optional translation"
+        if artifacts:
+            self.capture(artifacts / "installer-components.png")
+            (artifacts / "installer-text-layout.json").write_text(json.dumps(self.layout, indent=2) + "\n")
+
     def verify_landing_and_license(self, artifacts=None):
-        assert any(PROJECT_CREDIT in text for _, text in self.controls()), "Welcome page omits the project credit"
+        welcome = [(handle, text) for handle, text in self.controls() if PROJECT_CREDIT in text]
+        assert len(welcome) == 1, "Welcome page omits the project credit"
+        handle, text = welcome[0]
+        assert "Current-user setup needs no administrator rights" in text
+        assert "optional Windows Service" in text
+        assert "MIT License" in text
+        self.verify_wrapped_text_fits(handle, "complete welcome explanation")
         if artifacts:
             self.capture(artifacts / "installer-welcome.png")
         self.advance(lambda: self.button("I accept the agreement") is not None)
@@ -283,17 +352,31 @@ def main():
             (bundle / "runtime/bin/pythonw.exe").write_bytes(b"MZ installer fixture, never executed")
             (bundle / "app/gui_bootstrap.py").write_text("# Non-executable installer fixture\n")
             (bundle / "docs/windows-gui-installer.md").write_text("Installer fixture guide\n")
+            (bundle / "bin/ui-locales").mkdir()
+            for language in UI_LANGUAGES:
+                (bundle / f"bin/ui-locales/{language}.json").write_text(json.dumps({"fixture_language": language}))
+            (bundle / "bin/mandatory-core-fixture.txt").write_text("core is independent from web translations")
             subprocess.run([str(args.compiler), "/Qp", "/DBundleDir=" + str(bundle), "/DOutputDir=" + str(output),
                             "/DAppVersion=" + version, "/DNumericVersion=" + version + ".0",
                             str(ROOT / "tools/windows-installer/entropy-service.iss")], check=True, timeout=60)
             setups[version] = next(output.glob("*_gui_setup.exe"))
 
-        def launch(version, name, *, silent=False, target=installation):
+        def launch(version, name, *, silent=False, target=installation, languages=None):
             command = [str(setups[version]), "/SP-", "/CURRENTUSER", "/NORESTART", "/DIR=" + str(target),
                        "/LOG=" + str(artifacts / (name + ".log"))]
+            if languages is not None:
+                components = ["core"]
+                if languages:
+                    components += ["web_locales", *["web_locales\\" + code.replace('-', '_').lower() for code in languages]]
+                command += ["/TYPE=" + ("custom" if languages else "english"), "/COMPONENTS=" + ','.join(components)]
             if silent:
                 command += ["/VERYSILENT", "/SUPPRESSMSGBOXES"]
             return subprocess.Popen(command, stdin=subprocess.DEVNULL)
+
+        def verify_languages(expected):
+            catalog = installation / "bin/ui-locales"
+            assert {path.stem for path in catalog.glob("*.json")} == set(expected)
+            assert (installation / "bin/mandatory-core-fixture.txt").read_text() == "core is independent from web translations"
 
         active = None
         helpers = []
@@ -301,6 +384,7 @@ def main():
             active = launch("1.0.0", "fresh", silent=True)
             assert active.wait(timeout=30) == 0
             assert registry_values()["DisplayVersion"] == "1.0.0"
+            verify_languages(UI_LANGUAGES)
             retained = installation / "my sample.bin"
             retained.write_bytes(b"retain user export")
             outside = work / "private certificate.pem"
@@ -317,6 +401,7 @@ def main():
             wizard.cancel(active)
             assert active.returncode != 0 and registry_values()["DisplayVersion"] == "1.0.0"
             assert all((installation / name / "obsolete.txt").is_file() for name in MANAGED)
+            verify_languages(UI_LANGUAGES)
 
             active = launch("2.0.0", "wrong-location", silent=True, target=work / "Other location")
             assert active.wait(timeout=30) != 0
@@ -352,6 +437,7 @@ def main():
 
             active = launch("2.0.0", "upgrade")
             wizard = Wizard()
+            wizard.verify_components_page(artifacts)
             progress = []
             wizard.advance(lambda: wizard.button("Finish") is not None,
                            observe=lambda: wizard.observe_upgrade(progress), timeout=90)
@@ -370,12 +456,30 @@ def main():
             assert all((installation / name / "current.txt").read_text() == "2.0.0" for name in MANAGED)
             assert len(list(group.glob("*.lnk"))) == 3
             assert retained.read_bytes() == b"retain user export" and outside.read_text() == "retain separate user data"
+            verify_languages(UI_LANGUAGES)
 
             active = launch("2.0.0", "reinstall", silent=True)
             assert active.wait(timeout=30) == 0
             explorer_folder(group, expect_open=False)
             assert registry_values()["DisplayVersion"] == "2.0.0"
             assert retained.read_bytes() == b"retain user export"
+            verify_languages(UI_LANGUAGES)
+
+            # Changing optional components replaces only installer-owned
+            # payloads; no stale web catalog may survive an upgrade/reinstall.
+            active = launch("2.0.0", "subset-languages", silent=True, languages=("fr", "de"))
+            assert active.wait(timeout=30) == 0
+            verify_languages(("en", "fr", "de"))
+            active = launch("2.0.0", "retained-subset-languages", silent=True)
+            assert active.wait(timeout=30) == 0
+            verify_languages(("en", "fr", "de"))
+            active = launch("2.0.0", "english-only", silent=True, languages=())
+            assert active.wait(timeout=30) == 0
+            verify_languages(("en",))
+            active = launch("2.0.0", "retained-english-only", silent=True)
+            assert active.wait(timeout=30) == 0
+            verify_languages(("en",))
+            assert retained.read_bytes() == b"retain user export" and outside.read_text() == "retain separate user data"
         finally:
             for child in helpers:
                 if child.poll() is None:
@@ -402,6 +506,9 @@ def main():
         "private_helper_stopped_unrelated_helper_retained": True,
         "cleanup_progress_visible_and_responsive": True, "junction_target_retained": True,
         "readonly_old_file_removed": True, "landing_credit_and_license_reflow": True,
+        "welcome_text_fits_native_font_and_bounds": True, "components_page_explains_word_dictionary_independence": True,
+        "default_all_ui_languages": True, "partial_ui_language_reinstall_removes_unselected": True,
+        "english_only_retains_core": True, "component_selections_remembered": True,
         "reinstall": True, "finish_opens_start_menu_folder": True, "silent_does_not_open_explorer": True,
         "uninstall_keeps_user_data": True}, indent=2) + "\n")
     print("Native installer upgrade, cancellation, cleanup, reinstall and Start Menu handoff passed")

@@ -99,7 +99,14 @@ body {
   overflow-y: auto;
   overflow-wrap: anywhere;
 }
-body.page-home { text-align: left; padding: 0; }
+body.page-home { text-align: start; padding: 0; }
+/* Interface direction follows the chosen UI language. Literal protocols, byte
+   dumps and plots retain their data order independently of surrounding prose. */
+pre, code, kbd, samp, canvas, input[type="url"], input[type="number"],
+input[inputmode="url"], input[name="endpoint"], textarea[name="urls"],
+#registration-json, #certificate-names, #certificate-pem, #lab-pattern,
+#file-sha256, #hash, .hash, .hex, .base64, .path { direction: ltr; unicode-bidi: isolate; }
+:root[dir="rtl"] .path { text-align: end; }
 h1, h2, h3, h4, .eyebrow, .pill, .status-label, p[role="status"] {
   font-family: var(--font-terminal);
   letter-spacing: .035em;
@@ -203,7 +210,7 @@ code { font-size: .88em; }
 .eyebrow { color: var(--green); font-size: .8rem; }
 .page-home h1 { margin: .75rem 0 1rem; font-size: clamp(2.2rem, 6vw, 4.3rem); }
 .page-home h2 { margin: 2.6rem 0 .6rem; font-size: clamp(1.25rem, 2.6vw, 1.7rem); }
-.page-home p { margin-left: 0; }
+.page-home p { margin-inline-start: 0; }
 .lede { font-size: 1.05rem; }
 .pills { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.6rem 0 0; }
 .pill { font-size: .74rem; border: 1px solid var(--border); padding: .35rem .7rem; border-radius: 6px; color: var(--green-bright); }
@@ -218,7 +225,7 @@ code { font-size: .88em; }
 .card strong { display: block; color: var(--green-bright); font-size: 1.03rem; margin-bottom: .5rem; }
 .card span { display: block; color: var(--muted); font-size: .89rem; }
 .path { display: block; color: var(--cyan); margin-top: 1rem; font-size: .73rem; overflow-wrap: anywhere; text-transform: none; letter-spacing: 0; }
-.page-home .panel { width: 100%; max-width: 100%; margin: 1rem 0; text-align: left; }
+.page-home .panel { width: 100%; max-width: 100%; margin: 1rem 0; text-align: start; }
 .page-home .panel p { max-width: none; }
 .page-home .note { font-size: .89rem; }
 .page-home footer { border-top: 1px solid var(--border); padding: 1.4rem 0; margin-top: 3rem; color: var(--muted); }
@@ -256,7 +263,7 @@ code { font-size: .88em; }
 /* Center the harmonic-sound player and controls without affecting other pages. */
 .page-sound .sound-shell { width: min(100%, 44rem); margin: 0 auto; text-align: center; }
 .page-sound #controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: end; gap: 1rem; margin: 1.6rem auto; }
-.page-sound #controls label { display: grid; gap: .45rem; text-align: left; }
+.page-sound #controls label { display: grid; gap: .45rem; text-align: start; }
 .page-sound #controls input { width: 9rem; }
 .page-sound audio { display: block; width: min(100%, 36rem); margin: 1.3rem auto; }
 .page-sound #status { max-width: 36rem; }
@@ -266,7 +273,7 @@ code { font-size: .88em; }
 .analysis-panel canvas { display: block; width: 100%; margin: .7rem auto 0; }
 .analysis-panel #pie { max-width: 340px; }
 .analysis-controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: end; gap: 1rem; margin: 1.1rem auto; }
-.analysis-controls label { display: grid; gap: .3rem; text-align: left; }
+.analysis-controls label { display: grid; gap: .3rem; text-align: start; }
 .analysis-controls input { width: min(9rem, 40vw); }
 .analysis-meta { color: var(--green); font-size: .88rem; font-variant-numeric: tabular-nums; }
 .analysis-value { color: var(--green-bright); }
@@ -300,7 +307,7 @@ code { font-size: .88em; }
 .page-gallery .gallery-controls label { color: var(--green-bright); }
 .page-gallery .gallery-controls input { inline-size: 4rem; padding: .4rem .5rem; text-align: center; }
 .page-gallery .gallery-controls button { padding: .4rem .65rem; }
-.page-gallery #gallery-status { flex: 1 1 12rem; text-align: right; color: var(--cyan); font-size: .72rem; }
+.page-gallery #gallery-status { flex: 1 1 12rem; text-align: end; color: var(--cyan); font-size: .72rem; }
 .page-gallery #gallery-status[data-state="error"] { color: var(--warn); }
 .page-gallery .gallery-notes { margin-top: 1rem; font-size: .8rem; }
 .page-gallery footer { padding: .8rem 0; margin-top: 1.25rem; font-size: .8rem; }
@@ -308,7 +315,7 @@ code { font-size: .88em; }
 @media (max-width: 599px) {
   .page-gallery .gallery-grid { grid-template-columns: 1fr; }
   .page-gallery .gallery-header { padding-top: 1.25rem; gap: .6rem; }
-  .page-gallery #gallery-status { text-align: left; }
+  .page-gallery #gallery-status { text-align: start; }
   .page-gallery .gallery-card--words .gallery-preview { aspect-ratio: auto; block-size: 12rem; }
 }
 
@@ -320,7 +327,7 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 
 /* Two independent telemetry rows: cumulative reception vs sampled analysis. */
 .analysis-stats { width: min(100%, 46rem); margin: 1rem auto; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; font-variant-numeric: tabular-nums; }
-.analysis-stat-row { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr); align-items: center; gap: .5rem; padding: .55rem 1rem; text-align: left; font-size: clamp(.8rem, 1.8vw, 1rem); }
+.analysis-stat-row { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr); align-items: center; gap: .5rem; padding: .55rem 1rem; text-align: start; font-size: clamp(.8rem, 1.8vw, 1rem); }
 .analysis-stat-row + .analysis-stat-row { border-top: 1px solid var(--border); }
 .analysis-stat-title { color: var(--green-bright); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
 .analysis-stat-row output { color: var(--cyan); }
@@ -658,10 +665,10 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-analysis-lab .checkbox-label { display: flex; align-items: center; align-self: center; }
 .page-analysis-lab input[type="checkbox"] { width: auto; accent-color: var(--green); }
 .page-analysis-lab input[type="range"] { width: 100%; min-width: 6rem; accent-color: var(--green); }
-.page-analysis-lab details { text-align: left; }
+.page-analysis-lab details { text-align: start; }
 .page-analysis-lab summary { color: var(--cyan); cursor: pointer; }
-.page-analysis-lab .note { font-size: .8rem; text-align: left; }
-.page-analysis-lab .analysis-meta { font-size: .79rem; text-align: left; }
+.page-analysis-lab .note { font-size: .8rem; text-align: start; }
+.page-analysis-lab .analysis-meta { font-size: .79rem; text-align: start; }
 .page-analysis-lab .diagnostic-plot { width: 100%; height: 240px; }
 /* Subgrid keeps paired headings, toolbars, plots and card borders aligned. */
 .page-analysis-lab .plot-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: .3rem; }
@@ -674,8 +681,8 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-analysis-lab #sample-info { min-height: 3.2em; }
 .page-analysis-lab .balance-layout { display: flex; align-items: center; justify-content: center; gap: 1rem; }
 .page-analysis-lab .analysis-panel #pie { width: 148px; height: 148px; flex: 0 0 148px; margin: 0; }
-.balance-legend { min-width: 0; text-align: left; font-size: .84rem; }
-.zero-key::before, .one-key::before { content: ""; display: inline-block; width: .7rem; height: .7rem; margin-right: .5rem; border: 1px solid var(--cyan); background: var(--plot-zero); }
+.balance-legend { min-width: 0; text-align: start; font-size: .84rem; }
+.zero-key::before, .one-key::before { content: ""; display: inline-block; width: .7rem; height: .7rem; margin-inline-end: .5rem; border: 1px solid var(--cyan); background: var(--plot-zero); }
 .one-key::before { background: var(--plot-one); }
 .bit-rate-grid { display: grid; gap: .3rem; margin-top: .8rem; }
 .bit-rate-row { display: grid; grid-template-columns: 4rem minmax(0, 1fr) 5rem; align-items: center; gap: .6rem; font-size: .8rem; }
@@ -689,7 +696,7 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-analysis-lab #marker-reading { display: block; min-height: 2.8em; }
 .page-analysis-lab .form-error { color: var(--warn); }
 .page-analysis-lab .analysis-help { margin-top: 1rem; }
-.page-analysis-lab .graph-palette-control { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: .8rem 0; text-align: left; }
+.page-analysis-lab .graph-palette-control { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: .8rem 0; text-align: start; }
 .page-analysis-lab .graph-palette-control select { max-width: 100%; }
 .page-analysis-lab .graph-palette-hint { margin: .4rem 0 1rem; }
 .page-analysis-lab .bit-meter::after { background: var(--plot-reference); }
@@ -699,7 +706,7 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-analysis-lab .bit-rate-row meter::-moz-meter-bar { background: var(--plot-primary); }
 .page-analysis-lab .diagnostics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .page-analysis-lab .diagnostics-grid > section { min-width: 0; padding: .5rem; border: 1px solid var(--border); border-radius: 10px; }
-.page-analysis-lab .diagnostics-grid h2 { font-size: 1rem; text-align: left; margin: .3rem 0 .7rem; }
+.page-analysis-lab .diagnostics-grid h2 { font-size: 1rem; text-align: start; margin: .3rem 0 .7rem; }
 .page-analysis-lab .optional-plot { display: block; width: 100%; height: 260px; margin: 0; }
 .page-analysis-lab .optional-diagnostics > summary { line-height: 1.5; }
 .page-analysis-lab .optional-diagnostics .analysis-meta { overflow-wrap: anywhere; }
@@ -726,7 +733,7 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
 .page-upload #file-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
 .page-upload #file-controls:disabled { opacity: .55; }
 
-.page-upload #server-report-content { max-height: 20rem; text-align: left; }
+.page-upload #server-report-content { max-height: 20rem; text-align: start; }
 
 /* Experimental sources share the analysis grid and keep source controls local. */
 .page-lab .lab-only[hidden] { display: none; }
@@ -832,7 +839,7 @@ body.page-home > .site-toolbar { width:min(calc(100% - 2rem),70rem); margin:1rem
 }
 
 /* The interface choice is independent from the generated word-list language. */
-.ui-language-control { display:flex; margin-left:auto; align-items:center; flex-wrap:wrap; gap:.35rem .6rem; font-size:.82rem; min-width:0; }
+.ui-language-control { display:flex; margin-inline-start:auto; align-items:center; flex-wrap:wrap; gap:.35rem .6rem; font-size:.82rem; min-width:0; }
 .ui-language-control select { width:auto; max-width:100%; padding:.35rem .5rem; }
 @media (max-width:36rem) {
   .ui-language-control { flex-basis:100%; justify-content:space-between; }

@@ -56,6 +56,15 @@ default differs from the ordinary CLI, which still enables HTTPS by default.
 The client initially connects to the local HTTP server. Neither shortcut starts
 a background service automatically.
 
+The component page offers **Full installation**, **English web interface only**,
+or **Custom installation** with individual web translations. English is required;
+all 18 random-word dictionaries remain available in every profile. Subsequent
+setups remember the selected components and can add or remove translations.
+These options affect the installed server's browser pages, independently of
+native GUI and installer language. See [interface languages](web-interface-languages.md)
+for the 14 supported languages, regional Portuguese, Arabic direction and silent
+setup examples. This component selection is newer than the v2.8.0 release.
+
 GUI-created relative paths and caches use `%LOCALAPPDATA%\Entropy Service`.
 Both GUI windows also offer **Open web application** for the selected server's
 browser interface, including graphs, LAB tools and service status. It opens only
@@ -161,6 +170,8 @@ licenses. It is deliberately larger than the CLI ZIP. `bundle-manifest.json`
 records every runtime package/version/license and exact corresponding source
 archive URL and SHA-256. Package metadata and upstream notices remain installed;
 consult `THIRD_PARTY_NOTICES.txt` and `runtime/share/licenses`.
+The manifest's `web_ui_locales` list records catalogs available in the setup;
+the selected component files under `bin\ui-locales` determine which are installed.
 
 The companion runtime-sources ZIP contains the matching MSYS2 complete source
 packages (upstream code, recipes and patches). Distribute it alongside the
@@ -175,7 +186,10 @@ The `windows-gui-installer.yml` workflow builds both Go companions from the same
 revision, stages Python/GTK and complete source packages, and compiles an Inno
 Setup 6.7+ installer. A small native fixture first exercises the actual
 upgrade notice, cancellation, old-file cleanup, location guard, reinstall,
-uninstall and Explorer handoff using the production installer recipe. The full
+uninstall and Explorer handoff using the production installer recipe. It checks
+the rendered welcome/component text against native font measurements and captures
+the wizard pages, then exercises full, custom and remembered English-only
+component selections. The full
 test also installs the checksum-pinned **released v2.6.0** setup and upgrades it
 with the candidate installer, checking visible/responsive cleanup and retained
 user exports. Fixtures additionally cover read-only old files and a directory
@@ -187,6 +201,8 @@ owned-process controls and shutdown. It upgrades that installed bundle and
 repeats the GUI checks with the original runtime still unavailable, verifying
 obsolete-file removal and preservation of user data, then uninstalls. It also
 checks that an active runtime process blocks replacement without being killed.
+The installed server is also checked over HTTP: selected interface catalogs are
+available, removed catalogs return 404, and all random-word languages remain.
 An administrative fixture additionally checks the actual service task defaults,
 unsafe locations and cross-mode rejection, account/startup policy, explicit
 Start, running-service upgrade with the same TLS identity, and preserving

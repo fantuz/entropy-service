@@ -21,6 +21,29 @@ ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "mingw-w64-ucrt-x86_64-"
 
 
+def stage_ui_locales(source, destination):
+    """Keep web translations separate from binaries and passphrase dictionaries."""
+    catalogs = sorted(source.glob("*.json"))
+    if not any(path.name == "en.json" for path in catalogs):
+        raise ValueError("Web interface catalogs must include the English fallback")
+    records = []
+    for catalog in catalogs:
+        if catalog.is_symlink() or not catalog.is_file() or not re.fullmatch(r"[a-z]{2}(?:-[A-Z]{2})?\.json", catalog.name):
+            raise ValueError("Unexpected web interface catalog: " + catalog.name)
+        body = catalog.read_bytes()
+        if len(body) > 2 * 1024 * 1024:
+            raise ValueError("Web interface catalog exceeds 2 MiB: " + catalog.name)
+        messages = json.loads(body.decode("utf-8"))
+        if not isinstance(messages, dict) or not messages or any(not isinstance(value, str) for value in messages.values()):
+            raise ValueError("Invalid web interface message map: " + catalog.name)
+        records.append({"language": catalog.stem, "file": catalog.name,
+                        "sha256": hashlib.sha256(body).hexdigest()})
+    destination.mkdir(parents=True, exist_ok=False)
+    for catalog in catalogs:
+        shutil.copy2(catalog, destination / catalog.name)
+    return records
+
+
 def fields(text, separator):
     result = {}
     for line in text.splitlines():
@@ -90,12 +113,14 @@ def main():
     (output / "bin").mkdir()
     for name in ("entropy-server.exe", "entropy-client.exe"):
         shutil.copy2(ROOT / "bin" / name, output / "bin" / name)
+    ui_locales = stage_ui_locales(ROOT / "cmd/entropy-server/web/locales", output / "bin/ui-locales")
     for name in ("LICENSE", "QUANTIS_NOTICES.txt"):
         shutil.copy2(ROOT / name, output / name)
     shutil.copy2(ROOT / "cmd/entropy-server/internal/wordlist/NOTICE.txt", output / "WORDLIST_NOTICES.txt")
     shutil.copytree(ROOT / "docs", output / "docs")
     (output / "THIRD_PARTY_NOTICES.txt").write_text("This bundle includes MSYS2 Python/GTK and their dependencies.\nLicense files are retained under runtime/share/licenses and within each runtime package.\nSee bundle-manifest.json for exact package versions, licenses, corresponding source archive URLs and SHA-256 hashes.\nThe companion runtime-sources ZIP contains those complete source packages and recipes.\nEntropy Service source is included under app; the complete project revision is recorded in the manifest.\n", encoding="utf-8")
-    manifest = {"version": args.version, "source_sha": args.source_sha, "packages": records, "sources": sources}
+    manifest = {"version": args.version, "source_sha": args.source_sha, "packages": records, "sources": sources,
+                "web_ui_locales": ui_locales}
     (output / "bundle-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (source_dir / "bundle-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     for name in ("LICENSE",):

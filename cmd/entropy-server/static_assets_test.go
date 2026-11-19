@@ -23,7 +23,7 @@ import (
 func staticFixtureFS() fstest.MapFS {
 	return fstest.MapFS{
 		"index.html":        {Data: []byte("<!doctype html><title>Home</title>" + strings.Repeat("<p>Public sample</p>", 60))},
-		"i18n.js":           {Data: []byte(`const version="` + uiCatalogVersionPlaceholder + `";` + strings.Repeat("\n// Public interface catalog loader", 50))},
+		"i18n.js":           {Data: []byte(`const version="` + uiCatalogVersionPlaceholder + `"; const installedLanguages="` + uiLanguagesPlaceholder + `".split(",");` + strings.Repeat("\n// Public interface catalog loader", 50))},
 		"theme.css":         {Data: []byte(strings.Repeat("body { color: #123456; background: white; }\n", 100))},
 		"locales/en.json":   {Data: []byte(`{"Hello":"Hello"}`)},
 		"locales/fr.json":   {Data: []byte(`{"Hello":"` + strings.Repeat("Bonjour ", 100) + `"}`)},
@@ -97,7 +97,13 @@ func TestStaticAssetsEmbeddedRepresentations(t *testing.T) {
 	}
 
 	handler := makeStaticHandler(t, root)
-	for _, name := range []string{"/", "/theme.css", "/api-stream.html", "/api-certificates.html", "/certificate-crypto.js", "/locales/fr.json", "/locales/el.json"} {
+
+	names := []string{"/", "/theme.css", "/api-stream.html", "/api-certificates.html", "/certificate-crypto.js", "/locales/en.json"}
+	if !externalUILocales {
+		names = append(names, "/locales/fr.json", "/locales/el.json")
+	}
+
+	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			identity := staticRequest(t, handler, http.MethodGet, name, nil)
 			compressed := staticRequest(t, handler, http.MethodGet, name, map[string]string{"Accept-Encoding": "gzip"})
@@ -124,7 +130,7 @@ func TestStaticAssetsEmbeddedRepresentations(t *testing.T) {
 	}
 
 	script := staticRequest(t, handler, http.MethodGet, "/i18n.js", nil)
-	if strings.Contains(script.Body.String(), uiCatalogVersionPlaceholder) || !strings.Contains(script.Body.String(), handler.catalogVersion) {
+	if strings.Contains(script.Body.String(), uiCatalogVersionPlaceholder) || strings.Contains(script.Body.String(), uiLanguagesPlaceholder) || !strings.Contains(script.Body.String(), handler.catalogVersion) {
 		t.Fatal("served script must contain the real catalog version, not its build placeholder")
 	}
 }
@@ -367,7 +373,12 @@ func TestStaticAssetsDoNotWrapRandomOutput(t *testing.T) {
 }
 
 func TestStaticAssetsRequireCatalogVersionPlaceholder(t *testing.T) {
-	for _, script := range []string{"const version='missing';", uiCatalogVersionPlaceholder + uiCatalogVersionPlaceholder} {
+	for _, script := range []string{
+		"const version='missing';",
+		uiCatalogVersionPlaceholder + uiCatalogVersionPlaceholder + uiLanguagesPlaceholder,
+		uiCatalogVersionPlaceholder,
+		uiCatalogVersionPlaceholder + uiLanguagesPlaceholder + uiLanguagesPlaceholder,
+	} {
 		root := staticFixtureFS()
 		root["i18n.js"] = &fstest.MapFile{Data: []byte(script)}
 

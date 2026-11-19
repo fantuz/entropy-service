@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -11,7 +10,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/fs"
 	"log"
 	"net/http"
 	"net/http/pprof"
@@ -34,9 +32,6 @@ import (
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/transport"
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/wordlist"
 )
-
-//go:embed web
-var webFS embed.FS
 
 // GoReleaser injects the release tag; development binaries report dev.
 var appVersion = "dev"
@@ -1290,14 +1285,9 @@ func runServer(ctx context.Context, cfg *config.Config, ready func()) error {
 	// create the multiplexed listener proto
 	mux := http.NewServeMux()
 
-	webRoot, err := fs.Sub(webFS, "web")
+	staticAssets, err := newWebAssetHandler()
 	if err != nil {
-		return fmt.Errorf("open embedded web assets: %w", err)
-	}
-
-	staticAssets, err := newStaticAssetHandler(webRoot)
-	if err != nil {
-		return fmt.Errorf("prepare embedded web assets: %w", err)
+		return fmt.Errorf("prepare web interface assets: %w", err)
 	}
 
 	mux.Handle("/", staticAssets)

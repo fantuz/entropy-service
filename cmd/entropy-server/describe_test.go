@@ -54,6 +54,10 @@ func TestServerDescriptionOmitsPrivateConfiguration(t *testing.T) {
 		t.Fatalf("description does not reflect supplied configuration: %+v", got)
 	}
 
+	if got.Features.ExternalUILocales != externalUILocales {
+		t.Fatal("descriptor must report its catalog build mode without inspecting installed files")
+	}
+
 	if err := writeServerDescription(failingDescriptionWriter{}, cfg); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatalf("writer error was not preserved: %v", err)
 	}

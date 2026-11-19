@@ -31,8 +31,13 @@ func TestEmbeddedWebShowcase(t *testing.T) {
 			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 			handler.ServeHTTP(w, r)
 
-			if w.Code != http.StatusOK {
-				t.Fatalf("GET %s returned %d, want 200", path, w.Code)
+			want := http.StatusOK
+			if externalUILocales && strings.HasPrefix(path, "/locales/") && path != "/locales/en.json" {
+				want = http.StatusNotFound
+			}
+
+			if w.Code != want {
+				t.Fatalf("GET %s returned %d, want %d", path, w.Code, want)
 			}
 		})
 	}
