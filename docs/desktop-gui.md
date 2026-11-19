@@ -57,7 +57,7 @@ enters and leaves fullscreen with **F11** or **Escape**. Fullscreen retains the
 summary indicators and waterfall; normal panels and their positions return on
 exit. A new window starts with the default layout. Resizing changes display
 space, not acquisition settings, sample contents or the bounded waterfall
-history. Adjustable panels require a GUI revision newer than v2.8.0.
+history. Adjustable panels are available from v2.8.1.
 
 ## Source and executable versions
 
@@ -122,9 +122,9 @@ can be selected with `--server-binary /usr/bin/entropy-server` or
 
 ### Download the GUI source and the executables
 
-For v2.8.0, download the matching
-[source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.8.0.zip)
-and [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.8.0/entropy-service_2.8.0_windows_amd64.zip).
+For v2.8.1, download the matching
+[source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.8.1.zip)
+and [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.8.1/entropy-service_2.8.1_windows_amd64.zip).
 Use matching source and executable versions as explained under
 [Source and executable versions](#source-and-executable-versions).
 Extract the entire source archive. Its directory must contain `go.mod`, `cmd`,
