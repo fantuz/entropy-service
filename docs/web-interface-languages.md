@@ -28,7 +28,7 @@ selected server.
 
 ## Installation choices
 
-The bundled Windows installer offers a component selection page with **Full
+From v2.8.1, the bundled Windows installer offers a component selection page with **Full
 installation**, **English web interface only**, and **Custom installation**.
 English and the core application are required. Custom installation lets users
 select each additional translation separately. Full installation is the initial
