@@ -1,7 +1,9 @@
 # Desktop GUI
 
-The GTK 4/PyGObject desktop interface supports Linux and Windows x64. It runs
-from source, with Python/GTK dependencies separate from the Go binaries. The
+The GTK 4/PyGObject desktop interface supports Linux, Windows x64 and macOS
+Intel/Apple Silicon. Linux and macOS use source launchers with Python/GTK
+dependencies; the [Windows installer](windows-gui-installer.md) bundles its runtime.
+See the [macOS guide](macos.md) for the Homebrew launcher. The
 command-line and web interfaces remain independently usable.
 
 Both windows provide an **Options** editor for common startup settings and
@@ -36,8 +38,8 @@ contains the earlier GUI: it can monitor a server and run the client, but its
 server settings are read-only and it has no Options editor or local-server
 Start/Stop controls. Its separate
 [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.2.0/entropy-service_2.2.0_windows_amd64.zip)
-contains compatible CLI executables, which can also be used with the updated
-GUI source. The source and binaries are separate downloads; CLI archives do
+contains its CLI executables. Use matching source and binary versions for the
+complete set of startup options. The source and binaries are separate downloads; CLI archives do
 not contain the Python GUI.
 
 ## Linux setup
@@ -491,7 +493,7 @@ python scripts/test_desktop_gui_gtk.py \
   --server bin/entropy-server.exe --client bin/entropy-client.exe --artifacts gui-artifacts/windows
 ```
 
-CI exercises native GTK windows on Linux and Windows, real CLI acquisition,
+CI exercises native GTK windows on Linux, Windows and both macOS architectures, real CLI acquisition,
 option editing, live health, process cleanup and terminal interruption,
 alongside the CLI/browser regression suites. Fullscreen geometry and native
 Wayland/HiDPI behavior can depend on the desktop compositor. The

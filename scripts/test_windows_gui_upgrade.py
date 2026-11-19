@@ -73,7 +73,15 @@ class Wizard:
 
     def text(self, handle):
         buffer = ctypes.create_unicode_buffer(8192)
-        self.user.GetWindowTextW(handle, buffer, len(buffer))
+        # GetWindowText cannot retrieve another process's edit-control text.
+        # WM_GETTEXT is marshalled by Windows; bound it so a busy installer
+        # produces diagnostics rather than hanging the UI test.
+        if any(part in self.class_name(handle).lower() for part in ("rich", "memo", "edit")):
+            result = ctypes.c_size_t()
+            assert self.user.SendMessageTimeoutW(handle, 0x000D, len(buffer), ctypes.addressof(buffer),
+                2, 1000, ctypes.byref(result)), "Could not read the native license viewer"
+        else:
+            self.user.GetWindowTextW(handle, buffer, len(buffer))
         return buffer.value
 
     def class_name(self, handle):
@@ -133,17 +141,44 @@ class Wizard:
             "Setup stopped processing Windows messages during cleanup"
         observations.append("responsive cleanup with a visible progress bar")
 
-    def verify_landing_and_license(self):
+    def capture(self, destination):
+        """Preserve real wizard pixels with Windows' built-in drawing library."""
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        rect = wintypes.RECT()
+        self.user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        assert self.user.GetWindowRect(self.handle, ctypes.byref(rect))
+        script = r'''
+        $ErrorActionPreference = 'Stop'
+        Add-Type -AssemblyName System.Drawing
+        $bounds = $env:ENTROPY_WIZARD_RECT.Split(',') | ForEach-Object { [int]$_ }
+        $bitmap = [Drawing.Bitmap]::new($bounds[2], $bounds[3])
+        $graphics = [Drawing.Graphics]::FromImage($bitmap)
+        try {
+          $graphics.CopyFromScreen($bounds[0], $bounds[1], 0, 0, $bitmap.Size)
+          $bitmap.Save($env:ENTROPY_WIZARD_IMAGE, [Drawing.Imaging.ImageFormat]::Png)
+        } finally { $graphics.Dispose(); $bitmap.Dispose() }
+        '''
+        subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            env=dict(os.environ, ENTROPY_WIZARD_IMAGE=str(destination),
+                     ENTROPY_WIZARD_RECT=','.join(map(str, (rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top)))),
+            check=True, timeout=15, capture_output=True)
+
+    def verify_landing_and_license(self, artifacts=None):
         assert any(PROJECT_CREDIT in text for _, text in self.controls()), "Welcome page omits the project credit"
+        if artifacts:
+            self.capture(artifacts / "installer-welcome.png")
         self.advance(lambda: self.button("I accept the agreement") is not None)
         licenses = [text for _, text in self.controls() if 'THE SOFTWARE IS PROVIDED "AS IS"' in text.replace('\xa0', ' ')]
-        assert len(licenses) == 1, "MIT license is not displayed"
+        assert len(licenses) == 1, "MIT license is not displayed: " + repr([
+            (self.class_name(handle), text[:2000]) for handle, text in self.controls()])
         text = licenses[0].replace('\xa0', ' ')
         assert PROJECT_CREDIT in text
         expected = (ROOT / "LICENSE").read_text()
         assert " ".join(expected.split()) in " ".join(text.split()), "License wording changed"
         assert "DEALINGS IN THE\r\nSOFTWARE" not in text and "THE\r\nSOFTWARE" not in text, \
             "The MIT license retains orphaned hard line breaks"
+        if artifacts:
+            self.capture(artifacts / "installer-license.png")
 
     def cancel(self, process):
         self.click(self.button("Cancel"))
@@ -266,7 +301,7 @@ def main():
 
             active = launch("2.0.0", "cancel-upgrade")
             wizard = Wizard()
-            wizard.verify_landing_and_license()
+            wizard.verify_landing_and_license(artifacts)
             wizard.advance(lambda: any(text == "Existing installation found" for _, text in wizard.controls()))
             text = "\n".join(text for _, text in wizard.controls())
             assert "Installed version: 1.0.0" in text and "Setup version: 2.0.0" in text, text

@@ -45,7 +45,8 @@ cryptographic-assurance evidence.
 
 ## Stale wording to update, not documents to delete
 
-These are recommendations only; this audit leaves the old text intact.
+The following recommendations describe the 13 November baseline. Subsequent
+documentation corrections are recorded in the [maintenance report](maintenance-review-2026-11-13.md).
 
 | Document | What is stale | Recommended correction |
 | --- | --- | --- |
@@ -65,11 +66,11 @@ Four images total **308,316 bytes**:
 [stream-analysis-preview.webp](images/stream-analysis-preview.webp).
 They are linked in the README's explicitly historical **Earlier November 2026
 interface** gallery. Retire them only if intentionally retiring that gallery
-and its links. My default is to keep them: they are not orphans or misleading
-current previews. All 21 tracked `docs/images/` files have references at this
+and its links. They remain referenced historical evidence rather than current
+previews. All 21 tracked `docs/images/` files had references at this
 baseline.
 
-## Material I would keep
+## Material retained
 
 - The `aa_` health/metrics and six `zz_v1-*.html` helpers are linked, documented
   and tested public compatibility paths. Retiring/replacing them needs an

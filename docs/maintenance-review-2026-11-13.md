@@ -55,7 +55,7 @@ the [baseline CSV](coverage/2026-11-13-main.csv) preserves that distinction.
   failure while preserving a completed sample; an unavailable device is
   explained in human output, returns failure and creates no capture file.
 
-Focused local checks cover the changed capture behavior and existing DRBG/output
-regressions. Full module coverage, race/vet/lint, platform/package/browser and
-security checks belong to GitHub CI for this PR. A new percentage must be read
-from that run rather than inferred by adding these narrow tests to the baseline.
+The focused checks for this revision covered capture behavior and existing
+DRBG/output regressions. Full coverage, race/vet/lint, platform/package/browser
+and security checks run in GitHub CI. Coverage percentages must come from an
+identified full run rather than adding narrow-test results to an older baseline.

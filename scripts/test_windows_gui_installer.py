@@ -42,7 +42,7 @@ def install_v260_and_upgrade(installer, installation, work, artifacts):
                                 "/LOG=" + str(artifacts / "upgrade-from-2.6.0.log")])
     try:
         wizard = Wizard()
-        wizard.verify_landing_and_license()
+        wizard.verify_landing_and_license(artifacts)
         progress = []
         wizard.advance(lambda: wizard.button("Finish") is not None,
                        observe=lambda: wizard.observe_upgrade(progress), timeout=240)
