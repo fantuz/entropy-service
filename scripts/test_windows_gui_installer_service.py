@@ -68,9 +68,14 @@ def qualify_machine_service(installer, artifacts):
         # targets user-writable storage, even when that setup can create SCM entries.
         setup("unsafe-service-location", "server_service", artifacts / "unsafe program", expected=1)
         assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY)
+        setup("nested-service-location", "server_service", installation / "nested", expected=1)
+        assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY)
+        assert not installation.exists(), "Rejected service setup created an unverified program tree"
         setup("machine-default-off")
         assert registry_present(winreg.HKEY_LOCAL_MACHINE, UNINSTALL_KEY)
         assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY), "Service installed without explicit selection"
+        setup("desktop-service-promotion-rejected", "server_service", expected=1)
+        assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY), "Desktop directory adopted for a privileged service"
         setup("scope-switch-rejected", target=artifacts / "per-user replacement", mode="/CURRENTUSER", expected=1)
         assert not registry_present(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY)
         subprocess.run([str(installation / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
@@ -118,6 +123,8 @@ def qualify_machine_service(installer, artifacts):
         assert retained.is_file()
         (artifacts / "results.json").write_text(json.dumps({
             "machine_service_default_off": True, "unsafe_location_rejected": True,
+            "nested_service_location_rejected": True,
+            "desktop_service_promotion_rejected": True,
             "cross_scope_replacement_rejected": True, "dedicated_virtual_account": True,
             "delayed_automatic_start": True, "start_task_unchecked": True,
             "running_upgrade_resumed_same_identity": True, "owned_uninstall_preserves_state": True}, indent=2) + "\n")

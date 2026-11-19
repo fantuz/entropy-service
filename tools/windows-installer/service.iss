@@ -65,6 +65,14 @@ begin
   Result := (Length(AddBackslash(Directory)) > Length(Root)) and
     (CompareText(Copy(AddBackslash(Directory), 1, Length(Root)), Root) = 0);
   if not Result then Exit;
+  { A first installation inherits the protected Program Files ACL directly.
+    Arbitrary existing intermediate directories may grant ordinary users write. }
+  if not ServiceWasManaged and
+    (CompareText(AddBackslash(ExtractFileDir(Directory)), Root) <> 0) then
+  begin
+    Result := False;
+    Exit;
+  end;
   { Program Files supplies the administrative parent. Reject directory links
     rather than treating a redirected user-writable tree as a protected path. }
   repeat
@@ -107,9 +115,16 @@ begin
       'Choose its existing current-user/all-users mode to upgrade, or uninstall that copy before switching modes. Separate user data is retained.';
     Exit;
   end;
+  if WindowsServiceSelected and ReplacingInstallation and not ServiceWasManaged then
+  begin
+    { A desktop installation may have adopted a pre-existing directory with
+      permissive ACLs. A Program Files prefix alone cannot prove its safety. }
+    Result := 'Adding the first Windows Service requires a fresh protected installation. Uninstall this desktop-only copy, retain your separate user data, then install for all users in a new Program Files folder with the service selected. Existing installer-managed services can be upgraded normally.';
+    Exit;
+  end;
   if WindowsServiceSelected and not ServiceLocationSafe then
   begin
-    Result := 'A Windows Service requires a protected installation under Program Files without directory links. Use the default new folder or the existing machine-wide installation.';
+    Result := 'A first Windows Service installation requires a new folder directly inside Program Files without directory links. Use the default folder or upgrade an existing installer-managed service.';
     Exit;
   end;
   if WindowsServiceSelected and ServiceRegistrationExists and not ServiceWasManaged then

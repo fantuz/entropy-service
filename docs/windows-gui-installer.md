@@ -74,6 +74,14 @@ entropy-server as a Windows Service**. This is unchecked by default. A separate,
 also unchecked **Start the server service after installation** option controls
 initial startup. entropy-client remains a GUI/CLI application.
 
+The first service installation requires a new directory directly inside
+Program Files. Setup rejects nested paths and existing desktop-only program
+directories because their inherited permissions may allow ordinary users to
+replace an executable. To add a service after a desktop-only installation,
+uninstall that program copy, retain its separate user data, then install afresh
+with the service selected. Existing installer-managed services support normal
+in-place upgrades.
+
 The service is named `EntropyServer`, uses `NT SERVICE\EntropyServer` and
 automatic delayed startup. It binds HTTP `127.0.0.1:8080` and HTTPS
 `127.0.0.1:8443`. On first start it provisions a seven-day self-signed identity
