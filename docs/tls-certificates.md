@@ -7,6 +7,15 @@ entropy source or a listener. Use an operator-issued CA/ACME certificate
 chain for public deployments. Certificate provisioning provides server
 identity and encryption, not client authentication.
 
+## Browser certificate tools
+
+The optional [Certificate tools page](certificate-bootstrap-design.md) creates
+self-signed server leaves locally in a trusted browser, using both server and
+browser randomness. It supports DNS, IPv4 and IPv6 SANs, separate certificate/key
+downloads and SHA-256 fingerprints. It never installs the files or changes a
+running identity. The local CLI below remains suitable for installers and
+service provisioning, including before any server is running.
+
 ## Generate a local identity
 
 After building or installing the binary, run the following as the user who

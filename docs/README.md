@@ -4,6 +4,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 
 | Document | Contents |
 | --- | --- |
+| [Certificate tools](certificate-bootstrap-design.md) | Browser-local self-signed certificates, server/browser entropy, TLS test uses, provisioning and trust limits. |
 | [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
 | [GUI validation and load observations](desktop-gui-validation.md) | Large-frame investigation, failure diagnostics, native settings checks and remaining manual coverage. |
 | [Windows Service](windows-service.md) | Native SCM installation, account/state policy, certificates, stop/restart, logs and upgrades. |

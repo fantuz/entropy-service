@@ -2,6 +2,12 @@
 
 HTTP and HTTPS use the same routes. WebSockets use the corresponding `ws://` or `wss://` address and require a normal HTTP Upgrade handshake. Browser `.html` pages are clients of the APIs, not WebSocket endpoints themselves.
 
+`/api-certificates.html` is the [Certificate tools page](certificate-bootstrap-design.md).
+Generation requests exactly 64 bytes from `/v1/data/random?bytes=64`, then
+combines them with independent browser randomness. Keys and certificates are
+created locally and downloaded separately; there is no private-key upload or
+server-side certificate-signing endpoint.
+
 ## Binary data, words, images and sound
 
 The normal request method below is GET, except where another method is specified.

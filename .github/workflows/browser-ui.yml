@@ -150,6 +150,11 @@ jobs:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_static_assets_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/static-assets
         if: needs.plan.outputs.mode == 'full'
+      - name: Test browser-local certificate generation and Go TLS interoperability
+        env:
+          DEBUG: pw:browser
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_certificates_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/certificates
+        if: needs.plan.outputs.mode == 'full'
       - name: Upload browser evidence
         if: needs.plan.outputs.mode == 'full' && (always())
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
