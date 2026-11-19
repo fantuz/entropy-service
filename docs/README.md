@@ -4,7 +4,8 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 
 | Document | Contents |
 | --- | --- |
-| [Certificate tools](certificate-bootstrap-design.md) | Browser-local self-signed certificates, server/browser entropy, TLS test uses, provisioning and trust limits. |
+| [LAB across Linux, Windows and macOS](lab-platforms.md) | Always-available LAB tools, registry types, browser/device/FFmpeg requirements and the GUI pprof startup control. |
+| [v2.7.0 release notes](releases/v2.7.0.md) | Client capabilities, performance view, adaptive pull and desktop/installer controls. |
 | [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
 | [GUI validation and load observations](desktop-gui-validation.md) | Large-frame investigation, failure diagnostics, native settings checks and remaining manual coverage. |
 | [Windows Service](windows-service.md) | Native SCM installation, account/state policy, certificates, stop/restart, logs and upgrades. |
@@ -40,6 +41,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Client recovery](client-recovery.md) | Disconnect causes, opt-in bounded retries, backoff, permanent failures and export limits. |
 | [Client TLS trust](client-tls.md) | HTTPS/WSS verification, Linux public-certificate trust, IPv4 SANs, renewal and downgrade protection. |
 | [Adaptive client terminal](client-terminal.md) | Compact/full layouts, sizing, bounded history, screenshots and display-cost trade-offs. |
+| [Certificate tools](certificate-bootstrap-design.md) | Browser-local self-signed certificates, server/browser entropy, TLS test uses, provisioning and trust limits. |
 | [Browser showcases](browser-ui.md) | Embedded HTTP gallery, stream counters, word rendering and consolidated status dashboard. |
 | [Visual diagnostics](visual-diagnostics.md) | Optional dependence/transition/local-block plots, spectral history and explicit PCM audio/notch comparison. |
 | [Graph colour palettes](graph-palettes.md) | Three graph palettes, persistence, contrast and colour-independent cues. |

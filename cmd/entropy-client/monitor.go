@@ -503,7 +503,7 @@ func pullFramesWithPacing(ctx context.Context, cfg *config.Config, endpoint stri
 
 		started := time.Now()
 		previousStart = started
-		requestCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		requestCtx, cancel := context.WithTimeout(ctx, cfg.PullRequestTimeout())
 		data, err := client.FetchEntropy(requestCtx, endpoint, cfg.Slice)
 		wait := time.Since(started)
 

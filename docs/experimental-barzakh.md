@@ -117,7 +117,7 @@ and must not be confused with this Go implementation.
 free availability and experimental use do not automatically grant patent
 permission or establish an exemption. An unreferenced pending-patent notice
 is not evidence of an enforceable granted claim, nor proof that no relevant
-application exists. This PR does not verify ownership, application numbers,
+application exists. This project has not verified ownership, application numbers,
 jurisdictions, claims or freedom to operate, and does not assume an upstream
 patent grant covers this implementation. Obtain clarification and qualified
 legal review before depending on it for distribution/deployment where such

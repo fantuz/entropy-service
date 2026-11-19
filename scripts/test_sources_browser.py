@@ -561,6 +561,10 @@ def browser_checks(base, peer, artifacts, chromium, udp_port, http_url, engine="
         # No startup registry: direct CORS-enabled pages/redirects work; CORS denial is explained.
         page.goto(peer+"/api-socket.html")
         expect(page.locator("#lab-catalog-info")).to_contain_text("No registered sources are active")
+        expect(page.locator("#lab-platform-info")).to_be_visible()
+        catalog=page.request.get(peer+"/lab/sources").json()
+        for kind in catalog["source_kinds"]:
+            expect(page.locator("#lab-platform-info")).to_contain_text(kind)
         page.locator("#lab-kind").select_option("http");page.locator("#lab-bytes").fill("1024")
         assert page.locator("#lab-page-preset option").count()==8
         page.locator("#lab-url").fill(http_url+"/redirect");page.locator("#lab-once").click();expect(page.locator("#lab-download")).to_be_enabled()

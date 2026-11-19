@@ -26,6 +26,8 @@
 
 **Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
+Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi. [MIT License](LICENSE).
+
 Entropy Service is a Go server and command-line client for generating, distributing, and inspecting pseudorandom data from a cryptographic deterministic random bit generator (DRBG). It supports hardware or operating-system seed sources; ChaCha20 and AES-256-CTR backends; bounded HTTP and WebSocket delivery; and a browser-based showcase for experiments and diagnostics.
 
 <p align="center">
@@ -61,6 +63,15 @@ The buttons track the latest stable release automatically.
 - **Integrate:** request binary samples over HTTP or maintain a WebSocket stream for development and test applications.
 - **Experiment:** inspect byte statistics, live stream previews, words, images, colours, QR codes, and synthesized sounds.
 - **Operate:** monitor readiness, reseeding, traffic and resource admission through JSON and Prometheus metrics.
+
+The CLI and GTK desktop interfaces support **Linux, Windows x64 and macOS
+Intel/Apple Silicon**. Client capability discovery checks server limits before
+acquisition; the performance view separates requested, effective and received
+rates. Optional [adaptive HTTP pull](docs/client-capabilities-performance.md)
+adjusts scheduling without changing sample size or statistical thresholds.
+The web interface offers nine UI languages and three graph palettes.
+[LAB platform support](docs/lab-platforms.md) distinguishes shared browser/network
+tools from browser permissions, FFmpeg and OS-specific devices.
 
 `entropy-server` serves the APIs and embedded browser pages. `entropy-client` consumes binary HTTP/WebSocket APIs and provides terminal monitoring with bounded analysis.
 
@@ -125,7 +136,7 @@ docker pull ghcr.io/fantuz/entropy-client:latest
 
 Browse the [server container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-service)
 and [client container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-client)
-versions. Pin `:v2.3.0`, or an image digest, for controlled deployments; `:edge`
+versions. Pin `:v2.7.0`, or an image digest, for controlled deployments; `:edge`
 follows validated development builds. The container guide includes the one-time
 existing-release publication, readiness probes, SBOMs and maintenance policy.
 
@@ -165,10 +176,13 @@ Large interactive terminals use the [adaptive full layout](docs/client-terminal.
 with adjacent panels and wider histories. `-layout=compact` keeps stacked
 output; `-layout=full -waterfall` requests the larger dashboard explicitly.
 
-An optional [GTK desktop GUI](docs/desktop-gui.md) for Linux and Windows
+An optional [GTK desktop GUI](docs/desktop-gui.md) for Linux, Windows and macOS
 edits common startup options, starts and stops its own server/client processes,
 and displays live server health or a client waterfall with fullscreen mode.
-It runs from source with separate Python/GTK dependencies.
+Linux and macOS use source launchers with Python/GTK dependencies; the
+[Windows GUI installer](docs/windows-gui-installer.md) bundles its private runtime.
+Repository installer builds also offer an explicit, default-off Windows server
+service through administrative all-users setup; desktop-only setup remains per-user.
 See the [running server and client screenshots](#desktop-guis).
 
 ![Entropy client with byte-hue waterfall](docs/images/client-waterfall.png)
@@ -457,7 +471,10 @@ tagged commit before publishing. See [CI execution and caching](docs/ci.md).
 
 See [Go conventions, module policy and coverage review](docs/go-quality.md)
 for the measured baseline, remaining test gaps and badge meanings. Hardware
-deployment and full interactive browser checks still require separate validation.
+qualification and manual checks with actual devices, browsers and desktops remain
+separate from statement coverage. Native Windows/macOS CLI and GTK tests, both
+browser engines and [endurance/fault scenarios](docs/endurance-tests.md) run in CI;
+the [hardware matrix](docs/hardware-qualification.md) records physical evidence.
 
 The [experimental source/socket labs](docs/source-labs.md) add browser generators/media, RTSP/ONVIF cameras, optional previews, metering/comparisons, binary downloads and registered peer/self/device connections. An assisted configurator prepares source registries; web-page sources support bounded body prefixes and random URL pools.
 
@@ -480,17 +497,17 @@ Available features are documented above. The following are follow-up work or ide
 
 ### Desktop GUIs
 
-The optional GTK interface supports Linux and Windows. These live Linux captures
-show a GUI-launched server with readiness and reseed status, and a client
-receiving WebSocket samples with a filled 128-row waterfall. The demonstration
-uses a loopback connection and the operating system seed source.
+The GTK interface supports Linux, Windows and macOS. These current Linux captures
+show a GUI-launched server with live readiness, LAB and profiling controls, and
+a client receiving HTTP samples with acquisition performance and a live waterfall.
+The demonstration uses loopback networking and an operating-system seed source.
 
-| Server — local process and live health | Client — live waterfall and sample statistics |
+| Server — live health and startup controls | Client — live waterfall and acquisition performance |
 | --- | --- |
-| [![Entropy server GUI running with live READY health and ChaCha20 settings](docs/images/desktop-gui-server-live.webp)](docs/images/desktop-gui-server-live.webp) | [![Entropy client GUI receiving WebSocket samples with a filled byte-hue waterfall, Shannon entropy and throughput](docs/images/desktop-gui-client-live.webp)](docs/images/desktop-gui-client-live.webp) |
+| [![Entropy server GUI with live READY health, LAB controls and profiling startup option](docs/images/desktop-gui-server-controls.webp)](docs/images/desktop-gui-server-controls.webp) | [![Entropy client GUI with HTTP acquisition performance, Shannon assessment and byte-hue waterfall](docs/images/desktop-gui-client-performance.webp)](docs/images/desktop-gui-client-performance.webp) |
 
 Select an image for the full-size view. The [desktop guide](docs/desktop-gui.md)
-includes Linux and Windows launch instructions, the Options editor and more
+includes Linux and Windows launch instructions, the [macOS launcher](docs/macos.md), the Options editor and more
 platform screenshots.
 
 ### Current browser interface (November 2026)

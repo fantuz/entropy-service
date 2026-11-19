@@ -298,6 +298,12 @@ window.addEventListener("pageshow", event => { if(event.persisted)location.reloa
         try{
             const response=await fetch("/lab/sources",{cache:"no-store"});if(!response.ok)throw new Error(response.status===403?"Registered sources are restricted. Use this instance's localhost address or ask its operator to configure LAB access.":"Source catalog unavailable");catalog=await response.json();
             if(!Array.isArray(catalog.sources))throw new Error("Invalid source catalog");
+            if(typeof catalog.platform==="string"&&Array.isArray(catalog.source_kinds)&&catalog.source_kinds.every(kind=>typeof kind==="string")){
+                const info=$("lab-platform-info");
+                setText(info,"Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.",
+                    {platform:({linux:"Linux",windows:"Windows",darwin:"macOS"})[catalog.platform]||catalog.platform,kinds:catalog.source_kinds.join(", ")});
+                info.hidden=false;
+            }
             $("lab-registered").replaceChildren();
             const available=catalog.sources.filter(source=>document.body.dataset.lab==="sources"?source.width>0:!source.width);
             for(const source of available){const option=document.createElement("option");option.value=source.id;option.textContent=`${source.name} (${source.kind})`;$("lab-registered").append(option);}

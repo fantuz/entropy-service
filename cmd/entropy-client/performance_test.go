@@ -46,6 +46,48 @@ func TestAdaptiveControllerBoundsHysteresisAndRecovery(t *testing.T) {
 	}
 }
 
+func TestAdaptiveControllerBackoffAndRecoverySteps(t *testing.T) {
+	p := newAcquisitionPacing(&config.Config{Refresh: 100 * time.Millisecond, AdaptiveMaxInterval: time.Second})
+	p.observe(100 * time.Millisecond)
+
+	if got := time.Duration(p.interval.Load()); got != 133*time.Millisecond {
+		t.Fatalf("expected 33%% backoff, got %s", got)
+	}
+
+	// A larger demand must be handled immediately rather than requiring many
+	// percentage steps; the independent ceiling still bounds the result.
+	p.observe(time.Second)
+
+	if got := time.Duration(p.interval.Load()); got != 350*time.Millisecond {
+		t.Fatalf("did not jump to measured demand with headroom: %s", got)
+	}
+
+	p.interval.Store(int64(800 * time.Millisecond))
+
+	p.smoothed = 100 * time.Millisecond
+	for range 7 {
+		p.observe(100 * time.Millisecond)
+	}
+
+	if got := time.Duration(p.interval.Load()); got != 800*time.Millisecond {
+		t.Fatalf("recovered without eight healthy observations: %s", got)
+	}
+
+	p.observe(100 * time.Millisecond)
+
+	if got := time.Duration(p.interval.Load()); got != 400*time.Millisecond {
+		t.Fatalf("expected 50%% interval recovery, got %s", got)
+	}
+
+	for range 16 {
+		p.observe(100 * time.Millisecond)
+	}
+
+	if got := time.Duration(p.interval.Load()); got != 125*time.Millisecond {
+		t.Fatalf("recovery went below measured demand or did not converge: %s", got)
+	}
+}
+
 func TestPerformanceRatesUseAllFramesAndMeasuredDuration(t *testing.T) {
 	began := time.Now()
 	cfg := &config.Config{Refresh: 100 * time.Millisecond, Slice: 1 << 20}
@@ -124,5 +166,46 @@ func TestAdaptiveFailureRemainsFailureAndCancelInterruptsLongPacing(t *testing.T
 		}
 	case <-time.After(time.Second):
 		t.Fatal("adaptive wait blocked cancellation")
+	}
+}
+
+func TestConfiguredPullTimeoutAndCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(80 * time.Millisecond)
+
+		_, _ = w.Write(bytes.Repeat([]byte{1}, 64))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{Refresh: time.Millisecond, Slice: 64, RequestTimeout: 20 * time.Millisecond}
+
+	frames := make(chan client.StreamFrame, 1)
+	if err := pullFramesWithPacing(t.Context(), cfg, server.URL, frames, nil); err == nil || !strings.Contains(err.Error(), "deadline exceeded") {
+		t.Fatalf("short request budget did not fail: %v", err)
+	}
+
+	cfg.RequestTimeout = time.Second
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- pullFramesWithPacing(ctx, cfg, server.URL, frames, nil) }()
+
+	select {
+	case frame := <-frames:
+		if len(frame.Data) != 64 {
+			t.Fatalf("configured timeout changed payload: %d", len(frame.Data))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("larger explicit budget did not permit the response")
+	}
+
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("larger request budget delayed cancellation")
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -66,7 +67,12 @@ func labCatalogHandler(registry *lab.Registry, budget *webSocketBudget, maxBytes
 			MaxBytes       int              `json:"max_bytes"`
 			MaxConnections int              `json:"max_connections"`
 			Active         int              `json:"active"`
-		}{Sources: sources, Allowed: labAllowed(r, allowRemote, allowedHosts...), MaxBytes: maxBytes, MaxConnections: usage.MaxConnections, Active: usage.Active})
+			Platform       string           `json:"platform"`
+			SourceKinds    []string         `json:"source_kinds"`
+		}{
+			Sources: sources, Allowed: labAllowed(r, allowRemote, allowedHosts...), MaxBytes: maxBytes, MaxConnections: usage.MaxConnections, Active: usage.Active,
+			Platform: runtime.GOOS, SourceKinds: lab.SupportedKinds(),
+		})
 	}
 }
 
