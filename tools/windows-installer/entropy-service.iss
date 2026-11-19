@@ -41,8 +41,8 @@ LicenseFile={#BundleDir}\LICENSE
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Tasks]
-Name: "server-service"; Description: "Install entropy-server as a Windows Service"; GroupDescription: "Optional machine-wide service:"; Flags: unchecked checkablealone; Check: IsAdminInstallMode
-Name: "server-service\start"; Description: "Start the server service after installation"; Flags: unchecked dontinheritcheck; Check: IsAdminInstallMode
+Name: "server_service"; Description: "Install entropy-server as a Windows Service"; GroupDescription: "Optional machine-wide service:"; Flags: unchecked checkablealone; Check: IsAdminInstallMode
+Name: "server_service\start"; Description: "Start the server service after installation"; Flags: unchecked dontinheritcheck; Check: IsAdminInstallMode
 
 [Icons]
 Name: "{group}\Entropy Server"; Filename: "{app}\runtime\bin\pythonw.exe"; Parameters: "-I -B ""{app}\app\gui_bootstrap.py"" --view server"; WorkingDir: "{app}"

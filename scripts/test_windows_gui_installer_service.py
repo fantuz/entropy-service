@@ -66,7 +66,7 @@ def qualify_machine_service(installer, artifacts):
     try:
         # A service must never be registered from an administrative setup that
         # targets user-writable storage, even when that setup can create SCM entries.
-        setup("unsafe-service-location", "server-service", artifacts / "unsafe program", expected=1)
+        setup("unsafe-service-location", "server_service", artifacts / "unsafe program", expected=1)
         assert not registry_present(winreg.HKEY_LOCAL_MACHINE, SERVICE_KEY)
         setup("machine-default-off")
         assert registry_present(winreg.HKEY_LOCAL_MACHINE, UNINSTALL_KEY)
@@ -77,7 +77,7 @@ def qualify_machine_service(installer, artifacts):
                        check=True, timeout=120)
         wait_for(lambda: not registry_present(winreg.HKEY_LOCAL_MACHINE, UNINSTALL_KEY), "desktop-only machine uninstall")
         assert not installation.exists(), "Fresh service fixture must start in a new protected directory"
-        setup("service-selected", "server-service")
+        setup("service-selected", "server_service")
         assert "State: stopped" in service("status"), "Installation started an unchecked Start task"
         retained = installation / "operator export.bin"
         retained.write_bytes(b"retain unowned machine-install export")
@@ -86,7 +86,7 @@ def qualify_machine_service(installer, artifacts):
             assert winreg.QueryValueEx(key, "Start")[0] == 2
             assert winreg.QueryValueEx(key, "DelayedAutoStart")[0] == 1
             assert str(binary).lower() in winreg.QueryValueEx(key, "ImagePath")[0].lower()
-        setup("start-task-selected", "server-service,server-service\\start")
+        setup("start-task-selected", "server_service,server_service\\start")
         wait_for(live, "installed optional service HTTP listener")
         certificate = (state / "cert.pem").read_bytes()
         assert certificate.startswith(b"-----BEGIN CERTIFICATE-----")
@@ -101,7 +101,7 @@ def qualify_machine_service(installer, artifacts):
             secure.close()
         service_state = state / "installer-fixture.txt"
         service_state.write_text("retain service state across upgrades and uninstall")
-        setup("managed-service-upgrade", "server-service")
+        setup("managed-service-upgrade", "server_service")
         assert "State: running" in service("status")
         wait_for(live, "running service resumed after upgrade")
         assert (state / "cert.pem").read_bytes() == certificate

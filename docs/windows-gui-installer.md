@@ -95,8 +95,8 @@ installer-owned registration and retains all state, certificates and logs.
 To switch from an existing current-user installation to all-users mode, uninstall
 the program first; retain its separate user data. Cross-mode replacement is
 rejected before copying/removing files. Silent automation uses `/CURRENTUSER`
-for desktop-only or `/ALLUSERS /TASKS=server-service` for explicit service
-registration. Add `server-service\start` to the task list only to start it now.
+for desktop-only or `/ALLUSERS /TASKS=server_service` for explicit service
+registration. Add `server_service\start` to the task list only to start it now.
 
 ### Upgrade or reinstall
 

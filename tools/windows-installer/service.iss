@@ -11,7 +11,7 @@ end;
 
 function WindowsServiceSelected: Boolean;
 begin
-  Result := IsAdminInstallMode and WizardIsTaskSelected('server-service');
+  Result := IsAdminInstallMode and WizardIsTaskSelected('server_service');
 end;
 
 function WindowsServiceMenu: Boolean;
@@ -152,7 +152,7 @@ begin
     end;
     if not RegWriteDWordValue(HKLM64, UninstallKey, 'EntropyServiceManaged', 1) then
       RaiseException('Could not record Windows Service ownership for safe upgrades and uninstall.');
-    if ServiceWasRunning or WizardIsTaskSelected('server-service\start') then
+    if ServiceWasRunning or WizardIsTaskSelected('server_service\start') then
       if not RunManagedService('start', State) then
         RaiseException('The service is installed but could not start. Check ports 8080/8443, certificates and logs under ProgramData\entropy-service.');
     ServiceStopped := False;
