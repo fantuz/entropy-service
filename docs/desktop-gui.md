@@ -37,6 +37,28 @@ browser uses its own certificate trust configuration.
 These Linux captures use an OS-seeded local server and a WebSocket client.
 Select an image for the full-size view.
 
+## Resize the information panels
+
+Two horizontal handles divide the main workspace into three adjustable areas.
+Drag a handle up or down to give a section more room:
+
+| View | Top | Middle | Bottom |
+| --- | --- | --- | --- |
+| Server | Live health | Requested startup settings | Local server logs |
+| Client | Connection and performance | Waterfall and palette | Startup settings and diagnostics |
+
+Smaller sections scroll rather than removing information. Start/Stop, Options
+and the ordinary status area remain outside the dividers. GTK's standard
+keyboard handling also lets you focus a divider with **F8** and adjust it with
+the arrow keys.
+
+Positions are remembered while that window is open, including when the client
+enters and leaves fullscreen with **F11** or **Escape**. Fullscreen retains the
+summary indicators and waterfall; normal panels and their positions return on
+exit. A new window starts with the default layout. Resizing changes display
+space, not acquisition settings, sample contents or the bounded waterfall
+history. Adjustable panels require a GUI revision newer than v2.8.0.
+
 ## Source and executable versions
 
 The editable Options and local-server controls described here require the
