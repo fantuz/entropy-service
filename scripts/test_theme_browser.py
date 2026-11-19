@@ -82,15 +82,30 @@ def main():
                                     "cards => cards.map(card => Math.round(card.getBoundingClientRect().top))")
                                 assert len(rows) == 5 and len(set(rows)) == (1 if width == 1440 else 5), rows
                                 if width == 1440:
-                                    for section, remainder in [("explore-title", 2), ("http-title", 1)]:
-                                        boxes = page.locator(f"section[aria-labelledby='{section}'] .grid > .card").evaluate_all(
-                                            "cards => cards.map(card => {const r=card.getBoundingClientRect(); return {x:r.x,right:r.right,top:r.top}})")
-                                        if remainder == 2:
-                                            assert abs(boxes[-2]["x"] - boxes[0]["x"]) < 1, boxes
-                                            assert abs(boxes[-1]["right"] - boxes[2]["right"]) < 1, boxes
-                                            assert boxes[-2]["top"] == boxes[-1]["top"], boxes
-                                        else:
-                                            assert abs(boxes[-1]["x"] - boxes[1]["x"]) < 1, boxes
+                                    for section in ("explore-title", "http-title"):
+                                        # Exercise both incomplete-row layouts independently
+                                        # of how many navigation cards the homepage offers.
+                                        grid = page.locator(f"section[aria-labelledby='{section}'] .grid")
+                                        for remainder in (0, 1, 2):
+                                            boxes = grid.evaluate("""(grid,remainder)=>{
+                                              const removed=[],count=grid.children.length;
+                                              try{
+                                                for(let n=(count-remainder)%3;n>0;n--){
+                                                  removed.unshift(grid.lastElementChild);grid.lastElementChild.remove();
+                                                }
+                                                return [...grid.children].map(card=>{const r=card.getBoundingClientRect();return {x:r.x,right:r.right,top:r.top};});
+                                              }finally{grid.append(...removed);}
+                                            }""", remainder)
+                                            assert len(boxes) % 3 == remainder
+                                            if remainder == 2:
+                                                assert abs(boxes[-2]["x"] - boxes[0]["x"]) < 1, boxes
+                                                assert abs(boxes[-1]["right"] - boxes[2]["right"]) < 1, boxes
+                                                assert boxes[-2]["top"] == boxes[-1]["top"], boxes
+                                            elif remainder == 1:
+                                                assert abs(boxes[-1]["x"] - boxes[1]["x"]) < 1, boxes
+                                            else:
+                                                assert abs(boxes[-3]["x"] - boxes[0]["x"]) < 1, boxes
+                                                assert abs(boxes[-1]["right"] - boxes[2]["right"]) < 1, boxes
                             if path in ["/api-sources.html", "/api-socket.html"]:
                                 assert "Experimental" not in page.title()
                                 help_sections = page.locator(".lab-help details")

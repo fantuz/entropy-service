@@ -100,9 +100,11 @@ can be selected with `--server-binary /usr/bin/entropy-server` or
 
 ### Download the GUI source and the executables
 
-Obtain the updated GUI source as explained under
-[Source and executable versions](#source-and-executable-versions), and download
-the [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.2.0/entropy-service_2.2.0_windows_amd64.zip).
+For v2.8.0, download the matching
+[source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.8.0.zip)
+and [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.8.0/entropy-service_2.8.0_windows_amd64.zip).
+Use matching source and executable versions as explained under
+[Source and executable versions](#source-and-executable-versions).
 Extract the entire source archive. Its directory must contain `go.mod`, `cmd`,
 `docs/desktop-gui.md` and `tools`. You can rename it to `entropy-service-gui`
 to match the examples below.
@@ -144,7 +146,9 @@ pacman -S --needed mingw-w64-ucrt-x86_64-gtk4 \
 ```
 
 Use UCRT64's `python` for the GUI commands so its GTK DLLs and bindings match.
-A [bundled Windows GUI installer](windows-gui-installer.md) is available through the dedicated installer workflow. The manual source setup below remains supported.
+A [bundled Windows GUI installer](windows-gui-installer.md) is available from the
+[latest release](https://github.com/fantuz/entropy-service/releases/latest) and
+includes these dependencies. The manual source setup below remains supported.
 
 ### Start the server GUI
 

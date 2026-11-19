@@ -108,6 +108,11 @@ jobs:
             /tmp/entropy-browser-tests/bin/python -m playwright install-deps ${{ matrix.browser }}
           /tmp/entropy-browser-tests/bin/python -m playwright install ${{ matrix.browser }}
         if: needs.plan.outputs.mode == 'full'
+      - name: Test browser-local certificate generation and Go TLS interoperability
+        env:
+          DEBUG: pw:browser
+        run: /tmp/entropy-browser-tests/bin/python scripts/test_certificates_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/certificates
+        if: needs.plan.outputs.mode == 'full'
       - name: Provide a virtual audio output for headless Firefox
         if: needs.plan.outputs.mode == 'full' && (matrix.browser == 'firefox')
         run: |

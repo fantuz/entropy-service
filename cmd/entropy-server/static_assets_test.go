@@ -97,7 +97,7 @@ func TestStaticAssetsEmbeddedRepresentations(t *testing.T) {
 	}
 
 	handler := makeStaticHandler(t, root)
-	for _, name := range []string{"/", "/theme.css", "/api-stream.html", "/locales/fr.json", "/locales/el.json"} {
+	for _, name := range []string{"/", "/theme.css", "/api-stream.html", "/api-certificates.html", "/certificate-crypto.js", "/locales/fr.json", "/locales/el.json"} {
 		t.Run(name, func(t *testing.T) {
 			identity := staticRequest(t, handler, http.MethodGet, name, nil)
 			compressed := staticRequest(t, handler, http.MethodGet, name, map[string]string{"Accept-Encoding": "gzip"})
@@ -126,6 +126,40 @@ func TestStaticAssetsEmbeddedRepresentations(t *testing.T) {
 	script := staticRequest(t, handler, http.MethodGet, "/i18n.js", nil)
 	if strings.Contains(script.Body.String(), uiCatalogVersionPlaceholder) || !strings.Contains(script.Body.String(), handler.catalogVersion) {
 		t.Fatal("served script must contain the real catalog version, not its build placeholder")
+	}
+}
+
+func TestCertificatePageOriginPolicy(t *testing.T) {
+	root, err := fs.Sub(webFS, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler := makeStaticHandler(t, root)
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		response := staticRequest(t, handler, method, "/api-certificates.html", map[string]string{"Accept-Encoding": "gzip"})
+		if response.Code != http.StatusOK {
+			t.Fatalf("certificate page %s: HTTP %d", method, response.Code)
+		}
+
+		for _, directive := range []string{"script-src 'self'", "connect-src 'self'", "frame-ancestors 'none'", "form-action 'none'", "base-uri 'none'"} {
+			if !strings.Contains(response.Header().Get("Content-Security-Policy"), directive) {
+				t.Errorf("certificate page is missing CSP directive %q", directive)
+			}
+		}
+
+		for name, want := range map[string]string{"X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff"} {
+			if got := response.Header().Get(name); got != want {
+				t.Errorf("%s = %q, want %q", name, got, want)
+			}
+		}
+	}
+
+	// The existing gallery intentionally frames other pages; its embedding
+	// policy must not change when the key-generation page is introduced.
+	response := staticRequest(t, handler, http.MethodGet, "/api-gallery.html", nil)
+	if response.Header().Get("X-Frame-Options") != "" || response.Header().Get("Content-Security-Policy") != "" {
+		t.Fatal("certificate policy escaped to an unrelated page")
 	}
 }
 

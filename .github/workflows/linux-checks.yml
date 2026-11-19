@@ -127,6 +127,9 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_mark_ui_text.py'
           node scripts/test-ui-i18n.mjs
         if: inputs.suite == 'quality'
+      - name: Test certificate key mixing and X.509 format
+        run: node scripts/test-certificate-crypto.mjs
+        if: inputs.suite == 'quality'
       - name: Check shared analysis markup
         run: node scripts/render-analysis-pages.mjs --check
         if: inputs.suite == 'quality'

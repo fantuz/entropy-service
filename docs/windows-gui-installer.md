@@ -5,15 +5,15 @@ utilities and private Python/GTK libraries. Users do not need Go, Python, MSYS2
 or a separately downloaded source archive. It is separate from the small portable
 CLI ZIP and does not change Linux packaging.
 
-Published v2.7.0 uses current-user installation. Repository builds containing
-the service options also support an all-users installation and optional server
-service, described below. The service option is off by default.
+From v2.8.0, setup supports current-user desktop installation or an all-users
+installation with an optional server service, described below. The service
+option is off by default. The v2.7.0 installer supports current-user installation.
 
 Starting with **v2.4.1**, download the Windows GUI setup `.exe` from the
 [latest release](https://github.com/fantuz/entropy-service/releases/latest).
-For example, v2.7.0 provides `entropy-service_2.7.0_windows_amd64_gui_setup.exe`.
+For example, v2.8.0 provides `entropy-service_2.8.0_windows_amd64_gui_setup.exe`.
 Download `checksums.txt` from the same release to verify it. The versioned
-`entropy-service_2.7.0_windows_amd64_gui_sources.zip` contains matching runtime
+`entropy-service_2.8.0_windows_amd64_gui_sources.zip` contains matching runtime
 sources; it is a separate download and is not needed to run the application.
 
 The replacement notice and Finish-page Start Menu option described below are

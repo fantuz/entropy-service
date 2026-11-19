@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title data-i18n="Entropy Service — Certificate tools">Entropy Service — Certificate tools</title>
+  <script src="/i18n.js"></script>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/certificates.css">
+  <script src="/certificate-crypto.js" defer></script>
+  <script src="/certificates.js" defer></script>
+</head>
+<body class="page-home page-certificates">
+  <nav class="site-toolbar" aria-label="Site and appearance" data-i18n-aria-label="Site and appearance">
+    <a href="/">Entropy Service</a>
+    <button type="button" data-theme-toggle hidden><span><span data-i18n="Dark mode">Dark mode</span></span></button>
+  </nav>
+  <div class="wrap">
+    <header>
+      <h1><span data-i18n="Certificate tools">Certificate tools</span></h1>
+      <p class="lede"><span data-i18n="Create self-signed TLS certificates for local services, LAB connections and client testing. Private keys are generated in this browser and never uploaded.">Create self-signed TLS certificates for local services, LAB connections and client testing. Private keys are generated in this browser and never uploaded.</span></p>
+      <p class="note"><span data-i18n="Experimental tool: use trusted HTTPS or localhost. Downloading a certificate does not install it or establish trust.">Experimental tool: use trusted HTTPS or localhost. Downloading a certificate does not install it or establish trust.</span></p>
+    </header>
+    <main>
+      <section class="panel" aria-labelledby="certificate-settings-title">
+        <h2 id="certificate-settings-title"><span data-i18n="Certificate settings">Certificate settings</span></h2>
+        <form id="certificate-form">
+          <div class="certificate-fields">
+            <label><span><span data-i18n="Common name">Common name</span></span><input id="certificate-common-name" maxlength="64" value="Entropy Service" autocomplete="off"></label>
+            <label><span><span data-i18n="Validity (days)">Validity (days)</span></span><input id="certificate-days" type="number" min="1" max="365" value="7" required></label>
+            <label class="certificate-wide"><span><span data-i18n="DNS names and IP addresses">DNS names and IP addresses</span></span><textarea id="certificate-names" rows="3" maxlength="8192" spellcheck="false" required>localhost
+127.0.0.1
+::1</textarea></label>
+          </div>
+          <p class="note"><span data-i18n="Provide 1–32 DNS names or IP addresses, separated by lines or commas. These subject alternative names are used for hostname verification. Key type: ECDSA P-256 with SHA-256.">Provide 1–32 DNS names or IP addresses, separated by lines or commas. These subject alternative names are used for hostname verification. Key type: ECDSA P-256 with SHA-256.</span></p>
+          <div class="certificate-actions">
+            <button id="certificate-generate" type="submit"><span data-i18n="Generate certificate">Generate certificate</span></button>
+            <button id="certificate-cancel" type="button" disabled><span data-i18n="Cancel generation">Cancel generation</span></button>
+            <button id="certificate-clear" type="button"><span data-i18n="Clear generated material">Clear generated material</span></button>
+          </div>
+        </form>
+        <p id="certificate-status" role="status" aria-live="polite"><span data-i18n="Ready. Generation requests 64 bytes from this server and mixes them with independent browser CSPRNG bytes.">Ready. Generation requests 64 bytes from this server and mixes them with independent browser CSPRNG bytes.</span></p>
+      </section>
+      <section id="certificate-result" class="panel" aria-labelledby="certificate-result-title" hidden>
+        <h2 id="certificate-result-title"><span data-i18n="Generated certificate">Generated certificate</span></h2>
+        <dl class="certificate-summary">
+          <dt><span data-i18n="Names">Names</span></dt><dd id="certificate-result-names"></dd>
+          <dt><span data-i18n="Valid from (UTC)">Valid from (UTC)</span></dt><dd id="certificate-result-before"></dd>
+          <dt><span data-i18n="Valid until (UTC)">Valid until (UTC)</span></dt><dd id="certificate-result-after"></dd>
+          <dt><span data-i18n="SHA-256 fingerprint">SHA-256 fingerprint</span></dt><dd id="certificate-result-fingerprint"></dd>
+        </dl>
+        <label><span><span data-i18n="Public certificate (PEM)">Public certificate (PEM)</span></span><textarea id="certificate-pem" rows="9" readonly spellcheck="false" autocomplete="off"></textarea></label>
+        <div class="certificate-actions">
+          <button id="certificate-download-public" type="button"><span data-i18n="Download certificate">Download certificate</span></button>
+          <button id="certificate-download-key" type="button"><span data-i18n="Download private key">Download private key</span></button>
+        </div>
+        <p class="note"><span data-i18n="The private key download is unencrypted PKCS#8 PEM. Keep it private and restrict file permissions. Clearing or leaving this page drops key references; downloaded files remain on disk.">The private key download is unencrypted PKCS#8 PEM. Keep it private and restrict file permissions. Clearing or leaving this page drops key references; downloaded files remain on disk.</span></p>
+      </section>
+      <section class="panel" aria-labelledby="certificate-deployment-title">
+        <h2 id="certificate-deployment-title"><span data-i18n="Use with entropy-server">Use with entropy-server</span></h2>
+        <p><span data-i18n="Download both files and configure the server through its startup options. This page does not replace the running server&#x27;s identity.">Download both files and configure the server through its startup options. This page does not replace the running server&#x27;s identity.</span></p>
+        <pre><code>entropy-server -cert-file=entropy-server-cert.pem -key-file=entropy-server-key.pem</code></pre>
+        <p><span data-i18n="For Linux, restrict the key before use:">For Linux, restrict the key before use:</span></p>
+        <pre><code>chmod 600 entropy-server-key.pem</code></pre>
+        <details><summary><span data-i18n="Choices and limitations">Choices and limitations</span></summary>
+          <p><span data-i18n="HKDF-SHA-256 combines 64 server bytes with 64 browser CSPRNG bytes. Native Web Crypto imports the P-256 key and signs the certificate. Server bytes follow the configured source and reseed policy.">HKDF-SHA-256 combines 64 server bytes with 64 browser CSPRNG bytes. Native Web Crypto imports the P-256 key and signs the certificate. Server bytes follow the configured source and reseed policy.</span></p>
+          <p><span data-i18n="This self-signed server certificate is not a certificate authority or a publicly trusted identity. Use organizational PKI or ACME for public trust. You remain responsible for deployment, expiry and renewal.">This self-signed server certificate is not a certificate authority or a publicly trusted identity. Use organizational PKI or ACME for public trust. You remain responsible for deployment, expiry and renewal.</span></p>
+          <p><span data-i18n="Trust the page&#x27;s origin and browser. Scripts from a compromised server can steal private keys. Downloads do not guarantee secure file permissions or memory erasure. Service accounts need permission to read their certificate and key.">Trust the page&#x27;s origin and browser. Scripts from a compromised server can steal private keys. Downloads do not guarantee secure file permissions or memory erasure. Service accounts need permission to read their certificate and key.</span></p>
+        </details>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -5,7 +5,7 @@ The console and GTK GUI remain available. This adds native service commands to
 the portable executable; it does not bundle GTK, an MSI installer or signing.
 Use a build containing these commands; v2.3.1 predates service support.
 
-The [bundled GUI installer](windows-gui-installer.md#optional-windows-server-service)
+From v2.8.0, the [bundled GUI installer](windows-gui-installer.md#optional-windows-server-service)
 can also register a service through its explicit all-users task. Its current-user
 mode stays desktop-only. Installer-managed registrations are stopped/resumed
 during upgrades and removed during program uninstall; state and certificates

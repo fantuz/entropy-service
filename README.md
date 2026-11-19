@@ -136,7 +136,7 @@ docker pull ghcr.io/fantuz/entropy-client:latest
 
 Browse the [server container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-service)
 and [client container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-client)
-versions. Pin `:v2.7.0`, or an image digest, for controlled deployments; `:edge`
+versions. Pin `:v2.8.0`, or an image digest, for controlled deployments; `:edge`
 follows validated development builds. The container guide includes the one-time
 existing-release publication, readiness probes, SBOMs and maintenance policy.
 
@@ -274,6 +274,8 @@ For public deployments, use your organization's CA/ACME certificate lifecycle. T
 ```
 
 See [certificate generation, startup provisioning and migration](docs/tls-certificates.md) and [SECURITY.md](SECURITY.md). Missing or invalid TLS files fail startup; certificates are never silently generated or replaced.
+
+The [Certificate tools page](docs/certificate-bootstrap-design.md) at `/api-certificates.html` creates self-signed P-256 server certificates for local services, LAB peers and TLS client tests. It combines server bytes with independent browser randomness, keeps private keys in the browser and offers separate PEM downloads. Use trusted HTTPS or localhost; self-signed output requires explicit client trust and is never installed automatically.
 
 Use `https://` and `wss://` for remote consumers. Configure authentication and access controls at the deployment boundary: the service has no built-in client authentication. The WebSocket upgrader uses Gorilla's default same-host browser origin policy; requests without an `Origin` header may still be admitted. Origin validation is not authentication. HTTP/2 is not enabled in the current listener setup.
 

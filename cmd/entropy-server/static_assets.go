@@ -223,6 +223,15 @@ func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if name == "api-certificates.html" {
+		// Key generation runs only in this document. Keep it out of frames and
+		// restrict its scripts and network requests to this trusted origin.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+	}
+
 	// Even an identity-only asset can reject identity;q=0, so this request
 	// header influences both successful representations and 406 responses.
 	w.Header().Add("Vary", "Accept-Encoding")

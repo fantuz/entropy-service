@@ -1,0 +1,14 @@
+.page-certificates .certificate-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.page-certificates label { display: block; text-align: left; }
+.page-certificates label > span { display: block; margin-bottom: .4rem; }
+.page-certificates input, .page-certificates textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: .7rem; background: var(--surface-raised); }
+.page-certificates textarea { resize: vertical; }
+.page-certificates .certificate-wide { grid-column: 1 / -1; }
+.page-certificates .certificate-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+.page-certificates .certificate-summary { display: grid; grid-template-columns: minmax(10rem, auto) 1fr; gap: .5rem 1rem; }
+.page-certificates .certificate-summary dd { margin: 0; overflow-wrap: anywhere; }
+.page-certificates #certificate-pem { font-size: .8rem; }
+.page-certificates #certificate-status[data-state="error"] { color: var(--error); }
+@media (max-width: 700px) {
+  .page-certificates .certificate-fields, .page-certificates .certificate-summary { grid-template-columns: 1fr; }
+}
