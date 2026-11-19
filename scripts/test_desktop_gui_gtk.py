@@ -261,8 +261,10 @@ def entropy_server(binary):
     port = free_port()
     with tempfile.TemporaryFile() as log:
         source = ["-device="+OS_SOURCE] if WINDOWS or DARWIN else ["-device=/dev/urandom", "-require-device=true"]
+        # This fixture checks GUI/payload acceptance, not the throughput of a
+        # particular backend on a shared runner. Backend correctness is tested separately.
         child = spawn_owned([str(binary), f"-http=127.0.0.1:{port}",
-                             "-enable-https=false", *source], stdout=log, stderr=subprocess.STDOUT)
+                             "-enable-https=false", "-drbg=chacha20", *source], stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 8
             while True:

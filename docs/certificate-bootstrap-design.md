@@ -5,6 +5,17 @@ loopback HTTP. The page creates a self-signed TLS server certificate and matchin
 ECDSA P-256 private key locally in the browser. It does not install files, change
 trust stores, restart services or issue publicly trusted certificates.
 
+For an initial local Linux bootstrap, run:
+
+```sh
+entropy-server -device=/dev/urandom -enable-https=false -http=127.0.0.1:8080
+```
+
+Open `http://127.0.0.1:8080/api-certificates.html` on that machine. On macOS use
+`-device=macos-csprng`; on Windows use `entropy-server.exe` with
+`-device=windows-csprng`. Stop this initial process before starting the same
+instance with the downloaded certificate/key pair and HTTPS enabled.
+
 ## Uses and workflow
 
 Useful applications include local HTTPS bootstrap, separate identities for LAB
@@ -54,8 +65,24 @@ HKDF-SHA-256 uses the local bytes as input key material, server bytes as salt
 and versioned domain labels for the private scalar and certificate serial.
 Rejection sampling selects `1 <= d < n` for P-256; it rejects zero and the group
 order, with a bounded failure limit. Native Web Crypto imports the private key,
-derives the public point and signs using ECDSA/SHA-256. JavaScript formats the
-bounded X.509 DER structure; it does not implement elliptic-curve arithmetic.
+performs private scalar multiplication and signs using ECDSA/SHA-256. JavaScript
+formats the bounded X.509 DER structure.
+
+Providers such as Chromium can export the public point directly from the
+imported key. Firefox can import the same scalar but cannot export that point
+from its minimal PKCS#8 representation. The compatibility path imports the same
+scalar for native ECDH against the fixed standard P-256 generator. Its result is
+the **public** x coordinate. SEC1 point decompression uses JavaScript modular
+arithmetic on that public coordinate to obtain the two possible public points.
+A native ECDSA proof over a fixed domain-separated message must verify for
+exactly one candidate. The key is then re-imported with the verified complete
+public point. Zero or ambiguous matches fail generation.
+
+No private scalar is converted to a JavaScript BigInt or multiplied in
+JavaScript. This public-only compatibility step avoids adding a separate
+implementation of secret scalar multiplication or a large WebAssembly runtime.
+It requires native HKDF, P-256 ECDH and ECDSA support; provider behaviour is
+qualified by actual browser tests rather than inferred from compilation.
 
 The standard Web Crypto `generateKey` API cannot accept an external seed.
 Importing a derived scalar allows the server contribution to affect the actual
@@ -111,7 +138,9 @@ remote private-key distribution require separate designs.
 
 Focused Node tests independently parse X.509, verify self-signatures and key
 matching, check SANs/usage/validity, force scalar rejection boundaries and
-confirm that changing either entropy input changes the public key. Browser CI
+confirm that changing either entropy input changes the public key. The public
+point compatibility path is forced in focused tests, including both possible
+y signs and rejection of invalid or ambiguous provider results. Browser CI
 runs Chromium and Firefox with real native crypto, explicit public/key downloads,
 failed and malformed entropy, cancellation, navigation cleanup, private-data
 network/storage checks and light/dark responsive layouts. Downloaded private

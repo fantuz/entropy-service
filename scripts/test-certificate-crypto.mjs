@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
-import {X509Certificate, createPrivateKey, webcrypto} from "node:crypto";
+import {X509Certificate, createECDH, createPrivateKey, webcrypto} from "node:crypto";
 
 const require = createRequire(import.meta.url);
 const {generate, pem, names} = require("../cmd/entropy-server/web/certificate-crypto.js");
@@ -71,6 +71,100 @@ attempts = 0;
 await assert.rejects(generate(seed, {now, crypto: rejectionProvider(true)}), /valid P-256 key/);
 assert.equal(attempts, 128, "A failing provider must not loop indefinitely");
 
+// NSS can import a private scalar without exposing its public point as JWK.
+// Force that genuine provider limitation while keeping ECDH, ECDSA, ASN.1
+// parsing and certificate verification with Node's independent native crypto.
+function compatibleProvider(base = provider(7), overrides = {}) {
+    const calls = {privateJwk: 0, ecdh: 0, verify: 0, privateEncodings: [], localBytes: []};
+    const crypto = {getRandomValues(bytes) {
+        calls.localBytes.push(bytes);
+        return base.getRandomValues(bytes);
+    }, subtle: new Proxy(base.subtle, {
+        get(target, property) {
+            if (property === "exportKey") return (format, key) => {
+                if (format === "jwk" && key.type === "private") {
+                    calls.privateJwk++;
+                    throw new DOMException("The provider does not expose a private EC public point", "OperationError");
+                }
+                return target.exportKey(format, key);
+            };
+            if (property === "importKey") return (format, bytes, ...args) => {
+                if (format === "pkcs8") calls.privateEncodings.push(bytes);
+                return target.importKey(format, bytes, ...args);
+            };
+            if (property === "deriveBits") return (algorithm, key, bits) => {
+                if (algorithm.name === "ECDH") {
+                    calls.ecdh++;
+                    if (overrides.ecdh) return overrides.ecdh(algorithm, key, bits);
+                }
+                return target.deriveBits(algorithm, key, bits);
+            };
+            if (property === "verify") return (...args) => {
+                calls.verify++;
+                return overrides.verify ? overrides.verify(...args) : target.verify(...args);
+            };
+            const value = Reflect.get(target, property);
+            return typeof value === "function" ? value.bind(target) : value;
+        },
+    })};
+    return {crypto, calls};
+}
+function cleared(calls) {
+    assert.ok(calls.privateEncodings.length > 0);
+    assert.ok(calls.privateEncodings.every(bytes => bytes.every(value => value === 0)),
+        "Minimal and complete private DER encodings must be cleared after native import");
+    assert.ok(calls.localBytes.every(bytes => bytes.every(value => value === 0)), "Local seed buffers must be cleared");
+}
+const compatibility = compatibleProvider();
+const portable = await certificate(seed, 7, {crypto: compatibility.crypto});
+assert.deepEqual(portable.publicKey, first.publicKey, "Provider compatibility must preserve the exact mixed-entropy key");
+assert.equal(compatibility.calls.privateJwk, 1, "A missing public point must take one bounded compatibility path");
+assert.equal(compatibility.calls.ecdh, 1, "Private scalar multiplication must use native ECDH");
+assert.equal(compatibility.calls.verify, 2, "Both public-point candidates must be verified");
+cleared(compatibility.calls);
+assert.notDeepEqual((await certificate(new Uint8Array(64).fill(43), 7,
+    {crypto: compatibleProvider().crypto})).publicKey, portable.publicKey,
+    "The compatibility path must retain the server contribution");
+assert.notDeepEqual((await certificate(seed, 8,
+    {crypto: compatibleProvider(provider(8)).crypto})).publicKey, portable.publicKey,
+    "The compatibility path must retain the independent local contribution");
+
+for (const scalar of [Buffer.from("01".padStart(64, "0"), "hex"),
+    Buffer.from((BigInt("0x" + order.toString("hex")) - 1n).toString(16), "hex")]) {
+    const fixed = {getRandomValues: bytes => bytes.fill(7), subtle: new Proxy(webcrypto.subtle, {
+        get(target, property) {
+            if (property === "deriveBits") return (algorithm, key, bits) =>
+                algorithm.name === "HKDF" && new TextDecoder().decode(algorithm.info).startsWith("entropy-service:certificate-key:")
+                    ? Promise.resolve(Uint8Array.from(scalar).buffer) : target.deriveBits(algorithm, key, bits);
+            const value = Reflect.get(target, property);
+            return typeof value === "function" ? value.bind(target) : value;
+        },
+    })};
+    const compat = compatibleProvider(fixed);
+    const result = await certificate(seed, 7, {crypto: compat.crypto});
+    const reference = createECDH("prime256v1");
+    reference.setPrivateKey(scalar);
+    const jwk = result.parsed.publicKey.export({format: "jwk"});
+    const point = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, "base64url"), Buffer.from(jwk.y, "base64url")]);
+    assert.deepEqual(point, reference.getPublicKey(), "Scalars one and n-1 must recover opposite generator points");
+    assert.equal(compat.calls.verify, 2);
+    cleared(compat.calls);
+}
+for (const overrides of [
+    {verify: async () => false}, {verify: async () => true},
+    {ecdh: async () => { throw new Error("Native ECDH unavailable"); }},
+    {ecdh: async () => new ArrayBuffer(31)}, {ecdh: async () => new Uint8Array(32).fill(255).buffer},
+    // x=1 is inside the field, but x^3-3x+b is not a quadratic residue.
+    {ecdh: async () => { const x = new Uint8Array(32); x[31] = 1; return x.buffer; }},
+]) {
+    const compat = compatibleProvider(provider(7), overrides);
+    await assert.rejects(generate(seed, {now, crypto: compat.crypto}), /required native P-256 key format/,
+        "Failed or ambiguous native public-point recovery must fail closed");
+    assert.equal(compat.calls.ecdh, 1, "A provider failure must not retry indefinitely or select another key");
+    if (overrides.verify) assert.equal(compat.calls.verify, 2, "Neither zero nor two proof matches may be accepted");
+    cleared(compat.calls);
+}
+
 const international = await certificate(seed, 7, {commonName: "Service α", days: 365,
     names: ["*.example.org", "bücher.example", "2001:db8::7", "::ffff:192.0.2.4", "LOCALHOST.", "localhost"]});
 assert.equal(international.parsed.checkHost("api.example.org"), "*.example.org");
@@ -98,4 +192,4 @@ await assert.rejects(generate(seed, {crypto: {}}), /Web Crypto/);
 await assert.rejects(generate(seed, {crypto: {getRandomValues: bytes => bytes.fill(1),
     subtle: {...webcrypto.subtle, importKey: () => Promise.reject(new Error("Provider unavailable"))}}}));
 assert.throws(() => pem("PUBLIC KEY", new Uint8Array(8)), /Unsupported PEM/);
-console.log("Certificate crypto: native key mixing, X.509 signatures, SANs, validity, usage and input bounds passed");
+console.log("Certificate crypto: mixed-entropy native keys, Firefox compatibility, X.509 signatures, SANs, validity, usage and bounds passed");

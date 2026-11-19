@@ -137,6 +137,14 @@ def run(browser, base, binary, directory, artifacts):
         assert COOKIE + "=present" in page.evaluate("document.cookie"), "Cookie-omission fixture was not installed"
         expect(page.locator("#certificate-result")).to_be_hidden()
         assert not any("/v1/data/random" in row.url for row in requests), "Generation must require a user action"
+        if browser.browser_type.name == "chromium":
+            # Firefox naturally needs public-point recovery. Force that same
+            # path through Chromium's independent native provider as well.
+            page.evaluate("""()=>{const original=crypto.subtle.exportKey.bind(crypto.subtle);
+              window.restoreCertificateExport=()=>{crypto.subtle.exportKey=original;};
+              crypto.subtle.exportKey=(format,key)=>{
+                if(format==='jwk'&&key.type==='private')throw new DOMException('Public point unavailable','OperationError');
+                return original(format,key);};}""")
         page.locator("#certificate-generate").click()
         expect(page.locator("#certificate-result")).to_be_visible(timeout=15000)
         expect(page.locator("#certificate-status")).to_have_attribute("data-state", "ready")
@@ -154,7 +162,13 @@ def run(browser, base, binary, directory, artifacts):
             else:
                 key = content
                 assert b"-----BEGIN PRIVATE KEY-----" in key and len(key) < 4096
+        private_body = "".join(line for line in key.decode().splitlines() if not line.startswith("-----"))
+        private_tokens = (key.decode(), private_body)
+        immediate = page.content() + page.evaluate("()=>JSON.stringify([Object.entries(localStorage),Object.entries(sessionStorage),document.cookie])")
+        assert all(token not in immediate for token in private_tokens), "Private export was persisted in the page"
         go_tls(binary, directory, certificate, key)
+        if browser.browser_type.name == "chromium":
+            page.evaluate("()=>{restoreCertificateExport();}")
         # Changing the interface language must not regenerate a key or translate
         # its public certificate, names or fingerprint.
         french = json.loads((ROOT / "cmd/entropy-server/web/locales/fr.json").read_text())
@@ -195,9 +209,10 @@ def run(browser, base, binary, directory, artifacts):
           window.originalCertificateDigest=crypto.subtle.digest.bind(crypto.subtle);
           crypto.subtle.digest=async(...args)=>{const result=await originalCertificateDigest(...args);
             document.documentElement.dataset.certificateTestDigest='done';return result;};
+          let blocked=false;
           crypto.subtle.sign=async(...args)=>{const result=await originalCertificateSign(...args);
-            await new Promise(resolve=>{window.releaseCertificateTest=resolve;
-              document.documentElement.dataset.certificateTestSigning='ready';});return result;};}""")
+            if(!blocked){blocked=true;await new Promise(resolve=>{window.releaseCertificateTest=resolve;
+              document.documentElement.dataset.certificateTestSigning='ready';});}return result;};}""")
         page.locator("#certificate-generate").click()
         expect(page.locator("html")).to_have_attribute("data-certificate-test-signing", "ready")
         page.locator("#certificate-cancel").click()
@@ -262,8 +277,6 @@ def run(browser, base, binary, directory, artifacts):
             else:
                 assert not parsed.query, "Unexpected private data in an asset URL"
             assert not parsed.fragment, "Unexpected request URL fragment"
-        private_body = "".join(line for line in key.decode().splitlines() if not line.startswith("-----"))
-        private_tokens = (key.decode(), private_body)
         visible_and_persisted = page.content() + json.dumps(storage) + page.evaluate(
             "()=>document.cookie+[...document.querySelectorAll('input,textarea')].map(node=>node.value).join('\\n')")
         network_values = "\n".join(unquote(row.url) + json.dumps(row.all_headers()) for row in requests)
@@ -271,6 +284,7 @@ def run(browser, base, binary, directory, artifacts):
         assert not errors, errors
         (artifacts / "qualification.json").write_text(json.dumps({
             "native_p256_import": True, "self_signed_go_tls": True,
+            "native_compatibility_forced_in_chromium": browser.browser_type.name == "chromium",
             "go_self_signature_usage_and_sans": True, "missing_san_rejected": True,
             "private_upload_requests": 0, "entropy_cookie_omitted": True,
             "security_headers": True, "language_preserves_certificate": True,
