@@ -99,6 +99,7 @@ def go_tls(binary, directory, certificate, key):
             f"-cert-file={cert_path}", f"-key-file={key_path}"))
         try:
             trust = ssl.create_default_context(cadata=certificate.decode())
+            trust.minimum_version = ssl.TLSVersion.TLSv1_3
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=trust))
             with opener.open(f"https://127.0.0.1:{port}/live", timeout=5) as response:
                 assert response.status == 200
