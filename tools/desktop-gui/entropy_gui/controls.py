@@ -73,6 +73,7 @@ class SettingsWindow(Gtk.Window):
 
         self.fields_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         scroller = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
+        self.scroller = scroller
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroller.set_child(self.fields_box)
         body.append(scroller)
@@ -192,6 +193,17 @@ class SettingsWindow(Gtk.Window):
             control.set_selected(self._choices[name].index(value))
         else:
             control.set_text(str(value))
+
+    def reveal_control(self, name):
+        """Focus and scroll a shortcut target after GTK has allocated its page."""
+        control = self.controls[name]
+        valid, bounds = control.compute_bounds(self.fields_box)
+        adjustment = self.scroller.get_vadjustment()
+        if not valid or control.get_height() <= 0 or adjustment.get_page_size() <= 0:
+            return False
+        control.grab_focus()
+        adjustment.clamp_page(max(0, bounds.get_y() - 12), bounds.get_y() + bounds.get_height() + 12)
+        return True
 
     def candidate_arguments(self):
         values = {name: self.get_value(name) for name in self.controls}

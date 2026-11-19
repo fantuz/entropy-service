@@ -46,6 +46,48 @@ func TestAdaptiveControllerBoundsHysteresisAndRecovery(t *testing.T) {
 	}
 }
 
+func TestAdaptiveControllerBackoffAndRecoverySteps(t *testing.T) {
+	p := newAcquisitionPacing(&config.Config{Refresh: 100 * time.Millisecond, AdaptiveMaxInterval: time.Second})
+	p.observe(100 * time.Millisecond)
+
+	if got := time.Duration(p.interval.Load()); got != 133*time.Millisecond {
+		t.Fatalf("expected 33%% backoff, got %s", got)
+	}
+
+	// A larger demand must be handled immediately rather than requiring many
+	// percentage steps; the independent ceiling still bounds the result.
+	p.observe(time.Second)
+
+	if got := time.Duration(p.interval.Load()); got != 350*time.Millisecond {
+		t.Fatalf("did not jump to measured demand with headroom: %s", got)
+	}
+
+	p.interval.Store(int64(800 * time.Millisecond))
+
+	p.smoothed = 100 * time.Millisecond
+	for range 7 {
+		p.observe(100 * time.Millisecond)
+	}
+
+	if got := time.Duration(p.interval.Load()); got != 800*time.Millisecond {
+		t.Fatalf("recovered without eight healthy observations: %s", got)
+	}
+
+	p.observe(100 * time.Millisecond)
+
+	if got := time.Duration(p.interval.Load()); got != 400*time.Millisecond {
+		t.Fatalf("expected 50%% interval recovery, got %s", got)
+	}
+
+	for range 16 {
+		p.observe(100 * time.Millisecond)
+	}
+
+	if got := time.Duration(p.interval.Load()); got != 125*time.Millisecond {
+		t.Fatalf("recovery went below measured demand or did not converge: %s", got)
+	}
+}
+
 func TestPerformanceRatesUseAllFramesAndMeasuredDuration(t *testing.T) {
 	began := time.Now()
 	cfg := &config.Config{Refresh: 100 * time.Millisecond, Slice: 1 << 20}

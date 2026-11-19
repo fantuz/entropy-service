@@ -429,6 +429,21 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
             assert not any(_listener_open(port) for port in (http_port, https_port, 6060))
 
         try:
+            assert window.feature_checks["lab"].get_active(), "LAB is not advertised as available"
+            for button, field in ((window.debug_options_button, "debug"), (window.lab_options_button, "lab-sources")):
+                button.emit("clicked")
+                wait_for(context, lambda: window.settings_window is not None and window.settings_window.get_mapped(),
+                         "dedicated LAB/debug startup controls")
+                assert field in window.settings_window.controls
+                editor = window.settings_window
+                def target_visible():
+                    valid, bounds = editor.controls[field].compute_bounds(editor.fields_box)
+                    scroll = editor.scroller.get_vadjustment()
+                    return valid and bounds.get_height() > 0 and scroll.get_value() <= bounds.get_y() and \
+                        bounds.get_y() + bounds.get_height() <= scroll.get_value() + scroll.get_page_size()
+                wait_for(context, target_visible, "shortcut target scrolled into the visible viewport")
+                window.settings_window.close()
+                wait_for(context, lambda: window.settings_window is None, "startup shortcut editor close")
             window.feature_options_button.emit("clicked")
             wait_for(context, lambda: window.settings_window is not None and window.settings_window.get_mapped(),
                      "Edit features opens the native options editor")

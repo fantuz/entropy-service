@@ -928,5 +928,6 @@
   "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list.": "{title} · записей: {entries} · {bits} бит/слово при равномерном выборе. Подмножество орфографического словаря; не отобрано как список для парольных фраз.",
   "{{waterfall_title}}": "{{waterfall_title}}",
   "← All endpoints": "← Все эндпоинты",
-  "← Back to all endpoints": "← Назад ко всем эндпоинтам"
+  "← Back to all endpoints": "← Назад ко всем эндпоинтам",
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Сервер: {platform}. Типы источников LAB: {kinds}. Для сетевых камер также требуется FFmpeg."
 }

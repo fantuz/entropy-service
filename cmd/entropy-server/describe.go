@@ -46,6 +46,7 @@ type serverDescriptionFeatures struct {
 	RDRANDMix             bool `json:"rdrand_mix"`
 	Debug                 bool `json:"debug"`
 	Cookie                bool `json:"cookie"`
+	Lab                   bool `json:"lab"`
 	LabRegistry           bool `json:"lab_registry"`
 	LabAllowRemote        bool `json:"lab_allow_remote"`
 	CertificateConfigured bool `json:"certificate_configured"`
@@ -67,7 +68,7 @@ func writeServerDescription(out io.Writer, cfg *config.Config) error {
 		Features: serverDescriptionFeatures{
 			HTTPS: cfg.EnableHTTPS, RequireDevice: cfg.RequireDevice,
 			CPUMix: cfg.MixCPU, RDRANDMix: cfg.MixRDRAND, Debug: cfg.ShowDebug,
-			Cookie: cfg.WantsCookie, LabRegistry: cfg.LabSources != "",
+			Cookie: cfg.WantsCookie, Lab: true, LabRegistry: cfg.LabSources != "",
 			LabAllowRemote:        cfg.LabAllowRemote,
 			CertificateConfigured: cfg.CertFile != "" && cfg.KeyFile != "",
 		},

@@ -26,6 +26,8 @@
 
 **Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
+Software Architecture, Build pipelines and Security Audit by Massimiliano Fantuzzi. [MIT License](LICENSE).
+
 Entropy Service is a Go server and command-line client for generating, distributing, and inspecting pseudorandom data from a cryptographic deterministic random bit generator (DRBG). It supports hardware or operating-system seed sources; ChaCha20 and AES-256-CTR backends; bounded HTTP and WebSocket delivery; and a browser-based showcase for experiments and diagnostics.
 
 <p align="center">

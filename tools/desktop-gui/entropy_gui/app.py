@@ -39,7 +39,7 @@ LABELS = {
     "output_kind": "Export destination type", "output_limit_bytes": "Export limit (bytes)",
     "https": "HTTPS requested", "require_device": "Require requested device", "cpu_mix": "CPU mixing",
     "rdrand_mix": "RDRAND mixing", "debug": "Debug listener", "cookie": "Cookie preferences",
-    "lab_registry": "LAB source registry", "certificate_configured": "Certificate paths supplied",
+    "lab": "LAB browser and network tools", "lab_registry": "LAB registry configured", "certificate_configured": "Certificate paths supplied",
     "headless": "Headless CLI", "writeout": "Mix into system random device", "output": "Raw export",
     "report_waterfall": "Sample-prefix reporting", "report": "Statistics reporting",
     "waterfall": "Terminal waterfall", "matrix": "Terminal matrix",
@@ -291,11 +291,14 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.settings_window.present()
         if focus_field in self.settings_window.controls:
             editor = self.settings_window
+            attempts = 0
             def focus_option():
-                if editor.get_visible():
-                    editor.controls[focus_field].grab_focus()
-                return GLib.SOURCE_REMOVE
-            GLib.idle_add(focus_option)
+                nonlocal attempts
+                attempts += 1
+                if not editor.get_visible() or attempts >= 50:
+                    return GLib.SOURCE_REMOVE
+                return GLib.SOURCE_REMOVE if editor.reveal_control(focus_field) else GLib.SOURCE_CONTINUE
+            GLib.timeout_add(20, focus_option)
 
     def _settings_closed(self, _window):
         self.settings_window = None
@@ -527,6 +530,17 @@ class DesktopWindow(Gtk.ApplicationWindow):
         feature_box.append(feature_heading)
         feature_box.append(features)
         if self.role == "server":
+            shortcuts = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=2,
+                                    min_children_per_line=1, column_spacing=6, row_spacing=6)
+            self.lab_options_button = Gtk.Button(label="LAB sources…")
+            self.debug_options_button = Gtk.Button(label="Debug / pprof…")
+            for button, field in ((self.lab_options_button, "lab-sources"), (self.debug_options_button, "debug")):
+                button.connect("clicked", lambda _button, field=field: self.open_options(field))
+                self.options_button.bind_property("sensitive", button, "sensitive", GObject.BindingFlags.SYNC_CREATE)
+                shortcuts.append(button)
+            feature_box.append(shortcuts)
+            feature_box.append(label("LAB browser tools are available on Linux, Windows and macOS. A registry adds server-side sources.", "gui-subtitle"))
+            feature_box.append(label("Enable Debug / pprof for the next Start to listen at http://127.0.0.1:6060/debug/pprof/ on the server host.", "gui-subtitle"))
             self.settings_box.append(self.server_log_expander)
             self.settings_box.append(feature_box)
             if not self.health_url_entry.get_text().strip():

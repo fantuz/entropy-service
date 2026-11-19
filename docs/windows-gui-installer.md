@@ -66,6 +66,16 @@ administrator-installed service.
 
 ### Upgrade or reinstall
 
+The replacement setup shows a preparation message while checking running
+programs, then an animated progress bar and a count of removed files/folders
+while removing the previous private runtime. This phase can take time because
+Python/GTK contains many small files. It is cleanup inside the new setup, not
+a separate uninstaller. Normal installation progress follows when copying the
+replacement files. Cleanup continues to process Windows messages, and a file
+that cannot be removed produces an actionable error rather than an indefinite
+blank wait. The installed `LICENSE` is unchanged; its wizard display reflows
+paragraphs to avoid isolated final words.
+
 Setup detects previous bundled installations for the current user through the
 existing Windows Apps registration. It adds one **Existing installation found**
 page showing the installed version, setup version and installation folder.
@@ -119,6 +129,10 @@ revision, stages Python/GTK and complete source packages, and compiles an Inno
 Setup 6 per-user installer. A small native fixture first exercises the actual
 upgrade notice, cancellation, old-file cleanup, location guard, reinstall,
 uninstall and Explorer handoff using the production installer recipe. The full
+test also installs the checksum-pinned **released v2.6.0** setup and upgrades it
+with the candidate installer, checking visible/responsive cleanup and retained
+user exports. Fixtures additionally cover read-only old files and a directory
+junction whose external target must survive cleanup. The full
 bundle then installs into a path containing spaces, removes
 access to the original MSYS2 UCRT64 prefix, strips build-time search paths and
 uses the installed runtime to exercise both GTK views, acquisition/fullscreen,
@@ -136,6 +150,9 @@ checksums and exact version/source identity, and publishes the same bytes with
 the native CLI packages and one combined checksum manifest. No installer rebuild
 occurs during publication. Signing and Windows ARM64 qualification remain separate
 steps. Native Windows x64 is the supported installer target.
+
+For the cross-platform LAB controls and the **Debug / pprof…** startup option,
+see [LAB platform support](lab-platforms.md).
 
 ## Recovering a publication failure
 

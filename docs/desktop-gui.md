@@ -522,3 +522,14 @@ average received FPS, receive/analysis/output timings and pacing status. Collaps
 it to give the waterfall more space. Fullscreen hides it. Older CLI reports can
 omit this information. See [the shared CLI/GUI guide](client-capabilities-performance.md)
 for interpretation, compatibility and the HTTP-only adaptive policy.
+
+## LAB and profiling startup controls
+
+In the server view, **LAB sources…** and **Debug / pprof…** open the matching
+startup controls directly. Validate and apply, then Start a new local run.
+The LAB tools are available on Linux, Windows and macOS even without a registry;
+**LAB registry configured** describes only the optional registry file.
+Profiling, when enabled, listens separately on
+`http://127.0.0.1:6060/debug/pprof/` on the server host.
+See [LAB platform support](lab-platforms.md) for the source matrix, prerequisites
+and CLI equivalents.

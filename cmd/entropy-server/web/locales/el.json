@@ -928,5 +928,6 @@
   "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list.": "{title} · {entries} καταχωρίσεις · {bits} bit/λέξη με ομοιόμορφη επιλογή. Υποσύνολο ορθογραφικού λεξικού· δεν είναι επιμελημένη λίστα συνθηματικών φράσεων.",
   "{{waterfall_title}}": "{{waterfall_title}}",
   "← All endpoints": "← Όλα τα σημεία πρόσβασης",
-  "← Back to all endpoints": "← Επιστροφή σε όλα τα σημεία πρόσβασης"
+  "← Back to all endpoints": "← Επιστροφή σε όλα τα σημεία πρόσβασης",
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Διακομιστής: {platform}. Τύποι πηγών LAB: {kinds}. Οι κάμερες δικτύου απαιτούν επίσης FFmpeg."
 }

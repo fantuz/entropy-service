@@ -928,5 +928,6 @@
   "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list.": "{title} · {entries} entrées · {bits} bits/mot avec une sélection uniforme. Sous-ensemble d’un dictionnaire orthographique ; non sélectionné comme liste pour phrases de passe.",
   "{{waterfall_title}}": "{{waterfall_title}}",
   "← All endpoints": "← Tous les points d’accès",
-  "← Back to all endpoints": "← Retour à tous les points d’accès"
+  "← Back to all endpoints": "← Retour à tous les points d’accès",
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Serveur : {platform}. Types de sources LAB : {kinds}. Les caméras réseau nécessitent aussi FFmpeg."
 }

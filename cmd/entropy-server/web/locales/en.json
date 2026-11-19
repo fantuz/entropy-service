@@ -928,5 +928,6 @@
   "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list.": "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list.",
   "Entropy Service — Random Words": "Entropy Service — Random Words",
   "Random Words": "Random Words",
-  "{list} · {size} entries · {bits} bits/word of uniform selection": "{list} · {size} entries · {bits} bits/word of uniform selection"
+  "{list} · {size} entries · {bits} bits/word of uniform selection": "{list} · {size} entries · {bits} bits/word of uniform selection",
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg."
 }

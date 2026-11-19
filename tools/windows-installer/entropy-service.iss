@@ -27,6 +27,7 @@ OutputBaseFilename=entropy-service_{#AppVersion}_windows_amd64_gui_setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+DisableWelcomePage=no
 DisableProgramGroupPage=yes
 UsePreviousAppDir=yes
 DisableDirPage=auto
@@ -37,14 +38,6 @@ LicenseFile={#BundleDir}\LICENSE
 
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-[InstallDelete]
-; These are installer-owned program trees, never the user's separate data directory.
-Type: filesandordirs; Name: "{app}\app"; Check: ReplacingInstallation
-Type: filesandordirs; Name: "{app}\bin"; Check: ReplacingInstallation
-Type: filesandordirs; Name: "{app}\runtime"; Check: ReplacingInstallation
-Type: filesandordirs; Name: "{app}\runtime-package-metadata"; Check: ReplacingInstallation
-Type: filesandordirs; Name: "{app}\docs"; Check: ReplacingInstallation
 
 [Icons]
 Name: "{group}\Entropy Server"; Filename: "{app}\runtime\bin\pythonw.exe"; Parameters: "-I -B ""{app}\app\gui_bootstrap.py"" --view server"; WorkingDir: "{app}"
@@ -57,9 +50,15 @@ Filename: "{group}"; Description: "Open the Entropy Service Start Menu folder"; 
 [Code]
 const
   UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{C5571481-03FA-4233-92FC-B0EF9BA76A44}_is1';
+  ProjectCredit = 'Software Architecture, Build pipelines and Security Audit by Massimiliano Fantuzzi';
 var
   PreviousDirectory: String;
   ReplacementPage: TOutputMsgWizardPage;
+  UpgradeProgress: TOutputMarqueeProgressWizardPage;
+  RemovedEntries: Integer;
+
+function SetOwnedAttributes(const Filename: String; Attributes: LongWord): Boolean;
+  external 'SetFileAttributesW@kernel32.dll stdcall';
 
 function ReplacingInstallation: Boolean;
 begin
@@ -68,8 +67,21 @@ end;
 
 procedure InitializeWizard;
 var
-  PreviousVersion: String;
+  PreviousVersion, LicenseText: String;
 begin
+  WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
+    ProjectCredit + #13#10#13#10 + 'Released under the MIT License, shown on the next page.';
+  { Reflow display paragraphs rather than retaining the plain-text file's
+    printing-width line breaks. The installed LICENSE is kept verbatim. }
+  LicenseText := WizardForm.LicenseMemo.Lines.Text;
+  StringChangeEx(LicenseText, #13#10#13#10, #1, True);
+  StringChangeEx(LicenseText, #13#10, ' ', True);
+  StringChangeEx(LicenseText, #1, #13#10#13#10, True);
+  StringChangeEx(LicenseText, 'THE SOFTWARE', 'THE' + #160 + 'SOFTWARE', True);
+  WizardForm.LicenseMemo.WordWrap := True;
+  WizardForm.LicenseMemo.Lines.Text := ProjectCredit + #13#10#13#10 + Trim(LicenseText);
+  UpgradeProgress := CreateOutputMarqueeProgressPage('Upgrading Entropy Service',
+    'Preparing the existing installation for replacement.');
   if not RegQueryStringValue(HKCU64, UninstallKey, 'Inno Setup: App Path', PreviousDirectory) then
     PreviousDirectory := '';
   if not RegQueryStringValue(HKCU64, UninstallKey, 'DisplayVersion', PreviousVersion) then
@@ -82,6 +94,76 @@ begin
     'Setup will replace the installed application and its bundled runtime. No separate uninstall is needed.' + #13#10#13#10 +
     'Close Entropy Service windows before continuing. Custom files inside the program and runtime folders will be removed. ' +
     'User data, certificates and exports outside those folders are kept. Cancel now to leave the current installation unchanged.');
+end;
+
+procedure CleanupOwnedEntry(const Filename: String);
+var
+  Entry, Child: TFindRec;
+  Attributes: LongWord;
+  Removed: Boolean;
+begin
+  if not FindFirst(Filename, Entry) then
+  begin
+    if FileExists(Filename) or DirExists(Filename) then
+      RaiseException('Cannot inspect the previous installation: ' + Filename);
+    Exit;
+  end;
+  Attributes := Entry.Attributes;
+  FindClose(Entry);
+  { Never follow directory junctions/symlinks outside the installer-owned
+    trees. Remove only the link, just as Inno's built-in DelTree does. }
+  if ((Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0) and
+     ((Attributes and FILE_ATTRIBUTE_REPARSE_POINT) = 0) then
+    if FindFirst(AddBackslash(Filename) + '*', Child) then
+    begin
+      try
+        repeat
+          if (Child.Name <> '.') and (Child.Name <> '..') then
+            CleanupOwnedEntry(AddBackslash(Filename) + Child.Name);
+        until not FindNext(Child);
+      finally
+        FindClose(Child);
+      end;
+    end;
+  if ((Attributes and FILE_ATTRIBUTE_READONLY) <> 0) and
+     ((Attributes and FILE_ATTRIBUTE_REPARSE_POINT) = 0) then
+    if not SetOwnedAttributes(Filename, Attributes and not FILE_ATTRIBUTE_READONLY) then
+      RaiseException('Cannot prepare an old application file for replacement: ' + Filename);
+  if (Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+    Removed := RemoveDir(Filename)
+  else
+    Removed := DeleteFile(Filename);
+  if not Removed then
+    RaiseException('Cannot remove an old application file: ' + Filename + #13#10 +
+      'Close applications using this installation, check file permissions, then run setup again.');
+  RemovedEntries := RemovedEntries + 1;
+  if RemovedEntries mod 32 = 0 then
+    UpgradeProgress.SetText('Removing previous application and runtime files...',
+      IntToStr(RemovedEntries) + ' files and folders removed');
+  UpgradeProgress.Animate;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssInstall) and ReplacingInstallation then
+  begin
+    RemovedEntries := 0;
+    UpgradeProgress.SetText('Removing previous application and runtime files...',
+      'The private Python/GTK runtime contains many small files. Please keep setup open.');
+    UpgradeProgress.Show;
+    try
+      Log('Upgrade cleanup started');
+      CleanupOwnedEntry(ExpandConstant('{app}\app'));
+      CleanupOwnedEntry(ExpandConstant('{app}\bin'));
+      CleanupOwnedEntry(ExpandConstant('{app}\runtime'));
+      CleanupOwnedEntry(ExpandConstant('{app}\runtime-package-metadata'));
+      CleanupOwnedEntry(ExpandConstant('{app}\docs'));
+      Log('Upgrade cleanup completed: ' + IntToStr(RemovedEntries) + ' files and folders removed');
+    finally
+      UpgradeProgress.Hide;
+    end;
+    WizardForm.StatusLabel.Caption := 'Installing the replacement application and runtime...';
+  end;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -135,6 +217,7 @@ begin
       process merely because it maps one of the runtime DLLs. }
     for Index := 0 to Processes.Count - 1 do
     begin
+      UpgradeProgress.Animate;
       RuntimeProcess := Processes.ItemIndex(Index);
       if PrivateProcessKind(RuntimeProcess) = 1 then
       begin
@@ -144,6 +227,7 @@ begin
     end;
     for Index := 0 to Processes.Count - 1 do
     begin
+      UpgradeProgress.Animate;
       RuntimeProcess := Processes.ItemIndex(Index);
       if PrivateProcessKind(RuntimeProcess) = 2 then
       begin
@@ -173,5 +257,14 @@ begin
     Result := 'An Entropy Service installation already exists at ' + PreviousDirectory + '.' + #13#10 +
       'Upgrade in that location, or uninstall it through Windows Apps before choosing a different folder.';
   if (Result = '') and ReplacingInstallation then
-    Result := ClosePrivateRuntimeHelpers;
+  begin
+    UpgradeProgress.SetText('Checking running applications and private runtime helpers...',
+      'No files have been removed. Close Entropy Service windows if setup asks.');
+    UpgradeProgress.Show;
+    try
+      Result := ClosePrivateRuntimeHelpers;
+    finally
+      UpgradeProgress.Hide;
+    end;
+  end;
 end;
