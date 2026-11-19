@@ -217,6 +217,10 @@ def run(browser, base, binary, directory, artifacts):
             page.locator("#certificate-cancel").click()
         expect(page.locator("#certificate-result")).to_be_hidden()
         page.unroute(ENTROPY)
+        for route in held:
+            # The browser already aborted the network request. Finish only the
+            # Playwright handler, without attempting a second protocol abort.
+            route.fallback()
         # A stalled body must hit the documented acquisition deadline without
         # waiting ten wall-clock seconds or creating a fallback key.
         held.clear()
@@ -231,6 +235,8 @@ def run(browser, base, binary, directory, artifacts):
         expect(page.locator("#certificate-result")).to_be_hidden()
         expect(page.locator("#certificate-generate")).to_be_enabled()
         page.unroute(ENTROPY)
+        for route in held:
+            route.fallback()
         page.clock.resume()
         # Navigating away and back with a live key cannot restore it.
         page.locator("#certificate-generate").click()
