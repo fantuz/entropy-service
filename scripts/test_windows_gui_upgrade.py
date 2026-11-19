@@ -137,8 +137,11 @@ class Wizard:
         bars = [handle for handle, _ in controls if "progress" in self.class_name(handle).lower()]
         assert bars, "Upgrade cleanup has no visible progress bar"
         result = ctypes.c_size_t()
-        assert self.user.SendMessageTimeoutW(self.handle, 0, 0, 0, 2, 1000, ctypes.byref(result)), \
-            "Setup stopped processing Windows messages during cleanup"
+        ctypes.set_last_error(0)
+        # Allow a slow filesystem/antivirus operation while retaining Windows'
+        # five-second hung-window bound; every completed entry pumps messages.
+        assert self.user.SendMessageTimeoutW(self.handle, 0, 0, 0, 2, 5000, ctypes.byref(result)), \
+            "Setup did not respond within five seconds during cleanup; Windows error " + str(ctypes.get_last_error())
         observations.append("responsive cleanup with a visible progress bar")
 
     def capture(self, destination):
@@ -168,10 +171,12 @@ class Wizard:
         if artifacts:
             self.capture(artifacts / "installer-welcome.png")
         self.advance(lambda: self.button("I accept the agreement") is not None)
-        licenses = [text for _, text in self.controls() if 'THE SOFTWARE IS PROVIDED "AS IS"' in text.replace('\xa0', ' ')]
+        licenses = [(handle, text) for handle, text in self.controls()
+                    if 'THE SOFTWARE IS PROVIDED "AS IS"' in text.replace('\xa0', ' ')]
         assert len(licenses) == 1, "MIT license is not displayed: " + repr([
             (self.class_name(handle), text[:2000]) for handle, text in self.controls()])
-        text = licenses[0].replace('\xa0', ' ')
+        handle, text = licenses[0]
+        text = text.replace('\xa0', ' ')
         assert PROJECT_CREDIT in text
         expected = (ROOT / "LICENSE").read_text()
         assert " ".join(expected.split()) in " ".join(text.split()), "License wording changed"
@@ -179,6 +184,9 @@ class Wizard:
             "The MIT license retains orphaned hard line breaks"
         if artifacts:
             self.capture(artifacts / "installer-license.png")
+            result = ctypes.c_size_t()
+            assert self.user.SendMessageTimeoutW(handle, 0x0115, 7, 0, 2, 1000, ctypes.byref(result))  # WM_VSCROLL / SB_BOTTOM.
+            self.capture(artifacts / "installer-license-bottom.png")
 
     def cancel(self, process):
         self.click(self.button("Cancel"))
