@@ -103,6 +103,7 @@ The certificate has a positive random serial, DNS/IPv4/IPv6 SANs, a critical
 non-CA basic constraint, critical digital-signature key usage and server-auth
 extended key usage. Validity includes five minutes of backward clock allowance.
 It is a server leaf, not a CA; it cannot provide a general signing service.
+These TLS identities are not Windows installer code-signing certificates.
 
 The server contribution follows the configured backend/source policy. It is not
 an independent fresh hardware measurement for every byte. Browser randomness

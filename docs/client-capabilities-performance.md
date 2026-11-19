@@ -1,6 +1,8 @@
 # Client capability discovery and performance
 
-Available from v2.7.0. Use matching server/client binaries and GUI source or the
+Capability discovery, performance reporting and initial adaptive pacing are
+available from v2.7.0. The request-timeout option and +33%/−50% adaptive steps
+require v2.8.0 or newer. Use matching server/client binaries and GUI source or the
 bundled Windows installer. Linux, Windows and macOS share the same flags and
 desktop controls.
 

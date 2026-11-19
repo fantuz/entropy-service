@@ -5,6 +5,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | Document | Contents |
 | --- | --- |
 | [LAB across Linux, Windows and macOS](lab-platforms.md) | Always-available LAB tools, registry types, browser/device/FFmpeg requirements and the GUI pprof startup control. |
+| [v2.8.0 release notes](releases/v2.8.0.md) | Browser-local certificate tools, optional Windows service setup, responsive upgrades and refined desktop/acquisition controls. |
 | [v2.7.0 release notes](releases/v2.7.0.md) | Client capabilities, performance view, adaptive pull and desktop/installer controls. |
 | [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
 | [GUI validation and load observations](desktop-gui-validation.md) | Large-frame investigation, failure diagnostics, native settings checks and remaining manual coverage. |
