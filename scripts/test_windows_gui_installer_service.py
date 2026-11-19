@@ -76,7 +76,10 @@ def qualify_machine_service(installer, artifacts):
         subprocess.run([str(installation / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
                        check=True, timeout=120)
         wait_for(lambda: not registry_present(winreg.HKEY_LOCAL_MACHINE, UNINSTALL_KEY), "desktop-only machine uninstall")
-        assert not installation.exists(), "Fresh service fixture must start in a new protected directory"
+        # Inno's detached uninstaller helper removes the original executable
+        # and its parent after the process/registry teardown has completed.
+        # Do not race that cleanup or remove the fresh-directory safety check.
+        wait_for(lambda: not installation.exists(), "desktop-only uninstaller self-cleanup", timeout=30)
         setup("service-selected", "server_service")
         assert "State: stopped" in service("status"), "Installation started an unchecked Start task"
         retained = installation / "operator export.bin"

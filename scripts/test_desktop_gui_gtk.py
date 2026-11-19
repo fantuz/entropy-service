@@ -255,14 +255,17 @@ def close_during_inspection(context, application_type):
 
 
 @contextlib.contextmanager
-def entropy_server(binary):
+def entropy_server(binary, log_path=None):
     from entropy_gui.process import spawn_owned, stop_owned
 
     port = free_port()
     with tempfile.TemporaryFile() as log:
         source = ["-device="+OS_SOURCE] if WINDOWS or DARWIN else ["-device=/dev/urandom", "-require-device=true"]
+        # The GUI maximum-payload contract uses the same software backend on
+        # all hosts; native backend/default selection has separate Go/CLI tests.
+        # Do not turn this functional check into an AES throughput requirement.
         child = spawn_owned([str(binary), f"-http=127.0.0.1:{port}",
-                             "-enable-https=false", *source], stdout=log, stderr=subprocess.STDOUT)
+                             "-enable-https=false", "-drbg=chacha20", *source], stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 8
             while True:
@@ -284,6 +287,9 @@ def entropy_server(binary):
             yield port
         finally:
             stop_owned(child)
+            if log_path is not None:
+                log.seek(0)
+                log_path.write_bytes(log.read())
 
 
 class HealthFixture(http.server.BaseHTTPRequestHandler):
@@ -821,7 +827,7 @@ def main():
     try:
         if args.fullscreen_outcome:
             result = {"platform": sys.platform}
-            with entropy_server(args.server.resolve()) as port:
+            with entropy_server(args.server.resolve(), args.artifacts / "fixture-server.log") as port:
                 result["fullscreen_outcomes"] = fullscreen_outcomes(context, DesktopApplication, Gdk,
                     args.client.resolve(), port, outcomes=(args.fullscreen_outcome,))
         else:
@@ -832,7 +838,7 @@ def main():
             result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
             print("Native GTK: inspection_close", flush=True)
             result["inspection_close"] = close_during_inspection(context, DesktopApplication)
-            with entropy_server(args.server.resolve()) as port:
+            with entropy_server(args.server.resolve(), args.artifacts / "fixture-server.log") as port:
                 from test_desktop_gui_controls_gtk import controls_and_owned_server
                 print("Native GTK: controls", flush=True)
                 result["controls"] = controls_and_owned_server(context, DesktopApplication, args.server.resolve(),
