@@ -111,11 +111,41 @@ def capture_window(context, window, path):
 
 
 def resize_native_window(window, width, height):
-    """Request a real user-style resize, including an already mapped Win32 HWND."""
+    """Resize this owned window, including mapped Win32 and AppKit windows."""
     assert window.get_resizable(), "The GUI must permit user window resizing"
     window.unfullscreen()
     window.unmaximize()
     window.set_default_size(width, height)
+    if DARWIN:
+        # Changing GTK's default is not a reliable resize of a mapped AppKit
+        # window. Use its public content-size API on GTK's own native window,
+        # on the main thread, without another GUI package or process lookup.
+        import ctypes
+        import gi
+
+        assert threading.current_thread() is threading.main_thread()
+        gi.require_version("GdkMacos", "4.0")
+        from gi.repository import GdkMacos
+
+        surface = window.get_surface()
+        assert surface is not None and window.get_mapped(), "No owned macOS surface to resize"
+        native = GdkMacos.MacosSurface.get_native_window(surface)
+        assert native, "GTK did not expose its owned native window"
+        objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        selector = objc.sel_registerName(b"setContentSize:")
+        responds = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p,
+                                   ctypes.c_void_p)(("objc_msgSend", objc))
+        assert responds(native, objc.sel_registerName(b"respondsToSelector:"), selector)
+
+        class ContentSize(ctypes.Structure):
+            _fields_ = [("width", ctypes.c_double), ("height", ctypes.c_double)]
+
+        resize = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p,
+                                  ContentSize)(("objc_msgSend", objc))
+        resize(native, selector, ContentSize(width, height))
+        return "macos-owned-window-content-size"
     if not WINDOWS:
         return "gtk-default-size"
 
@@ -184,6 +214,15 @@ def divider_layout(context, window):
     splitters = (window.workspace_paned, window.details_paned)
     original_size = (window.get_width(), window.get_height())
     original_positions = [paned.get_position() for paned in splitters]
+    workspace_height = window.workspace_paned.get_height()
+    if workspace_height >= 300:
+        # Catch queued outer/inner allocation races before test movements can
+        # repair them: initial settings/waterfall must have useful space.
+        middle_share = .25 if window.role == "server" else .45
+        wait_for(context, lambda: window.middle_pane.get_height() >= workspace_height * middle_share
+                 and 0 < window.bottom_pane.get_height() <= workspace_height * .25,
+                 window.role + " useful default panel allocations")
+    initial_heights = [pane.get_height() for pane in (window.top_pane, window.middle_pane, window.bottom_pane)]
     evidence = []
     for name, paned in zip(("workspace", "details"), splitters):
         assert isinstance(paned, Gtk.Paned)
@@ -289,10 +328,18 @@ def divider_layout(context, window):
         buffer.set_text(original_text)
         expander.set_expanded(expanded)
         resize_native_window(window, *original_size)
-        wait_for(context, lambda: window.get_width() > 700, window.role + " restored window width")
+        def original_width_restored():
+            # GTK reports content dimensions; resize requests also include
+            # platform/CSD frames (10 logical pixels on the Linux fixture).
+            return abs(window.get_width() - original_size[0]) <= 32
+        try:
+            wait_for(context, original_width_restored, window.role + " restored native window width")
+        except AssertionError as error:
+            raise AssertionError(f"{window.role} resize restoration: requested={original_size}, "
+                                 f"observed={(window.get_width(), window.get_height())}") from error
         for paned, position in zip(splitters, original_positions):
             paned.set_position(position)
-    return {"dividers": evidence, "narrow_window_controls_visible": True,
+    return {"dividers": evidence, "initial_band_heights": initial_heights, "narrow_window_controls_visible": True,
             "diagnostic_scroll_reaches_end": True}
 
 

@@ -147,6 +147,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._rows = ()
         self._palette = "byte"
         self._pane_defaults_pending = True
+        self._pane_default_geometry = None
         self._normal_pane_positions = None
         self._restore_dividers = False
         self._restore_geometry = None
@@ -328,9 +329,17 @@ class DesktopWindow(Gtk.ApplicationWindow):
             height = self.workspace_paned.get_height()
             if height > 0:
                 top_share, bottom_share = (.45, .12) if self.role == "server" else (.20, .14)
-                self.workspace_paned.set_position(round(height * top_share))
-                self.details_paned.set_position(max(0, round(height * (1 - top_share - bottom_share)) - 10))
+                geometry = (self.workspace_paned.get_width(), height,
+                            self.details_paned.get_height(), self.workspace_paned.get_position())
+                if geometry != self._pane_default_geometry:
+                    self.workspace_paned.set_position(round(height * top_share))
+                    self._pane_default_geometry = geometry
+                    return
+                # Set the inner divider only after its outer allocation has
+                # settled; otherwise GTK preserves a stale lower-pane size.
+                self.details_paned.set_position(max(0, self.details_paned.get_height() - round(height * bottom_share) - 10))
                 self._pane_defaults_pending = False
+                self._pane_default_geometry = None
         if (self._restore_dividers and not self._fullscreen and not self.is_fullscreen()
                 and self._native_fullscreen_pending is None):
             if self._normal_pane_positions is not None:
