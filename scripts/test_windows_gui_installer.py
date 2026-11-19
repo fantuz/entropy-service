@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Install, relocate-test and uninstall the GUI without the build-time runtime."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,9 +9,56 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
+
+from test_windows_gui_upgrade import Wizard, explorer_folder, programs_folder, registry_values
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE_VERSION = "2.6.0"
+BASELINE_SHA256 = "b63746ecc3af4df9ab212d444184ddc4535df541793bd3cea0b9f8ec7dc0c172"
+
+
+def install_v260_and_upgrade(installer, installation, work, artifacts):
+    """Exercise the released baseline, not two freshly compiled fixture setups."""
+    baseline = work / "entropy-service-2.6.0-setup.exe"
+    url = "https://github.com/fantuz/entropy-service/releases/download/v2.6.0/entropy-service_2.6.0_windows_amd64_gui_setup.exe"
+    with urllib.request.urlopen(url, timeout=120) as source, baseline.open("wb") as target:
+        size = 0
+        while chunk := source.read(1024 * 1024):
+            size += len(chunk)
+            assert size <= 256 * 1024 * 1024, "Baseline installer exceeded its download bound"
+            target.write(chunk)
+    with baseline.open("rb") as source:
+        assert hashlib.file_digest(source, "sha256").hexdigest() == BASELINE_SHA256, "Unverified baseline installer"
+    subprocess.run([str(baseline), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
+                    "/DIR=" + str(installation), "/LOG=" + str(artifacts / "baseline-2.6.0.log")], check=True, timeout=180)
+    assert registry_values()["DisplayVersion"] == BASELINE_VERSION
+    sentinel = installation / "retained export.bin"
+    sentinel.write_bytes(b"user export from 2.6.0")
+    obsolete = installation / "runtime/obsolete-v260.dll"
+    obsolete.write_bytes(b"obsolete private file")
+    process = subprocess.Popen([str(installer), "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=" + str(installation),
+                                "/LOG=" + str(artifacts / "upgrade-from-2.6.0.log")])
+    try:
+        wizard = Wizard()
+        wizard.verify_landing_and_license(artifacts)
+        progress = []
+        wizard.advance(lambda: wizard.button("Finish") is not None,
+                       observe=lambda: wizard.observe_upgrade(progress), timeout=240)
+        assert progress, "Released-baseline upgrade showed no cleanup progress"
+        wizard.click(wizard.button("Finish"))
+        assert process.wait(timeout=30) == 0
+        explorer_folder(programs_folder() / "Entropy Service", expect_open=True)
+        assert not obsolete.exists() and sentinel.read_bytes() == b"user export from 2.6.0"
+        (artifacts / "baseline-upgrade.json").write_text(json.dumps({"from": BASELINE_VERSION,
+            "to": registry_values()["DisplayVersion"], "verified_baseline_sha256": BASELINE_SHA256,
+            "progress_visible_and_responsive": True, "user_export_retained": True}, indent=2) + "\n")
+    finally:
+        if process.poll() is None:
+            subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"], check=False, timeout=15,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            process.wait(timeout=10)
 
 
 def main():
@@ -18,8 +66,16 @@ def main():
     parser.add_argument("--installer", type=Path, required=True)
     parser.add_argument("--msys-prefix", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
+    parser.add_argument("--qualify-v260", action="store_true", help="Upgrade the checksum-pinned released 2.6.0 installer")
+    parser.add_argument("--qualify-service", action="store_true", help="Qualify explicitly selected machine-wide SCM installation")
     args = parser.parse_args()
     assert sys.platform == "win32"
+    try:
+        registry_values()
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("Refusing to replace a non-fixture Entropy Service installation")
     prefix = args.msys_prefix.resolve()
     assert prefix.name.lower() == "ucrt64" and (prefix / "bin/python.exe").is_file()
     assert Path(sys.prefix).resolve() != prefix
@@ -34,9 +90,12 @@ def main():
         state.mkdir()
         sentinel = state / "retain.txt"
         sentinel.write_text("retain user data")
-        subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
-                        "/DIR=" + str(installation), "/LOG=" + str(artifacts / "install.log")], check=True, timeout=180)
         try:
+            if args.qualify_v260:
+                install_v260_and_upgrade(args.installer.resolve(), installation, work, artifacts)
+            else:
+                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
+                                "/DIR=" + str(installation), "/LOG=" + str(artifacts / "install.log")], check=True, timeout=180)
             manifest = json.loads((installation / "bundle-manifest.json").read_text())
             assert manifest["packages"] and manifest["sources"]
             prefix.rename(hidden)
@@ -71,7 +130,7 @@ def main():
                 try:
                     assert active.stdout.readline().strip() == b"ready"
                     blocked = subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES",
-                        "/NORESTART", "/SP-", "/DIR=" + str(installation),
+                        "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=" + str(installation),
                         "/LOG=" + str(artifacts / "active-process.log")], check=False, timeout=60)
                     assert blocked.returncode != 0 and active.poll() is None
                     assert obsolete.exists() and retained.read_bytes() == b"retain unowned user files"
@@ -80,7 +139,7 @@ def main():
                     active.wait(timeout=10)
                     active.stdout.close()
                     active.stderr.close()
-                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
                                 "/DIR=" + str(installation), "/LOG=" + str(artifacts / "upgrade.log")], check=True, timeout=180)
                 assert not obsolete.exists()
                 assert retained.read_bytes() == b"retain unowned user files"
@@ -98,6 +157,9 @@ def main():
                 time.sleep(.2)
             assert not (installation / "bin/entropy-server.exe").exists()
             assert sentinel.read_text() == "retain user data"
+    if args.qualify_service:
+        from test_windows_gui_installer_service import qualify_machine_service
+        qualify_machine_service(args.installer.resolve(), artifacts / "machine-service")
     print("Installed GTK server/client, owned-process lifecycle and uninstall passed without MSYS2 runtime access")
 
 

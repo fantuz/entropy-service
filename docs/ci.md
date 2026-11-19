@@ -108,16 +108,16 @@ the repository-wide cache count changed while it was paginating. Its guard
 aborted before any DELETE, so the failure did not invalidate the merged build
 or remove artifacts. The targeted inventory, bounded retries, explicit deferral
 and concurrent-eviction tests address that failure mode. The failed
-attempt remains in run history. A rerun can use the fix once it is on the default
-branch; a retry alone does not add concurrency handling.
+attempt remains in run history. Its second attempt succeeded with the corrected
+default-branch script, removing 100 of the closed PR's 103 caches within the
+configured deletion bound. The fix shipped in v2.7.0.
 
 Manual maintenance and the script itself default to **dry run**; the CLI
 requires `--apply` to delete. Maintenance reports numeric cache IDs and
 does not print tokens or untrusted cache keys. Cache removal only affects
 future download/compilation time; it never deletes artifacts or reports.
-The new maintenance policy takes effect after this workflow is merged; no
-repository cache deletion is needed to validate this PR. GitHub's own
-retention/quota policy continues to apply. The investigated 960 entries
+The maintenance policy applies to the default branch. GitHub's own
+retention/quota policy also continues to apply. The investigated 960 entries
 occupied about 7.3 GB; that observation does not establish the configured
 repository quota.
 

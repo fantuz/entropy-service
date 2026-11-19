@@ -107,6 +107,8 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
     app, window = _window(context, application_type, "client", binary, arguments, "Client")
     try:
         assert window.session is None, "Opening the client GUI must not start acquisition"
+        assert not window.web_application_button.get_sensitive(), "A credentialed endpoint must not open a browser URL"
+        assert "fixture-password" not in window.web_application_button.get_tooltip_text()
         editor = _options(context, window)
         assert editor.get_value("url") == displayed_endpoint, "Saved endpoint secrets were displayed"
         editor.set_value("capabilities", "required")
@@ -222,6 +224,10 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         editor.set_value("analysis-bytes", "0")
         editor.set_value("refresh", "1s")
         editor.set_value("duration", "10s")
+        # Qualify payload acceptance/analysis independently of a shared runner's
+        # ability to generate 32 MiB within the normal three-second deadline.
+        editor.set_value("request-timeout", "15s")
+        editor.set_value("duration", "30s")
         editor.apply_button.emit("clicked")
         wait_for(context, lambda: not editor.get_visible() and
                  window.descriptor["settings"]["payload_bytes"] == 33554432,
@@ -229,7 +235,7 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         window.start_button.emit("clicked")
         try:
             wait_for(context, lambda: window.session.snapshot()["sample"].get("sample_bytes") == 33554432,
-                     "full 32 MiB acquisition and analysis", timeout=15)
+                     "full 32 MiB acquisition and analysis", timeout=25)
         except AssertionError as error:
             failure = {key: value for key, value in window.session.snapshot().items() if key != "rows"}
             failure["visible_status"] = window.status_label.get_text()
@@ -429,6 +435,21 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
             assert not any(_listener_open(port) for port in (http_port, https_port, 6060))
 
         try:
+            assert window.feature_checks["lab"].get_active(), "LAB is not advertised as available"
+            for button, field in ((window.debug_options_button, "debug"), (window.lab_options_button, "lab-sources")):
+                button.emit("clicked")
+                wait_for(context, lambda: window.settings_window is not None and window.settings_window.get_mapped(),
+                         "dedicated LAB/debug startup controls")
+                assert field in window.settings_window.controls
+                editor = window.settings_window
+                def target_visible():
+                    valid, bounds = editor.controls[field].compute_bounds(editor.fields_box)
+                    scroll = editor.scroller.get_vadjustment()
+                    return valid and bounds.get_height() > 0 and scroll.get_value() <= bounds.get_y() and \
+                        bounds.get_y() + bounds.get_height() <= scroll.get_value() + scroll.get_page_size()
+                wait_for(context, target_visible, "shortcut target scrolled into the visible viewport")
+                window.settings_window.close()
+                wait_for(context, lambda: window.settings_window is None, "startup shortcut editor close")
             window.feature_options_button.emit("clicked")
             wait_for(context, lambda: window.settings_window is not None and window.settings_window.get_mapped(),
                      "Edit features opens the native options editor")

@@ -20,6 +20,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{C5571481-03FA-4233-92FC-B0EF9BA76A44}_is1"
 MANAGED = ("app", "bin", "runtime", "runtime-package-metadata", "docs")
+PROJECT_CREDIT = "Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi"
 
 
 def wait_for(predicate, description, timeout=20):
@@ -49,6 +50,9 @@ class Wizard:
         self.user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
         self.user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
         self.user.PostMessageW.restype = wintypes.BOOL
+        self.user.SendMessageTimeoutW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
+            wintypes.LPARAM, wintypes.UINT, wintypes.UINT, ctypes.POINTER(ctypes.c_size_t)]
+        self.user.SendMessageTimeoutW.restype = ctypes.c_ssize_t
         try:
             self.handle = wait_for(self.find_wizard, "Entropy Service setup wizard")
         except AssertionError:
@@ -69,7 +73,15 @@ class Wizard:
 
     def text(self, handle):
         buffer = ctypes.create_unicode_buffer(8192)
-        self.user.GetWindowTextW(handle, buffer, len(buffer))
+        # GetWindowText cannot retrieve another process's edit-control text.
+        # WM_GETTEXT is marshalled by Windows; bound it so a busy installer
+        # produces diagnostics rather than hanging the UI test.
+        if any(part in self.class_name(handle).lower() for part in ("rich", "memo", "edit")):
+            result = ctypes.c_size_t()
+            assert self.user.SendMessageTimeoutW(handle, 0x000D, len(buffer), ctypes.addressof(buffer),
+                2, 1000, ctypes.byref(result)), "Could not read the native license viewer"
+        else:
+            self.user.GetWindowTextW(handle, buffer, len(buffer))
         return buffer.value
 
     def class_name(self, handle):
@@ -99,8 +111,10 @@ class Wizard:
         # modal cancellation confirmation that this test then needs to answer.
         assert self.user.PostMessageW(handle, 0x00F5, 0, 0)  # BM_CLICK, including radio buttons.
 
-    def advance(self, predicate):
+    def advance(self, predicate, *, observe=None, timeout=30):
         def step():
+            if observe:
+                observe()
             if predicate():
                 return True
             accept = self.button("I accept the agreement")
@@ -111,10 +125,68 @@ class Wizard:
                 self.click(button)
             return False
         try:
-            wait_for(step, "requested installer page", timeout=30)
+            wait_for(step, "requested installer page", timeout=timeout)
         except AssertionError:
             print("Visible wizard controls:", self.controls(), flush=True)
             raise
+
+    def observe_upgrade(self, observations):
+        controls = self.controls()
+        if not any(text.startswith("Removing previous application and runtime files") for _, text in controls):
+            return
+        bars = [handle for handle, _ in controls if "progress" in self.class_name(handle).lower()]
+        assert bars, "Upgrade cleanup has no visible progress bar"
+        result = ctypes.c_size_t()
+        ctypes.set_last_error(0)
+        # Allow a slow filesystem/antivirus operation while retaining Windows'
+        # five-second hung-window bound; every completed entry pumps messages.
+        assert self.user.SendMessageTimeoutW(self.handle, 0, 0, 0, 2, 5000, ctypes.byref(result)), \
+            "Setup did not respond within five seconds during cleanup; Windows error " + str(ctypes.get_last_error())
+        observations.append("responsive cleanup with a visible progress bar")
+
+    def capture(self, destination):
+        """Preserve real wizard pixels with Windows' built-in drawing library."""
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        rect = wintypes.RECT()
+        self.user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        assert self.user.GetWindowRect(self.handle, ctypes.byref(rect))
+        script = r'''
+        $ErrorActionPreference = 'Stop'
+        Add-Type -AssemblyName System.Drawing
+        $bounds = $env:ENTROPY_WIZARD_RECT.Split(',') | ForEach-Object { [int]$_ }
+        $bitmap = [Drawing.Bitmap]::new($bounds[2], $bounds[3])
+        $graphics = [Drawing.Graphics]::FromImage($bitmap)
+        try {
+          $graphics.CopyFromScreen($bounds[0], $bounds[1], 0, 0, $bitmap.Size)
+          $bitmap.Save($env:ENTROPY_WIZARD_IMAGE, [Drawing.Imaging.ImageFormat]::Png)
+        } finally { $graphics.Dispose(); $bitmap.Dispose() }
+        '''
+        subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            env=dict(os.environ, ENTROPY_WIZARD_IMAGE=str(destination),
+                     ENTROPY_WIZARD_RECT=','.join(map(str, (rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top)))),
+            check=True, timeout=15, capture_output=True)
+
+    def verify_landing_and_license(self, artifacts=None):
+        assert any(PROJECT_CREDIT in text for _, text in self.controls()), "Welcome page omits the project credit"
+        if artifacts:
+            self.capture(artifacts / "installer-welcome.png")
+        self.advance(lambda: self.button("I accept the agreement") is not None)
+        licenses = [(handle, text) for handle, text in self.controls()
+                    if 'THE SOFTWARE IS PROVIDED "AS IS"' in text.replace('\xa0', ' ')]
+        assert len(licenses) == 1, "MIT license is not displayed: " + repr([
+            (self.class_name(handle), text[:2000]) for handle, text in self.controls()])
+        handle, text = licenses[0]
+        text = text.replace('\xa0', ' ')
+        assert PROJECT_CREDIT in text
+        expected = (ROOT / "LICENSE").read_text()
+        assert " ".join(expected.split()) in " ".join(text.split()), "License wording changed"
+        assert "DEALINGS IN THE\r\nSOFTWARE" not in text and "THE\r\nSOFTWARE" not in text, \
+            "The MIT license retains orphaned hard line breaks"
+        if artifacts:
+            self.capture(artifacts / "installer-license.png")
+            result = ctypes.c_size_t()
+            assert self.user.SendMessageTimeoutW(handle, 0x0115, 7, 0, 2, 1000, ctypes.byref(result))  # WM_VSCROLL / SB_BOTTOM.
+            self.capture(artifacts / "installer-license-bottom.png")
 
     def cancel(self, process):
         self.click(self.button("Cancel"))
@@ -201,7 +273,7 @@ def main():
             bundle, output = work / ("bundle " + version), work / ("setup " + version)
             bundle.mkdir()
             output.mkdir()
-            (bundle / "LICENSE").write_text("Entropy Service installer test fixture. MIT license.")
+            shutil.copyfile(ROOT / "LICENSE", bundle / "LICENSE")
             (bundle / "bundle-manifest.json").write_text(json.dumps({"version": version}))
             for name in MANAGED:
                 folder = bundle / name
@@ -217,7 +289,7 @@ def main():
             setups[version] = next(output.glob("*_gui_setup.exe"))
 
         def launch(version, name, *, silent=False, target=installation):
-            command = [str(setups[version]), "/SP-", "/NORESTART", "/DIR=" + str(target),
+            command = [str(setups[version]), "/SP-", "/CURRENTUSER", "/NORESTART", "/DIR=" + str(target),
                        "/LOG=" + str(artifacts / (name + ".log"))]
             if silent:
                 command += ["/VERYSILENT", "/SUPPRESSMSGBOXES"]
@@ -237,6 +309,7 @@ def main():
 
             active = launch("2.0.0", "cancel-upgrade")
             wizard = Wizard()
+            wizard.verify_landing_and_license(artifacts)
             wizard.advance(lambda: any(text == "Existing installation found" for _, text in wizard.controls()))
             text = "\n".join(text for _, text in wizard.controls())
             assert "Installed version: 1.0.0" in text and "Setup version: 2.0.0" in text, text
@@ -262,14 +335,34 @@ def main():
             time.sleep(1)
             assert all(child.poll() is None for child in helpers), "Helper fixtures did not stay alive"
 
+            # A realistic many-small-file workload makes the cleanup phase
+            # observable without adding sleeps or test hooks to setup itself.
+            old_library = installation / "runtime/old-library"
+            old_library.mkdir()
+            for index in range(4000):
+                (old_library / f"old-{index}.py").write_bytes(b"obsolete runtime fixture")
+            readonly = old_library / "readonly.py"
+            readonly.write_text("obsolete readonly fixture")
+            readonly.chmod(0o444)
+            linked_data = work / "linked user data"
+            linked_data.mkdir()
+            (linked_data / "keep.pem").write_text("retain user data behind a junction")
+            subprocess.run(["cmd.exe", "/d", "/c", "mklink", "/J", str(old_library / "external"),
+                            str(linked_data)], check=True, capture_output=True, timeout=10)
+
             active = launch("2.0.0", "upgrade")
             wizard = Wizard()
-            wizard.advance(lambda: wizard.button("Finish") is not None)
+            progress = []
+            wizard.advance(lambda: wizard.button("Finish") is not None,
+                           observe=lambda: wizard.observe_upgrade(progress), timeout=90)
+            assert progress, "Never observed upgrade-cleanup progress"
             wizard.click(wizard.button("Finish"))
             assert active.wait(timeout=30) == 0
             helpers[0].wait(timeout=10)
             assert helpers[1].poll() is None, "Setup stopped an unrelated helper with the same name"
             assert "Closed private GTK runtime helper:" in (artifacts / "upgrade.log").read_text(encoding="utf-8-sig")
+            assert "Upgrade cleanup completed:" in (artifacts / "upgrade.log").read_text(encoding="utf-8-sig")
+            assert (linked_data / "keep.pem").read_text() == "retain user data behind a junction"
             explorer_folder(group, expect_open=True)
             values = registry_values()
             assert values["DisplayVersion"] == "2.0.0" and Path(values["Inno Setup: App Path"]) == installation
@@ -307,6 +400,8 @@ def main():
     (artifacts / "results.json").write_text(json.dumps({"fresh": True, "cancel_preserves_old_version": True,
         "relocation_rejected": True, "upgrade_removes_old_program_files": True, "single_registration": True,
         "private_helper_stopped_unrelated_helper_retained": True,
+        "cleanup_progress_visible_and_responsive": True, "junction_target_retained": True,
+        "readonly_old_file_removed": True, "landing_credit_and_license_reflow": True,
         "reinstall": True, "finish_opens_start_menu_folder": True, "silent_does_not_open_explorer": True,
         "uninstall_keeps_user_data": True}, indent=2) + "\n")
     print("Native installer upgrade, cancellation, cleanup, reinstall and Start Menu handoff passed")

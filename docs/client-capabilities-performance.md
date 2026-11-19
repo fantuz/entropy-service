@@ -47,6 +47,13 @@ opening. `-describe-json` remains entirely offline.
 
 ## Read the performance view
 
+HTTP pull has a separate `-request-timeout` budget, also exposed as **HTTP
+request timeout** in GUI Options. The default remains three seconds; an explicit
+value from 1 ms to 30 seconds can accommodate large samples or slow links.
+`0` selects the default. Adaptive pacing does not raise this budget. A run's
+duration/cancellation can stop a request earlier, and transport dial/TLS limits
+still apply. The request budget is included in configuration/JSONL settings.
+
 The normal terminal monitor and the desktop client's **Connection & performance**
 section distinguish:
 
@@ -102,9 +109,14 @@ the fastest allowed cadence. The default adaptive ceiling is five seconds;
 
 A smoothed estimate combines full receive time with consumer processing,
 including analysis, output and report writes. A 25% scheduling margin reduces
-continuous saturation. Rising cost slows the next requests promptly. Recovery
-requires sustained spare capacity and proceeds gradually, with hysteresis to
-avoid rapid oscillation. Measurements may include overlapping work, so this is
+continuous saturation. When that target exceeds the current interval, backoff
+adds **33%** to the interval, or jumps directly to the larger measured target,
+subject to the configured ceiling. After **eight consecutive** observations
+with sufficient headroom, recovery reduces the interval by **50%**, bounded by
+the measured target and requested refresh. For example, a 100 ms interval can
+back off to 133 ms; a 400 ms interval can recover to 200 ms when the measured
+workload permits it. Hysteresis avoids reacting to every small fluctuation.
+Measurements may include overlapping work, so this is
 a conservative local pacing policy, not an estimate of server-only capacity.
 The receive queue stays bounded; adaptive mode does not create parallel requests.
 

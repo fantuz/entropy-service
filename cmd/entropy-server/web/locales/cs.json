@@ -928,5 +928,8 @@
   "{title} · {entries} entries · {bits} bits/word of uniform selection. Spelling dictionary subset; not curated as a passphrase list.": "{title} · {entries} položek · {bits} bitů/slovo při rovnoměrném výběru. Podmnožina pravopisného slovníku; není sestavena jako seznam pro přístupové fráze.",
   "{{waterfall_title}}": "{{waterfall_title}}",
   "← All endpoints": "← Všechny koncové body",
-  "← Back to all endpoints": "← Zpět na všechny koncové body"
+  "← Back to all endpoints": "← Zpět na všechny koncové body",
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Server: {platform}. Typy zdrojů LAB: {kinds}. Síťové kamery také vyžadují FFmpeg.",
+  "Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi": "Softwarová architektura, sestavovací pipeline a bezpečnostní audit: Massimiliano Fantuzzi",
+  "MIT License": "Licence MIT"
 }

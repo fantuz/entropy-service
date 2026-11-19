@@ -125,6 +125,7 @@ type reportSettings struct {
 	Endpoint            string  `json:"endpoint"`
 	PayloadBytes        int64   `json:"payload_bytes"`
 	Refresh             string  `json:"refresh"`
+	RequestTimeout      string  `json:"request_timeout"`
 	AnalysisBytes       int     `json:"analysis_bytes"`
 	AnalysisInterval    string  `json:"analysis_interval"`
 	DisplayInterval     string  `json:"display_interval"`
@@ -186,7 +187,7 @@ func (r *runReport) start(ctx context.Context, cfg *config.Config, endpoint stri
 func clientReportSettings(cfg *config.Config, endpoint string) reportSettings {
 	return reportSettings{
 		Mode: cfg.Mode, Endpoint: endpoint, PayloadBytes: cfg.Slice,
-		Refresh: cfg.Refresh.String(), AnalysisBytes: cfg.AnalysisBytes,
+		Refresh: cfg.Refresh.String(), RequestTimeout: cfg.PullRequestTimeout().String(), AnalysisBytes: cfg.AnalysisBytes,
 		AnalysisInterval: cfg.AnalysisInterval.String(), DisplayInterval: cfg.DisplayInterval.String(),
 		ShannonThreshold: cfg.ShannonThreshold, Duration: cfg.Duration.String(),
 		Headless: cfg.Headless, Matrix: cfg.ShowMatrix, WriteOut: cfg.WriteOut,

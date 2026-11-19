@@ -69,7 +69,7 @@ The initial 64 KiB AES HTTP median was 7.1% below pre-i18n. A longer, warm follo
 | Current | 849.9 | 831.0–872.9 | 1.173 |
 | Current-control, same current binary | 817.3 | 717.0–861.3 | 1.199 |
 
-Current is 4.94% below pre-i18n in these follow-up medians. Running the identical current binary under a second label gives another 3.83% decrease relative to current. This demonstrates meaningful run-to-run variation, but does not prove the entire observed difference is noise. Conversely, unchanged request-path source and a faster current 64 KiB handler microbenchmark do not support calling this a confirmed translation-induced regression. A stable dedicated host, longer paired runs and profiling would be needed to resolve a small sustained effect. No server-throughput fix is claimed by this PR.
+Current is 4.94% below pre-i18n in these follow-up medians. Running the identical current binary under a second label gives another 3.83% decrease relative to current. This demonstrates meaningful run-to-run variation, but does not prove the entire observed difference is noise. Conversely, unchanged request-path source and a faster current 64 KiB handler microbenchmark do not support calling this a confirmed translation-induced regression. A stable dedicated host, longer paired runs and profiling would be needed to resolve a small sustained effect. These measurements do not establish a server-throughput fix.
 
 Shared cancellation changes have bounded work outside bulk generation: handshake watchers run while dialing; the absolute seed-read deadline guard runs during seeding/reseeding. Optional JSONL output has context-aware work per report record. These security/cancellation protections should not be removed on the basis of an uncertain small benchmark delta.
 

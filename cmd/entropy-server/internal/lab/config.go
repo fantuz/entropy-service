@@ -23,6 +23,7 @@ import (
 
 const (
 	windowsOS         = "windows"
+	linuxOS           = "linux"
 	sourceHTTP        = "http"
 	sourceHTTPS       = "https"
 	sourceWS          = "websocket"
@@ -241,6 +242,10 @@ func (c *Config) validate() error {
 			return errors.New("socket port must be 1–65535")
 		}
 	case sourceUnix, sourceDevice:
+		if c.Kind == sourceDevice && runtime.GOOS != linuxOS {
+			return errors.New("direct device LAB sources require Linux; use a TCP/UDP or HTTP/WebSocket adapter")
+		}
+
 		if runtime.GOOS == windowsOS {
 			return errors.New("unix sockets and direct device LAB sources are unavailable on Windows; use a TCP/UDP or HTTP/WebSocket adapter")
 		}

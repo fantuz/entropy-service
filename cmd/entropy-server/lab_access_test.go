@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -15,6 +18,34 @@ import (
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/lab"
 )
+
+func TestLabAvailableWithoutRegistryOnEveryPlatform(t *testing.T) {
+	registry, err := lab.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(registry.Close)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://localhost/lab/sources", nil)
+	request.RemoteAddr = "127.0.0.1:1234"
+	response := httptest.NewRecorder()
+	labCatalogHandler(registry, newWebSocketBudget(2, 4<<20), 4096, false)(response, request)
+
+	var catalog struct {
+		Allowed  bool             `json:"allowed"`
+		Platform string           `json:"platform"`
+		Kinds    []string         `json:"source_kinds"`
+		Sources  []lab.Descriptor `json:"sources"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &catalog); err != nil {
+		t.Fatal(err)
+	}
+
+	if response.Code != http.StatusOK || !catalog.Allowed || catalog.Platform != runtime.GOOS || len(catalog.Sources) != 0 ||
+		!slices.Equal(catalog.Kinds, lab.SupportedKinds()) {
+		t.Fatalf("LAB disabled or platform support incorrect without registry: %s", response.Body.String())
+	}
+}
 
 func TestLabRejectsRebindingHostBeforeCatalogOrSourceAccess(t *testing.T) {
 	var reads atomic.Int64

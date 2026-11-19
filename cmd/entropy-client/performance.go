@@ -37,12 +37,14 @@ func (p *acquisitionPacing) observe(work time.Duration) {
 	current := time.Duration(p.interval.Load())
 	switch {
 	case target > current:
-		p.interval.Store(int64(target))
+		// Back off decisively, while jumping directly to measured demand when
+		// it exceeds a 33% step. The configured ceiling remains authoritative.
+		p.interval.Store(int64(min(p.ceiling, max(target, current+current*33/100))))
 		p.recovery = 0
 	case target < current-current/10 || target == p.base && current > p.base:
 		p.recovery++
 		if p.recovery >= 8 {
-			p.interval.Store(int64(max(target, current-max(time.Millisecond, current/20))))
+			p.interval.Store(int64(max(target, current-current/2)))
 			p.recovery = 0
 		}
 	default:

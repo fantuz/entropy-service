@@ -21,6 +21,7 @@ type Config struct {
 	MaxWords            int
 	RefreshRate         int
 	Refresh             time.Duration
+	RequestTimeout      time.Duration
 	HTTPUrl             string
 	WSUrl               string
 	Mode                string
@@ -58,14 +59,15 @@ type Config struct {
 }
 
 const (
-	CapabilitiesAuto     = "auto"
-	CapabilitiesOff      = "off"
-	CapabilitiesRequired = "required"
-	ModePull             = "pull"
-	ModeStream           = "stream"
-	MaxRetryDelay        = 30 * time.Second
-	defaultColorMode     = "auto"
-	noColorMode          = "never"
+	CapabilitiesAuto      = "auto"
+	CapabilitiesOff       = "off"
+	CapabilitiesRequired  = "required"
+	ModePull              = "pull"
+	ModeStream            = "stream"
+	MaxRetryDelay         = 30 * time.Second
+	DefaultRequestTimeout = 3 * time.Second
+	defaultColorMode      = "auto"
+	noColorMode           = "never"
 )
 
 func ParseConfig() *Config {
@@ -108,6 +110,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 	flags.StringVar(&cfg.Capabilities, "capabilities", CapabilitiesAuto, "server limit discovery: auto|off|required; auto probes recognized entropy-service routes once")
 	flags.BoolVar(&cfg.Adaptive, "adaptive", false, "opt in to adaptive HTTP pull pacing; keeps payload, analysis and failure policies unchanged")
 	flags.DurationVar(&cfg.AdaptiveMaxInterval, "adaptive-max-interval", 5*time.Second, "maximum adaptive request interval (refresh..1m)")
+	flags.DurationVar(&cfg.RequestTimeout, "request-timeout", DefaultRequestTimeout, "HTTP pull request timeout (1ms..30s; 0 uses the 3s default)")
 	flags.DurationVar(&cfg.Refresh, "refresh", time.Second, "refresh interval for both HTTP and WS")
 	flags.IntVar(&cfg.AnalysisBytes, "analysis-bytes", 1<<20, "maximum prefix bytes per analysed frame; 0 analyses the full frame")
 	flags.DurationVar(&cfg.AnalysisInterval, "analysis-interval", 250*time.Millisecond, "minimum interval between analysed frames; 0 analyses every frame")
@@ -200,6 +203,10 @@ func (cfg *Config) validatePlatform(goos string) error {
 }
 
 func (cfg *Config) ValidateAnalysis() error {
+	if cfg.RequestTimeout < 0 || cfg.RequestTimeout > 30*time.Second || (cfg.RequestTimeout > 0 && cfg.RequestTimeout < time.Millisecond) {
+		return errors.New("request-timeout must be 0 (default) or between 1ms and 30s")
+	}
+
 	if cfg.Capabilities != "" && cfg.Capabilities != CapabilitiesAuto && cfg.Capabilities != CapabilitiesOff && cfg.Capabilities != CapabilitiesRequired {
 		return errors.New("capabilities must be auto, off or required")
 	}
@@ -279,6 +286,15 @@ func (cfg *Config) ValidateAnalysis() error {
 	}
 
 	return nil
+}
+
+// PullRequestTimeout preserves the default for callers constructing Config directly.
+func (cfg *Config) PullRequestTimeout() time.Duration {
+	if cfg.RequestTimeout == 0 {
+		return DefaultRequestTimeout
+	}
+
+	return cfg.RequestTimeout
 }
 
 func (cfg *Config) OutputEnabled() bool {
