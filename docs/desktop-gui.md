@@ -27,6 +27,8 @@ fragments. Nothing opens automatically and the button neither starts a server no
 changes browser certificate trust. Endpoints with embedded credentials are
 rejected; open their credential-free server homepage manually instead. The
 reference is hidden during the client's fullscreen waterfall.
+The server GUI's `--health-ca` applies only to health polling; the default
+browser uses its own certificate trust configuration.
 
 | Server — local process and live health | Client — live waterfall |
 | --- | --- |
