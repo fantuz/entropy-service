@@ -27,7 +27,9 @@ func TestLabEightMiBSampleAndConfiguredLimits(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	registry, err := lab.New([]lab.Config{{ID: "large", Kind: "http", Endpoint: upstream.URL}})
+	// Qualify the configured byte ceiling, independently of a shared race
+	// runner's ability to relay eight MiB within the normal source deadline.
+	registry, err := lab.New([]lab.Config{{ID: "large", Kind: "http", Endpoint: upstream.URL, TimeoutMs: 10000}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +41,9 @@ func TestLabEightMiBSampleAndConfiguredLimits(t *testing.T) {
 	defer server.Close()
 
 	conn := budgetConnect(t, server, "/lab/stream?source=large&bytes="+strconv.Itoa(sampleBytes)+"&refresh=100")
-	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	defer func() { _ = conn.Close() }()
+
+	_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 
 	typ, data, err := conn.ReadMessage()
 	if err != nil || typ != websocket.BinaryMessage || !bytes.Equal(data, payload) {
