@@ -18,6 +18,7 @@ class WebApplicationURLTests(unittest.TestCase):
             "wss://example.org:8443/stream?token=secret#fragment": "https://example.org:8443/",
             "HTTP://EXAMPLE.ORG/path": "http://example.org/",
             "https://bücher.example/path": "https://xn--bcher-kva.example/",
+            "https://xn--fa-hia.example/path": "https://xn--fa-hia.example/",
             "http://[2001:db8::7]:8080/v1/data/random": "http://[2001:db8::7]:8080/",
             "wss://[::1]/stream": "https://[::1]/",
         }
@@ -35,6 +36,7 @@ class WebApplicationURLTests(unittest.TestCase):
                    "http://0.0.0.0/", "http://[::]/", "http://[fe80::1%eth0]/",
                    "http://127.1/", "http://2130706433/", "http://0x7f.1/", "http://127.00.0.1/", "http://example.123/",
                    "http://bad_name/", "http://example..org/", "http://-bad.example/",
+                   "https://faß.example/",
                    "http://example%2eorg/", "http://" + "a" * 64 + ".org/",
                    " http://example.org/", "http://example.org/ ", "http://example.org/\n",
                    "http://example.org/path\x00", "http://example.org/\u200b", "http://example.org\\@other/",

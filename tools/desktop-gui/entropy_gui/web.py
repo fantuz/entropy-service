@@ -35,6 +35,10 @@ def web_application_url(value):
             raise ValueError("Use a conventional dotted IPv4 address or DNS name") from None
         try:
             normalized = host.encode("idna").decode("ascii").lower()
+            # stdlib IDNA uses the older profile. Do not silently select a
+            # different host for names such as faß.example; require punycode.
+            if not host.isascii() and normalized.encode("ascii").decode("idna") != host.lower():
+                raise ValueError("Use the ASCII punycode spelling of this endpoint DNS name")
         except UnicodeError as error:
             raise ValueError("The endpoint DNS name is invalid") from error
         labels = normalized.removesuffix(".").split(".")
