@@ -1,4 +1,4 @@
-; Optional machine-wide SCM integration. Included inside the recipe's [Code].
+{ Optional machine-wide SCM integration. Included inside the recipe's [Code]. }
 function InstallRegistrationRoot: Integer;
 begin
   if IsAdminInstallMode then Result := HKLM64 else Result := HKCU64;
