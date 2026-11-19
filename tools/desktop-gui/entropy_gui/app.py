@@ -22,6 +22,8 @@ from .process import ClientSession, describe
 from .health import HealthSession
 from .controls import SettingsWindow
 from .server_process import ServerSession
+from .options import initial_values
+from .web import web_application_url
 
 
 HISTORY_ROWS = 128
@@ -81,6 +83,11 @@ def byte_hue(value):
 
 
 BYTE_COLORS = tuple(byte_hue(value) for value in range(256))
+
+
+def launch_web_application(target):
+    """Use the desktop handler only after an explicit button activation."""
+    return Gio.AppInfo.launch_default_for_uri(target, None)
 
 
 def default_health_url(descriptor):
@@ -254,11 +261,50 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self.client_log_expander = Gtk.Expander(label="Client diagnostics")
             self.client_log_expander.set_child(diagnostics)
             body.append(self.client_log_expander)
+        self.web_application_box = Gtk.Box(spacing=12)
+        self.web_application_note = label("Web interface · graphs, LAB and service status", "gui-subtitle")
+        self.web_application_note.set_hexpand(True)
+        self.web_application_box.append(self.web_application_note)
+        self.web_application_button = Gtk.Button(label="Open web application", sensitive=False)
+        self.web_application_button.connect("clicked", lambda _button: self.open_web_application())
+        self.web_application_box.append(self.web_application_button)
+        body.append(self.web_application_box)
+        if role == "server":
+            self.health_url_entry.connect("changed", lambda _entry: self._update_web_application())
+        self._update_web_application()
         body.append(self.status_label)
         self._tick_id = GLib.timeout_add(50, self._tick)
         # Inspection is bounded by describe(). Keep its cleanup alive if the
         # window closes before the short-lived description child has exited.
         self._start_inspection(self.binary, self.arguments)
+
+    def _web_application_target(self):
+        try:
+            if self.role == "server":
+                endpoint = self.health_url_entry.get_text()
+            elif self.descriptor is not None:
+                values = initial_values("client", self.arguments, self.descriptor)
+                endpoint = values["wsurl" if values["mode"] == "push" else "url"]
+            else:
+                return ""
+            return web_application_url(endpoint)
+        except ValueError:
+            return ""
+
+    def _update_web_application(self):
+        target = self._web_application_target()
+        self.web_application_button.set_sensitive(bool(target))
+        self.web_application_button.set_tooltip_text(target or "Select a complete server endpoint without embedded credentials. Nothing opens automatically.")
+
+    def open_web_application(self):
+        target = self._web_application_target()
+        if not target or self._closing:
+            return
+        try:
+            if not launch_web_application(target):
+                self.status_label.set_text("The web application could not be opened. Open the server homepage in your browser.")
+        except GLib.Error:
+            self.status_label.set_text("The web application could not be opened. Open the server homepage in your browser.")
 
     def _build_local_server_panel(self, body):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -567,6 +613,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             self.settings_box.append(feature_box)
         self.start_button.set_sensitive(True)
         self.options_button.set_sensitive(True)
+        self._update_web_application()
         if editor is not None:
             editor.destroy()
             self.settings_window = None
@@ -784,6 +831,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.status_label.set_visible(not enabled)
         self.client_log_expander.set_visible(not enabled)
         self.performance_expander.set_visible(not enabled)
+        self.web_application_box.set_visible(not enabled)
         if sys.platform == "darwin":
             self._advance_macos_fullscreen()
         else:

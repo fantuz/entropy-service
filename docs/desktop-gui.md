@@ -17,6 +17,16 @@ It does not install or control an operating-system service.
 | Server | **Connect/Disconnect** | Monitor the server at the health URL, independently of the local process. |
 | Client (`--view client`) | **Start/Stop**, at the top left | Run the selected client and display its statistics and waterfall. |
 | Both | **Options** | Choose a local executable and edit startup options while its owned process is stopped. |
+| Both | **Open web application** | Open the selected server's homepage in the default browser, with graphs, LAB tools and service status. |
+
+The web application is served by entropy-server; the desktop client does not
+host a separate website. The server window uses its selected health URL, while
+the client window uses its validated pull/push endpoint. WebSocket addresses map
+to HTTP or HTTPS, retaining the host and port and removing API paths, queries and
+fragments. Nothing opens automatically and the button neither starts a server nor
+changes browser certificate trust. Endpoints with embedded credentials are
+rejected; open their credential-free server homepage manually instead. The
+reference is hidden during the client's fullscreen waterfall.
 
 | Server — local process and live health | Client — live waterfall |
 | --- | --- |

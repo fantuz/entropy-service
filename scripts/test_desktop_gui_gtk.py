@@ -21,6 +21,7 @@ import sys
 import tempfile
 import threading
 import time
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -211,6 +212,47 @@ def server_configuration(context, application_type, binary):
     finally:
         close_window(context, window)
         app.quit()
+
+
+def web_application_controls(context, application_type, server_binary, client_binary):
+    """Exercise real GTK buttons while keeping the external browser mocked."""
+    from entropy_gui import app as desktop
+
+    results = {}
+    cases = (("server", server_binary, ["-enable-https=false"], "https://[::1]:9443/custom/path?ignored=1"),
+             ("client", client_binary, ["-mode=push", "-wsurl=wss://example.invalid:9443/stream?token=hidden#part"], None))
+    with mock.patch.object(desktop, "launch_web_application", return_value=True) as launch:
+        for role, binary, arguments, health_url in cases:
+            app = application_type(role, str(binary), arguments, health_url=health_url)
+            app.set_application_id("org.entropyservice.Desktop.TestWeb" + role.title())
+            assert app.register(None)
+            app.activate()
+            window = app.window
+            try:
+                wait_for(context, lambda: window.descriptor is not None and window.get_mapped(), role + " browser reference")
+                launch.assert_not_called()
+                assert window.web_application_button.get_sensitive()
+                expected = "https://[::1]:9443/" if role == "server" else "https://example.invalid:9443/"
+                assert window.web_application_button.get_tooltip_text() == expected
+                window.web_application_button.emit("clicked")
+                launch.assert_called_once_with(expected)
+                launch.reset_mock()
+                if role == "server":
+                    window.health_url_entry.set_text("javascript:alert(1)")
+                    assert not window.web_application_button.get_sensitive()
+                    window.open_web_application()
+                    launch.assert_not_called()
+                    window.health_url_entry.set_text("http://127.0.0.1:8080/v1/data/random?secret=discard")
+                    assert window.web_application_button.get_tooltip_text() == "http://127.0.0.1:8080/"
+                    window.health_url_entry.set_text("https://operator:secret@example.invalid/")
+                    assert not window.web_application_button.get_sensitive()
+                    assert "secret" not in window.web_application_button.get_tooltip_text()
+                assert window.session is None and window.health_session is None
+                results[role] = {"explicit_click_only": True, "origin_without_api_path_or_secrets": True}
+            finally:
+                close_window(context, window)
+                app.quit()
+    return results
 
 
 def close_during_inspection(context, application_type):
@@ -539,9 +581,11 @@ def client_waterfall(context, application_type, gdk, binary, port, artifacts):
         assert window._on_key(None, gdk.KEY_F11, 0, 0)
         assert window._fullscreen and not window.header.get_visible()
         assert not window.controls.get_visible() and not window.status_label.get_visible()
+        assert not window.web_application_box.get_visible()
         assert window._on_key(None, gdk.KEY_Escape, 0, 0)
         assert not window._fullscreen and window.header.get_visible()
         assert window.controls.get_visible() and window.status_label.get_visible()
+        assert window.web_application_box.get_visible()
 
         owned_child = window.session._child
         window.stop_button.emit("clicked")
@@ -834,6 +878,9 @@ def main():
             print("Native GTK: server configuration", flush=True)
             result = {"platform": sys.platform,
                       "server": server_configuration(context, DesktopApplication, args.server.resolve())}
+            print("Native GTK: web_application_controls", flush=True)
+            result["web_application_controls"] = web_application_controls(context, DesktopApplication,
+                                                                         args.server.resolve(), args.client.resolve())
             print("Native GTK: missing_local_executables", flush=True)
             result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
             print("Native GTK: inspection_close", flush=True)

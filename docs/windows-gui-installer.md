@@ -57,6 +57,10 @@ The client initially connects to the local HTTP server. Neither shortcut starts
 a background service automatically.
 
 GUI-created relative paths and caches use `%LOCALAPPDATA%\Entropy Service`.
+Both GUI windows also offer **Open web application** for the selected server's
+browser interface, including graphs, LAB tools and service status. It opens only
+on a click, uses the selected server origin rather than an API route, and does
+not bypass certificate verification. See the [desktop guide](desktop-gui.md).
 Certificate provisioning and client exports retain the CLI's existing policies.
 Startup failures are written to `gui-startup-error.txt` there, with a Windows
 message identifying the file. Installed source modules are under `app`, CLI

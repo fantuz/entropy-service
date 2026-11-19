@@ -107,6 +107,8 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
     app, window = _window(context, application_type, "client", binary, arguments, "Client")
     try:
         assert window.session is None, "Opening the client GUI must not start acquisition"
+        assert not window.web_application_button.get_sensitive(), "A credentialed endpoint must not open a browser URL"
+        assert "fixture-password" not in window.web_application_button.get_tooltip_text()
         editor = _options(context, window)
         assert editor.get_value("url") == displayed_endpoint, "Saved endpoint secrets were displayed"
         editor.set_value("capabilities", "required")
