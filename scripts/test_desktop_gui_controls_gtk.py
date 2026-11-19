@@ -222,6 +222,10 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         editor.set_value("analysis-bytes", "0")
         editor.set_value("refresh", "1s")
         editor.set_value("duration", "10s")
+        # Qualify payload acceptance/analysis independently of a shared runner's
+        # ability to generate 32 MiB within the normal three-second deadline.
+        editor.set_value("request-timeout", "15s")
+        editor.set_value("duration", "30s")
         editor.apply_button.emit("clicked")
         wait_for(context, lambda: not editor.get_visible() and
                  window.descriptor["settings"]["payload_bytes"] == 33554432,
@@ -229,7 +233,7 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         window.start_button.emit("clicked")
         try:
             wait_for(context, lambda: window.session.snapshot()["sample"].get("sample_bytes") == 33554432,
-                     "full 32 MiB acquisition and analysis", timeout=15)
+                     "full 32 MiB acquisition and analysis", timeout=25)
         except AssertionError as error:
             failure = {key: value for key, value in window.session.snapshot().items() if key != "rows"}
             failure["visible_status"] = window.status_label.get_text()

@@ -47,6 +47,13 @@ opening. `-describe-json` remains entirely offline.
 
 ## Read the performance view
 
+HTTP pull has a separate `-request-timeout` budget, also exposed as **HTTP
+request timeout** in GUI Options. The default remains three seconds; an explicit
+value from 1 ms to 30 seconds can accommodate large samples or slow links.
+`0` selects the default. Adaptive pacing does not raise this budget. A run's
+duration/cancellation can stop a request earlier, and transport dial/TLS limits
+still apply. The request budget is included in configuration/JSONL settings.
+
 The normal terminal monitor and the desktop client's **Connection & performance**
 section distinguish:
 

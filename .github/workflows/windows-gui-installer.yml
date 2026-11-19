@@ -97,7 +97,7 @@ jobs:
           $installers = @(Get-ChildItem gui-installer -Filter '*_gui_setup.exe')
           if ($installers.Count -ne 1) { throw 'Expected one installer' }
           $origin = Get-Content build/runtime-origin.json -Raw | ConvertFrom-Json
-          python scripts/test_windows_gui_installer.py --installer "$($installers[0].FullName)" --msys-prefix "$($origin.prefix)" --artifacts gui-installer-evidence --qualify-v260
+          python scripts/test_windows_gui_installer.py --installer "$($installers[0].FullName)" --msys-prefix "$($origin.prefix)" --artifacts gui-installer-evidence --qualify-v260 --qualify-service
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Package tested installer, source and checksums together
         shell: pwsh

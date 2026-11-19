@@ -26,6 +26,8 @@ _CLIENT_FIELDS = (
                 "Pull uses the HTTP endpoint; push uses the WebSocket endpoint."),
     OptionField("url", "HTTP endpoint (pull)", "Connection",
                 hint="Only used in pull mode. Unchanged URL credentials and query parameters are retained."),
+    OptionField("request-timeout", "HTTP request timeout", "Connection",
+                hint="1ms–30s per HTTP pull request; default 3s. Increase explicitly for large samples or slow links. Run cancellation remains immediate."),
     OptionField("wsurl", "WebSocket endpoint (push)", "Connection",
                 hint="Only used in push mode."),
     OptionField("capabilities", "Server capability discovery", "Connection", "choice", ("auto", "off", "required"),
@@ -99,7 +101,7 @@ _BOOL_FLAGS = {
 _CLIENT_DEFAULTS = {
     "capabilities": "auto", "adaptive": False, "adaptive-max-interval": "5s",
     "mode": "pull", "url": "http://127.0.0.1:8080/v1/data/random", "wsurl": "ws://127.0.0.1:8080/stream",
-    "slice": "2097152", "refresh": "1s", "analysis-bytes": "1048576", "analysis-interval": "250ms",
+    "slice": "2097152", "refresh": "1s", "request-timeout": "3s", "analysis-bytes": "1048576", "analysis-interval": "250ms",
     "shannon-threshold": "7.999", "waterfall-mode": "byte", "duration": "0s", "retries": "0", "retry-delay": "1s",
 }
 _SERVER_DEFAULTS = {
@@ -112,7 +114,7 @@ _SERVER_DEFAULTS = {
 }
 _DESCRIPTION_SETTINGS = {
     "client": {"capabilities":"capabilities", "adaptive":"adaptive", "adaptive-max-interval":"adaptive_max_interval", "mode": "mode", "slice": "payload_bytes", "refresh": "refresh", "analysis-bytes": "analysis_bytes",
-               "analysis-interval": "analysis_interval", "shannon-threshold": "shannon_threshold_bits_per_byte",
+               "analysis-interval": "analysis_interval", "shannon-threshold": "shannon_threshold_bits_per_byte", "request-timeout": "request_timeout",
                "duration": "duration", "retries": "retries", "retry-delay": "retry_delay", "waterfall-mode": "waterfall_mode"},
     "server": {"device": "seed_source", "drbg": "drbg", "http": "http_address", "https": "https_address",
                "reseed-ms": "reseed_interval_ms", "max-reseed-age": "max_reseed_age_ms",

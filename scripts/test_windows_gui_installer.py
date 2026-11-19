@@ -31,14 +31,14 @@ def install_v260_and_upgrade(installer, installation, work, artifacts):
             target.write(chunk)
     with baseline.open("rb") as source:
         assert hashlib.file_digest(source, "sha256").hexdigest() == BASELINE_SHA256, "Unverified baseline installer"
-    subprocess.run([str(baseline), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+    subprocess.run([str(baseline), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
                     "/DIR=" + str(installation), "/LOG=" + str(artifacts / "baseline-2.6.0.log")], check=True, timeout=180)
     assert registry_values()["DisplayVersion"] == BASELINE_VERSION
     sentinel = installation / "retained export.bin"
     sentinel.write_bytes(b"user export from 2.6.0")
     obsolete = installation / "runtime/obsolete-v260.dll"
     obsolete.write_bytes(b"obsolete private file")
-    process = subprocess.Popen([str(installer), "/NORESTART", "/SP-", "/DIR=" + str(installation),
+    process = subprocess.Popen([str(installer), "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=" + str(installation),
                                 "/LOG=" + str(artifacts / "upgrade-from-2.6.0.log")])
     try:
         wizard = Wizard()
@@ -67,6 +67,7 @@ def main():
     parser.add_argument("--msys-prefix", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--qualify-v260", action="store_true", help="Upgrade the checksum-pinned released 2.6.0 installer")
+    parser.add_argument("--qualify-service", action="store_true", help="Qualify explicitly selected machine-wide SCM installation")
     args = parser.parse_args()
     assert sys.platform == "win32"
     try:
@@ -93,7 +94,7 @@ def main():
             if args.qualify_v260:
                 install_v260_and_upgrade(args.installer.resolve(), installation, work, artifacts)
             else:
-                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
                                 "/DIR=" + str(installation), "/LOG=" + str(artifacts / "install.log")], check=True, timeout=180)
             manifest = json.loads((installation / "bundle-manifest.json").read_text())
             assert manifest["packages"] and manifest["sources"]
@@ -129,7 +130,7 @@ def main():
                 try:
                     assert active.stdout.readline().strip() == b"ready"
                     blocked = subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES",
-                        "/NORESTART", "/SP-", "/DIR=" + str(installation),
+                        "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=" + str(installation),
                         "/LOG=" + str(artifacts / "active-process.log")], check=False, timeout=60)
                     assert blocked.returncode != 0 and active.poll() is None
                     assert obsolete.exists() and retained.read_bytes() == b"retain unowned user files"
@@ -138,7 +139,7 @@ def main():
                     active.wait(timeout=10)
                     active.stdout.close()
                     active.stderr.close()
-                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
                                 "/DIR=" + str(installation), "/LOG=" + str(artifacts / "upgrade.log")], check=True, timeout=180)
                 assert not obsolete.exists()
                 assert retained.read_bytes() == b"retain unowned user files"
@@ -156,6 +157,9 @@ def main():
                 time.sleep(.2)
             assert not (installation / "bin/entropy-server.exe").exists()
             assert sentinel.read_text() == "retain user data"
+    if args.qualify_service:
+        from test_windows_gui_installer_service import qualify_machine_service
+        qualify_machine_service(args.installer.resolve(), artifacts / "machine-service")
     print("Installed GTK server/client, owned-process lifecycle and uninstall passed without MSYS2 runtime access")
 
 

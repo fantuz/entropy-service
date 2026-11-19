@@ -16,9 +16,10 @@ VersionInfoVersion={#NumericVersion}
 AppPublisher=Entropy Service contributors
 AppPublisherURL=https://github.com/fantuz/entropy-service
 AppSupportURL=https://github.com/fantuz/entropy-service/issues
-DefaultDirName={localappdata}\Programs\Entropy Service
+DefaultDirName={autopf}\Entropy Service
 DefaultGroupName=Entropy Service
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0
@@ -39,10 +40,15 @@ LicenseFile={#BundleDir}\LICENSE
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Tasks]
+Name: "server-service"; Description: "Install entropy-server as a Windows Service"; GroupDescription: "Optional machine-wide service:"; Flags: unchecked checkablealone; Check: IsAdminInstallMode
+Name: "server-service\start"; Description: "Start the server service after installation"; Flags: unchecked dontinheritcheck; Check: IsAdminInstallMode
+
 [Icons]
 Name: "{group}\Entropy Server"; Filename: "{app}\runtime\bin\pythonw.exe"; Parameters: "-I -B ""{app}\app\gui_bootstrap.py"" --view server"; WorkingDir: "{app}"
 Name: "{group}\Entropy Client"; Filename: "{app}\runtime\bin\pythonw.exe"; Parameters: "-I -B ""{app}\app\gui_bootstrap.py"" --view client"; WorkingDir: "{app}"
 Name: "{group}\GUI guide"; Filename: "{app}\docs\windows-gui-installer.md"
+Name: "{group}\Windows Services"; Filename: "{sys}\mmc.exe"; Parameters: "services.msc"; Check: WindowsServiceMenu
 
 [Run]
 Filename: "{group}"; Description: "Open the Entropy Service Start Menu folder"; Flags: postinstall shellexec nowait skipifsilent
@@ -50,12 +56,14 @@ Filename: "{group}"; Description: "Open the Entropy Service Start Menu folder"; 
 [Code]
 const
   UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{C5571481-03FA-4233-92FC-B0EF9BA76A44}_is1';
-  ProjectCredit = 'Software Architecture, Build pipelines and Security Audit by Massimiliano Fantuzzi';
+  ProjectCredit = 'Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi';
 var
   PreviousDirectory: String;
   ReplacementPage: TOutputMsgWizardPage;
   UpgradeProgress: TOutputMarqueeProgressWizardPage;
   RemovedEntries: Integer;
+  ServiceInfoPage: TOutputMsgMemoWizardPage;
+  ServiceWasManaged, ServiceWasRunning, ServiceStopped, UpgradeCleanupStarted: Boolean;
 
 function SetOwnedAttributes(const Filename: String; Attributes: LongWord): Boolean;
   external 'SetFileAttributesW@kernel32.dll stdcall';
@@ -65,12 +73,15 @@ begin
   Result := PreviousDirectory <> '';
 end;
 
+#include "service.iss"
+
 procedure InitializeWizard;
 var
   PreviousVersion, LicenseText: String;
 begin
   WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
-    ProjectCredit + #13#10#13#10 + 'Released under the MIT License, shown on the next page.';
+    ProjectCredit + #13#10#13#10 + 'Released under the MIT License, shown on the next page.' + #13#10#13#10 +
+    'For an optional Windows server service, choose the all-users installation mode. The current-user GUI installation does not need administrator rights.';
   { Reflow display paragraphs rather than retaining the plain-text file's
     printing-width line breaks. The installed LICENSE is kept verbatim. }
   LicenseText := WizardForm.LicenseMemo.Lines.Text;
@@ -82,9 +93,9 @@ begin
   WizardForm.LicenseMemo.Lines.Text := ProjectCredit + #13#10#13#10 + Trim(LicenseText);
   UpgradeProgress := CreateOutputMarqueeProgressPage('Upgrading Entropy Service',
     'Preparing the existing installation for replacement.');
-  if not RegQueryStringValue(HKCU64, UninstallKey, 'Inno Setup: App Path', PreviousDirectory) then
+  if not RegQueryStringValue(InstallRegistrationRoot, UninstallKey, 'Inno Setup: App Path', PreviousDirectory) then
     PreviousDirectory := '';
-  if not RegQueryStringValue(HKCU64, UninstallKey, 'DisplayVersion', PreviousVersion) then
+  if not RegQueryStringValue(InstallRegistrationRoot, UninstallKey, 'DisplayVersion', PreviousVersion) then
     PreviousVersion := 'Unknown';
   ReplacementPage := CreateOutputMsgPage(wpLicense, 'Existing installation found',
     'Review the replacement before continuing.',
@@ -94,6 +105,7 @@ begin
     'Setup will replace the installed application and its bundled runtime. No separate uninstall is needed.' + #13#10#13#10 +
     'Close Entropy Service windows before continuing. Custom files inside the program and runtime folders will be removed. ' +
     'User data, certificates and exports outside those folders are kept. Cancel now to leave the current installation unchanged.');
+  InitializeServiceOptions;
 end;
 
 procedure CleanupOwnedEntry(const Filename: String);
@@ -147,6 +159,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if (CurStep = ssInstall) and ReplacingInstallation then
   begin
+    UpgradeCleanupStarted := True;
     RemovedEntries := 0;
     UpgradeProgress.SetText('Removing previous application and runtime files...',
       'The private Python/GTK runtime contains many small files. Please keep setup open.');
@@ -163,12 +176,18 @@ begin
       UpgradeProgress.Hide;
     end;
     WizardForm.StatusLabel.Caption := 'Installing the replacement application and runtime...';
-  end;
+  end
+  else if CurStep = ssPostInstall then
+    InstallOrResumeService
+  else if (CurStep = ssDone) and IsAdminInstallMode and ServiceWasManaged then
+    RegWriteDWordValue(HKLM64, UninstallKey, 'EntropyServiceManaged', 1);
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := (PageID = ReplacementPage.ID) and not ReplacingInstallation;
+  if PageID = ServiceInfoPage.ID then
+    Result := not (WindowsServiceSelected or ServiceWasManaged);
 end;
 
 function PrivateProcessKind(RuntimeProcess: Variant): Integer;
@@ -256,6 +275,7 @@ begin
      (CompareText(AddBackslash(ExpandFileName(WizardDirValue)), AddBackslash(ExpandFileName(PreviousDirectory))) <> 0) then
     Result := 'An Entropy Service installation already exists at ' + PreviousDirectory + '.' + #13#10 +
       'Upgrade in that location, or uninstall it through Windows Apps before choosing a different folder.';
+  if Result = '' then Result := PrepareManagedService;
   if (Result = '') and ReplacingInstallation then
   begin
     UpgradeProgress.SetText('Checking running applications and private runtime helpers...',
@@ -267,4 +287,5 @@ begin
       UpgradeProgress.Hide;
     end;
   end;
+  if Result <> '' then RestoreStoppedService;
 end;

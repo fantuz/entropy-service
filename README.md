@@ -26,7 +26,7 @@
 
 **Self-hosted random data — configurable entropy sources, high-throughput delivery, and interactive exploration.**
 
-Software Architecture, Build pipelines and Security Audit by Massimiliano Fantuzzi. [MIT License](LICENSE).
+Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi. [MIT License](LICENSE).
 
 Entropy Service is a Go server and command-line client for generating, distributing, and inspecting pseudorandom data from a cryptographic deterministic random bit generator (DRBG). It supports hardware or operating-system seed sources; ChaCha20 and AES-256-CTR backends; bounded HTTP and WebSocket delivery; and a browser-based showcase for experiments and diagnostics.
 
@@ -181,6 +181,8 @@ edits common startup options, starts and stops its own server/client processes,
 and displays live server health or a client waterfall with fullscreen mode.
 Linux and macOS use source launchers with Python/GTK dependencies; the
 [Windows GUI installer](docs/windows-gui-installer.md) bundles its private runtime.
+Repository installer builds also offer an explicit, default-off Windows server
+service through administrative all-users setup; desktop-only setup remains per-user.
 See the [running server and client screenshots](#desktop-guis).
 
 ![Entropy client with byte-hue waterfall](docs/images/client-waterfall.png)

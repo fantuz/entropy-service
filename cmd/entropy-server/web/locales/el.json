@@ -929,5 +929,7 @@
   "{{waterfall_title}}": "{{waterfall_title}}",
   "← All endpoints": "← Όλα τα σημεία πρόσβασης",
   "← Back to all endpoints": "← Επιστροφή σε όλα τα σημεία πρόσβασης",
-  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Διακομιστής: {platform}. Τύποι πηγών LAB: {kinds}. Οι κάμερες δικτύου απαιτούν επίσης FFmpeg."
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Διακομιστής: {platform}. Τύποι πηγών LAB: {kinds}. Οι κάμερες δικτύου απαιτούν επίσης FFmpeg.",
+  "Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi": "Αρχιτεκτονική λογισμικού, διαδικασίες μεταγλώττισης και έλεγχος ασφάλειας από τον Massimiliano Fantuzzi",
+  "MIT License": "Άδεια MIT"
 }

@@ -20,7 +20,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{C5571481-03FA-4233-92FC-B0EF9BA76A44}_is1"
 MANAGED = ("app", "bin", "runtime", "runtime-package-metadata", "docs")
-PROJECT_CREDIT = "Software Architecture, Build pipelines and Security Audit by Massimiliano Fantuzzi"
+PROJECT_CREDIT = "Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi"
 
 
 def wait_for(predicate, description, timeout=20):
@@ -289,7 +289,7 @@ def main():
             setups[version] = next(output.glob("*_gui_setup.exe"))
 
         def launch(version, name, *, silent=False, target=installation):
-            command = [str(setups[version]), "/SP-", "/NORESTART", "/DIR=" + str(target),
+            command = [str(setups[version]), "/SP-", "/CURRENTUSER", "/NORESTART", "/DIR=" + str(target),
                        "/LOG=" + str(artifacts / (name + ".log"))]
             if silent:
                 command += ["/VERYSILENT", "/SUPPRESSMSGBOXES"]

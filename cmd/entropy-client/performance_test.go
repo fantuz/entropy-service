@@ -168,3 +168,44 @@ func TestAdaptiveFailureRemainsFailureAndCancelInterruptsLongPacing(t *testing.T
 		t.Fatal("adaptive wait blocked cancellation")
 	}
 }
+
+func TestConfiguredPullTimeoutAndCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(80 * time.Millisecond)
+
+		_, _ = w.Write(bytes.Repeat([]byte{1}, 64))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{Refresh: time.Millisecond, Slice: 64, RequestTimeout: 20 * time.Millisecond}
+
+	frames := make(chan client.StreamFrame, 1)
+	if err := pullFramesWithPacing(t.Context(), cfg, server.URL, frames, nil); err == nil || !strings.Contains(err.Error(), "deadline exceeded") {
+		t.Fatalf("short request budget did not fail: %v", err)
+	}
+
+	cfg.RequestTimeout = time.Second
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- pullFramesWithPacing(ctx, cfg, server.URL, frames, nil) }()
+
+	select {
+	case frame := <-frames:
+		if len(frame.Data) != 64 {
+			t.Fatalf("configured timeout changed payload: %d", len(frame.Data))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("larger explicit budget did not permit the response")
+	}
+
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("larger request budget delayed cancellation")
+	}
+}

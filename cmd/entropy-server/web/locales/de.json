@@ -929,5 +929,7 @@
   "{{waterfall_title}}": "{{waterfall_title}}",
   "← All endpoints": "← Alle Endpunkte",
   "← Back to all endpoints": "← Zurück zu allen Endpunkten",
-  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Server: {platform}. LAB-Quellentypen: {kinds}. Netzwerkkameras benötigen zusätzlich FFmpeg."
+  "Server: {platform}. LAB registration types: {kinds}. Network cameras also require FFmpeg.": "Server: {platform}. LAB-Quellentypen: {kinds}. Netzwerkkameras benötigen zusätzlich FFmpeg.",
+  "Software Architecture, Build Pipelines and Security Audit by Massimiliano Fantuzzi": "Softwarearchitektur, Build-Pipelines und Sicherheitsaudit von Massimiliano Fantuzzi",
+  "MIT License": "MIT-Lizenz"
 }
