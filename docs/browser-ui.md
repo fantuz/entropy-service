@@ -365,8 +365,10 @@ unaffected.
 
 ## Byte, colour and upload presentation
 
-`/api-bytes.html` uses the common light/dark theme for its hexadecimal, Base64
-and SHA-256 fields rather than an old inline stylesheet. Base64 remains
+`/api-bytes.html` requests the first 256 bytes of each generated sample, or the
+whole sample when smaller. It shows the generated length, received prefix length
+and SHA-256 of the full sample. Hexadecimal and Base64 encode the received prefix.
+Each WebSocket message fits in 292 bytes. Base64 remains
 in a centered, width-limited box with justified wrapped lines and a centered
 last line. CSS changes no characters, spaces or padding in the copyable sample.
 

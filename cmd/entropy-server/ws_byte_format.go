@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,7 +19,11 @@ type byteFrameFormat string
 const (
 	byteFrameJSON    byteFrameFormat = "json"
 	byteFrameCompact byteFrameFormat = "compact"
+	byteFramePreview byteFrameFormat = "preview"
 	byteFrameHash    byteFrameFormat = "hash"
+
+	previewPrefixBytes = 256
+	previewHeaderBytes = 4 + sha256.Size
 )
 
 func parseByteFrameFormat(query url.Values) (byteFrameFormat, error) {
@@ -29,17 +34,17 @@ func parseByteFrameFormat(query url.Values) (byteFrameFormat, error) {
 
 	if len(values) == 1 {
 		switch format := byteFrameFormat(values[0]); format {
-		case byteFrameJSON, byteFrameCompact, byteFrameHash:
+		case byteFrameJSON, byteFrameCompact, byteFramePreview, byteFrameHash:
 			return format, nil
 		}
 	}
 
-	return "", errors.New("format must be supplied once as json, compact or hash")
+	return "", errors.New("format must be supplied once as json, compact, preview or hash")
 }
 
 func writeByteFrame(conn *websocket.Conn, data []byte, format byteFrameFormat) error {
 	kind := websocket.TextMessage
-	if format == byteFrameCompact {
+	if format == byteFrameCompact || format == byteFramePreview {
 		kind = websocket.BinaryMessage
 	}
 
@@ -52,6 +57,15 @@ func encodeByteFrame(w io.Writer, data []byte, format byteFrameFormat) error {
 	digest := sha256.Sum256(data)
 
 	switch format {
+	case byteFramePreview:
+		// Preview v1: full sample length (big endian), its digest, then its prefix.
+		var frame [previewHeaderBytes + previewPrefixBytes]byte
+		binary.BigEndian.PutUint32(frame[:4], uint32(len(data)))
+		copy(frame[4:previewHeaderBytes], digest[:])
+		n := copy(frame[previewHeaderBytes:], data)
+		_, err := w.Write(frame[:previewHeaderBytes+n])
+
+		return err
 	case byteFrameCompact:
 		// Compact v1: one binary message containing the 32-byte SHA-256 digest
 		// followed by the requested raw bytes. Separate writes avoid a large copy.
