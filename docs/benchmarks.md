@@ -14,6 +14,7 @@ For a **32 MiB generated sample**, current encoder payloads are:
 | `/stream` | 33,554,432 | Raw sample. |
 | `/bytes?format=json` | 111,848,205 | Hex + Base64 + digest, approximately 106.7 MiB. |
 | `/bytes?format=compact` | 33,554,464 | Digest + raw sample: 32 bytes overhead. |
+| `/bytes?format=preview` | 292 | Generated size, digest of the full sample and its first 256 bytes. |
 | `/colors?format=hash` | 93 | Digest and sample length; no raw sample. |
 
 Sizes include JSON's trailing newline and exclude HTTP Upgrade, WebSocket framing and TLS overhead. Compact cuts application payload by about **70% versus the JSON byte format**. Ordinary binary HTTP and `/stream` were already raw and do not incur that 3.33× text-encoding expansion.

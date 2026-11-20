@@ -25,6 +25,21 @@ const (
 	Barzakh521 Algorithm = "barzakh-521-experimental"
 )
 
+// CompiledAlgorithms lists the compiled backends and their host availability.
+// CPU feature detection uses CPUID. No generator or seed source is opened.
+func CompiledAlgorithms() map[string]bool {
+	backends := map[string]bool{string(AES256CTR): true, string(ChaCha20): true}
+	if barzakhEnabled {
+		backends[string(Barzakh521)] = true
+	}
+
+	if rdrand.Compiled {
+		backends[string(RDRAND)] = rdrand.Available()
+	}
+
+	return backends
+}
+
 func ParseAlgorithm(name string) (Algorithm, error) {
 	algorithm := Algorithm(name)
 	switch algorithm {

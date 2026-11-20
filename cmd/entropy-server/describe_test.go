@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,6 +57,10 @@ func TestServerDescriptionOmitsPrivateConfiguration(t *testing.T) {
 
 	if got.Features.ExternalUILocales != externalUILocales {
 		t.Fatal("descriptor must report its catalog build mode without inspecting installed files")
+	}
+
+	if !maps.Equal(got.Backends["drbg"], drbg.CompiledAlgorithms()) {
+		t.Fatalf("wrong generator inventory: %v", got.Backends)
 	}
 
 	if err := writeServerDescription(failingDescriptionWriter{}, cfg); !errors.Is(err, io.ErrClosedPipe) {

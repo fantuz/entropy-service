@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/rdrand"
 )
 
 func testAlgorithms() []Algorithm {
@@ -17,6 +19,27 @@ func testAlgorithms() []Algorithm {
 	}
 
 	return algorithms
+}
+
+func TestCompiledAlgorithms(t *testing.T) {
+	inventory := CompiledAlgorithms()
+	if !inventory[string(AES256CTR)] || !inventory[string(ChaCha20)] {
+		t.Fatal("missing standard software generator")
+	}
+
+	if enabled, compiled := inventory[string(Barzakh521)]; enabled != barzakhEnabled || compiled != barzakhEnabled {
+		t.Fatalf("incorrect Barzakh build status: %v", inventory)
+	}
+
+	if available, compiled := inventory[string(RDRAND)]; available != rdrand.Available() || compiled != rdrand.Compiled {
+		t.Fatalf("incorrect RDRAND build/host status: %v", inventory)
+	}
+
+	for name, available := range inventory {
+		if _, err := ParseAlgorithm(name); (err == nil) != available {
+			t.Fatalf("%s availability=%t but selection returned %v", name, available, err)
+		}
+	}
 }
 
 func testSeed() []byte {

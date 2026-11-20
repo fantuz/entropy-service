@@ -4,9 +4,9 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools/desktop-gui"))
-from entropy_gui.model import ReportError, StreamModel, performance_text
+from entropy_gui.model import ReportError, StreamModel, performance_text, received_throughput
 from entropy_gui.options import fields_for
-from test_desktop_gui import start_record, sample_record
+from test_desktop_gui import start_record, sample_record, summary_record
 
 
 def performance():
@@ -62,6 +62,15 @@ class PerformanceTests(unittest.TestCase):
         self.assertEqual(state["sample"]["received_bytes"], sample["received_bytes"])
         self.assertEqual(state["performance"]["received_bytes"], 2097152)
         self.assertIn("9.80 average received", performance_text(state))
+        self.assertEqual(received_throughput(state), 1.0)
+        model.consume({**sample_record(), "elapsed_ms": 3000, "received_bytes": 6 << 20})
+        self.assertEqual(received_throughput(model.snapshot()), 2.0)
+        model.consume({**update, "elapsed_ms": 4000, "received_bytes": 12 << 20, "received_mib_per_second": 3.0})
+        self.assertEqual(received_throughput(model.snapshot()), 3.0)
+        model.consume({**summary_record(), "elapsed_ms": 5000, "received_bytes": 13 << 20, "received_mib_per_second": 2.6})
+        self.assertEqual(received_throughput(model.snapshot()), 2.6)
+        model.reset()
+        self.assertIsNone(received_throughput(model.snapshot()))
 
     def test_editor_exposes_discovery_and_optional_adaptive_limits(self):
         names = {field.name for field in fields_for("client")}

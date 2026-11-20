@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real browser checks for shared themes, navigation, plots and lab disclosures."""
 import argparse
+import base64
 import json
 from pathlib import Path
 import signal
@@ -64,7 +65,17 @@ def main():
                             page = context.new_page()
                             errors = []
                             page.on("pageerror", lambda error, errors=errors: errors.append({"message": str(error), "stack": error.stack}))
-                            page.goto(base + path)
+                            large_preview = path == "/api-bytes.html" and width == 1440 and theme == "light"
+                            query = "?bytes=8388608&refresh=100" if large_preview else ""
+                            page.goto(base + path + query)
+                            if large_preview:
+                                expect(page.locator("#sample-info")).to_have_text(
+                                    "8388608 bytes generated. Received 256 preview bytes. SHA-256 covers the full sample.")
+                                raw, encoded, digest = page.evaluate(
+                                    "['hex', 'base64', 'hash'].map(id => document.getElementById(id).textContent)")
+                                prefix = bytes.fromhex(raw)
+                                assert len(prefix) == 256 and base64.b64decode(encoded, validate=True) == prefix
+                                assert len(bytes.fromhex(digest)) == 32
                             # Layout checks have their own page. Finish classic
                             # worker bootstrap before closing/reloading it;
                             # Firefox otherwise reports the cancelled import.

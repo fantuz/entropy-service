@@ -537,19 +537,28 @@ alongside the CLI/browser regression suites. Fullscreen geometry and native
 Wayland/HiDPI behavior can depend on the desktop compositor. The
 [Windows installer](windows-gui-installer.md) bundles the private runtime; native
 [Windows Service commands](windows-service.md) are separate from GUI process
-controls. macOS, signing and GUI integration with operating-system services
-remain follow-ups.
+controls. Signing and desktop management of operating-system services remain
+follow-ups.
 
-The server's Output backend selector also offers `rdrand-experimental` for
-explicit CPU experiments. It requires native x64 and advertised RDRAND support;
-the CLI rejects it on unsupported hosts. This mode has CPU-only output trust,
-no software fallback and a restart-required failure latch. See the
-[direct CPU backend guide](experimental-rdrand.md) before selecting it.
+**Output backend** in the server editor and **Transport** in the client editor
+use the choices advertised by the selected executable. Native amd64 servers
+offer RDRAND on CPUs that advertise it. Builds with `experimental_barzakh`
+also offer Barzakh-521. After applying a different executable, reopen Options
+to see its choices. Older companions that omit the backend inventory use the
+legacy choices and validate the selection when applying settings. The CLI
+descriptor also lists its compiled export destinations. The desktop client
+reserves stdout for its JSONL report. [Descriptor fields](configuration.md) ·
+[Direct CPU backend](experimental-rdrand.md)
 
 macOS Intel and Apple Silicon use the same interface through the
 [Homebrew launcher](macos.md#homebrew-gui).
 
 ## Server limits and acquisition performance
+
+In server **Options → Resource limits**, set the maximum sample size, concurrent
+HTTP generation requests, concurrent entropy WebSockets and each transport's
+memory budget in MiB. The selected server binary validates the values before
+they can be applied to a new run.
 
 Client Options now includes **Server capability discovery**, **Adaptive HTTP pull
 pacing**, and its maximum interval. Start checks advertised operator limits

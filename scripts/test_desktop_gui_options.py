@@ -11,6 +11,28 @@ from entropy_gui.options import edited_arguments, fields_for, initial_values
 
 
 class StartupOptionsTests(unittest.TestCase):
+    def test_binary_inventory_supplies_available_backends(self):
+        for role, flag, advertised, expected in (
+                ("server", "drbg", {"aes-256-ctr": True, "rdrand-experimental": False,
+                                    "barzakh-521-experimental": True}, ("aes-256-ctr", "barzakh-521-experimental")),
+                ("client", "mode", {"pull": True}, ("pull",))):
+            fields = fields_for(role, {flag: advertised, "output": {"file": True}})
+            self.assertEqual(next(f.choices for f in fields if f.name == flag), expected)
+            self.assertNotIn("output", [f.name for f in fields])
+
+    def test_transport_budgets_use_cli_values_and_preserve_unedited_arguments(self):
+        settings = {"http_max_requests": 5, "http_memory_mib": 7, "ws_max_connections": 11, "ws_memory_mib": 13}
+        arguments = ["--ws-memory-mib", "19", "-lab-memory-mib=3"]
+        values = initial_values("server", arguments, {"settings": settings})
+        self.assertEqual([values[name.replace("_", "-")] for name in settings], ["5", "7", "11", "19"])
+        self.assertEqual(edited_arguments("server", arguments, {"ws-memory-mib": "23"}),
+                         ["-lab-memory-mib=3", "-ws-memory-mib=23"])
+
+    def test_adaptive_checkbox_reads_boolean_from_descriptor(self):
+        description = {"settings": {"adaptive": True}}
+        self.assertIs(initial_values("client", [], description)["adaptive"], True)
+        self.assertIs(initial_values("client", ["-adaptive=false"], description)["adaptive"], False)
+
     def test_explicit_experimental_cpu_backend_is_preserved(self):
         field = next(field for field in fields_for("server") if field.name == "drbg")
         self.assertIn("rdrand-experimental", field.choices)

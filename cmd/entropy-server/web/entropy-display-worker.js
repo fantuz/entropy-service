@@ -2,6 +2,7 @@
 
 const maxDisplayBytes = 32 * 1024 * 1024;
 const previewBytes = 256;
+const previewHeaderBytes = 4 + 32;
 let socket = null;
 let pending = null;
 let awaitingPaint = false;
@@ -21,18 +22,19 @@ function decodeDisplayFrame(data, view) {
         return { hash: frame.hash, bytes: frame.bytes };
     }
 
-    if (!(data instanceof ArrayBuffer) || data.byteLength < 33 ||
-        data.byteLength > maxDisplayBytes + 32) {
-        throw new Error("Invalid compact response");
+    if (!(data instanceof ArrayBuffer) || data.byteLength <= previewHeaderBytes ||
+        data.byteLength > previewHeaderBytes + previewBytes) {
+        throw new Error("Invalid preview response");
     }
 
-    // Compact v1: SHA-256 of the full sample, followed by the sample itself.
-    // Only encode a bounded preview; never create full-sample display strings.
-    const bytes = new Uint8Array(data, 32);
-    const preview = bytes.subarray(0, previewBytes);
+    const generated = new DataView(data).getUint32(0);
+    const preview = new Uint8Array(data, previewHeaderBytes);
+    if (generated < 1 || generated > maxDisplayBytes || preview.length !== Math.min(generated, previewBytes)) {
+        throw new Error("Invalid preview response");
+    }
     return {
-        hash: hexOf(new Uint8Array(data, 0, 32)),
-        bytes: bytes.length,
+        hash: hexOf(new Uint8Array(data, 4, 32)),
+        bytes: generated,
         previewBytes: preview.length,
         hex: hexOf(preview),
         base64: btoa(String.fromCharCode(...preview))

@@ -56,10 +56,35 @@ assert.equal(colors.swatch.color, "#fff");
 assert.equal(colors.style.backgroundColor, undefined, "page chrome follows the selected theme");
 assert.equal(simulateFrame("colors", {...frame, hash: "f".repeat(64)}).swatch.color, "#000", "bright sample swatches need dark digest text");
 const bytes = simulateFrame("bytes", frame);
+assert.equal(new URL(bytes.worker.messages[0].url).searchParams.get("format"), "preview");
+assert.equal(new URL(colors.worker.messages[0].url).searchParams.get("format"), "hash");
+assert.match(bytes.value("sample-info"), /64 bytes generated\. Received 2 preview bytes/);
 assert.equal(bytes.value("hash"), hash);
 assert.equal(bytes.value("base64"), "ESI=");
 assert.equal(bytes.value("hex"), "11 22");
 assert.equal(bytes.style.backgroundColor, undefined);
+
+const worker = {self: {}, ArrayBuffer, Uint8Array, DataView, btoa};
+vm.runInNewContext(readFileSync(new URL("entropy-display-worker.js", root), "utf8"), worker);
+for (const size of [1, 255, 256, 257, 32 << 20]) {
+    const prefixSize = Math.min(size, 256);
+    const data = new ArrayBuffer(36 + prefixSize);
+    const header = new DataView(data);
+    header.setUint32(0, size);
+    new Uint8Array(data, 4, 32).fill(0xab);
+    new Uint8Array(data, 36).fill(0x5a);
+    const decoded = worker.decodeDisplayFrame(data, "bytes");
+    assert.equal(decoded.bytes, size);
+    assert.equal(decoded.hash, "ab".repeat(32));
+    assert.equal(decoded.hex, "5a".repeat(prefixSize));
+    assert.equal(decoded.base64, Buffer.alloc(prefixSize, 0x5a).toString("base64"));
+    assert.throws(() => worker.decodeDisplayFrame(data.slice(0, -1), "bytes"), /Invalid preview/);
+    header.setUint32(0, 0);
+    assert.throws(() => worker.decodeDisplayFrame(data, "bytes"), /Invalid preview/);
+    header.setUint32(0, (32 << 20) + 1);
+    assert.throws(() => worker.decodeDisplayFrame(data, "bytes"), /Invalid preview/);
+}
+assert.throws(() => worker.decodeDisplayFrame(new ArrayBuffer(293), "bytes"), /Invalid preview/);
 
 // The old inline CSS hid the shared Base64 layout; the new page must use only
 // the common stylesheet. The WebSocket path labels must be flex-pinned.

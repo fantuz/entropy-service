@@ -7,6 +7,18 @@ startup configuration, then exit before opening runtime devices, listeners,
 TLS material or output destinations. It describes requested options rather
 than live health. See the optional [desktop GUI](desktop-gui.md).
 
+The schema-version-1 `backends` object lists the implementations compiled into
+the selected executable. A value of `true` means the build and host meet the
+backend's selection requirements. A native amd64 server can report
+`"rdrand-experimental": false` when its CPU lacks the instruction. Pure-Go
+and non-amd64 builds omit that entry. Describe mode performs no sample reads.
+
+| Binary | Group | Advertised choices |
+| --- | --- | --- |
+| Server | `backends.drbg` | AES-256-CTR, ChaCha20, native RDRAND and tagged Barzakh-521 as compiled. Keys use the exact `-drbg` names. |
+| Client | `backends.mode` | `pull` (HTTP) and `push` (WebSocket). Existing CLI aliases also work. |
+| Client | `backends.output` | `file` on all builds, raw `stdout` on Linux/macOS and `device` on Linux. The Linux device writer also serves `-writeout`. Opening a destination checks its permissions and type. |
+
 ## Server
 
 Server millisecond flags accept **plain integer milliseconds**, without a unit suffix: `-reseed-ms=15000`, not `15s`. The `-source-timeout` flag instead accepts a **Go duration**, such as `3s`; hardware subcommand `-timeout` flags also use durations. Sizes below are bytes unless explicitly labelled MiB.

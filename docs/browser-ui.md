@@ -365,8 +365,10 @@ unaffected.
 
 ## Byte, colour and upload presentation
 
-`/api-bytes.html` uses the common light/dark theme for its hexadecimal, Base64
-and SHA-256 fields rather than an old inline stylesheet. Base64 remains
+`/api-bytes.html` requests the first 256 bytes of each generated sample, or the
+whole sample when smaller. It shows the generated length, received prefix length
+and SHA-256 of the full sample. Hexadecimal and Base64 encode the received prefix.
+Each WebSocket message fits in 292 bytes. Base64 remains
 in a centered, width-limited box with justified wrapped lines and a centered
 last line. CSS changes no characters, spaces or padding in the copyable sample.
 
@@ -554,7 +556,9 @@ default cadences are unchanged.
 Gallery refresh accepts 0.05–120 seconds in 0.05-second steps; its default is
 still two seconds. A batch finishes before the next begins. Status refresh
 accepts 0.05–60 seconds and defaults to five seconds; it also waits for the current
-cycle to finish. At fast status refresh rates, the dashboard's health/metrics
+cycle to finish. A hidden status page pauses polling. Returning to the tab or
+restoring the page with Back starts a fresh check and a new rate sampling window.
+At fast status refresh rates, the dashboard's health/metrics
 requests contribute to `http_requests_total`. Network latency, browser scheduling,
 FFT settings and rendering cost can lower actual frame rates. Display FPS is
 independent of FFT frequency units (cycles/byte) and does not measure entropy rate.

@@ -11,7 +11,7 @@ import (
 )
 
 func FuzzGenerationQuery(f *testing.F) {
-	for _, seed := range []string{"", "bytes=1", "bytes=33554433", "bytes=1&bytes=2", "bytes=%zz", "bytes=-1&format=compact", "format=json&format=hash"} {
+	for _, seed := range []string{"", "bytes=1", "bytes=33554433", "bytes=1&bytes=2", "bytes=%zz", "bytes=-1&format=compact", "format=preview", "format=json&format=hash"} {
 		f.Add(seed)
 	}
 
@@ -28,7 +28,7 @@ func FuzzGenerationQuery(f *testing.F) {
 		}
 
 		format, err := parseByteFrameFormat(request.URL.Query())
-		if err == nil && format != byteFrameJSON && format != byteFrameCompact && format != byteFrameHash {
+		if err == nil && format != byteFrameJSON && format != byteFrameCompact && format != byteFramePreview && format != byteFrameHash {
 			t.Fatal("unknown format accepted")
 		}
 	})

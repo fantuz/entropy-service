@@ -95,6 +95,25 @@ def _discovery(value):
     return result
 
 
+def _latest_measurement(state):
+    sample = state.get("sample", {})
+    performance = state.get("performance", {})
+    if performance and performance["elapsed_ms"] >= sample.get("elapsed_ms", 0):
+        return performance
+    return sample
+
+
+def received_throughput(state):
+    """Average MiB/s from the newest measurement, or the final CLI summary."""
+    record = state.get("summary") or _latest_measurement(state)
+    if not record:
+        return None
+    if record["type"] in ("performance", "run_summary"):
+        return record["received_mib_per_second"]
+    seconds = record["elapsed_ms"] / 1000
+    return record["received_bytes"] / (1 << 20) / seconds if seconds else 0.0
+
+
 def performance_text(state):
     """Compact, scalar-only presentation; old companions may omit these fields."""
     discovery = state.get("discovery", {})
@@ -102,9 +121,7 @@ def performance_text(state):
     limit = discovery.get("max_bytes")
     server = f"Server capabilities: {status}" + (f" · max {limit:,} bytes" if limit else "")
     sample = state.get("sample", {})
-    performance = state.get("performance") or sample
-    if sample.get("elapsed_ms", 0) > performance.get("elapsed_ms", 0):
-        performance = sample
+    performance = _latest_measurement(state)
     record = state.get("summary") or performance
     if "average_received_fps" not in record:
         return server + "\nPerformance: awaiting measurements"
@@ -144,8 +161,17 @@ def configuration(data, role):
     features = value.get("features")
     if not isinstance(features, dict) or any(type(item) is not bool for item in features.values()):
         raise ReportError("Invalid feature switches")
+    backends = value.get("backends", {})
+    if not isinstance(backends, dict):
+        raise ReportError("Invalid backend inventory")
+    for flag, choices in backends.items():
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", flag) or not isinstance(choices, dict):
+            raise ReportError("Invalid backend group")
+        for name, available in choices.items():
+            if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", name) or type(available) is not bool:
+                raise ReportError("Invalid backend choice")
     return {"schema_version": 1, "type": "configuration", "role": role,
-            "live": False, "settings": settings, "features": dict(features)}
+            "live": False, "settings": settings, "features": dict(features), "backends": backends}
 
 
 def _number(record, key, *, integer=False, maximum=None):

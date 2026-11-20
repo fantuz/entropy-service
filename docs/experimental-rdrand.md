@@ -176,6 +176,47 @@ no network, renderer or statistical analysis. Allocation counts are reported
 by Go; they are not an assertion that the CPU instruction itself allocates.
 Benchmarks are opt-in and do not run during ordinary `go test`.
 
+## Reseed latency during concurrent reads
+
+On a Linux KVM guest, four simultaneous 32 MiB RDRAND reads delayed the server's
+root freshness update by **133 ms at p95**. The p99 varied from **155 to 208 ms**
+across three runs. The same four connections reading 1 MiB each produced a
+median run p95 of 4.69 ms.
+
+| Bytes per active read | Concurrent reads | p50 (ms) | p95 (ms) | p99 (ms) | Range of run p99s (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Idle | 0 | 0.000120 | 0.000160 | 0.000211 | 0.000191–0.000331 |
+| 1 MiB | 1 | 3.15 | 4.36 | 5.61 | 3.76–7.14 |
+| 1 MiB | 4 | 3.52 | 4.69 | 6.62 | 6.30–12.23 |
+| 8 MiB | 1 | 25.66 | 29.80 | 38.01 | 32.57–46.40 |
+| 8 MiB | 4 | 27.77 | 33.90 | 37.29 | 35.49–72.00 |
+| 32 MiB | 1 | 101.2 | 113.4 | 124.8 | 124.4–128.3 |
+| 32 MiB | 4 | 110.9 | 133.2 | 202.1 | 155.1–208.3 |
+
+Each run measured 100 updates per case. The table gives the median of the
+three run percentiles, with nearest-rank percentiles within each run. All reads
+and reseed calls completed successfully. The host reported an AMD EPYC 9V74
+with RDRAND exposed through KVM, Linux 6.18.57 and Go 1.26.11. The benchmark
+was pinned to four logical CPUs with `-cpu=4`. [Raw results](benchmark-results/rdrand-reseed-kvm-2026-11-20.txt)
+
+Each connection enters the actual CPU reader while holding the serving root's
+shared freshness lock. The benchmark releases all readers together and times
+`root.Reseed` with a 256-byte input already in memory. That interval includes
+waiting for the lock and recording the freshness update. Seed-device access,
+network delivery and the CPU's internal DRNG reseeding are outside this timing.
+Synchronizing the reads measures contention at the start of full-size reads.
+Ordinary traffic arrives at different points in a read. Use an identified
+bare-metal host to establish a physical CPU baseline.
+
+Repeat on a native amd64 binary with RDRAND available. The benchmark skips
+unsupported hosts and pure-Go builds. The custom p50/p95/p99 metrics time
+the reseed call. Go's standard ns/op includes the complete trial.
+
+```sh
+go test ./cmd/entropy-server/internal/drbg -run '^$' \
+  -bench '^BenchmarkRDRANDReseedLatency$' -cpu=4 -benchtime=100x -count=3
+```
+
 ## Test evidence and remaining qualification
 
 Deterministic fault-injection tests cover partial-buffer clearing, valid zero

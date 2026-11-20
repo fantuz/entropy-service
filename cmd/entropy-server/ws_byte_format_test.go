@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,7 +26,7 @@ func TestByteFrameFormats(t *testing.T) {
 	data := bytes.Repeat([]byte{0, 1, 0x7f, 0x80, 0xff}, 107)
 	digest := sha256.Sum256(data)
 
-	for _, format := range []byteFrameFormat{byteFrameJSON, byteFrameCompact, byteFrameHash} {
+	for _, format := range []byteFrameFormat{byteFrameJSON, byteFrameCompact, byteFramePreview, byteFrameHash} {
 		t.Run(string(format), func(t *testing.T) {
 			var output bytes.Buffer
 
@@ -37,8 +39,85 @@ func TestByteFrameFormats(t *testing.T) {
 	}
 }
 
+func TestJSONFrameWireCompatibility(t *testing.T) {
+	// Cross both the output buffer boundary and all three Base64 tail lengths.
+	for _, size := range []int{1, 2048, 65535, 65536, 65537} {
+		data := make([]byte, size)
+		for i := range data {
+			data[i] = byte(i)
+		}
+
+		digest := sha256.Sum256(data)
+
+		var want, got bytes.Buffer
+
+		err := json.NewEncoder(&want).Encode(EntropyDataFrame{
+			Hex: hex.EncodeToString(data), Base64: base64.StdEncoding.EncodeToString(data),
+			Hash: hex.EncodeToString(digest[:]),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := encodeByteFrame(&got, data, byteFrameJSON); err != nil || !bytes.Equal(got.Bytes(), want.Bytes()) {
+			t.Fatalf("%d sample bytes: legacy JSON wire bytes differ, err=%v", size, err)
+		}
+	}
+}
+
+func TestPreviewFrameBoundaries(t *testing.T) {
+	for _, size := range []int{1, 255, 256, 257, 8 << 20} {
+		data := bytes.Repeat([]byte{0x5a}, size)
+
+		var out bytes.Buffer
+		if err := encodeByteFrame(&out, data, byteFramePreview); err != nil {
+			t.Fatal(err)
+		}
+
+		checkByteFormat(t, byteFramePreview, out.Bytes(), data, sha256.Sum256(data))
+	}
+
+	w := &limitedFrameWriter{remaining: 36}
+	if err := encodeByteFrame(w, []byte{42}, byteFramePreview); !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatalf("preview write error = %v", err)
+	}
+}
+
+func TestJSONFrameWriteFailure(t *testing.T) {
+	data := make([]byte, 128<<10)
+	// Fail in each encoding and on the final flush.
+	for _, limit := range []int{100, 2*len(data) + 100, 2*len(data) + base64.StdEncoding.EncodedLen(len(data)) + 40} {
+		w := &limitedFrameWriter{remaining: limit}
+		if err := encodeByteFrame(w, data, byteFrameJSON); !errors.Is(err, io.ErrClosedPipe) {
+			t.Fatalf("failure after %d bytes: got %v", limit, err)
+		}
+	}
+}
+
+type limitedFrameWriter struct{ remaining int }
+
+func (w *limitedFrameWriter) Write(data []byte) (int, error) {
+	if len(data) > w.remaining {
+		return w.remaining, io.ErrClosedPipe
+	}
+
+	w.remaining -= len(data)
+
+	return len(data), nil
+}
+
 func checkByteFormat(t *testing.T, format byteFrameFormat, payload, data []byte, digest [32]byte) {
 	t.Helper()
+
+	if format == byteFramePreview {
+		prefix := data[:min(len(data), 256)]
+		if len(payload) != 36+len(prefix) || int(binary.BigEndian.Uint32(payload[:4])) != len(data) ||
+			!bytes.Equal(payload[4:36], digest[:]) || !bytes.Equal(payload[36:], prefix) {
+			t.Fatal("preview length, full-sample digest or prefix differs")
+		}
+
+		return
+	}
 
 	if format == byteFrameCompact {
 		if len(payload) != sha256.Size+len(data) || !bytes.Equal(payload[:sha256.Size], digest[:]) ||
@@ -99,7 +178,7 @@ func TestByteFrameFormatValidation(t *testing.T) {
 
 func TestByteFormatsUsePrivateGeneratorsAndReleaseBudget(t *testing.T) {
 	for _, algorithm := range []drbg.Algorithm{drbg.ChaCha20, drbg.AES256CTR} {
-		for _, format := range []byteFrameFormat{byteFrameCompact, byteFrameHash} {
+		for _, format := range []byteFrameFormat{byteFrameCompact, byteFramePreview, byteFrameHash} {
 			t.Run(algorithm.String()+"/"+string(format), func(t *testing.T) {
 				seed := bytes.Repeat([]byte{0x5a}, 64)
 
@@ -140,7 +219,7 @@ func TestByteFormatsUsePrivateGeneratorsAndReleaseBudget(t *testing.T) {
 							t.Fatal(err)
 						}
 
-						if (format == byteFrameCompact && kind != websocket.BinaryMessage) ||
+						if (format != byteFrameHash && kind != websocket.BinaryMessage) ||
 							(format == byteFrameHash && kind != websocket.TextMessage) {
 							t.Fatal("incorrect WebSocket message type")
 						}
@@ -176,7 +255,9 @@ func TestByteFormatMemoryAdmission(t *testing.T) {
 		budgetReject(t, server, "/bytes?bytes=1048576", http.StatusRequestEntityTooLarge)
 		budgetReject(t, server, "/colors?bytes=1048576&format=json", http.StatusRequestEntityTooLarge)
 
-		for _, path := range []string{"/bytes?bytes=1048576&format=compact", "/colors?bytes=1048576&format=hash"} {
+		budgetReject(t, server, "/bytes?bytes=2097152&format=preview", http.StatusRequestEntityTooLarge)
+
+		for _, path := range []string{"/bytes?bytes=1048576&format=compact", "/bytes?bytes=1048576&format=preview", "/colors?bytes=1048576&format=hash"} {
 			conn := budgetConnect(t, server, path)
 			if usage := budget.usage(); usage.Reserved != wsByteReservation(1<<20, false) {
 				t.Fatalf("incorrect reservation: %+v", usage)
@@ -190,8 +271,8 @@ func TestByteFormatMemoryAdmission(t *testing.T) {
 }
 
 func BenchmarkByteFrameFormats(b *testing.B) {
-	for _, size := range []int{512 << 10, 8 << 20} {
-		for _, format := range []byteFrameFormat{byteFrameJSON, byteFrameCompact, byteFrameHash} {
+	for _, size := range []int{2 << 10, 512 << 10, 8 << 20} {
+		for _, format := range []byteFrameFormat{byteFrameJSON, byteFrameCompact, byteFramePreview, byteFrameHash} {
 			b.Run(fmt.Sprintf("%dKiB/%s", size>>10, format), func(b *testing.B) {
 				data := bytes.Repeat([]byte{0x5a}, size)
 				b.SetBytes(int64(size))

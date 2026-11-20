@@ -1,0 +1,32 @@
+goos: linux
+goarch: amd64
+pkg: github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg
+cpu: AMD EPYC 9V74 80-Core Processor
+BenchmarkRDRANDReseedLatency/idle-4         	     100	       243.7 ns/op	         0.0005810 p100-ms	         0.0001200 p50-ms	         0.0001600 p95-ms	         0.0001910 p99-ms
+BenchmarkRDRANDReseedLatency/1MiB/1-readers-4         	     100	   3313184 ns/op	         5.674 p100-ms	         3.151 p50-ms	         4.363 p95-ms	         5.612 p99-ms
+BenchmarkRDRANDReseedLatency/1MiB/4-readers-4         	     100	   3741743 ns/op	         7.996 p100-ms	         3.514 p50-ms	         4.692 p95-ms	         6.615 p99-ms
+BenchmarkRDRANDReseedLatency/8MiB/1-readers-4         	     100	  26396370 ns/op	        41.08 p100-ms	        25.66 p50-ms	        29.80 p95-ms	        38.01 p99-ms
+BenchmarkRDRANDReseedLatency/8MiB/4-readers-4         	     100	  27727431 ns/op	        37.75 p100-ms	        27.56 p50-ms	        33.90 p95-ms	        35.49 p99-ms
+BenchmarkRDRANDReseedLatency/32MiB/1-readers-4        	     100	 102551581 ns/op	       136.0 p100-ms	       100.9 p50-ms	       110.4 p95-ms	       124.8 p99-ms
+BenchmarkRDRANDReseedLatency/32MiB/4-readers-4        	     100	 111673915 ns/op	       164.9 p100-ms	       109.0 p50-ms	       127.3 p95-ms	       155.1 p99-ms
+PASS
+
+goos: linux
+goarch: amd64
+pkg: github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg
+cpu: AMD EPYC 9V74 80-Core Processor
+BenchmarkRDRANDReseedLatency/idle-4         	     100	       883.7 ns/op	         0.0005500 p100-ms	         0.0001200 p50-ms	         0.0001600 p95-ms	         0.0002110 p99-ms
+BenchmarkRDRANDReseedLatency/idle-4         	     100	       350.2 ns/op	         0.0004510 p100-ms	         0.0001200 p50-ms	         0.0001400 p95-ms	         0.0003310 p99-ms
+BenchmarkRDRANDReseedLatency/1MiB/1-readers-4         	     100	   3215079 ns/op	         6.984 p100-ms	         3.153 p50-ms	         3.442 p95-ms	         3.757 p99-ms
+BenchmarkRDRANDReseedLatency/1MiB/1-readers-4         	     100	   3533896 ns/op	         7.176 p100-ms	         3.235 p50-ms	         5.155 p95-ms	         7.138 p99-ms
+BenchmarkRDRANDReseedLatency/1MiB/4-readers-4         	     100	   3691333 ns/op	         7.747 p100-ms	         3.519 p50-ms	         3.981 p95-ms	         6.301 p99-ms
+BenchmarkRDRANDReseedLatency/1MiB/4-readers-4         	     100	   3952526 ns/op	        12.33 p100-ms	         3.535 p50-ms	         6.173 p95-ms	        12.23 p99-ms
+BenchmarkRDRANDReseedLatency/8MiB/1-readers-4         	     100	  26148561 ns/op	        35.02 p100-ms	        25.69 p50-ms	        29.21 p95-ms	        32.57 p99-ms
+BenchmarkRDRANDReseedLatency/8MiB/1-readers-4         	     100	  26227148 ns/op	        53.01 p100-ms	        25.25 p50-ms	        29.82 p95-ms	        46.40 p99-ms
+BenchmarkRDRANDReseedLatency/8MiB/4-readers-4         	     100	  28159680 ns/op	        38.07 p100-ms	        27.77 p50-ms	        32.10 p95-ms	        37.29 p99-ms
+BenchmarkRDRANDReseedLatency/8MiB/4-readers-4         	     100	  30075185 ns/op	        82.22 p100-ms	        27.86 p50-ms	        37.96 p95-ms	        72.00 p99-ms
+BenchmarkRDRANDReseedLatency/32MiB/1-readers-4        	     100	 105281868 ns/op	       124.5 p100-ms	       102.8 p50-ms	       120.6 p95-ms	       124.4 p99-ms
+BenchmarkRDRANDReseedLatency/32MiB/1-readers-4        	     100	 103514954 ns/op	       168.4 p100-ms	       101.2 p50-ms	       113.4 p95-ms	       128.3 p99-ms
+BenchmarkRDRANDReseedLatency/32MiB/4-readers-4        	     100	 117334647 ns/op	       227.1 p100-ms	       111.4 p50-ms	       150.4 p95-ms	       208.3 p99-ms
+BenchmarkRDRANDReseedLatency/32MiB/4-readers-4        	     100	 115887985 ns/op	       223.0 p100-ms	       110.9 p50-ms	       133.2 p95-ms	       202.1 p99-ms
+PASS

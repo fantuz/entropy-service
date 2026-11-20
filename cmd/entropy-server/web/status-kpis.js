@@ -35,14 +35,19 @@
 
     function readMetrics(source) {
         const metrics = new Map();
+        let generated = "—", connections = "—";
         for (const line of source.split(/\r?\n/)) {
             if (!line || line.startsWith("#")) continue;
             const fields = /^([a-zA-Z_:][a-zA-Z0-9_:]*)\s+(\S+)(?:\s|$)/.exec(line);
             if (!fields) continue;
             const value = Number(fields[2]);
-            if (Number.isFinite(value) && value >= 0) metrics.set(fields[1], value);
+            if (!Number.isFinite(value) || value < 0) continue;
+            metrics.set(fields[1], value);
+            // Display the original decimal counter even beyond Number.MAX_SAFE_INTEGER.
+            if (fields[1] === "rng_bytes_generated_total") generated = fields[2];
+            if (fields[1] === "ws_connections_active") connections = fields[2];
         }
-        return metrics;
+        return {metrics, generated, connections};
     }
 
     function get(metrics, name) {
@@ -60,7 +65,8 @@
     }
 
     function text(id, value) {
-        document.getElementById(id).textContent = value;
+        const node = document.getElementById(id);
+        if (node.textContent !== value) node.textContent = value;
     }
 
     function count(value) {
@@ -156,8 +162,10 @@
     }
 
     function update(source) {
-        const metrics = readMetrics(source);
+        const {metrics, generated, connections} = readMetrics(source);
         if (metrics.size === 0) throw new Error("No numeric Prometheus metrics available");
+        text("bytes-generated", generated);
+        text("active-websockets", connections);
         const now = performance.now();
         const latest = history.at(-1);
         if (latest && counterNames.some(name => {
@@ -226,6 +234,8 @@
 
     function unavailable() {
         history.length = 0;
+        text("bytes-generated", "—");
+        text("active-websockets", "—");
         for (const name of gaugeNames) gauge(name, null, null, null, name.includes("Memory"));
         for (const name of rateNames) text(`kpi-${name}`, "—");
         for (const name of extraNames) text(`kpi-${name}`, "—");
@@ -235,5 +245,5 @@
         }
     }
 
-    window.EntropyStatusKPIs = {update, unavailable, updateReady};
+    window.EntropyStatusKPIs = {update, unavailable, updateReady, resetHistory() { history.length = 0; }};
 })();

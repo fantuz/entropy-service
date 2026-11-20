@@ -25,8 +25,8 @@ cancellation in a required job fails the aggregate gate.
 Code changes run independent Linux quality, bounded fuzz, all-package race
 (including the opt-in experimental backend), terminal and package jobs.
 The fuzz iteration budgets and terminal checks are unchanged. Compilation
-is cached; tests run again, with `-count=1` on coverage, race, fallback and
-native unit tests. Coverage profiles, logs and executables are artifacts,
+is cached; tests run again, with `-count=1` on coverage, race, fallback,
+installer-locale and native unit tests. Coverage profiles, logs and executables are artifacts,
 never reusable test results.
 
 The package producer builds the GoReleaser snapshot immediately, validates
@@ -59,7 +59,7 @@ overall PR duration.
 The local `setup-go-cache` action disables setup-go's combined cache and
 keeps separate verified module downloads and compiled inputs. Module keys
 include OS, architecture, exact Go version and `go.sum`. Build keys also
-include the compiler workload and a source/embedded-asset hash. A changed
+include the compiler workload and a hash of Go sources, assembly and embedded assets. A changed
 source restores the previous matching workload as a starting point and
 saves a fresh snapshot, instead of indefinitely hitting a stale immutable
 cache. Race, fuzz, browser, package and ordinary builds do not overwrite one

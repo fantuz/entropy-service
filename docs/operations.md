@@ -84,7 +84,7 @@ The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket hand
 | CLI receive queue | One queued WS message; other in-flight reader/consumer buffers can also exist. |
 | Network lifecycle | Context-driven cancellation, WS write deadlines and a shared five-second server shutdown deadline. |
 
-Budgets are **admission estimates, not process RSS limits**. For N-byte WS samples the reservation is `N + 64 KiB` for raw/compact/hash formats, or `16N + 64 KiB` for JSON. With the default 1 GiB budget and full 32 MiB samples, that admits at most 31 raw/compact/hash connections, or one JSON connection, before other reservations. TLS, kernel buffers, garbage collection and retained allocations require additional headroom.
+Budgets estimate working memory at admission. For N-byte WS samples the reservation is `N + 64 KiB` for raw, compact, preview and hash formats, or `16N + 64 KiB` for JSON. With the default 1 GiB budget and full 32 MiB samples, that admits at most 31 connections using the first four formats, or one JSON connection, before other reservations. TLS, kernel buffers, garbage collection and retained allocations require additional headroom.
 
 Invalid sample parameters return 400. A request whose reservation exceeds the entire memory budget returns 413; temporary connection/request or aggregate-memory exhaustion returns 503 with `Retry-After: 1`. Successful WebSocket admission is still followed by the usual Upgrade validation.
 
@@ -132,7 +132,7 @@ normal shutdown summary. Counters reset when the process starts.
 | CPU and concurrency | Removed the disconnected producer and busy-spinning WS branches; optional AES backend and private bulk generators reduce shared-lock contention. |
 | Validation and budgets | Validated byte counts/cookies, a common 32 MiB sample ceiling, inbound WS limits and aggregate HTTP/WS admission budgets. |
 | Lifecycle and diagnostics | Joined WS cleanup, client cancellation, synchronised client rate metrics and separate HTTP/WS cycle timing. |
-| Transmission and UI | Opt-in compact/hash WS formats, bounded browser previews and worker-based presentation instead of sending/rendering both full text encodings. |
+| Transmission and UI | The byte viewer receives a bounded prefix and full-sample digest. Compact and hash-only formats serve clients with different bandwidth needs. |
 | Features and operations | Harmonic WAV output, streaming file analysis, embedded web assets and failed-request logging; word sampling loads the dictionary once instead of shuffling it per request. |
 
 These are implementation improvements, not a claim of a measured percentage gain for every workload. The results below separate protocol size, encoding CPU cost and historical network throughput.

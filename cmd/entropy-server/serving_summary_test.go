@@ -92,7 +92,7 @@ func TestHTTPServedByteAccounting(t *testing.T) {
 
 func TestServingCountersAcrossWebSocketFormats(t *testing.T) {
 	for _, secure := range []bool{false, true} {
-		for _, path := range []string{"/stream", "/bytes", "/colors", "/bytes?format=compact", "/colors?format=hash", "/words"} {
+		for _, path := range []string{"/stream", "/bytes", "/colors", "/bytes?format=compact", "/bytes?format=preview", "/colors?format=hash", "/words"} {
 			t.Run(path+"/TLS="+boolLabel(secure), func(t *testing.T) {
 				before := metrics.ServingSnapshot()
 				budget := newWebSocketBudget(2, 1<<20)

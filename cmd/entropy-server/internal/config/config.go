@@ -163,7 +163,7 @@ func parseConfig(args []string, output io.Writer) (*Config, error) {
 		fmt.Fprintln(output, "Millisecond flags use plain integer milliseconds, e.g. 1000 (no unit suffix); source-timeout uses a Go duration, e.g. 3s.")
 		fmt.Fprintln(output, "WebSocket budgets are shared by HTTP/HTTPS and reserved until disconnect.")
 		fmt.Fprintln(output, "Inbound WebSocket messages are limited to 1 KiB.")
-		fmt.Fprintln(output, "/bytes and /colors accept format=json (default), compact, or hash.")
+		fmt.Fprintln(output, "/bytes and /colors accept format=json (default), compact, preview, or hash.")
 		fmt.Fprintln(output, "HTTP generation budgets are shared by HTTP/HTTPS; probes and static files are excluded.")
 		flags.PrintDefaults()
 	}
