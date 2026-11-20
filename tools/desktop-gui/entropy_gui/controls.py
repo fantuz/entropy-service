@@ -34,7 +34,8 @@ class SettingsWindow(Gtk.Window):
     """
 
     def __init__(self, parent, role, binary, arguments, descriptor, on_apply):
-        fields = fields_for(role)
+        advertised = (descriptor or {}).get("backends", {})
+        fields = fields_for(role, advertised)
         initial = initial_values(role, list(arguments), descriptor)
         super().__init__(title=f"Entropy {role.title()} · Options", transient_for=parent,
                          modal=True, destroy_with_parent=True)
@@ -42,6 +43,7 @@ class SettingsWindow(Gtk.Window):
         self._arguments = list(arguments)
         self._initial_binary = str(binary)
         self._fields = fields
+        self._advertised = advertised
         self._initial_values = initial
         # Compare edits with the displayed values, while retaining the original
         # arguments verbatim. Opening or resetting the editor must neither
@@ -114,9 +116,6 @@ class SettingsWindow(Gtk.Window):
                 grid.attach(caption, 0, row, 1, 1)
                 if field.kind == "choice":
                     choices = list(field.choices)
-                    current = str(self._initial_values[field.name])
-                    if current not in choices:
-                        choices.append(current)
                     self._choices[field.name] = choices
                     control = Gtk.DropDown.new_from_strings(choices)
                     control.set_hexpand(True)
@@ -188,6 +187,9 @@ class SettingsWindow(Gtk.Window):
         elif kind == "choice":
             value = str(value)
             if value not in self._choices[name]:
+                if name in self._advertised:
+                    control.set_selected(Gtk.INVALID_LIST_POSITION)
+                    return
                 self._choices[name].append(value)
                 control.get_model().append(value)
             control.set_selected(self._choices[name].index(value))

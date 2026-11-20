@@ -11,6 +11,15 @@ from entropy_gui.options import edited_arguments, fields_for, initial_values
 
 
 class StartupOptionsTests(unittest.TestCase):
+    def test_binary_inventory_supplies_available_backends(self):
+        for role, flag, advertised, expected in (
+                ("server", "drbg", {"aes-256-ctr": True, "rdrand-experimental": False,
+                                    "barzakh-521-experimental": True}, ("aes-256-ctr", "barzakh-521-experimental")),
+                ("client", "mode", {"pull": True}, ("pull",))):
+            fields = fields_for(role, {flag: advertised, "output": {"file": True}})
+            self.assertEqual(next(f.choices for f in fields if f.name == flag), expected)
+            self.assertNotIn("output", [f.name for f in fields])
+
     def test_transport_budgets_use_cli_values_and_preserve_unedited_arguments(self):
         settings = {"http_max_requests": 5, "http_memory_mib": 7, "ws_max_connections": 11, "ws_memory_mib": 13}
         arguments = ["--ws-memory-mib", "19", "-lab-memory-mib=3"]

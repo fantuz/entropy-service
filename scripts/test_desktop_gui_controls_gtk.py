@@ -110,6 +110,7 @@ def _client_options(context, application_type, binary, remote_port, artifacts):
         assert not window.web_application_button.get_sensitive(), "A credentialed endpoint must not open a browser URL"
         assert "fixture-password" not in window.web_application_button.get_tooltip_text()
         editor = _options(context, window)
+        assert set(editor._choices["mode"]) == {name for name, available in window.descriptor["backends"]["mode"].items() if available}
         assert editor.get_value("url") == displayed_endpoint, "Saved endpoint secrets were displayed"
         editor.set_value("capabilities", "required")
         editor.set_value("adaptive", True)
@@ -456,6 +457,7 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
             editor = window.settings_window
             limits = {"http-max-requests": 12, "http-memory-mib": 64,
                       "ws-max-connections": 8, "ws-memory-mib": 128}
+            assert set(editor._choices["drbg"]) == {name for name, available in window.descriptor["backends"]["drbg"].items() if available}
             for name, value in limits.items():
                 editor.set_value(name, str(value))
             for name, value in {"enable-https": True, "https": f"127.0.0.1:{https_port}",

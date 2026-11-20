@@ -2,6 +2,9 @@
 
 package rdrand
 
+// Compiled reports whether this binary includes the native instruction path.
+const Compiled = false
+
 const available = false
 
 const seedAvailable = false

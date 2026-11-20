@@ -4,6 +4,9 @@ package device
 
 import "errors"
 
+// Supported reports whether this binary includes the device writer.
+const Supported = false
+
 func Open() (*Writer, error) {
 	return nil, errors.New("writeout is supported only on Linux")
 }

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -53,6 +55,20 @@ func TestClientDescriptionRedactsAndLabelsRequestedOptions(t *testing.T) {
 
 			if got.SchemaVersion != 1 || got.Type != "configuration" || got.Role != "client" || got.Live || !got.Features["https"] || !got.Features["output"] || got.Settings.OutputKind != "file" {
 				t.Fatalf("incorrect configured-only description: %+v", got)
+			}
+
+			wantOutputs := map[string]bool{"file": true}
+			if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+				wantOutputs["stdout"] = true
+			}
+
+			if runtime.GOOS == "linux" {
+				wantOutputs["device"] = true
+			}
+
+			if !maps.Equal(got.Backends["output"], wantOutputs) ||
+				!maps.Equal(got.Backends["mode"], map[string]bool{"pull": true, "push": true}) {
+				t.Fatalf("incorrect client backend inventory: %v", got.Backends)
 			}
 
 			var extra any

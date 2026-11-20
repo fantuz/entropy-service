@@ -9,6 +9,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// RawStdoutSupported reports whether this binary can export binary samples to stdout.
+const RawStdoutSupported = true
+
 func OpenStdout() (*Writer, error) { return openStdout(os.Stdout) }
 
 // OpenTextStdout also allows human-readable reports to a terminal.

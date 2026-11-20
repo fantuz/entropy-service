@@ -161,8 +161,17 @@ def configuration(data, role):
     features = value.get("features")
     if not isinstance(features, dict) or any(type(item) is not bool for item in features.values()):
         raise ReportError("Invalid feature switches")
+    backends = value.get("backends", {})
+    if not isinstance(backends, dict):
+        raise ReportError("Invalid backend inventory")
+    for flag, choices in backends.items():
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", flag) or not isinstance(choices, dict):
+            raise ReportError("Invalid backend group")
+        for name, available in choices.items():
+            if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", name) or type(available) is not bool:
+                raise ReportError("Invalid backend choice")
     return {"schema_version": 1, "type": "configuration", "role": role,
-            "live": False, "settings": settings, "features": dict(features)}
+            "live": False, "settings": settings, "features": dict(features), "backends": backends}
 
 
 def _number(record, key, *, integer=False, maximum=None):

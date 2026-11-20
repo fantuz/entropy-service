@@ -4,7 +4,7 @@ The CLI remains responsible for validating option values. Only changed fields
 are written back, so advanced arguments and unredacted endpoints keep their
 original spelling when the user edits an unrelated field.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import platform
 import sys
 
@@ -136,12 +136,19 @@ _DESCRIPTION_FEATURES = {"enable-https": "https", "require-device": "require_dev
                          "lab-allow-remote": "lab_allow_remote"}
 
 
-def fields_for(role):
-    """Return the explicit editable allowlist for one utility."""
+def fields_for(role, backends=None):
+    """Use choices advertised by the selected binary for editable dropdowns."""
     try:
-        return _FIELDS[role]
+        fields = _FIELDS[role]
     except (KeyError, TypeError) as error:
         raise ValueError("Unknown utility role") from error
+    if not backends:
+        return fields
+    return tuple(
+        replace(field, choices=tuple(name for name, available in backends[field.name].items() if available))
+        if field.kind == "choice" and field.name in backends else field
+        for field in fields
+    )
 
 
 def _validated_arguments(role, arguments):

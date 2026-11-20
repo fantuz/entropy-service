@@ -108,6 +108,12 @@ class ModelTests(unittest.TestCase):
         value = {"schema_version": 1, "type": "configuration", "role": "server", "live": False,
                  "settings": {"drbg": "chacha20"}, "features": {"https": True}}
         self.assertFalse(configuration(encode(value), "server")["live"])
+        self.assertEqual(configuration(encode(value), "server")["backends"], {})
+        inventory = {"drbg": {"chacha20": True, "rdrand-experimental": False}}
+        self.assertEqual(configuration(encode({**value, "backends": inventory}), "server")["backends"], inventory)
+        for bad in ([], {"drbg": None}, {"drbg": {"bad\nname": True}}, {"drbg": {"rdrand-experimental": 1}}):
+            with self.subTest(backends=bad), self.assertRaises(ReportError):
+                configuration(encode({**value, "backends": bad}), "server")
         for changed in ({"live": True}, {"role": "client"}, {"features": {"https": "yes"}}):
             with self.subTest(changed=changed), self.assertRaises(ReportError):
                 configuration(encode({**value, **changed}), "server")

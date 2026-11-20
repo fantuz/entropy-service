@@ -6,18 +6,20 @@ import (
 	"io"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/config"
+	"github.com/fantuz/entropy-service/cmd/entropy-server/internal/drbg"
 )
 
 // The desktop interface inspects requested settings without starting a service. These
 // allowlisted fields intentionally omit TLS paths and private source registries.
 // Enabled features describe configuration, not successful runtime checks.
 type serverDescription struct {
-	SchemaVersion int                       `json:"schema_version"`
-	Type          string                    `json:"type"`
-	Role          string                    `json:"role"`
-	Live          bool                      `json:"live"`
-	Settings      serverDescriptionSettings `json:"settings"`
-	Features      serverDescriptionFeatures `json:"features"`
+	SchemaVersion int                        `json:"schema_version"`
+	Type          string                     `json:"type"`
+	Role          string                     `json:"role"`
+	Live          bool                       `json:"live"`
+	Settings      serverDescriptionSettings  `json:"settings"`
+	Features      serverDescriptionFeatures  `json:"features"`
+	Backends      map[string]map[string]bool `json:"backends"`
 }
 
 type serverDescriptionSettings struct {
@@ -56,6 +58,7 @@ type serverDescriptionFeatures struct {
 func writeServerDescription(out io.Writer, cfg *config.Config) error {
 	description := serverDescription{
 		SchemaVersion: 1, Type: "configuration", Role: "server", Live: false,
+		Backends: map[string]map[string]bool{"drbg": drbg.CompiledAlgorithms()},
 		Settings: serverDescriptionSettings{
 			DRBG: cfg.DRBG, HTTPAddress: cfg.HTTPAddr, HTTPSAddress: cfg.HTTPSAddr,
 			SeedSource: cfg.DevicePath, ReseedIntervalMS: cfg.ReseedMs,

@@ -8,6 +8,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Supported reports whether this binary includes the device writer.
+const Supported = true
+
 // Open opens the fixed Linux destination once, without creating/truncating a
 // file or following a symlink. Validate the actual descriptor before any write.
 func Open() (*Writer, error) {

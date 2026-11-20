@@ -7,18 +7,21 @@ import (
 	"net/url"
 
 	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/config"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/device"
+	"github.com/fantuz/entropy-service/cmd/entropy-client/internal/output"
 	"github.com/fantuz/entropy-service/internal/capabilities"
 )
 
 // Descriptions contain requested configuration only. They do not prove that an
 // endpoint, TLS identity, output destination or hardware device is available.
 type clientDescription struct {
-	SchemaVersion int             `json:"schema_version"`
-	Type          string          `json:"type"`
-	Role          string          `json:"role"`
-	Live          bool            `json:"live"`
-	Settings      reportSettings  `json:"settings"`
-	Features      map[string]bool `json:"features"`
+	SchemaVersion int                        `json:"schema_version"`
+	Type          string                     `json:"type"`
+	Role          string                     `json:"role"`
+	Live          bool                       `json:"live"`
+	Settings      reportSettings             `json:"settings"`
+	Features      map[string]bool            `json:"features"`
+	Backends      map[string]map[string]bool `json:"backends"`
 }
 
 const (
@@ -42,9 +45,21 @@ func writeClientDescription(out io.Writer, cfg *config.Config, endpoint string) 
 		return errors.New("describe endpoint is invalid")
 	}
 
+	destinations := map[string]bool{config.OutputKindFile: true}
+	if output.RawStdoutSupported {
+		destinations[config.OutputKindStdout] = true
+	}
+
+	if device.Supported {
+		destinations[config.OutputKindDevice] = true
+	}
+
 	return json.NewEncoder(out).Encode(clientDescription{
 		SchemaVersion: reportSchemaVersion, Type: "configuration", Role: "client", Live: false,
 		Settings: clientReportSettings(cfg, endpoint),
+		Backends: map[string]map[string]bool{
+			"mode": {config.ModePull: true, config.ModePush: true}, "output": destinations,
+		},
 		Features: map[string]bool{
 			"report_performance": cfg.ReportPerformance,
 			"adaptive":           cfg.Adaptive,

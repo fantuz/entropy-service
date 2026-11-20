@@ -63,7 +63,11 @@ const (
 	CapabilitiesOff       = "off"
 	CapabilitiesRequired  = "required"
 	ModePull              = "pull"
+	ModePush              = "push"
 	ModeStream            = "stream"
+	OutputKindFile        = "file"
+	OutputKindStdout      = "stdout"
+	OutputKindDevice      = "device"
 	MaxRetryDelay         = 30 * time.Second
 	DefaultRequestTimeout = 3 * time.Second
 	defaultColorMode      = "auto"
@@ -162,7 +166,7 @@ func (cfg *Config) NormalizeMode() error {
 	switch cfg.Mode {
 	case ModePull, "http":
 		cfg.Mode = ModePull
-	case ModeStream, "push", "websocket":
+	case ModeStream, ModePush, "websocket":
 		cfg.Mode = ModeStream
 	default:
 		return errors.New("mode must be http (pull) or websocket (push, stream)")
@@ -307,11 +311,11 @@ func (cfg *Config) OutputKind() string {
 	case cfg.WriteOut:
 		return "urandom"
 	case cfg.OutputDevice != "":
-		return "device"
+		return OutputKindDevice
 	case cfg.OutputPath == "-":
-		return "stdout"
+		return OutputKindStdout
 	case cfg.OutputPath != "":
-		return "file"
+		return OutputKindFile
 	default:
 		return "disabled"
 	}

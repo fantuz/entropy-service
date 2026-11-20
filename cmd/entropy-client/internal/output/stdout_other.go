@@ -7,6 +7,9 @@ import (
 	"os"
 )
 
+// RawStdoutSupported reports whether this binary can export binary samples to stdout.
+const RawStdoutSupported = false
+
 func OpenStdout() (*Writer, error) {
 	return nil, errors.New("raw stdout export is supported on Linux; use -output=FILE on this platform")
 }
