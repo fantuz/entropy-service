@@ -22,6 +22,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [Experimental Barzakh-521](experimental-barzakh.md) | Opt-in original Go scalar backend, build instructions, exact mapping, tests and licensing/patent boundary. |
 | [Process-memory hardening](process-memory-hardening.md) | Opt-in systemd protection, core-dump caveats and host security checklist. |
 | [DRBG lifecycle benchmarks](drbg-lifecycle-benchmarks.md) | Reproducible microbenchmark suite, before/after comparison, and interpretation. |
+| [Runtime and build review of v2.8.1](runtime-review-v2.8.1.md) | WebSocket allocation and loopback measurements, dashboard polling, desktop settings and build-cache findings. |
 | [Linux v2.0.3 performance assessment](linux-performance-v2.0.3.md) | Pre-Windows comparison, generator/HTTP/client measurements, source inspection, raw samples and limitations. |
 | [Architecture and assurance status](architecture-review.md) | Current controls, resolved historical findings, remaining assurance gaps and original review archive. |
 | [Coverage review, November 13](coverage-review-2026-11-13.md) | Exact-main CI baseline, weighted package counts, meaningful gaps and platform-test boundaries. |

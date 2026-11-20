@@ -10,7 +10,8 @@ import (
 const (
 	wsInboundLimit           = 1024
 	wsConnectionMemory int64 = 64 << 10
-	// Raw data, hex/base64 strings and copies, JSON scratch, and growth headroom.
+	// Keep the established admission limit for JSON's expanded wire payload,
+	// even though its encoder now streams through a bounded buffer.
 	wsJSONMemoryFactor int64 = 16
 )
 

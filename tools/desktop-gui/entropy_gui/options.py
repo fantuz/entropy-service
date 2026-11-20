@@ -84,6 +84,12 @@ _SERVER_FIELDS = (
     OptionField("buffer-reseed", "Bytes per reseed", "Reseed policy", hint="32–1048576 bytes."),
     OptionField("source-timeout", "Source read timeout", "Reseed policy", hint="Go duration from 1ms to 5m."),
     OptionField("max-bytes", "Maximum sample bytes", "Resource limits", hint="Up to 33554432 bytes (32 MiB), the server default. Also bounds LAB samples."),
+    OptionField("http-max-requests", "Concurrent HTTP generation requests", "Resource limits"),
+    OptionField("http-memory-mib", "HTTP generation memory budget (MiB)", "Resource limits",
+                hint="Estimated working memory shared by admitted HTTP generation requests."),
+    OptionField("ws-max-connections", "Concurrent entropy WebSockets", "Resource limits"),
+    OptionField("ws-memory-mib", "WebSocket memory budget (MiB)", "Resource limits",
+                hint="Estimated working memory shared by entropy WebSocket connections."),
 )
 
 _FIELDS = {"client": _CLIENT_FIELDS, "server": _SERVER_FIELDS}
@@ -111,6 +117,7 @@ _SERVER_DEFAULTS = {
     "lab-max-connections": "8", "lab-memory-mib": "32",
     "reseed-ms": "15000", "max-reseed-age": "0", "on-reseed-failure": "stop", "buffer-reseed": "256",
     "source-timeout": "3s", "max-bytes": "33554432",
+    "http-max-requests": "128", "http-memory-mib": "512", "ws-max-connections": "128", "ws-memory-mib": "1024",
 }
 _DESCRIPTION_SETTINGS = {
     "client": {"capabilities":"capabilities", "adaptive":"adaptive", "adaptive-max-interval":"adaptive_max_interval", "mode": "mode", "slice": "payload_bytes", "refresh": "refresh", "analysis-bytes": "analysis_bytes",
@@ -120,7 +127,9 @@ _DESCRIPTION_SETTINGS = {
                "reseed-ms": "reseed_interval_ms", "max-reseed-age": "max_reseed_age_ms",
                "on-reseed-failure": "reseed_failure_policy", "buffer-reseed": "reseed_bytes",
                "source-timeout": "source_timeout", "max-bytes": "max_bytes",
-               "lab-max-connections": "lab_max_connections", "lab-memory-mib": "lab_memory_mib"},
+               "lab-max-connections": "lab_max_connections", "lab-memory-mib": "lab_memory_mib",
+               "http-max-requests": "http_max_requests", "http-memory-mib": "http_memory_mib",
+               "ws-max-connections": "ws_max_connections", "ws-memory-mib": "ws_memory_mib"},
 }
 _DESCRIPTION_FEATURES = {"enable-https": "https", "require-device": "require_device", "cpu-mix": "cpu_mix",
                          "rdrand-mix": "rdrand_mix", "cookie": "cookie", "debug": "debug",
@@ -197,8 +206,12 @@ def initial_values(role, arguments, descriptor=None):
         if not isinstance(settings, dict) or not isinstance(features, dict):
             raise ValueError("Startup description settings and features must be objects")
         for flag, key in _DESCRIPTION_SETTINGS[role].items():
-            if key in settings and type(settings[key]) in (str, int, float):
-                values[flag] = str(settings[key])
+            value = settings.get(key)
+            if flag in _BOOL_FLAGS[role]:
+                if type(value) is bool:
+                    values[flag] = value
+            elif type(value) in (str, int, float):
+                values[flag] = str(value)
         if role == "server":
             for flag, key in _DESCRIPTION_FEATURES.items():
                 if type(features.get(key)) is bool:

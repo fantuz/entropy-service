@@ -17,7 +17,7 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Pango", "1.0")
 from gi.repository import Gdk, Gio, GLib, GObject, Gtk, Pango
 
-from .model import StreamModel, client_failure_text, performance_text, safe_text
+from .model import StreamModel, client_failure_text, performance_text, received_throughput, safe_text
 from .process import ClientSession, describe
 from .health import HealthSession
 from .controls import SettingsWindow
@@ -803,7 +803,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         if state["revision"] != self._revision:
             self._revision = state["revision"]
             self.performance_label.set_text(performance_text(state))
-            sample, settings, summary = state["sample"], state["settings"], state["summary"]
+            sample, settings = state["sample"], state["settings"]
             if settings:
                 self.stat_labels["threshold"].set_text(f"{settings['shannon_threshold_bits_per_byte']:.6f}")
             if sample:
@@ -813,17 +813,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
                 for name in ("status-ok", "status-warn"):
                     self.stat_labels["assessment"].remove_css_class(name)
                 self.stat_labels["assessment"].add_css_class("status-ok" if assessment == "OK" else "status-warn")
-                elapsed = sample.get("elapsed_ms", 0) / 1000
-                rate = sample.get("received_bytes", 0) / (1 << 20) / elapsed if elapsed > 0 else 0
-                self.stat_labels["throughput"].set_text(f"{rate:.3f}")
-            performance = state.get("performance", {})
-            if performance:
-                self.stat_labels["throughput"].set_text(f"{performance.get('received_mib_per_second', 0):.3f}")
-            performance = state.get("performance", {})
-            if performance.get("elapsed_ms", 0) >= sample.get("elapsed_ms", 0) and performance:
-                self.stat_labels["throughput"].set_text(f"{performance['received_mib_per_second']:.3f}")
-            if summary:
-                self.stat_labels["throughput"].set_text(f"{summary.get('received_mib_per_second', 0):.3f}")
+            rate = received_throughput(state)
+            self.stat_labels["throughput"].set_text("—" if rate is None else f"{rate:.3f}")
             if state["rows"] != self._rows:
                 self._rows = state["rows"]
                 self.placeholder.set_visible(not self._rows)

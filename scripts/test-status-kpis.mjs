@@ -147,4 +147,11 @@ update(first.replace("http_generation_memory_peak_reserved_bytes 402653184",
 assert.equal(value("kpi-httpMemory-peak-detail"), "PEAK N/A");
 assert.equal(document.getElementById("kpi-httpMemory-peak-shadow").style.width, "0%");
 
+update("rng_bytes_generated_total 9007199254740993\nws_connections_active 17");
+assert.equal(value("bytes-generated"), "9007199254740993");
+assert.equal(value("active-websockets"), "17");
+unavailable();
+assert.equal(value("bytes-generated"), "—");
+assert.equal(value("active-websockets"), "—");
+
 console.log("Status KPI calculations: passed");

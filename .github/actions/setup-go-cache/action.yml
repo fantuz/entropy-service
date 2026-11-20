@@ -1,5 +1,5 @@
 name: Setup Go with separate module and build caches
-description: Cache compiler inputs per platform, Go version, workload and source; never cache test results or executables.
+description: Cache module downloads and the Go build cache per platform, Go version, workload and compiler inputs.
 inputs:
   profile:
     description: Compiler workload (quality, race, fuzz, terminal, packages, browser, windows, endurance or publication)
@@ -34,6 +34,6 @@ runs:
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ${{ steps.paths.outputs.build }}
-        key: go-build-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.profile }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ hashFiles('**/*.go', 'cmd/entropy-server/web/**', 'cmd/entropy-server/internal/wordlist/**', 'Makefile', 'go.mod', '.github/actions/setup-go-cache/**') }}
+        key: go-build-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.profile }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ hashFiles('**/*.go', '**/*.s', 'cmd/entropy-server/web/**', 'cmd/entropy-server/internal/wordlist/**', 'Makefile', 'go.mod', '.github/actions/setup-go-cache/**') }}
         restore-keys: |
           go-build-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.profile }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum') }}-

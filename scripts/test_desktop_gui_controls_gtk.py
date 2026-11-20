@@ -454,6 +454,10 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
             wait_for(context, lambda: window.settings_window is not None and window.settings_window.get_mapped(),
                      "Edit features opens the native options editor")
             editor = window.settings_window
+            limits = {"http-max-requests": 12, "http-memory-mib": 64,
+                      "ws-max-connections": 8, "ws-memory-mib": 128}
+            for name, value in limits.items():
+                editor.set_value(name, str(value))
             for name, value in {"enable-https": True, "https": f"127.0.0.1:{https_port}",
                                 "cert-file": str(cert), "key-file": str(key), "cookie": True, "debug": True,
                                 "lab-sources": str(registry), "lab-allow-remote": False,
@@ -467,6 +471,8 @@ def _server_features(context, application_type, binary, remote_port, artifacts):
                      "LAB/debug/cookie options validated")
             assert all(window.feature_checks[name].get_active() for name in ("https", "cookie", "debug", "lab_registry"))
             assert not window.feature_checks["lab_allow_remote"].get_active()
+            for name, value in limits.items():
+                assert window.descriptor["settings"][name.replace("-", "_")] == value
             assert not registry.exists(), "Startup inspection unexpectedly created/read a registry"
             assert not any(_listener_open(port) for port in (http_port, https_port, 6060))
 

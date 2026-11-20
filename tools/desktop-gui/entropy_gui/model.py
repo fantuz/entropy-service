@@ -95,6 +95,25 @@ def _discovery(value):
     return result
 
 
+def _latest_measurement(state):
+    sample = state.get("sample", {})
+    performance = state.get("performance", {})
+    if performance and performance["elapsed_ms"] >= sample.get("elapsed_ms", 0):
+        return performance
+    return sample
+
+
+def received_throughput(state):
+    """Average MiB/s from the newest measurement, or the final CLI summary."""
+    record = state.get("summary") or _latest_measurement(state)
+    if not record:
+        return None
+    if record["type"] in ("performance", "run_summary"):
+        return record["received_mib_per_second"]
+    seconds = record["elapsed_ms"] / 1000
+    return record["received_bytes"] / (1 << 20) / seconds if seconds else 0.0
+
+
 def performance_text(state):
     """Compact, scalar-only presentation; old companions may omit these fields."""
     discovery = state.get("discovery", {})
@@ -102,9 +121,7 @@ def performance_text(state):
     limit = discovery.get("max_bytes")
     server = f"Server capabilities: {status}" + (f" · max {limit:,} bytes" if limit else "")
     sample = state.get("sample", {})
-    performance = state.get("performance") or sample
-    if sample.get("elapsed_ms", 0) > performance.get("elapsed_ms", 0):
-        performance = sample
+    performance = _latest_measurement(state)
     record = state.get("summary") or performance
     if "average_received_fps" not in record:
         return server + "\nPerformance: awaiting measurements"

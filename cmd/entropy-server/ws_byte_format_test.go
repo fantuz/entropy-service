@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,55 @@ func TestByteFrameFormats(t *testing.T) {
 			checkByteFormat(t, format, output.Bytes(), data, digest)
 		})
 	}
+}
+
+func TestJSONFrameWireCompatibility(t *testing.T) {
+	// Cross both the output buffer boundary and all three Base64 tail lengths.
+	for _, size := range []int{1, 2048, 65535, 65536, 65537} {
+		data := make([]byte, size)
+		for i := range data {
+			data[i] = byte(i)
+		}
+
+		digest := sha256.Sum256(data)
+
+		var want, got bytes.Buffer
+
+		err := json.NewEncoder(&want).Encode(EntropyDataFrame{
+			Hex: hex.EncodeToString(data), Base64: base64.StdEncoding.EncodeToString(data),
+			Hash: hex.EncodeToString(digest[:]),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := encodeByteFrame(&got, data, byteFrameJSON); err != nil || !bytes.Equal(got.Bytes(), want.Bytes()) {
+			t.Fatalf("%d sample bytes: legacy JSON wire bytes differ, err=%v", size, err)
+		}
+	}
+}
+
+func TestJSONFrameWriteFailure(t *testing.T) {
+	data := make([]byte, 128<<10)
+	// Fail in each encoding and on the final flush.
+	for _, limit := range []int{100, 2*len(data) + 100, 2*len(data) + base64.StdEncoding.EncodedLen(len(data)) + 40} {
+		w := &limitedFrameWriter{remaining: limit}
+		if err := encodeByteFrame(w, data, byteFrameJSON); !errors.Is(err, io.ErrClosedPipe) {
+			t.Fatalf("failure after %d bytes: got %v", limit, err)
+		}
+	}
+}
+
+type limitedFrameWriter struct{ remaining int }
+
+func (w *limitedFrameWriter) Write(data []byte) (int, error) {
+	if len(data) > w.remaining {
+		return w.remaining, io.ErrClosedPipe
+	}
+
+	w.remaining -= len(data)
+
+	return len(data), nil
 }
 
 func checkByteFormat(t *testing.T, format byteFrameFormat, payload, data []byte, digest [32]byte) {
@@ -190,7 +240,7 @@ func TestByteFormatMemoryAdmission(t *testing.T) {
 }
 
 func BenchmarkByteFrameFormats(b *testing.B) {
-	for _, size := range []int{512 << 10, 8 << 20} {
+	for _, size := range []int{2 << 10, 512 << 10, 8 << 20} {
 		for _, format := range []byteFrameFormat{byteFrameJSON, byteFrameCompact, byteFrameHash} {
 			b.Run(fmt.Sprintf("%dKiB/%s", size>>10, format), func(b *testing.B) {
 				data := bytes.Repeat([]byte{0x5a}, size)

@@ -11,8 +11,9 @@
     const intervalInput = document.getElementById("status-interval");
     let intervalMs = 5000;
     let timer = null;
-    let running = false;
-    let disposed = false;
+    let deadline = null;
+    let active = null;
+    let onPage = true;
 
     function setStatus(name, state, value) {
         document.getElementById(name + "-card").dataset.state = state;
@@ -20,85 +21,92 @@
     }
 
     function setValue(id, value) {
-        document.getElementById(id).textContent = value ?? "—";
+        const node = document.getElementById(id);
+        const next = String(value ?? "—");
+        if (node.textContent !== next) node.textContent = next;
     }
 
-    async function read(url) {
-        // Status 503 from /ready is a valid, informative JSON response.
-        const response = await fetch(url, {cache: "no-store", signal: AbortSignal.timeout(4000)});
-        return response;
-    }
-
-    function metric(source, name) {
-        const line = source.split("\n").find(row => row.startsWith(name + " "));
-        return line?.trim().split(/\s+/)[1] ?? null;
-    }
-
-    async function update() {
-        if (running || disposed) return;
-        clearTimeout(timer);
-        timer = null;
-        running = true;
-        refresh.disabled = true;
-
+    async function read(path, signal) {
+        let response;
         try {
-        const checks = await Promise.allSettled([read("/live"), read("/ready"), read("/metrics")]);
-        const [live, ready, metrics] = checks;
+            response = await fetch(path, {cache: "no-store", signal});
+        } catch { return {error: "UNREACHABLE"}; }
+        // A degraded server deliberately answers /ready with JSON and HTTP 503.
+        if (!response.ok && path !== "/ready") return {error: "UNREACHABLE"};
+        try {
+            const body = path === "/metrics" ? await response.text() : await response.json();
+            if (path !== "/metrics" && (body === null || typeof body !== "object" || Array.isArray(body))) return {error: "INVALID JSON"};
+            return {ok: response.ok, body};
+        } catch { return {error: path === "/metrics" ? "INVALID RESPONSE" : "INVALID JSON"}; }
+    }
 
-        if (live.status === "fulfilled" && live.value.ok) {
-            try {
-                const body = await live.value.json();
-                setStatus("live", body.status === "ok" ? "ready" : "degraded", body.status === "ok" ? "ONLINE" : "UNEXPECTED RESPONSE");
-            } catch (_) { setStatus("live", "error", "INVALID JSON"); }
-        } else { setStatus("live", "error", "UNREACHABLE"); }
+    function render(live, ready, metrics) {
+        if (live.error) setStatus("live", "error", live.error);
+        else if (live.body.status === "ok") setStatus("live", "ready", "ONLINE");
+        else setStatus("live", "degraded", "UNEXPECTED RESPONSE");
 
-        if (ready.status === "fulfilled") {
-            try {
-                const body = await ready.value.json();
-                const isReady = ready.value.ok && body.ready === true;
-                setStatus("ready", isReady ? "ready" : "degraded", isReady ? "READY" : "DEGRADED");
-                setValue("rng-source", body.rng_source);
-                setValue("rng-drbg", body.rng_drbg);
-                setValue("reseed-age", Number.isFinite(body.reseed_age_ms) ? `${body.reseed_age_ms} ms` : "—");
-                setValue("reseed-failures", body.reseed_failures_total?.toLocaleString());
-                window.EntropyStatusKPIs.updateReady(body);
-            } catch (_) {
-                setStatus("ready", "error", "INVALID JSON");
-                window.EntropyStatusKPIs.updateReady(null);
-                for (const id of ["rng-source", "rng-drbg", "reseed-age", "reseed-failures"]) setValue(id, "—");
-            }
-        } else {
-            setStatus("ready", "error", "UNREACHABLE");
-            window.EntropyStatusKPIs.updateReady(null);
-            for (const id of ["rng-source", "rng-drbg", "reseed-age", "reseed-failures"]) setValue(id, "—");
+        const body = ready.body;
+        if (ready.error) setStatus("ready", "error", ready.error);
+        else {
+            const isReady = ready.ok && body.ready === true;
+            setStatus("ready", isReady ? "ready" : "degraded", isReady ? "READY" : "DEGRADED");
         }
+        setValue("rng-source", body?.rng_source);
+        setValue("rng-drbg", body?.rng_drbg);
+        setValue("reseed-age", Number.isFinite(body?.reseed_age_ms) ? `${body.reseed_age_ms} ms` : "—");
+        setValue("reseed-failures", Number.isFinite(body?.reseed_failures_total) ? body.reseed_failures_total.toLocaleString() : "—");
+        window.EntropyStatusKPIs.updateReady(body);
 
-        if (metrics.status === "fulfilled" && metrics.value.ok) {
+        if (!metrics.error) {
             try {
-                const body = await metrics.value.text();
-                setValue("bytes-generated", metric(body, "rng_bytes_generated_total"));
-                setValue("active-websockets", metric(body, "ws_connections_active"));
-                window.EntropyStatusKPIs.update(body);
+                window.EntropyStatusKPIs.update(metrics.body);
                 setStatus("metrics", "ready", "AVAILABLE");
-            } catch (_) {
-                window.EntropyStatusKPIs.unavailable();
-                setStatus("metrics", "error", "INVALID RESPONSE");
-                setValue("bytes-generated", "—");
-                setValue("active-websockets", "—");
-            }
-        } else {
+            } catch { metrics.error = "INVALID RESPONSE"; }
+        }
+        if (metrics.error) {
             window.EntropyStatusKPIs.unavailable();
-            setStatus("metrics", "error", "UNREACHABLE");
-            setValue("bytes-generated", "—");
-            setValue("active-websockets", "—");
+            setStatus("metrics", "error", metrics.error);
         }
 
         setText(document.getElementById("status-updated"), "Last checked {time}", {time: new Date().toLocaleTimeString()});
+    }
+
+    async function update() {
+        clearTimeout(timer);
+        timer = null;
+        if (active || !onPage || document.hidden) return;
+
+        const request = new AbortController();
+        active = request;
+        refresh.disabled = true;
+        deadline = setTimeout(() => request.abort(), 4000);
+        try {
+            const results = await Promise.all(["/live", "/ready", "/metrics"].map(path => read(path, request.signal)));
+            if (active === request) render(...results);
         } finally {
-            running = false;
-            refresh.disabled = false;
-            if (!disposed) timer = setTimeout(update, intervalMs);
+            if (active === request) {
+                clearTimeout(deadline);
+                deadline = null;
+                active = null;
+                refresh.disabled = false;
+                timer = setTimeout(update, intervalMs);
+            }
         }
+    }
+
+    function syncVisibility() {
+        if (onPage && !document.hidden) {
+            if (!active && timer === null) void update();
+            return;
+        }
+        clearTimeout(timer);
+        timer = null;
+        clearTimeout(deadline);
+        deadline = null;
+        active?.abort();
+        active = null;
+        refresh.disabled = false;
+        window.EntropyStatusKPIs.resetHistory();
     }
 
     function changeInterval() {
@@ -110,17 +118,16 @@
         intervalMs = Math.round(Math.min(60, Math.max(0.05, requested)) * 1000);
         intervalInput.value = String(intervalMs / 1000);
         // If a cycle is running, its completion will schedule the new interval.
-        if (!running && !disposed) {
+        if (!active && onPage && !document.hidden) {
             clearTimeout(timer);
             timer = setTimeout(update, intervalMs);
         }
     }
 
     intervalInput.addEventListener("change", changeInterval);
-    refresh.addEventListener("click", () => {
-        clearTimeout(timer);
-        void update();
-    });
-    window.addEventListener("pagehide", () => { disposed = true; clearTimeout(timer); });
-    void update();
+    refresh.addEventListener("click", update);
+    document.addEventListener("visibilitychange", syncVisibility);
+    window.addEventListener("pagehide", () => { onPage = false; syncVisibility(); });
+    window.addEventListener("pageshow", () => { onPage = true; syncVisibility(); });
+    syncVisibility();
 })();

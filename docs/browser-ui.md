@@ -554,7 +554,9 @@ default cadences are unchanged.
 Gallery refresh accepts 0.05–120 seconds in 0.05-second steps; its default is
 still two seconds. A batch finishes before the next begins. Status refresh
 accepts 0.05–60 seconds and defaults to five seconds; it also waits for the current
-cycle to finish. At fast status refresh rates, the dashboard's health/metrics
+cycle to finish. A hidden status page pauses polling. Returning to the tab or
+restoring the page with Back starts a fresh check and a new rate sampling window.
+At fast status refresh rates, the dashboard's health/metrics
 requests contribute to `http_requests_total`. Network latency, browser scheduling,
 FFT settings and rendering cost can lower actual frame rates. Display FPS is
 independent of FFT frequency units (cycles/byte) and does not measure entropy rate.

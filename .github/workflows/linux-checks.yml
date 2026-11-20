@@ -70,7 +70,7 @@ jobs:
         run: go vet ./...
         if: inputs.suite == 'quality'
       - name: Test installer catalog isolation and unchanged random-word support
-        run: go test -tags=external_ui_locales ./cmd/entropy-server -run 'Test(UICatalog|StaticAssets|EmbeddedWebShowcase|Describe|Word)'
+        run: go test -count=1 -tags=external_ui_locales ./cmd/entropy-server -run 'Test(UICatalog|StaticAssets|EmbeddedWebShowcase|Describe|Word)'
         if: inputs.suite == 'quality'
       - name: Test actual executable startup failures and clean exits
         run: |

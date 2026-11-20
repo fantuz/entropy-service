@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -68,11 +69,45 @@ func encodeByteFrame(w io.Writer, data []byte, format byteFrameFormat) error {
 			Bytes int    `json:"bytes"`
 		}{Hash: hex.EncodeToString(digest[:]), Bytes: len(data)})
 	case byteFrameJSON:
-		return json.NewEncoder(w).Encode(EntropyDataFrame{
-			Hex: hex.EncodeToString(data), Base64: base64.StdEncoding.EncodeToString(data),
-			Hash: hex.EncodeToString(digest[:]),
-		})
+		return writeByteFrameJSON(w, data, digest)
 	default:
 		return errors.New("unsupported byte frame format")
 	}
+}
+
+// Hex, standard Base64 and the digest contain no JSON metacharacters. Stream
+// them into one text message with the same field order and trailing newline as
+// json.Encoder. The scratch buffer belongs to this frame and is never pooled.
+func writeByteFrameJSON(w io.Writer, data []byte, digest [sha256.Size]byte) error {
+	const (
+		maxBuffer  = 32 << 10
+		fixedBytes = len(`{"hex":"","base64":"","hash":""}`) + 1 + 2*sha256.Size
+	)
+
+	// A small frame fits in one write. Large samples use bounded scratch.
+	size := min(maxBuffer, hex.EncodedLen(len(data))+base64.StdEncoding.EncodedLen(len(data))+fixedBytes)
+	out := bufio.NewWriterSize(w, size)
+
+	// bufio.Writer retains the first write error until Flush.
+	_, _ = out.WriteString(`{"hex":"`)
+	if _, err := hex.NewEncoder(out).Write(data); err != nil {
+		return err
+	}
+
+	_, _ = out.WriteString(`","base64":"`)
+	encoder := base64.NewEncoder(base64.StdEncoding, out)
+
+	if _, err := encoder.Write(data); err != nil {
+		return err
+	}
+
+	if err := encoder.Close(); err != nil {
+		return err
+	}
+
+	_, _ = out.WriteString(`","hash":"`)
+	_, _ = out.WriteString(hex.EncodeToString(digest[:]))
+	_, _ = out.WriteString("\"}\n")
+
+	return out.Flush()
 }

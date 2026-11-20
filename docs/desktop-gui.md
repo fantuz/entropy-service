@@ -551,6 +551,11 @@ macOS Intel and Apple Silicon use the same interface through the
 
 ## Server limits and acquisition performance
 
+In server **Options → Resource limits**, set the maximum sample size, concurrent
+HTTP generation requests, concurrent entropy WebSockets and each transport's
+memory budget in MiB. The selected server binary validates the values before
+they can be applied to a new run.
+
 Client Options now includes **Server capability discovery**, **Adaptive HTTP pull
 pacing**, and its maximum interval. Start checks advertised operator limits
 before acquisition; oversized requests report the actual server maximum without
