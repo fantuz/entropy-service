@@ -427,15 +427,35 @@ func TestReportStdoutCancelsBlockedRecord(t *testing.T) {
 	}
 	defer report.close()
 
-	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	err = report.write(ctx, map[string]string{"data": strings.Repeat("x", 1<<20)})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatal("blocked report did not cancel:", err)
+	// One byte confirms that encoding finished and the pipe contains part of
+	// the record. Leave the rest unread to keep pressure on the writer.
+	done := make(chan error, 1)
+	go func() { done <- report.write(ctx, map[string]string{"data": strings.Repeat("x", 1<<20)}) }()
+
+	// Closing the reader also releases a writer that fails to honor cancellation.
+	watchdog := time.AfterFunc(10*time.Second, func() { _ = reader.Close() })
+	defer watchdog.Stop()
+
+	var first [1]byte
+
+	_, readErr := io.ReadFull(reader, first[:])
+
+	cancel()
+
+	writeErr := <-done
+
+	if readErr != nil || first[0] != '{' {
+		t.Fatalf("read first byte of JSON report: %q, %v", first, readErr)
 	}
 
-	if err := report.write(t.Context(), newReportHeader("run_summary")); !errors.Is(err, context.DeadlineExceeded) {
+	if !errors.Is(writeErr, context.Canceled) {
+		t.Fatal("blocked report did not cancel:", writeErr)
+	}
+
+	if err := report.write(t.Context(), newReportHeader("run_summary")); !errors.Is(err, context.Canceled) {
 		t.Fatal("failed report must not append after a partial record:", err)
 	}
 
@@ -452,8 +472,8 @@ func TestReportStdoutCancelsBlockedRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(data) == 0 || bytes.Contains(data, []byte("run_summary")) {
-		t.Fatalf("unexpected partial report: %d bytes", len(data))
+	if bytes.Contains(data, []byte{'\n'}) || bytes.Contains(data, []byte("run_summary")) {
+		t.Fatalf("expected one incomplete JSONL record, received %d bytes", len(data)+1)
 	}
 }
 
