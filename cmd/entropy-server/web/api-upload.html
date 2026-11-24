@@ -61,12 +61,19 @@
     <div class="analysis-grid">
       <section class="analysis-card entropy-alert-card" id="entropy-alert-card" data-state="waiting" aria-labelledby="entropy-alert-title">
         <h2 class="analysis-label" id="entropy-alert-title"><span data-i18n="Shannon entropy">Shannon entropy</span></h2>
-        <p class="entropy-reading"><output id="entropy" class="analysis-value">—</output> <span><span data-i18n="bits/byte">bits/byte</span></span></p>
-        <label class="entropy-threshold-control" for="entropy-threshold"><span data-i18n="Red alert below">Red alert below</span>
-          <input id="entropy-threshold" type="number" min="1" max="8" step="0.000001" value="7.999900" inputmode="decimal"> <span><span data-i18n="bits/byte">bits/byte</span></span>
+        <p class="entropy-reading"><output id="entropy" class="analysis-value" aria-live="off">—</output> <span><span data-i18n="bits/byte">bits/byte</span></span></p>
+        <p id="entropy-sample-size" class="analysis-meta"><span data-i18n="Sample size: —">Sample size: —</span></p>
+        <label class="entropy-alert-toggle" for="entropy-alert-enabled">
+          <input id="entropy-alert-enabled" type="checkbox" aria-controls="entropy-threshold-settings" aria-describedby="entropy-alert-hint"> <span data-i18n="Enable custom threshold alert">Enable custom threshold alert</span>
         </label>
+        <div id="entropy-threshold-settings" hidden>
+          <label class="entropy-threshold-control" for="entropy-threshold"><span data-i18n="Red alert below">Red alert below</span>
+            <input id="entropy-threshold" type="number" min="1" max="8" step="0.000001" inputmode="decimal" aria-describedby="entropy-threshold-error entropy-alert-hint" aria-invalid="false" disabled> <span><span data-i18n="bits/byte">bits/byte</span></span>
+          </label>
+          <p id="entropy-threshold-error" class="entropy-threshold-error" role="alert" hidden></p>
+        </div>
         <p class="entropy-alert-message" id="entropy-alert-message" role="status" aria-live="polite"><span data-i18n="AWAITING FIRST ANALYSIS SAMPLE">AWAITING FIRST ANALYSIS SAMPLE</span></p>
-        <p class="entropy-alert-hint"><span data-i18n="Finite-sample estimate. High thresholds can trigger on healthy samples.">Finite-sample estimate. High thresholds can trigger on healthy samples.</span></p>
+        <p class="entropy-alert-hint" id="entropy-alert-hint"><span data-i18n="Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.">Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.</span></p>
         <p id="byte-statistics" class="analysis-meta"><span data-i18n="Mean / standard deviation / range: —">Mean / standard deviation / range: —</span></p>
       </section>
       <section class="analysis-card balance-card" aria-labelledby="balance-title">

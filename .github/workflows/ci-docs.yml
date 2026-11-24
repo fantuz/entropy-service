@@ -35,6 +35,7 @@ jobs:
           python3 scripts/check_release_downloads.py
           python3 -m unittest discover -s scripts -p 'test_check_release_downloads.py'
           python3 -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
+          python3 -m unittest discover -s scripts -p 'test_native_release.py'
           python3 -m unittest discover -s scripts -p 'test_validate_release_recovery.py'
       - name: Reject tracked TLS identities and private keys
         run: |
@@ -42,6 +43,8 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_check_credential_files.py'
       - name: Exercise plan, gate, cache policy and workflow contracts
         run: python3 -m unittest discover -s scripts -p 'test_ci_*.py'
+      - name: Test mixed workload report validation
+        run: python3 -m unittest discover -s scripts -p 'test_benchmark_mixed.py'
       - name: Lint every GitHub workflow with pinned actionlint
         run: |
           curl --fail --location --silent --show-error --retry 2   https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz   -o "$RUNNER_TEMP/actionlint.tar.gz"

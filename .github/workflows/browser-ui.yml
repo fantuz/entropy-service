@@ -106,6 +106,8 @@ jobs:
           PY
           sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
             /tmp/entropy-browser-tests/bin/python -m playwright install-deps ${{ matrix.browser }}
+          sudo --preserve-env=http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,SSL_CERT_DIR,REQUESTS_CA_BUNDLE \
+            apt-get install -y --no-install-recommends xvfb xauth
           /tmp/entropy-browser-tests/bin/python -m playwright install ${{ matrix.browser }}
         if: needs.plan.outputs.mode == 'full'
       - name: Test browser-local certificate generation and Go TLS interoperability
@@ -159,6 +161,11 @@ jobs:
         env:
           DEBUG: pw:browser
         run: /tmp/entropy-browser-tests/bin/python scripts/test_static_assets_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/static-assets
+        if: needs.plan.outputs.mode == 'full'
+      - name: Test real tab visibility, BFCache recovery and subscription ownership
+        env:
+          DEBUG: pw:browser
+        run: xvfb-run -a /tmp/entropy-browser-tests/bin/python scripts/test_page_lifecycle_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/lifecycle
         if: needs.plan.outputs.mode == 'full'
       - name: Upload browser evidence
         if: needs.plan.outputs.mode == 'full' && (always())

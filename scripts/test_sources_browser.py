@@ -235,26 +235,88 @@ def registration_checks(page, artifacts):
 
 def shannon_precision_checks(browser, base):
     from playwright.sync_api import expect
-    for path in ("/api-stream.html", "/api-upload.html", "/api-sources.html", "/api-socket.html"):
+    paths = ("/api-stream.html", "/api-upload.html", "/api-sources.html", "/api-socket.html")
+    for path in paths:
         page = browser.new_page()
         try:
             page.goto(base + path)
             page.wait_for_function("Boolean(window.EntropyShannonAlert)")
+            toggle = page.locator("#entropy-alert-enabled")
             selector = page.locator("#entropy-threshold")
+            card = page.locator("#entropy-alert-card")
+            expect(toggle).not_to_be_checked()
+            expect(selector).to_be_disabled()
+            expect(page.locator("#entropy-threshold-settings")).to_be_hidden()
+            page.evaluate("EntropyShannonAlert.update(0, 4096)")
+            expect(card).to_have_attribute("data-state", "descriptive")
+            expect(page.locator("#entropy-sample-size")).to_have_text("Estimate from 4,096 bytes")
+            toggle.check()
+            expect(selector).to_have_value("")
+            expect(card).not_to_have_attribute("data-state", "alert")
             expect(selector).to_have_attribute("step", "0.000001")
+            selector.fill("7.1234567")
+            selector.dispatch_event("change")
+            expect(selector).to_have_attribute("aria-invalid", "true")
+            expect(card).not_to_have_attribute("data-state", "alert")
+            expect(page.locator("#entropy-threshold-error")).to_be_visible()
             selector.fill("7.123456")
             selector.dispatch_event("change")
             expect(selector).to_have_value("7.123456")
+            expect(selector).to_have_attribute("aria-invalid", "false")
             value = page.evaluate("""() => {
-                EntropyShannonAlert.update(7.1234556);
+                EntropyShannonAlert.update(7.1234556, 64);
                 return {text: document.getElementById('entropy').textContent,
                         state: document.getElementById('entropy-alert-card').dataset.state};
             }""")
             assert value == {"text": "7.123456", "state": "alert"}, (path, value)
             page.reload()
-            expect(page.locator("#entropy-threshold")).to_have_value("7.123456")
+            expect(toggle).to_be_checked()
+            expect(selector).to_have_value("7.123456")
+            toggle.uncheck()
+            page.reload()
+            expect(toggle).not_to_be_checked()
+            expect(selector).to_have_value("7.123456")
+            expect(selector).to_be_disabled()
         finally:
             page.close()
+
+    # Edits propagate between open pages and navigation retains an explicit
+    # disable, even when an old-style saved preference still exists.
+    context = browser.new_context()
+    first = context.new_page()
+    second = context.new_page()
+    try:
+        first.goto(base + paths[0])
+        second.goto(base + paths[1])
+        first.locator("#entropy-alert-enabled").check()
+        first.locator("#entropy-threshold").fill("7.234567")
+        first.locator("#entropy-threshold").dispatch_event("change")
+        expect(second.locator("#entropy-alert-enabled")).to_be_checked()
+        expect(second.locator("#entropy-threshold")).to_have_value("7.234567")
+        second.locator("#entropy-alert-enabled").uncheck()
+        expect(first.locator("#entropy-alert-enabled")).not_to_be_checked()
+        first.evaluate("localStorage.setItem('entropy-service:stream:shannon-threshold:v1', '7.9999')")
+        for path in paths[2:]:
+            first.goto(base + path)
+            expect(first.locator("#entropy-alert-enabled")).not_to_be_checked()
+            expect(first.locator("#entropy-threshold")).to_have_value("7.234567")
+            expect(first.locator("#entropy-threshold")).to_be_disabled()
+
+        # The real worker reports the selected byte window, rather than the
+        # full file size, and even a constant sample stays descriptive by default.
+        first.goto(base + "/api-upload.html")
+        first.locator("#fileInput").set_input_files({
+            "name": "shannon-window.bin", "mimeType": "application/octet-stream",
+            "buffer": bytes(8192),
+        })
+        first.locator("#submit-upload").click()
+        expect(first.locator("#entropy")).to_have_text("0.000000")
+        expect(first.locator("#entropy-sample-size")).to_have_text("Estimate from 8,192 bytes")
+        first.locator("#analysis-size").select_option("4096")
+        expect(first.locator("#entropy-sample-size")).to_have_text("Estimate from 4,096 bytes")
+        expect(first.locator("#entropy-alert-card")).to_have_attribute("data-state", "descriptive")
+    finally:
+        context.close()
 
 
 def audio_signal_checks(browser, base):

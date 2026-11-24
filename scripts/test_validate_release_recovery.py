@@ -1,7 +1,10 @@
 """Recovery cannot replace failed tests, stale evidence or a moved release tag."""
 import copy
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 import unittest
+
+import yaml
 
 from validate_release_recovery import REQUIRED, validate
 
@@ -19,6 +22,23 @@ def evidence():
 
 
 class RecoveryTests(unittest.TestCase):
+    def test_native_artifact_recovery_never_falls_back_to_a_rebuild(self):
+        path = Path(__file__).resolve().parents[1] / ".github/workflows/release-recovery.yml"
+        steps = yaml.load(path.read_text(), Loader=yaml.BaseLoader)["jobs"]["recover"]["steps"]
+        select = next(s for s in steps if s.get("id") == "packaging")
+        self.assertEqual("source", select["working-directory"])
+        self.assertIn("scripts/native_release.py", select["run"])
+        artifact = next(s for s in steps if s.get("with", {}).get("name") == "native-release-payloads")
+        self.assertEqual("${{ inputs.validated_run_id }}", artifact["with"]["run-id"])
+        self.assertNotIn("continue-on-error", artifact)
+        prepare = next(s for s in steps if "../tools/scripts/native_release.py prepare" in s.get("run", ""))
+        legacy = next(s for s in steps if "../tools/scripts/prepare_gui_release.py prepare" in s.get("run", ""))
+        self.assertEqual("steps.packaging.outputs.method == 'artifact'", artifact["if"])
+        self.assertEqual(artifact["if"], prepare["if"])
+        self.assertEqual("steps.packaging.outputs.method == 'goreleaser'", legacy["if"])
+        self.assertLess(steps.index(select), steps.index(artifact))
+        self.assertLess(steps.index(artifact), steps.index(prepare))
+
     def test_publication_failure_with_all_validation_passed(self):
         run, jobs = evidence()
         validate(run, jobs, "v2.4.1", SHA, NOW)

@@ -987,5 +987,12 @@
   "Use with entropy-server": "Χρήση με entropy-server",
   "Valid from (UTC)": "Ισχύει από (UTC)",
   "Valid until (UTC)": "Ισχύει έως (UTC)",
-  "Validity (days)": "Ισχύς (ημέρες)"
+  "Validity (days)": "Ισχύς (ημέρες)",
+  "Enable custom threshold alert": "Ενεργοποίηση ειδοποίησης με προσαρμοσμένο όριο",
+  "Sample size: —": "Μέγεθος δείγματος: —",
+  "Estimate from {bytes} bytes": "Εκτίμηση από {bytes} byte",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "ΠΕΡΙΓΡΑΦΙΚΗ ΕΚΤΙΜΗΣΗ · ΕΙΔΟΠΟΙΗΣΗ ΑΝΕΝΕΡΓΗ",
+  "Enter a custom threshold to enable alerts.": "Εισαγάγετε προσαρμοσμένο όριο για να ενεργοποιήσετε τις ειδοποιήσεις.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Εισαγάγετε 1–8 bit/byte με έως έξι δεκαδικά ψηφία.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Εκτίμηση πεπερασμένου δείγματος, όχι έλεγχος καλής λειτουργίας γεννήτριας τυχαίων αριθμών. Τα μικρά, υγιή δείγματα συχνά δίνουν εκτίμηση κάτω από οκτώ bit/byte."
 }

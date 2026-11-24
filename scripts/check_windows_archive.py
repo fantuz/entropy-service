@@ -8,12 +8,19 @@ import stat
 import struct
 import zipfile
 
+from check_release_downloads import read_checksums
+
 
 REQUIRED = {"entropy-server.exe", "entropy-client.exe", "LICENSE", "README.md",
             "WORDLIST_NOTICES.txt", "macos.md", "windows.md", "windows-service.md", "quantis.md", "hardware-probe.md", "hardware-drivers.md", "quantis-usb.md", "chaoskey.md", "QUANTIS_NOTICES.txt"}
 
 
-def check_archive(path, extract_to=None):
+def check_archive(path, extract_to=None, checksums=None):
+    path = Path(path)
+    with path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    if checksums is not None and read_checksums(checksums).get(path.name) != digest:
+        raise ValueError("Windows archive differs from its staged checksum")
     with zipfile.ZipFile(path) as archive:
         names, files = set(), {}
         for member in archive.infolist():
@@ -57,15 +64,16 @@ def check_archive(path, extract_to=None):
             destination.mkdir(parents=True, exist_ok=False)
             archive.extractall(destination)
 
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    return digest
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=Path)
     parser.add_argument("--extract-to", type=Path, help="extract verified contents into a new directory")
+    parser.add_argument("--checksums", type=Path, help="verify against the native package producer manifest")
     args = parser.parse_args()
-    digest = check_archive(args.archive, args.extract_to)
+    digest = check_archive(args.archive, args.extract_to, args.checksums)
     print(f"Verified Windows x64 release ZIP: {args.archive.name}; SHA-256 {digest}")
 
 

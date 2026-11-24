@@ -330,7 +330,7 @@ exposes the relevant capability. No exploit or penetration test is claimed.
 | T08 | Untrusted clients exhaust CPU, memory or bandwidth | **High** when exposed | Admission reservations and message limits | Rate limits and observed RSS/heap/load tests; distinguish rejection vs capacity. |
 | T09 | HTTP interceptor reads/substitutes random output | **High** if output is secret | Optional HTTPS listener | Require authenticated TLS or local trusted IPC; disallow plaintext at boundary. |
 | T10 | Browser embeds dashboard / probes sensitive status | **Medium** | Default WS origin check; no-store on health | Authentication and access policy for metrics/status; avoid treating Origin as credentials. |
-| T11 | Release validation bypass or packaging mismatch | **Medium** supply-chain/process | Tag workflow runs Go/race/lint/browser/snapshot checks before release | Review job permissions, verify signed artifacts as appropriate and test packages on target distributions. |
+| T11 | Release validation bypass or packaging mismatch | **Medium** supply-chain/process | Tag workflow validates the staged native packages, checks their source identity and digests, and publishes those bytes after the platform tests | Review job permissions, verify signed artifacts as appropriate and test packages on target distributions. |
 | T12 | Users mistake statistical entropy display for device assurance | **Medium** interpretation | Documentation disclaimers | Keep diagnostic/cryptographic assurances explicitly separate. |
 
 ## 8. Operational security profiles

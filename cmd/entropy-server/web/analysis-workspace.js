@@ -13,7 +13,7 @@
         const $ = id => document.getElementById(id);
         const analysis = window.EntropyAnalysis, plots = window.EntropyPlots;
         const history = new analysis.WaterfallHistory(), average = new analysis.PowerAverage();
-        const worker = new Worker("/worker.js");
+        let worker = null, suspended = false, destroyed = false, animation = null;
         let busy = false, queued = null, pending = null, scheduled = false, needsReanalysis = false;
         let epoch = 0, paused = kind === "file", last = null, displayFFT = null, traceGeometry = null;
         let markers = [], cursor = 0;
@@ -24,17 +24,19 @@
                 window: $("fft-window").value, removeMean: $("fft-demean").checked};
         }
         function pump() {
-            if (busy || !queued || !worker) return;
+            if (busy || !queued || !worker || suspended || destroyed) return;
             busy = true;
             const job = queued;
             queued = null;
             worker.postMessage({type: "analyze", ...job}, [job.buffer]);
         }
         function redraw() {
-            if (scheduled) return;
+            if (scheduled || suspended || destroyed) return;
             scheduled = true;
-            requestAnimationFrame(() => {
+            animation = requestAnimationFrame(() => {
+                animation = null;
                 scheduled = false;
+                if (suspended || destroyed) return;
                 if (pending && pending.epoch === epoch && (kind === "file" || !paused || pending.reanalysis)) {
                     if (kind === "file" && last?.offset !== pending.offset) clearMarkers();
                     last = pending;
@@ -106,7 +108,7 @@
             const bytes = new Uint8Array(last.buffer);
             $("bit-rates").dataset.state = "ready";
             $("sample-info").textContent = describe(last, paused);
-            window.EntropyShannonAlert.update(last.entropy);
+            window.EntropyShannonAlert.update(last.entropy, bytes.length);
             text($("byte-statistics"), "Mean {mean} · σ {stddev} · range {min}–{max}", {mean: last.mean.toFixed(3), stddev: last.stddev.toFixed(3), min: last.min, max: last.max});
             plots.balance($("pie"), last.zeros, last.ones);
             text($("zero-count"), "Zeros: {count} ({percent}%)", {count: last.zeros.toLocaleString(), percent: (last.zeros / (last.zeros + last.ones) * 100).toFixed(3)});
@@ -141,6 +143,7 @@
         }
         function invalidate(resetAverage = true) { epoch++; queued = null; pending = null; if (resetAverage) average.reset(); }
         function reanalyze() {
+            if (suspended || destroyed) return;
             if (busy || queued || pending) { needsReanalysis = true; return; }
             needsReanalysis = false;
             invalidate();
@@ -197,19 +200,27 @@
         window.addEventListener("entropythemechange", redraw);
         window.addEventListener("entropygraphpalettechange", redraw);
         window.addEventListener("entropylanguagechange", redraw);
-        worker.onerror = () => { busy = false; onError("ANALYSIS WORKER FAILED"); };
-        worker.onmessage = ({data}) => {
-            busy = false;
-            if (data?.type === "error") { onError(data.message); return; }
-            if (data?.type === "analysis") {
-                if (!data.reanalysis) { onAnalyzed(data); }
-                if (data.epoch === epoch && (kind === "file" || !paused || data.reanalysis) && (kind === "file" || !document.hidden)) { pending = data; redraw(); }
-            }
-            pump();
-            // A paused/invalidated in-flight result may be discarded without
-            // scheduling a paint. Drain deferred settings once the worker is idle.
-            if (needsReanalysis && !busy && !pending) reanalyze();
-        };
+        function startWorker() {
+            const active = new Worker("/worker.js");
+            worker = active;
+            active.onerror = () => {
+                if (worker !== active || suspended || destroyed) return;
+                busy = false; onError("ANALYSIS WORKER FAILED");
+            };
+            active.onmessage = ({data}) => {
+                if (worker !== active || suspended || destroyed) return;
+                busy = false;
+                if (data?.type === "error") { onError(data.message); return; }
+                if (data?.type === "analysis") {
+                    if (!data.reanalysis) { onAnalyzed(data); }
+                    if (data.epoch === epoch && (kind === "file" || !paused || data.reanalysis) && (kind === "file" || !document.hidden)) { pending = data; redraw(); }
+                }
+                pump();
+                // A paused/invalidated in-flight result may be discarded without
+                // scheduling a paint. Drain deferred settings once the worker is idle.
+                if (needsReanalysis && !busy && !pending) reanalyze();
+            };
+        }
         function clear(message = "Awaiting selected bytes.") {
             invalidate(); needsReanalysis = false; history.clear(); diagnostics.clear(); last = null; displayFFT = null; traceGeometry = null;
             clearMarkers();
@@ -218,6 +229,7 @@
         }
         const api = {
             submit(buffer, metadata) {
+                if (suspended || destroyed) return;
                 queued = {...metadata, ...diagnostics.options(metadata), buffer, epoch, reanalysis: false, fftOptions: fftOptions()};
                 pump();
             },
@@ -226,8 +238,29 @@
             setFrozen(value) { paused = value; invalidate(); clearMarkers(); redraw(); },
             get frozen() { return paused; },
             get sample() { return last; },
-            destroy() { worker.terminate(); observer.disconnect(); window.removeEventListener("entropythemechange", redraw); window.removeEventListener("entropygraphpalettechange", redraw); window.removeEventListener("entropylanguagechange", redraw); }
+            suspend() {
+                if (suspended || destroyed) return;
+                suspended = true; invalidate(); busy = false; needsReanalysis = false;
+                const active = worker; worker = null;
+                active.onmessage = active.onerror = null;
+                active.terminate(); observer.disconnect();
+                if (animation !== null) cancelAnimationFrame(animation);
+                animation = null; scheduled = false;
+            },
+            resume() {
+                if (!suspended || destroyed) return;
+                suspended = false; startWorker();
+                observer.observe(document.querySelector(".analysis-panel"));
+                redraw();
+            },
+            destroy() {
+                api.suspend(); destroyed = true;
+                window.removeEventListener("entropythemechange", redraw);
+                window.removeEventListener("entropygraphpalettechange", redraw);
+                window.removeEventListener("entropylanguagechange", redraw);
+            }
         };
+        startWorker();
         redraw();
         return api;
     };

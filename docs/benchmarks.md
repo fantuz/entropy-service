@@ -5,6 +5,77 @@ comparison with the last pre-Windows revision and its raw measurements. The
 [client terminal guide](client-terminal.md#waterfall-rendering-cost) records the
 subsequent waterfall optimization, including varying-input benchmarks.
 
+## Mixed HTTP and WebSocket audit
+
+Use the same workload when comparing releases or considering a WebSocket
+budget change. On a dedicated Linux host, build the two binaries to compare
+and run the following from the repository root with Python 3.11 or later.
+Each run uses one server, a 50 ms target cadence and all six combinations
+of 1, 8 and 32 MiB payloads with one or four clients **per transport**.
+The largest case starts four HTTP clients and four raw WebSocket clients together.
+
+```sh
+make build
+(
+./bin/entropy-server -http=127.0.0.1:8080 -enable-https=false -debug=true \
+  -device=/dev/urandom -require-device=true -drbg=aes-256-ctr > server-audit.log 2>&1 &
+server_pid=$!
+trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+curl --fail --retry 10 --retry-connrefused http://127.0.0.1:8080/ready
+python3 scripts/benchmark_mixed.py --server-pid "$server_pid" --seconds 30 \
+  --out mixed-raw-1 > mixed-raw-1.jsonl
+)
+```
+
+The JSONL summary records client/server binary hashes, aggregate delivered
+MiB/s and the nearest-rank p95/p99 of the client's receive wait for each
+transport. HTTP measures the complete fetch. WebSocket reads include waiting
+for the server's next frame. Counts show how many observations support each
+percentile. The throughput denominator includes client startup and drain.
+CPU is reported in cores consumed. RSS is sampled from the server every 50 ms,
+and allocation traffic is taken from the Go runtime's cumulative `TotalAlloc`
+counter via its local debug listener. Each case records the changes in the six
+HTTP/WS admission rejection counters. Per-client reports and error logs remain
+in the output directory, including after a failed run.
+
+Use the HTTP port belonging to the supplied PID. The harness checks the debug
+listener's command line against that PID and uses the selected HTTP port for
+traffic and admission counters. Each client must deliver at least one timed
+frame and finish its measurement. Throughput includes all received frames;
+the latency percentiles use only frames with timing records.
+
+Repeat at least three times with fresh servers and output paths. Keep the Go
+version, CPU allocation, server flags and client placement with the results.
+Compare the default budget first. Before lowering the JSON reservation factor,
+repeat with actual JSON consumers, including a slow reader and TLS, and record
+RSS, CPU, egress, rejections and response latency at saturation. The raw matrix
+measures different encoding and buffering costs. [Admission limits](operations.md#resource-limits)
+
+The focused comparisons for this audit also run independently of network speed.
+
+```sh
+go test ./cmd/entropy-server -run '^$' -bench BenchmarkImagePNG -benchmem -count=5
+go test ./cmd/entropy-client/internal/client -run '^$' -bench BenchmarkFetchEntropySized -benchmem -count=5
+```
+
+On Linux amd64 with Go 1.26.11, an AMD EPYC 9V74 VM and `GOMAXPROCS=1`, the 1024 × 1024 RGB handler completed loopback GETs in about 10 ms
+with PNG compression disabled, compared with 157–158 ms using default PNG
+compression. Each version ran two batches of seven requests after warmup.
+Corresponding decoded pixel buffers matched. The heatmap keeps its own encoder
+setting. In a separate in-memory HTTP transport benchmark, allocation traffic
+per 32 MiB pull fell from 77,251,264 to 33,604,568 bytes (five runs, 25 pulls
+per size). Use the mixed audit above to measure process memory under load.
+
+For release comparisons, also exercise the default Shannon display with a
+fresh browser profile and a profile with a saved threshold. Navigate away
+from an upload, press Back, and analyze a second file. Open and hide the
+byte and colour viewers and observe active WebSocket sessions through
+hide, return, Back and Forward in Chromium and Firefox. For native packages,
+compare the platform-tested archive checksums with the public release manifest.
+For device-specific claims attach a [physical qualification record](hardware-qualification.md)
+covering device and driver identity, read throughput, cancellation, disconnect
+and recovery. Record hardware results separately from software-only runs.
+
 ## Application payload size
 
 For a **32 MiB generated sample**, current encoder payloads are:

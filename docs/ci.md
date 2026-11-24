@@ -29,22 +29,22 @@ is cached; tests run again, with `-count=1` on coverage, race, fallback,
 installer-locale and native unit tests. Coverage profiles, logs and executables are artifacts,
 never reusable test results.
 
-The package producer builds the GoReleaser snapshot immediately, validates
-download aliases/checksums, actual GUI globbing, real systemd lifecycle and
-Windows ZIP layout, and uploads `windows-x64-release-zip`. Native Windows
-package testing depends on this producer, rather than waiting for fuzz,
-race, terminal or native source tests. It downloads the artifact from the
-**same workflow run**, executes its actual binaries and tests the real
-Windows Service lifecycle and private state. A failed producer cannot be
-replaced by an old cached ZIP.
+The package producer builds the native CLI archives, DEBs and RPMs once in
+GoReleaser release mode. A tag build uses the exact version in `VERSION`.
+PR and main builds rehearse the same path with a local CI prerelease tag.
+The producer stages the twelve canonical files, verifies their SHA-256 hashes,
+six download aliases, source commit and version, then exercises the
+publication configuration with uploads disabled. The systemd tests install
+the staged amd64 DEB. Native Windows and macOS jobs consume the staged
+archives from the same run and verify their checksums.
 
-The existing `build` check requires all planned validations. Main image
-publication waits for that gate. Tagged releases use the same reusable
-Linux/archive jobs, verify the tag against `VERSION`, and retain the final
-gate over Linux, both browsers, native Windows, the tested ZIP, endurance,
-containers and the GUI installer. Moving archive production earlier does
-not make any publication eligible before validation. Historical release
-recovery check names and immutable-source rules are preserved.
+Tagged publication waits for the Linux, browser, native, package, endurance,
+installer and container checks. The publisher downloads the staged inputs,
+verifies them and uploads the native packages, installer, runtime sources,
+offline OCI archives and stable aliases with a combined checksum file.
+Recovery downloads modern native packages from the original validated run.
+For releases predating native staging, recovery follows the original tagged
+source workflow. [Publication workflow](../.github/workflows/release.yml)
 
 In the investigated main run `43984858294`, the Linux build took 384 seconds
 and the Windows ZIP job took 77 seconds. The ZIP job started about 390 seconds

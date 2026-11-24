@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -70,13 +71,7 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 		return nil, &HTTPStatusError{Code: resp.StatusCode, Body: string(body), RetryAfter: retryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
 
-	if resp.ContentLength > maxEntropyBytes {
-		return nil, ErrEntropyTooLarge
-	}
-
-	// Inspect one extra byte so unknown-length/chunked responses cannot be
-	// silently truncated into an apparently successful entropy sample.
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxEntropyBytes+1))
+	data, err := readPullBody(resp.Body, resp.ContentLength, quantity)
 	if err != nil {
 		return nil, err
 	}
@@ -92,4 +87,31 @@ func FetchEntropy(ctx context.Context, endpoint string, quantity int64) ([]byte,
 	}
 
 	return data, nil
+}
+
+func readPullBody(body io.Reader, length, requested int64) ([]byte, error) {
+	if length > maxEntropyBytes {
+		return nil, ErrEntropyTooLarge
+	}
+
+	// The caller checks for the extra byte before counting a response.
+	limited := io.LimitReader(body, maxEntropyBytes+1)
+
+	const prefix = 32 << 10
+	if length <= prefix || length != requested {
+		return io.ReadAll(limited)
+	}
+
+	// Require a matching request and actual incoming data before reserving a
+	// large result. A stalled peer cannot trigger the allocation with headers alone.
+	buf := bytes.NewBuffer(make([]byte, 0, prefix+bytes.MinRead))
+	if _, err := buf.ReadFrom(io.LimitReader(limited, prefix)); err != nil || buf.Len() < prefix {
+		return buf.Bytes(), err
+	}
+
+	// Leave room for the overflow check and ReadFrom's final EOF read.
+	buf.Grow(int(length) - buf.Len() + 1 + bytes.MinRead)
+	_, err := buf.ReadFrom(limited)
+
+	return buf.Bytes(), err
 }

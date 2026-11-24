@@ -45,6 +45,10 @@ results stay unchanged. The Colours demo keeps its sampled color inside the
 digest swatch, with contrasting digest text; page controls retain the selected
 appearance. Bytes and Words no longer recolor the page background.
 
+The Bytes and Colours viewers close their WebSocket when the tab is hidden
+or the user navigates away. Returning to a visible viewer opens one fresh
+connection. Samples produced in the meantime are skipped.
+
 Source Lab and Socket Lab keep their experimental status in their descriptions.
 Both use the same three initially closed help sections: Connect entropy-server
 instances, HTTP body fetch, and Source notes. The first two link to the Socket
@@ -73,6 +77,13 @@ and machine-readable results are written to the artifact directory. Set
 The `browser-ui` GitHub workflow runs these checks and the source/socket suite
 in both engines, retaining screenshots and results for seven days. Release
 publication also waits for both browser checks.
+
+For the tab and history regression, build the server and run
+`xvfb-run -a python3 scripts/test_page_lifecycle_browser.py --browser chromium`
+or select `--browser firefox`. The Firefox check uses the installed Mozilla
+Firefox via WebDriver BiDi. Supply `--firefox-binary /path/to/firefox` when
+the executable is outside `PATH`. Playwright's patched Firefox forces its
+attached pages active, which masks real background-tab behaviour.
 
 The current interface already shares its colors, controls and responsive
 layouts. The next useful UX work is state reliability and shorter task-specific
@@ -166,7 +177,7 @@ window uses the available bytes; an offset outside the frame is reported
 rather than silently clamped. All statistics use exactly that selected window.
 The half-open `[start, end)` range appears above the charts.
 
-Display analysis can run at 1, 2, 5 or 10 frames/second (default 5), subject to
+Display analysis can run at 1, 2, 5, 10 or 20 frames/second (default 5), subject to
 the incoming frame rate and browser capacity. A worker computes statistics and
 FFT; there is at most one running job, one replaceable queued job and one
 pending display result. Large incoming messages are sliced to at most 1 MiB
@@ -179,6 +190,9 @@ received counters continue. Trace and plot controls remain usable; FFT changes
 recalculate the frozen sample. Changing the capture offset/cap requires
 resuming. Resize, colour changes, frozen recalculation and power-average
 changes never add duplicate frames to the waterfall or analysed counters.
+
+Leaving the stream-analysis page closes its connection. If Back or Forward
+restores the page from the browser cache, reception resumes on a fresh socket.
 
 The two cumulative counter rows have distinct meanings:
 
@@ -335,29 +349,38 @@ that every device can sustain the maximum settings.
 
 ### Shannon entropy sample alert
 
-The **Shannon entropy** instant value now has its own panel, independent of the
-byte histogram. Choose a red-alert threshold between **1.000000** and **8.000000**
-bits per byte, in increments of **0.000001** (default **7.999900**). The panel
-alone turns red when the *full-precision* sample estimate is strictly below
-that threshold. Equality is not an alert. The numeric readout is rounded to
-six decimals and can therefore appear equal to the threshold at its boundary.
-The source/socket measurement tables also use six decimals; API and exported
-JSON numbers keep their original precision. Additional displayed digits expose
-variation in the estimate, not additional statistical accuracy.
-Changing the selector immediately reevaluates the most recently analysed
-sample, without reconnecting the WebSocket or contacting the server.
+The **Shannon entropy** panel shows a descriptive estimate and the number of
+bytes in the selected analysis window. Alerts are **off by default**. Small
+healthy samples commonly estimate below eight bits/byte; the readout is not an
+RNG health test or a cryptographic quality verdict.
 
-The threshold is a **per-browser preference**, stored in `localStorage` if
-available. Existing five-decimal preferences remain valid and six-decimal
-preferences persist without rounding them to the old precision. It persists
-across page reloads in that browser, but never changes
-the server, API responses or the preferences of other visitors. Restricted
-browser storage falls back gracefully to the default.
+To use a statistical watchpoint, select **Enable custom threshold alert** and
+enter a threshold between **1.000000** and **8.000000** bits per byte, with up to
+six decimal places. No threshold is suggested automatically. The panel alone
+turns red when the *full-precision* sample estimate is strictly below the chosen
+threshold. Equality is not an alert. Invalid or unfinished threshold entries
+show an accessible validation message without classifying the sample.
+The numeric readout is rounded to six decimals and can therefore appear equal
+to the threshold at its boundary. The source/socket measurement tables also
+use six decimals; API and exported JSON numbers keep their original precision.
+Additional displayed digits expose variation, not additional statistical accuracy.
+Editing a valid threshold immediately reevaluates the latest analysed sample,
+without reconnecting or contacting the server. Clear the enable checkbox to
+return to the descriptive view; the last valid threshold is kept for reuse.
 
-**Interpretation:** Shannon's plug-in entropy estimator is sample-size-dependent
-and commonly *below* 8 even for excellent random streams. In particular, a
-threshold of 7.99990 can flag perfectly healthy 4 KiB or 64 KiB samples. This
-alert is a user-selected **statistical watchpoint**, *not* a cryptographic
+The enabled state and custom threshold are **per-browser preferences**, stored
+in `localStorage` when available and shared by the stream, upload, source and
+socket analysis pages on the same origin. Open pages synchronize preference
+changes. Previously saved five- or six-decimal thresholds remain enabled and
+retain their precision; an explicit disable takes precedence over an older
+saved threshold. Restricted browser storage still permits control in the
+current page, but cannot persist it across navigation. These settings do not
+change the CLI, server, API responses or other visitors' preferences.
+
+**Interpretation:** Shannon's plug-in estimator depends on sample size and
+commonly falls below 8 even for excellent random streams. For example, a
+threshold of 7.99990 can flag perfectly healthy 4 KiB or 64 KiB samples. A
+custom alert is a user-selected statistical watchpoint, not a cryptographic
 health check, entropy-source exhaustion detector, or independent randomness
 certification. Only the Shannon panel changes colour; other charts remain
 unaffected.
@@ -406,6 +429,10 @@ seeking and plot-control changes never upload the file again. Power averaging
 spans successive inspected windows of equal size, resetting on a direct seek,
 window-cap change or FFT configuration change. A recalculated frozen window
 is not counted as a new history entry.
+
+Navigating away cancels a pending upload. If the browser restores a completed
+analysis from its back/forward cache, local controls work again and a second
+file can be selected. Restoring the page sends no file data to the server.
 
 The file waterfall records inspected windows, newest first. Its columns are
 relative byte offsets within each window; left-axis labels identify each
