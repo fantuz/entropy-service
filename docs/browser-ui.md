@@ -78,6 +78,13 @@ The `browser-ui` GitHub workflow runs these checks and the source/socket suite
 in both engines, retaining screenshots and results for seven days. Release
 publication also waits for both browser checks.
 
+For the tab and history regression, build the server and run
+`xvfb-run -a python3 scripts/test_page_lifecycle_browser.py --browser chromium`
+or select `--browser firefox`. The Firefox check uses the installed Mozilla
+Firefox via WebDriver BiDi. Supply `--firefox-binary /path/to/firefox` when
+the executable is outside `PATH`. Playwright's patched Firefox forces its
+attached pages active, which masks real background-tab behaviour.
+
 The current interface already shares its colors, controls and responsive
 layouts. The next useful UX work is state reliability and shorter task-specific
 guidance, followed by measured analysis cost on slower devices. Another visual
