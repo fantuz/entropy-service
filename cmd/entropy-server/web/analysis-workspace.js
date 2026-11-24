@@ -208,17 +208,17 @@
                 busy = false; onError("ANALYSIS WORKER FAILED");
             };
             active.onmessage = ({data}) => {
-            if (worker !== active || suspended || destroyed) return;
-            busy = false;
-            if (data?.type === "error") { onError(data.message); return; }
-            if (data?.type === "analysis") {
-                if (!data.reanalysis) { onAnalyzed(data); }
-                if (data.epoch === epoch && (kind === "file" || !paused || data.reanalysis) && (kind === "file" || !document.hidden)) { pending = data; redraw(); }
-            }
-            pump();
-            // A paused/invalidated in-flight result may be discarded without
-            // scheduling a paint. Drain deferred settings once the worker is idle.
-            if (needsReanalysis && !busy && !pending) reanalyze();
+                if (worker !== active || suspended || destroyed) return;
+                busy = false;
+                if (data?.type === "error") { onError(data.message); return; }
+                if (data?.type === "analysis") {
+                    if (!data.reanalysis) { onAnalyzed(data); }
+                    if (data.epoch === epoch && (kind === "file" || !paused || data.reanalysis) && (kind === "file" || !document.hidden)) { pending = data; redraw(); }
+                }
+                pump();
+                // A paused/invalidated in-flight result may be discarded without
+                // scheduling a paint. Drain deferred settings once the worker is idle.
+                if (needsReanalysis && !busy && !pending) reanalyze();
             };
         }
         function clear(message = "Awaiting selected bytes.") {
