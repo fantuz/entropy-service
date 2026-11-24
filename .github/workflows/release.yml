@@ -127,6 +127,11 @@ jobs:
         uses: ./.github/actions/setup-go-cache
         with:
           profile: publication
+      - name: Download this run's validated native archives and packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: native-release-payloads
+          path: bin/native-release
       - name: Download this run's tested installer and complete runtime source
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -137,12 +142,12 @@ jobs:
         with:
           name: container-oci-bundles
           path: bin/oci-release
-      - name: Verify tagged installer artifacts and prepare publication config
+      - name: Verify tagged native, installer and OCI assets for publication
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          python3 scripts/prepare_gui_release.py prepare --artifacts bin/gui-release --oci-artifacts bin/oci-release --repository "$GITHUB_REPOSITORY" \
+          python3 scripts/native_release.py prepare --native bin/native-release --gui bin/gui-release --oci-artifacts bin/oci-release --repository "$GITHUB_REPOSITORY" \
             --version "${RELEASE_TAG#v}" --source-sha "$SOURCE_SHA" --output "$RUNNER_TEMP/goreleaser-release.yml"
       - name: Select curated release notes when available
         id: release-notes
@@ -162,6 +167,7 @@ jobs:
           args: release --clean --config "${{ runner.temp }}/goreleaser-release.yml" ${{ steps.release-notes.outputs.args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
   quality:
     name: Validate Linux quality
     if: inputs.validated_run_id == ''

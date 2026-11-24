@@ -103,11 +103,22 @@ func generatedImageHandler(d *drbg.DRBG, budget *httpRequestBudget, heatmap bool
 		w.Header().Set("X-Image-Palette", palette)
 		w.Header().Set(ageHeader, strconv.FormatInt(d.ReseedAge().Milliseconds(), 10))
 
-		if err := png.Encode(w, img); err != nil {
+		if err := writeSamplePNG(w, img, heatmap); err != nil {
 			// A PNG response may already have started; do not append an error body.
 			log.Printf("image response interrupted: %v", err)
 		}
 	}
+}
+
+func writeSamplePNG(w io.Writer, img *image.RGBA, heatmap bool) error {
+	if heatmap {
+		return png.Encode(w, img)
+	}
+
+	// Random RGB channels have little redundancy for PNG filters or DEFLATE.
+	encoder := png.Encoder{CompressionLevel: png.NoCompression}
+
+	return encoder.Encode(w, img)
 }
 
 func renderSampleImage(source io.Reader, size int, heatmap bool) (*image.RGBA, error) {

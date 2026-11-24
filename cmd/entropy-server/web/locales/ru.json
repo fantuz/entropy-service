@@ -987,5 +987,12 @@
   "Use with entropy-server": "Использование с entropy-server",
   "Valid from (UTC)": "Действителен с (UTC)",
   "Valid until (UTC)": "Действителен до (UTC)",
-  "Validity (days)": "Срок действия (дни)"
+  "Validity (days)": "Срок действия (дни)",
+  "Enable custom threshold alert": "Включить оповещение с заданным порогом",
+  "Sample size: —": "Размер выборки: —",
+  "Estimate from {bytes} bytes": "Оценка по {bytes} байтам",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "ОПИСАТЕЛЬНАЯ ОЦЕНКА · ОПОВЕЩЕНИЕ ОТКЛЮЧЕНО",
+  "Enter a custom threshold to enable alerts.": "Задайте порог, чтобы включить оповещения.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Введите значение от 1 до 8 бит/байт, не более шести знаков после запятой.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Оценка конечной выборки, а не проверка исправности генератора случайных чисел. Для небольших корректных выборок оценка часто ниже восьми бит/байт."
 }

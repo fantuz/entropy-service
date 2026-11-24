@@ -26,11 +26,16 @@ function harness() {
         return node;
     }
     let worker, rawRows = [], spectralRows = [], finalFrame = null, api;
+    const workers = [];
     const shared = {Uint8Array, Uint32Array, Float64Array, ArrayBuffer, DataView, performance};
     const context = vm.createContext({...shared,
         document: {getElementById: element, createElement: () => element(Symbol()),
             querySelector: () => element("panel"), hidden: false},
-        requestAnimationFrame(callback) { animationFrames.push(callback); },
+        requestAnimationFrame(callback) { animationFrames.push(callback); return callback; },
+        cancelAnimationFrame(callback) {
+            const position = animationFrames.indexOf(callback);
+            if (position >= 0) animationFrames.splice(position, 1);
+        },
         ResizeObserver: class { observe() {} disconnect() {} },
         addEventListener() {}, removeEventListener() {},
         Worker: class {
@@ -46,13 +51,14 @@ function harness() {
                 };
                 vm.runInContext(source("worker.js"), this.context);
                 worker = this;
+                workers.push(this);
             }
             postMessage(data, transfer) { this.jobs.push(structuredClone(data, {transfer})); }
             complete() {
                 assert.equal(this.jobs.length, 1, "only one actual worker job may run at a time");
                 this.context.self.onmessage({data: this.jobs.shift()});
             }
-            terminate() {}
+            terminate() { this.terminated = true; }
         }});
     context.window = context;
     context.EntropyPlots = {empty() {}, balance() {}, histogram() { return 0; }, spectrum() {},
@@ -92,7 +98,7 @@ function harness() {
         assert.deepEqual(errors, [], "production worker raised an error");
     }
     paint();
-    return {api, worker, analyzed, rendered, paint,
+    return {api, get worker() { return worker; }, workers, analyzed, rendered, paint,
         get rawRows() { return rawRows; }, get spectralRows() { return spectralRows; },
         finishAt(frame) { finalFrame = frame; },
         submit(frame, sourceId = 1) {
@@ -178,5 +184,28 @@ assert.equal(cleared.worker.jobs.length, 0, "cleared comparison requests must st
 assert.deepEqual(cleared.rendered.filter(row => !row.reanalysis).map(row => row.frame), [1, 3]);
 assert.deepEqual(cleared.rawRows.map(row => row.frame), [3]);
 assert.deepEqual(cleared.spectralRows.map(row => row.frame), [3]);
+
+// BFCache suspension retains the last sample but terminates its worker. A
+// resumed worker owns future jobs; late results/errors from the retired one
+// cannot render, count work or poison the replacement workspace.
+const restored = harness();
+restored.submit(1); restored.worker.complete(); restored.paint();
+restored.submit(2);
+const retiredWorker = restored.worker, retiredResult = retiredWorker.onmessage, retiredError = retiredWorker.onerror;
+restored.api.suspend(); restored.api.suspend();
+assert.equal(retiredWorker.terminated, true);
+restored.api.resume(); restored.api.resume();
+assert.equal(restored.workers.length, 2, "overlapping resume notifications create one worker");
+retiredResult({data: {type: "error", message: "stale worker error"}}); retiredError();
+restored.paint();
+assert.equal(restored.api.sample.frame, 1, "a restored page retains its existing sample");
+restored.submit(3); restored.worker.complete(); restored.paint();
+assert.equal(restored.api.sample.frame, 3);
+assert.deepEqual(restored.analyzed, [1, 3]);
+assert.deepEqual(restored.rawRows.map(row => row.frame), [3, 1]);
+restored.api.destroy(); restored.api.resume(); restored.submit(4);
+assert.equal(restored.worker.terminated, true);
+assert.equal(restored.worker.jobs.length, 0);
+assert.equal(restored.workers.length, 2, "final destruction cannot be resumed");
 
 console.log("Production workspace/worker: first/final capture drain, queued capture ownership, paused reanalysis, clear/reset and exact counters/history: passed");

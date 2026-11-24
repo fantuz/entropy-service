@@ -38,6 +38,18 @@ class WindowsArchiveTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 check_archive(path, destination)
 
+    def test_staged_hash_checked_before_extraction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = self.archive(directory)
+            manifest = Path(directory) / "checksums.txt"
+            dest = Path(directory) / "extracted"
+            manifest.write_text("0" * 64 + "  windows.zip\n")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                check_archive(archive, dest, manifest)
+            self.assertFalse(dest.exists())
+            manifest.write_text(check_archive(archive) + "  windows.zip\n")
+            check_archive(archive, dest, manifest)
+
     def test_invalid_deliverables_are_rejected(self):
         for options in [
             {"missing": "WORDLIST_NOTICES.txt"},

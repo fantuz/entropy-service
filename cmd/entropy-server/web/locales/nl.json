@@ -987,5 +987,12 @@
   "Check the computer clock before creating a certificate": "Controleer de computerklok vóór het maken van een certificaat",
   "Download private key": "Privésleutel downloaden",
   "Common name": "Algemene naam",
-  "Create self-signed TLS certificates locally with server and browser randomness.": "Maak lokaal zelfondertekende TLS-certificaten met willekeurigheid van server en browser."
+  "Create self-signed TLS certificates locally with server and browser randomness.": "Maak lokaal zelfondertekende TLS-certificaten met willekeurigheid van server en browser.",
+  "Enable custom threshold alert": "Waarschuwing met eigen drempel inschakelen",
+  "Sample size: —": "Steekproefgrootte: —",
+  "Estimate from {bytes} bytes": "Schatting op basis van {bytes} bytes",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "BESCHRIJVENDE SCHATTING · WAARSCHUWING UIT",
+  "Enter a custom threshold to enable alerts.": "Voer een eigen drempel in om waarschuwingen in te schakelen.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Voer 1–8 bits/byte in met maximaal zes decimalen.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Schatting van een eindige steekproef, geen controle van de werking van een toevalsgenerator. Kleine, goede steekproeven geven vaak een schatting onder acht bits/byte."
 }

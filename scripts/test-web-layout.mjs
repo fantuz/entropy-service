@@ -9,10 +9,12 @@ const html = name => readFileSync(new URL(name, root), "utf8").replace(/\sdata-i
 const css = html("theme.css");
 
 function simulateFrame(view, frame) {
-    const elements = new Map();
+    const elements = new Map(), documentListeners = new Map();
     const document = {
+        hidden: false,
         body: { dataset: { entropyView: view }, style: {} },
         currentScript: {src: "http://localhost/entropy-display.js"},
+        addEventListener(type, cb) { documentListeners.set(type, cb); },
         getElementById(id) {
             if (!elements.has(id)) {
                 elements.set(id, {textContent: "", hidden: false, dataset: {}, style: {}});
@@ -28,13 +30,13 @@ function simulateFrame(view, frame) {
     class FakeWorker {
         constructor(url) {this.url = url; workers.push(this); this.messages = [];}
         postMessage(data) {this.messages.push(data);}
-        terminate() {}
+        terminate() { this.terminated = true; }
     }
     const context = {
         document, window, Worker: FakeWorker, URL, URLSearchParams,
         location: { href: "http://localhost/api-" + view + ".html", protocol: "http:", search: "" },
         requestAnimationFrame: callback => {callback(); return 1;},
-        cancelAnimationFrame() {}, performance: {now: () => 0},
+        cancelAnimationFrame() {}, clearTimeout, setTimeout, performance: {now: () => 0},
     };
     vm.createContext(context);
     vm.runInContext(readFileSync(new URL("display-clock.js", root), "utf8"), context);
@@ -42,7 +44,9 @@ function simulateFrame(view, frame) {
     assert.equal(workers.length, 1);
     workers[0].onmessage({data: {type: "frame", ...frame}});
     return {value: id => document.getElementById(id).textContent, style: document.body.style,
-        swatch: document.getElementById("hash").style, worker: workers[0]};
+        swatch: document.getElementById("hash").style, worker: workers[0], workers,
+        page(type, persisted = false) { listeners.get(type)({persisted}); },
+        visible(value) { document.hidden = !value; documentListeners.get("visibilitychange")(); }};
 }
 
 const hash = "0123456789abcdef".repeat(4);
@@ -63,6 +67,24 @@ assert.equal(bytes.value("hash"), hash);
 assert.equal(bytes.value("base64"), "ESI=");
 assert.equal(bytes.value("hex"), "11 22");
 assert.equal(bytes.style.backgroundColor, undefined);
+
+// View-only subscriptions stop producing while hidden, and overlapping
+// visibility/pageshow notifications attach one fresh worker on return.
+const retired = bytes.worker.onmessage;
+bytes.page("pageshow"); bytes.page("pageshow", true);
+assert.equal(bytes.workers.length, 1);
+bytes.visible(false); bytes.visible(false);
+assert.equal(bytes.worker.terminated, true);
+retired({data: {type: "frame", ...frame, hash: "ff".repeat(32)}});
+assert.equal(bytes.value("hash"), hash, "a retired worker cannot paint while hidden");
+bytes.visible(true); bytes.page("pageshow", true);
+assert.equal(bytes.workers.length, 2);
+bytes.workers[1].onmessage({data: {type: "frame", ...frame, hash: "ab".repeat(32)}});
+retired({data: {type: "frame", ...frame, hash}});
+assert.equal(bytes.value("hash"), "ab".repeat(32), "retired results cannot replace the new subscription");
+bytes.page("pagehide", true); bytes.page("pageshow", true); bytes.page("pageshow", true);
+assert.equal(bytes.workers[1].terminated, true);
+assert.equal(bytes.workers.length, 3, "BFCache pageshow resumes exactly once");
 
 const worker = {self: {}, ArrayBuffer, Uint8Array, DataView, btoa};
 vm.runInNewContext(readFileSync(new URL("entropy-display-worker.js", root), "utf8"), worker);

@@ -987,5 +987,12 @@
   "Use with entropy-server": "Użycie z entropy-server",
   "Valid from (UTC)": "Ważny od (UTC)",
   "Valid until (UTC)": "Ważny do (UTC)",
-  "Validity (days)": "Ważność (dni)"
+  "Validity (days)": "Ważność (dni)",
+  "Enable custom threshold alert": "Włącz alert z własnym progiem",
+  "Sample size: —": "Rozmiar próbki: —",
+  "Estimate from {bytes} bytes": "Oszacowanie na podstawie {bytes} bajtów",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "OSZACOWANIE OPISOWE · ALERT WYŁĄCZONY",
+  "Enter a custom threshold to enable alerts.": "Wprowadź własny próg, aby włączyć alerty.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Wprowadź 1–8 bitów/bajt z najwyżej sześcioma miejscami po przecinku.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Oszacowanie dla skończonej próbki, a nie test sprawności generatora liczb losowych. Małe, poprawne próbki często dają wynik poniżej ośmiu bitów/bajt."
 }

@@ -133,7 +133,8 @@
         sourceId++; seekVersion++; queuedRead = null; file = null; windowNumber = 0;
         workspace.clear("Uploading the file for server analysis.");
         updateControls();
-        controller = new AbortController();
+        const active = new AbortController();
+        controller = active;
         submit.disabled = true; input.disabled = true; cancel.disabled = false;
         setStatus("connecting", "Uploading and analyzing");
         text($("file-entropy"), "{name} ({bytes} bytes)", {name: selected.name, bytes: selected.size.toLocaleString()});
@@ -144,9 +145,11 @@
             // The server keeps the existing bounded /files contract and hashes
             // the complete upload. Interactive windows use local File slices.
             const response = await fetch("/files", {method: "POST", headers: {"Content-Type": "application/octet-stream"},
-                body: selected, signal: controller.signal});
+                body: selected, signal: active.signal});
+            if (controller !== active) return;
             if (!response.ok) throw uiError("HTTP {status}: {detail}", {status: response.status, detail: (await response.text()).slice(0, 300)});
             const result = await response.json();
+            if (controller !== active) return;
             if (result.total_bytes !== selected.size || !Number.isSafeInteger(result.analyzed_bytes) ||
                 result.analyzed_bytes < 1 || result.analyzed_bytes > selected.size || !/^[0-9a-f]{64}$/.test(result.sha256)) {
                 throw uiError("Invalid file analysis response");
@@ -161,16 +164,26 @@
             updateControls();
             requestWindow(0);
         } catch (error) {
+            if (controller !== active) return;
             setStatus(error.name === "AbortError" ? "disconnected" : "error", error.name === "AbortError" ? "Upload canceled" : error.uiMessage || "{error}", error.uiParams || {error: error.message});
             text($("sample-info"), "Upload a file to begin analysis.");
         } finally {
-            controller = null;
-            submit.disabled = false; input.disabled = false; cancel.disabled = true;
+            if (controller === active) {
+                controller = null;
+                submit.disabled = false; input.disabled = false; cancel.disabled = true;
+            }
         }
     });
     cancel.addEventListener("click", () => controller?.abort());
-    window.addEventListener("pagehide", () => {
-        controller?.abort(); stopPlayback(); seekVersion++; queuedRead = null; workspace.destroy();
+    window.addEventListener("pagehide", event => {
+        const active = controller; controller = null;
+        active?.abort(); stopPlayback(); seekVersion++; queuedRead = null;
+        submit.disabled = false; input.disabled = false; cancel.disabled = true;
+        if (active) setStatus("disconnected", "Upload canceled");
+        if (event.persisted) workspace.suspend(); else workspace.destroy();
+    });
+    window.addEventListener("pageshow", event => {
+        if (event.persisted) { workspace.resume(); updateControls(); }
     });
     updateControls();
 })();

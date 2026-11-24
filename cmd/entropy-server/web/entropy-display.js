@@ -24,6 +24,7 @@
 
     let worker = null;
     let displayClock = null;
+    let pageActive = true;
 
     function setStatus(state, message) {
         status.hidden = false;
@@ -32,13 +33,14 @@
     }
 
     function start() {
+        if (worker !== null || !pageActive || document.hidden) return;
         setStatus("waiting", "Awaiting first sample");
         const active = new Worker(new URL("entropy-display-worker.js", scriptURL));
         worker = active;
         active.onerror = () => {
             if (worker === active) setStatus("error", "Display worker failed");
         };
-        displayClock = window.EntropyDisplayClock.create(frame => {
+        const clock = window.EntropyDisplayClock.create(frame => {
             if (worker !== active) return;
             status.hidden = true;
             // Two rows preserve all 32 SHA-256 digest bytes.
@@ -65,6 +67,7 @@
             }
             active.postMessage({ type: "ready" });
         });
+        displayClock = clock;
         active.onmessage = function(event) {
             if (worker !== active) return;
             const frame = event.data;
@@ -74,19 +77,33 @@
             }
             if (frame.type !== "frame") return;
 
-            displayClock.submit(frame);
+            clock.submit(frame);
         };
         active.postMessage({ type: "start", view, url: endpoint.href });
     }
 
-    window.addEventListener("pagehide", () => {
-        if (worker !== null) worker.postMessage({ type: "stop" });
+    function stop() {
+        const active = worker;
         worker = null;
+        if (active !== null) {
+            // Termination also closes the worker-owned WebSocket, including
+            // when pagehide freezes the worker before a queued stop message.
+            active.onmessage = active.onerror = null;
+            active.terminate();
+        }
         displayClock?.cancel();
         displayClock = null;
+    }
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) stop(); else start();
     });
-    window.addEventListener("pageshow", event => {
-        if (event.persisted) start();
+    window.addEventListener("pagehide", () => {
+        pageActive = false;
+        stop();
+    });
+    window.addEventListener("pageshow", () => {
+        pageActive = true;
+        start();
     });
     start();
 })();

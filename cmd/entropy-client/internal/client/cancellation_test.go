@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -97,6 +98,8 @@ func testCancellationLabel(handshake, deadline bool) string {
 }
 
 func TestHTTPBodyCancellation(t *testing.T) {
+	const size = 128 << 10
+
 	for _, diagnostic := range []bool{false, true} {
 		label := "fetch"
 		if diagnostic {
@@ -107,8 +110,8 @@ func TestHTTPBodyCancellation(t *testing.T) {
 			started := make(chan struct{})
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Length", "64")
-				_, _ = w.Write([]byte{1})
+				w.Header().Set("Content-Length", strconv.Itoa(size))
+				_, _ = w.Write(make([]byte, size/2))
 				_ = http.NewResponseController(w).Flush()
 
 				close(started)
@@ -125,7 +128,7 @@ func TestHTTPBodyCancellation(t *testing.T) {
 				if diagnostic {
 					done <- TestEntropyHTTP(ctx, server.URL)
 				} else {
-					_, err := FetchEntropy(ctx, server.URL, 64)
+					_, err := FetchEntropy(ctx, server.URL, size)
 					done <- err
 				}
 			}()

@@ -34,7 +34,7 @@ jobs:
         run: |
           $archives = @(Get-ChildItem -LiteralPath windows-release -Filter *.zip)
           if ($archives.Count -ne 1) { throw "Expected exactly one Windows x64 release ZIP" }
-          python scripts/check_windows_archive.py "$($archives[0].FullName)" --extract-to windows-package
+          python scripts/check_windows_archive.py "$($archives[0].FullName)" --checksums windows-release/checksums.txt --extract-to windows-package
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/test_windows.py --bin-dir windows-package
         if: (inputs.full)

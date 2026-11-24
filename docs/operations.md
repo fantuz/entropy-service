@@ -86,6 +86,17 @@ The generated-sample ceiling is **32 MiB**, shared by binary HTTP/WebSocket hand
 
 Budgets estimate working memory at admission. For N-byte WS samples the reservation is `N + 64 KiB` for raw, compact, preview and hash formats, or `16N + 64 KiB` for JSON. With the default 1 GiB budget and full 32 MiB samples, that admits at most 31 connections using the first four formats, or one JSON connection, before other reservations. TLS, kernel buffers, garbage collection and retained allocations require additional headroom.
 
+Raising `-ws-memory-mib` lets more simultaneous streams share the process.
+For example, with no other connections, `1025` MiB admits two 32 MiB JSON
+streams (each reserves 512 MiB + 64 KiB). Changing `-ws-max-connections`
+alone cannot admit the second stream. Another possible policy change is to
+lower the JSON reservation multiplier in code. That would admit more JSON
+streams under the same budget on every installation using that policy.
+Neither change makes a single stream faster. If more clients run together,
+CPU contention, transient memory use, GC work, tail latency and outbound
+traffic can increase. Use a representative mixed workload, including slow
+consumers, before changing either setting. [Mixed-load audit](benchmarks.md#mixed-http-and-websocket-audit)
+
 Invalid sample parameters return 400. A request whose reservation exceeds the entire memory budget returns 413; temporary connection/request or aggregate-memory exhaustion returns 503 with `Retry-After: 1`. Successful WebSocket admission is still followed by the usual Upgrade validation.
 
 HTTP responses with status **400 or higher** are logged to stderr with method, path, status, duration and remote address. Query strings and request bodies are omitted. After a successful WS upgrade, later stream errors are connection events rather than new HTTP response statuses. Under systemd, console logs are available through `journalctl`.

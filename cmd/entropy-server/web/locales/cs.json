@@ -987,5 +987,12 @@
   "Use with entropy-server": "Použití s entropy-server",
   "Valid from (UTC)": "Platný od (UTC)",
   "Valid until (UTC)": "Platný do (UTC)",
-  "Validity (days)": "Platnost (dny)"
+  "Validity (days)": "Platnost (dny)",
+  "Enable custom threshold alert": "Zapnout upozornění s vlastním prahem",
+  "Sample size: —": "Velikost vzorku: —",
+  "Estimate from {bytes} bytes": "Odhad z {bytes} bajtů",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "POPISNÝ ODHAD · UPOZORNĚNÍ VYPNUTO",
+  "Enter a custom threshold to enable alerts.": "Pro zapnutí upozornění zadejte vlastní práh.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Zadejte 1–8 bitů/bajt s nejvýše šesti desetinnými místy.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Odhad z konečného vzorku, nikoli test správné funkce generátoru náhodných čísel. Malé bezchybné vzorky běžně vykazují odhad pod osmi bity/bajt."
 }

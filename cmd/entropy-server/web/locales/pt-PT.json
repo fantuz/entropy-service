@@ -987,5 +987,12 @@
   "Check the computer clock before creating a certificate": "Verifique o relógio do computador antes de criar um certificado",
   "Download private key": "Descarregar chave privada",
   "Common name": "Nome comum",
-  "Create self-signed TLS certificates locally with server and browser randomness.": "Crie certificados TLS autoassinados localmente com aleatoriedade do servidor e do navegador."
+  "Create self-signed TLS certificates locally with server and browser randomness.": "Crie certificados TLS autoassinados localmente com aleatoriedade do servidor e do navegador.",
+  "Enable custom threshold alert": "Ativar alerta com limiar personalizado",
+  "Sample size: —": "Tamanho da amostra: —",
+  "Estimate from {bytes} bytes": "Estimativa a partir de {bytes} bytes",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "ESTIMATIVA DESCRITIVA · ALERTA DESATIVADO",
+  "Enter a custom threshold to enable alerts.": "Introduza um limiar personalizado para ativar os alertas.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Introduza entre 1 e 8 bits/byte com um máximo de seis casas decimais.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Estimativa de uma amostra finita, não um teste ao funcionamento do gerador aleatório. As amostras pequenas e corretas apresentam frequentemente uma estimativa inferior a oito bits/byte."
 }

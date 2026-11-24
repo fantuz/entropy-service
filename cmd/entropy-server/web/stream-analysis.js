@@ -11,7 +11,8 @@
         return Object.assign(new Error(tr(message, params)), {uiMessage: message, uiParams: params});
     }
     const $ = id => document.getElementById(id), controls = $("stream-controls");
-    let ws, receivedFrames = 0, receivedBytes = 0, analyzedFrames = 0, analyzedBytes = 0;
+    let ws = null, endpoint = null, pageActive = true;
+    let receivedFrames = 0, receivedBytes = 0, analyzedFrames = 0, analyzedBytes = 0;
     let lastAccepted = -Infinity, fatal = false, closed = false;
     function showNotice(state, message, params = {}) {
         $("stream-notice").hidden = false;
@@ -51,16 +52,28 @@
         const args = new URLSearchParams(location.search);
         const quantity = parseOption(args, "bytes", 65536, 32 * 1024 * 1024), refresh = parseOption(args, "refresh", 500, 60000);
         controls.elements.namedItem("bytes").value = quantity; controls.elements.namedItem("refresh").value = refresh;
-        const endpoint = new URL("/stream", location.href);
+        endpoint = new URL("/stream", location.href);
         endpoint.protocol = location.protocol === "https:" ? "wss:" : "ws:";
         endpoint.searchParams.set("bytes", quantity); endpoint.searchParams.set("refresh", refresh);
-        ws = new WebSocket(endpoint.href); ws.binaryType = "arraybuffer";
-        ws.onopen = () => showNotice("waiting", "AWAITING FIRST SAMPLE");
-        ws.onerror = () => { fatal = true; showNotice("error", "STREAM ERROR — CHECK SERVER AND REQUEST LIMITS"); };
-        ws.onclose = () => { closed = true; if (!fatal) showNotice("disconnected", "STREAM CLOSED — RELOAD TO RETRY"); };
-        ws.onmessage = event => {
+        connect();
+    } catch (error) { fatal = true; showNotice("error", error.uiMessage || "{error}", error.uiParams || {error: error.message}); }
+    function connect() {
+        if (ws !== null || !pageActive || endpoint === null) return;
+        const active = new WebSocket(endpoint.href);
+        ws = active; active.binaryType = "arraybuffer"; fatal = false; closed = false;
+        active.onopen = () => { if (ws === active && pageActive) showNotice("waiting", "AWAITING FIRST SAMPLE"); };
+        active.onerror = () => {
+            if (ws !== active || !pageActive) return;
+            fatal = true; showNotice("error", "STREAM ERROR — CHECK SERVER AND REQUEST LIMITS");
+        };
+        active.onclose = () => {
+            if (ws !== active || !pageActive) return;
+            closed = true; if (!fatal) showNotice("disconnected", "STREAM CLOSED — RELOAD TO RETRY");
+        };
+        active.onmessage = event => {
+            if (ws !== active || !pageActive) return;
             if (!(event.data instanceof ArrayBuffer) || !event.data.byteLength) {
-                fatal = true; showNotice("error", "UNEXPECTED STREAM FRAME"); ws.close(1002, "expected binary"); return;
+                fatal = true; showNotice("error", "UNEXPECTED STREAM FRAME"); active.close(1002, "expected binary"); return;
             }
             receivedFrames++; receivedBytes += event.data.byteLength; statistics();
             const now = performance.now();
@@ -73,7 +86,7 @@
             workspace.submit(event.data.slice(offset, Math.min(event.data.byteLength, offset + Number($("analysis-size").value))),
                 {totalBytes: event.data.byteLength, offset, frame: receivedFrames, time: Date.now(), captureTime: now});
         };
-    } catch (error) { fatal = true; showNotice("error", error.uiMessage || "{error}", error.uiParams || {error: error.message}); }
+    }
     function parseOption(params, key, fallback, max) {
         const all = params.getAll(key);
         if (!all.length) return fallback;
@@ -84,5 +97,17 @@
     controls.addEventListener("submit", event => {
         event.preventDefault(); if (controls.reportValidity()) location.search = new URLSearchParams(new FormData(controls)).toString();
     });
-    window.addEventListener("pagehide", () => { statsClock.cancel(); ws?.close(); workspace?.destroy(); });
+    window.addEventListener("pagehide", event => {
+        pageActive = false; statsClock.cancel();
+        const active = ws; ws = null;
+        if (active) {
+            active.onopen = active.onmessage = active.onerror = active.onclose = null;
+            active.close();
+        }
+        if (event.persisted) workspace?.suspend(); else workspace?.destroy();
+    });
+    window.addEventListener("pageshow", event => {
+        pageActive = true;
+        if (event.persisted) { workspace?.resume(); lastAccepted = -Infinity; connect(); }
+    });
 })();

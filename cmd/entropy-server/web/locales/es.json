@@ -987,5 +987,12 @@
   "Use with entropy-server": "Usar con entropy-server",
   "Valid from (UTC)": "Válido desde (UTC)",
   "Valid until (UTC)": "Válido hasta (UTC)",
-  "Validity (days)": "Validez (días)"
+  "Validity (days)": "Validez (días)",
+  "Enable custom threshold alert": "Activar alerta con umbral personalizado",
+  "Sample size: —": "Tamaño de la muestra: —",
+  "Estimate from {bytes} bytes": "Estimación a partir de {bytes} bytes",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "ESTIMACIÓN DESCRIPTIVA · ALERTA DESACTIVADA",
+  "Enter a custom threshold to enable alerts.": "Introduzca un umbral personalizado para activar las alertas.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "Introduzca entre 1 y 8 bits/byte con un máximo de seis decimales.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "Estimación de una muestra finita, no una prueba de funcionamiento del generador aleatorio. Las muestras pequeñas y correctas suelen dar estimaciones inferiores a ocho bits/byte."
 }

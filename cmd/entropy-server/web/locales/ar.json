@@ -987,5 +987,12 @@
   "Check the computer clock before creating a certificate": "تحقق من ساعة الحاسوب قبل إنشاء شهادة",
   "Download private key": "تنزيل المفتاح الخاص",
   "Common name": "الاسم الشائع",
-  "Create self-signed TLS certificates locally with server and browser randomness.": "أنشئ شهادات TLS موقعة ذاتيًا محليًا باستخدام عشوائية الخادم والمتصفح."
+  "Create self-signed TLS certificates locally with server and browser randomness.": "أنشئ شهادات TLS موقعة ذاتيًا محليًا باستخدام عشوائية الخادم والمتصفح.",
+  "Enable custom threshold alert": "تفعيل تنبيه بعتبة مخصصة",
+  "Sample size: —": "حجم العينة: —",
+  "Estimate from {bytes} bytes": "تقدير من {bytes} بايت",
+  "DESCRIPTIVE ESTIMATE · ALERT DISABLED": "تقدير وصفي · التنبيه معطّل",
+  "Enter a custom threshold to enable alerts.": "أدخل عتبة مخصصة لتفعيل التنبيهات.",
+  "Enter 1–8 bits/byte with up to six decimal places.": "أدخل قيمة بين 1 و8 بتات/بايت، بما لا يتجاوز ست منازل عشرية.",
+  "Finite-sample estimate, not an RNG health test. Small healthy samples commonly estimate below eight bits/byte.": "تقدير لعينة محدودة، وليس اختبارًا لسلامة مولّد الأعداد العشوائية. عادةً ما يكون تقدير العينات الصغيرة السليمة أقل من ثمانية بتات/بايت."
 }

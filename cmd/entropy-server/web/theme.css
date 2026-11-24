@@ -491,6 +491,17 @@ body.page-colors { min-block-size: 100svh; padding: clamp(1rem, 5vw, 3rem); }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+.page-analysis .entropy-alert-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  font-size: .83rem;
+}
+.page-analysis .entropy-alert-toggle input { width: auto; }
+.page-analysis .entropy-threshold-error { color: var(--error); font-size: .8rem; }
+.page-analysis .entropy-alert-card[data-state="descriptive"] .entropy-alert-message,
+.page-analysis .entropy-alert-card[data-state="unconfigured"] .entropy-alert-message { color: var(--muted); }
 .page-analysis .entropy-threshold-control {
   display: flex;
   justify-content: center;

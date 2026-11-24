@@ -110,6 +110,23 @@ class WorkflowContracts(unittest.TestCase):
                 self.assertTrue(all(step.get("merge-multiple") == "true" for step in downloads))
                 self.assertTrue(all("name" not in step for step in downloads))
 
+    def test_native_packages_are_built_once_tested_and_promoted(self):
+        steps = workflow("package-snapshot")["jobs"]["package"]["steps"]
+        builds = [s["with"]["args"] for s in steps if s.get("uses", "").startswith("goreleaser/")]
+        self.assertEqual("release --skip=publish --clean", builds[0])
+        self.assertIn("--skip=publish", builds[1])
+        self.assertIn("native-dry-run.yml", builds[1])
+        staged = {s.get("with", {}).get("name"): s["with"]["path"] for s in steps if s.get("uses", "").startswith("actions/upload-artifact@")}
+        self.assertEqual(staged["native-release-payloads"], "bin/native-release/")
+        for name in ("macos-cli-archives", "windows-x64-release-zip"):
+            self.assertTrue(all(line.startswith("bin/native-release/") for line in staged[name].splitlines()))
+            self.assertIn("bin/native-release/checksums.txt", staged[name])
+        windows = workflow("windows-package")["jobs"]["package"]["steps"]
+        self.assertTrue(any("--checksums windows-release/checksums.txt" in s.get("run", "") for s in windows))
+        release = workflow("release")["jobs"]["release"]["steps"]
+        self.assertTrue(any(s.get("with", {}).get("name") == "native-release-payloads" for s in release))
+        self.assertTrue(any("scripts/native_release.py prepare --native bin/native-release" in s.get("run", "") for s in release))
+
     def test_cache_maintenance_uses_only_default_branch_tools(self):
         document = workflow("cache-maintenance")
         self.assertEqual(["closed"], document["on"]["pull_request_target"]["types"])

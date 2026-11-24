@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"io"
 	"net/http"
@@ -54,10 +55,14 @@ func TestInvalidImageSizesRejectBeforeAdmission(t *testing.T) {
 }
 
 func TestPreviewSizeAndProportionalAdmission(t *testing.T) {
-	for _, factory := range []func(*drbg.DRBG, *httpRequestBudget) http.HandlerFunc{randomImageHandler, entropyHeatmapHandler} {
+	for _, tc := range []struct {
+		factory func(*drbg.DRBG, *httpRequestBudget) http.HandlerFunc
+		heatmap bool
+	}{{randomImageHandler, false}, {entropyHeatmapHandler, true}} {
 		d := observableTestDRBG(t)
+		reference := observableTestDRBG(t)
 		budget := newHTTPRequestBudget(1, 2<<20)
-		handler := factory(d, budget)
+		handler := tc.factory(d, budget)
 
 		for _, size := range []int{64, 65, 128} {
 			response := httptest.NewRecorder()
@@ -70,6 +75,18 @@ func TestPreviewSizeAndProportionalAdmission(t *testing.T) {
 			decoded, err := png.Decode(bytes.NewReader(response.Body.Bytes()))
 			if err != nil || decoded.Bounds().Size() != image.Pt(size, size) {
 				t.Fatalf("preview did not preserve the requested resolution: %v", err)
+			}
+
+			expected, err := renderSampleImage(reference, size, tc.heatmap)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pixels := image.NewRGBA(decoded.Bounds())
+			draw.Draw(pixels, pixels.Bounds(), decoded, image.Point{}, draw.Src)
+
+			if !bytes.Equal(pixels.Pix, expected.Pix) {
+				t.Fatalf("decoded pixels differ from the generated sample at size %d (heatmap=%t)", size, tc.heatmap)
 			}
 
 			if usage := budget.usage(); usage.Active != 0 || usage.Reserved != 0 || usage.PeakReserved != httpReservation(size*size, 16)+imagePNGWorkingMemory {
@@ -175,7 +192,7 @@ func BenchmarkImagePNG(b *testing.B) {
 						b.Fatal(err)
 					}
 
-					if err := png.Encode(io.Discard, img); err != nil {
+					if err := writeSamplePNG(io.Discard, img, heatmap); err != nil {
 						b.Fatal(err)
 					}
 				}
