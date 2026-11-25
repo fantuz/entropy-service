@@ -46,7 +46,7 @@ jobs:
       - name: Test bounded reports and owned-process lifecycle
         run: python3 -m unittest discover -s scripts -p 'test_desktop_gui*.py'
       - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Build the actual GUI companion binaries
@@ -109,7 +109,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Build the actual Windows GUI companion binaries
