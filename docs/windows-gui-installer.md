@@ -11,9 +11,9 @@ option is off by default. The v2.7.0 installer supports current-user installatio
 
 Starting with **v2.4.1**, download the Windows GUI setup `.exe` from the
 [latest release](https://github.com/fantuz/entropy-service/releases/latest).
-For example, v2.9.1 provides `entropy-service_2.9.1_windows_amd64_gui_setup.exe`.
+For example, v2.9.2 provides `entropy-service_2.9.2_windows_amd64_gui_setup.exe`.
 Download `checksums.txt` from the same release to verify it. The versioned
-`entropy-service_2.9.1_windows_amd64_gui_sources.zip` contains matching runtime
+`entropy-service_2.9.2_windows_amd64_gui_sources.zip` contains matching runtime
 sources; it is a separate download and is not needed to run the application.
 
 The replacement notice and Finish-page Start Menu option described below are
