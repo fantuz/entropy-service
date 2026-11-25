@@ -35,7 +35,7 @@ jobs:
         run: python3 scripts/check_release_downloads.py
       - name: Setup fixture Python
         if: (inputs.full)
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.13'
       - name: Setup Go and workload input caches

@@ -23,7 +23,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: python3 scripts/ci_release_tag.py
       - name: Setup Python and pip download cache
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.13'
           cache: pip
