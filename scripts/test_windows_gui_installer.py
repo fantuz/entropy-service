@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Install, relocate-test and uninstall the GUI without the build-time runtime."""
 import argparse
+from contextlib import contextmanager
 import hashlib
 import http.client
 import json
@@ -198,28 +199,30 @@ def install_v260_and_upgrade(installer, installation, work, artifacts):
             process.wait(timeout=10)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--installer", type=Path, required=True)
-    parser.add_argument("--msys-prefix", type=Path, required=True)
-    parser.add_argument("--artifacts", type=Path, required=True)
-    parser.add_argument("--qualify-v260", action="store_true", help="Upgrade the checksum-pinned released 2.6.0 installer")
-    parser.add_argument("--qualify-service", action="store_true", help="Qualify explicitly selected machine-wide SCM installation")
-    args = parser.parse_args()
-    assert sys.platform == "win32"
-    try:
-        registry_values()
-    except FileNotFoundError:
-        pass
-    else:
-        raise AssertionError("Refusing to replace a non-fixture Entropy Service installation")
-    prefix = args.msys_prefix.resolve()
-    assert prefix.name.lower() == "ucrt64" and (prefix / "bin/python.exe").is_file()
-    assert Path(sys.prefix).resolve() != prefix
+@contextmanager
+def unavailable_build_runtime(prefix, clean_runner):
+    """Hide the producer's exact UCRT prefix, or verify it is absent on a fresh VM."""
+    if clean_runner and (not prefix.is_absolute() or prefix.resolve() != prefix):
+        raise ValueError("Expected an absolute UCRT64 runtime directory")
+    prefix = prefix.resolve()
+    if prefix.name.lower() != "ucrt64" or prefix == Path(sys.prefix).resolve():
+        raise ValueError("Expected the build-time UCRT64 prefix and a separate test interpreter")
+    if clean_runner and not prefix.exists():
+        yield
+        return
+    if not prefix.is_dir() or (not clean_runner and not (prefix / "bin/python.exe").is_file()):
+        raise ValueError("The original build-time UCRT64 Python was not found")
     hidden = prefix.with_name("ucrt64-unavailable-for-installer-test")
-    assert not hidden.exists()
-    artifacts = args.artifacts.resolve()
-    artifacts.mkdir(parents=True, exist_ok=True)
+    if hidden.exists():
+        raise ValueError("A hidden UCRT64 runtime already exists at the fixture path")
+    prefix.rename(hidden)
+    try:
+        yield
+    finally:
+        hidden.rename(prefix)
+
+
+def qualify_per_user(installer, artifacts, qualify_v260):
     with tempfile.TemporaryDirectory(prefix="entropy installed GUI ") as temporary:
         work = Path(temporary)
         installation = work / "Application with spaces"
@@ -228,68 +231,64 @@ def main():
         sentinel = state / "retain.txt"
         sentinel.write_text("retain user data")
         try:
-            if args.qualify_v260:
-                install_v260_and_upgrade(args.installer.resolve(), installation, work, artifacts)
+            if qualify_v260:
+                install_v260_and_upgrade(installer, installation, work, artifacts)
             else:
-                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
+                subprocess.run([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
                                 "/DIR=" + str(installation), "/LOG=" + str(artifacts / "install.log")], check=True, timeout=180)
             manifest = json.loads((installation / "bundle-manifest.json").read_text())
             assert manifest["packages"] and manifest["sources"]
-            prefix.rename(hidden)
-            try:
-                environment = dict(os.environ)
-                environment["PATH"] = os.pathsep.join([str(installation / "runtime/bin"), str(Path(os.environ["SystemRoot"]) / "System32"), os.environ["SystemRoot"]])
-                environment["LOCALAPPDATA"] = str(state)
-                for name in ("PYTHONPATH", "PYTHONHOME", "GI_TYPELIB_PATH", "GSETTINGS_SCHEMA_DIR", "XDG_DATA_DIRS"):
-                    environment.pop(name, None)
-                all_languages = verify_installed_web_languages(installation, UI_LANGUAGES, artifacts, "ui-locales-default-all")
-                python = installation / "runtime/bin/python.exe"
-                subprocess.run([str(python), "-I", "-B", str(installation / "app/gui_bootstrap.py"), "--help"], env=environment, check=True, timeout=30)
-                bootstrap = installation / "app/gui_bootstrap.py"
-                script = ROOT / "scripts/test_desktop_gui_gtk.py"
-                def test_installed_gui(name):
-                    code = ("import importlib.util,runpy,sys; "
-                            f"spec=importlib.util.spec_from_file_location('bundle_bootstrap',{str(bootstrap)!r}); "
-                            "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
-                            f"module.configure_runtime({str(installation)!r},{str(state)!r}); "
-                            f"sys.path.insert(0,{str(ROOT / 'scripts')!r}); "
-                            f"sys.argv={[str(script), '--gui-source', str(installation / 'app'), '--server', str(installation / 'bin/entropy-server.exe'), '--client', str(installation / 'bin/entropy-client.exe'), '--artifacts', str(artifacts / name)]!r}; "
-                            f"runpy.run_path({str(script)!r},run_name='__main__')")
-                    subprocess.run([str(python), "-I", "-B", "-c", code], env=environment, check=True, timeout=180)
+            environment = dict(os.environ)
+            environment["PATH"] = os.pathsep.join([str(installation / "runtime/bin"), str(Path(os.environ["SystemRoot"]) / "System32"), os.environ["SystemRoot"]])
+            environment["LOCALAPPDATA"] = str(state)
+            for name in ("PYTHONPATH", "PYTHONHOME", "GI_TYPELIB_PATH", "GSETTINGS_SCHEMA_DIR", "XDG_DATA_DIRS"):
+                environment.pop(name, None)
+            all_languages = verify_installed_web_languages(installation, UI_LANGUAGES, artifacts, "ui-locales-default-all")
+            python = installation / "runtime/bin/python.exe"
+            subprocess.run([str(python), "-I", "-B", str(installation / "app/gui_bootstrap.py"), "--help"], env=environment, check=True, timeout=30)
+            bootstrap = installation / "app/gui_bootstrap.py"
+            script = ROOT / "scripts/test_desktop_gui_gtk.py"
+            def test_installed_gui(name):
+                code = ("import importlib.util,runpy,sys; "
+                        f"spec=importlib.util.spec_from_file_location('bundle_bootstrap',{str(bootstrap)!r}); "
+                        "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
+                        f"module.configure_runtime({str(installation)!r},{str(state)!r}); "
+                        f"sys.path.insert(0,{str(ROOT / 'scripts')!r}); "
+                        f"sys.argv={[str(script), '--gui-source', str(installation / 'app'), '--server', str(installation / 'bin/entropy-server.exe'), '--client', str(installation / 'bin/entropy-client.exe'), '--artifacts', str(artifacts / name)]!r}; "
+                        f"runpy.run_path({str(script)!r},run_name='__main__')")
+                subprocess.run([str(python), "-I", "-B", "-c", code], env=environment, check=True, timeout=180)
 
-                test_installed_gui("gtk")
-                obsolete = installation / "runtime/obsolete-upgrade-fixture.dll"
-                obsolete.write_bytes(b"remove obsolete bundled runtime files")
-                retained = installation / "user sample.bin"
-                retained.write_bytes(b"retain unowned user files")
-                active = subprocess.Popen([str(python), "-I", "-B", "-u", "-c",
-                    "import time; print('ready', flush=True); time.sleep(60)"], env=environment,
-                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                try:
-                    assert active.stdout.readline().strip() == b"ready"
-                    blocked = subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES",
-                        "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=" + str(installation),
-                        "/LOG=" + str(artifacts / "active-process.log")], check=False, timeout=60)
-                    assert blocked.returncode != 0 and active.poll() is None
-                    assert obsolete.exists() and retained.read_bytes() == b"retain unowned user files"
-                    locale_inventory(installation, UI_LANGUAGES)
-                finally:
-                    active.terminate()
-                    active.wait(timeout=10)
-                    active.stdout.close()
-                    active.stderr.close()
-                subprocess.run([str(args.installer.resolve()), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
-                                "/TYPE=custom", SUBSET_COMPONENTS,
-                                "/DIR=" + str(installation), "/LOG=" + str(artifacts / "upgrade.log")], check=True, timeout=180)
-                assert not obsolete.exists()
-                assert retained.read_bytes() == b"retain unowned user files"
-                assert sentinel.read_text() == "retain user data"
-                assert json.loads((installation / "bundle-manifest.json").read_text()) == manifest
-                subset = verify_installed_web_languages(installation, ("en", "fr", "de"), artifacts, "ui-locales-french-german")
-                assert all_languages["i18n_etag"] and subset["i18n_etag"] and all_languages["i18n_etag"] != subset["i18n_etag"], "Locale removal did not invalidate the served script"
-                test_installed_gui("gtk-upgraded")
+            test_installed_gui("gtk")
+            obsolete = installation / "runtime/obsolete-upgrade-fixture.dll"
+            obsolete.write_bytes(b"remove obsolete bundled runtime files")
+            retained = installation / "user sample.bin"
+            retained.write_bytes(b"retain unowned user files")
+            active = subprocess.Popen([str(python), "-I", "-B", "-u", "-c",
+                "import time; print('ready', flush=True); time.sleep(60)"], env=environment,
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                assert active.stdout.readline().strip() == b"ready"
+                blocked = subprocess.run([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                    "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=" + str(installation),
+                    "/LOG=" + str(artifacts / "active-process.log")], check=False, timeout=60)
+                assert blocked.returncode != 0 and active.poll() is None
+                assert obsolete.exists() and retained.read_bytes() == b"retain unowned user files"
+                locale_inventory(installation, UI_LANGUAGES)
             finally:
-                hidden.rename(prefix)
+                active.terminate()
+                active.wait(timeout=10)
+                active.stdout.close()
+                active.stderr.close()
+            subprocess.run([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER",
+                            "/TYPE=custom", SUBSET_COMPONENTS,
+                            "/DIR=" + str(installation), "/LOG=" + str(artifacts / "upgrade.log")], check=True, timeout=180)
+            assert not obsolete.exists()
+            assert retained.read_bytes() == b"retain unowned user files"
+            assert sentinel.read_text() == "retain user data"
+            assert json.loads((installation / "bundle-manifest.json").read_text()) == manifest
+            subset = verify_installed_web_languages(installation, ("en", "fr", "de"), artifacts, "ui-locales-french-german")
+            assert all_languages["i18n_etag"] and subset["i18n_etag"] and all_languages["i18n_etag"] != subset["i18n_etag"], "Locale removal did not invalidate the served script"
+            test_installed_gui("gtk-upgraded")
         finally:
             uninstaller = installation / "unins000.exe"
             if uninstaller.exists():
@@ -299,10 +298,37 @@ def main():
                 time.sleep(.2)
             assert not (installation / "bin/entropy-server.exe").exists()
             assert sentinel.read_text() == "retain user data"
-    if args.qualify_service:
-        from test_windows_gui_installer_service import qualify_machine_service
-        qualify_machine_service(args.installer.resolve(), artifacts / "machine-service")
-    print("Installed GTK server/client, owned-process lifecycle and uninstall passed without MSYS2 runtime access")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--installer", type=Path, required=True)
+    parser.add_argument("--msys-prefix", type=Path, required=True)
+    parser.add_argument("--artifacts", type=Path, required=True)
+    parser.add_argument("--qualify-v260", action="store_true", help="Upgrade the checksum-pinned released 2.6.0 installer")
+    parser.add_argument("--qualify-service", action="store_true", help="Qualify explicitly selected machine-wide SCM installation")
+    parser.add_argument("--service-only", action="store_true", help="Run only the machine-wide SCM scenarios")
+    parser.add_argument("--clean-runner", action="store_true", help="The build-time runtime may already be absent on this runner")
+    args = parser.parse_args()
+    if args.service_only and (args.qualify_v260 or args.qualify_service):
+        parser.error("--service-only runs independently of the per-user scenarios")
+    assert sys.platform == "win32"
+    try:
+        registry_values()
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("Refusing to replace a non-fixture Entropy Service installation")
+    artifacts = args.artifacts.resolve()
+    artifacts.mkdir(parents=True, exist_ok=True)
+    installer = args.installer.resolve(strict=True)
+    with unavailable_build_runtime(args.msys_prefix, args.clean_runner):
+        if not args.service_only:
+            qualify_per_user(installer, artifacts, args.qualify_v260)
+        if args.service_only or args.qualify_service:
+            from test_windows_gui_installer_service import qualify_machine_service
+            qualify_machine_service(installer, artifacts / "machine-service")
+    print("Windows installer qualification passed")
 
 
 if __name__ == "__main__":

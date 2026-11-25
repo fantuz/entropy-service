@@ -132,10 +132,15 @@ jobs:
         with:
           name: native-release-payloads
           path: bin/native-release
-      - name: Download this run's tested installer and complete runtime source
+      - name: Require one qualified GUI artifact ID
+        env:
+          GUI_ARTIFACT_ID: ${{ needs.gui-installer.outputs.gui_artifact_id }}
+        run: '[[ "$GUI_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+      - name: Download this run's qualified installer and matching runtime source
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
-          name: windows-gui-installer-and-sources
+          artifact-ids: ${{ needs.gui-installer.outputs.gui_artifact_id }}
+          merge-multiple: true
           path: bin/gui-release
       - name: Download this run's tested offline OCI bundles
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333

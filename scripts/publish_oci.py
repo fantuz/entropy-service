@@ -1,4 +1,5 @@
 """Publish the exact offline OCI bundles, preserving tested blobs and indexes."""
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import ipaddress
 import json
@@ -6,7 +7,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from oci_release import PLATFORMS, ROLES, native_inputs, verify
+from oci_release import PLATFORMS, native_inputs, verify
 
 
 def registry_options(registry, local, authfile):
@@ -28,11 +29,13 @@ def registry_options(registry, local, authfile):
 
 def publish(args, command):
     options, oras_options = registry_options(args.registry, args.local_registry, args.authfile)
+    owner = args.repository.lower().split('/', 1)[0]
+    destinations = {'server': args.registry+'/'+args.repository.lower(), 'client': args.registry+'/'+owner+'/entropy-client'}
+    if destinations['server'] == destinations['client']:
+        raise ValueError('Server and client images require distinct destination repositories')
     native = native_inputs(args.artifacts, args.source_sha, args.tag.removeprefix('v'), args.repository)
     folder = args.artifacts/'container-oci-bundles'
     bundles = verify(folder, args.source_sha, args.tag.removeprefix('v'), args.repository, native)
-    owner = args.repository.lower().split('/', 1)[0]
-    destinations = {'server': args.registry+'/'+args.repository.lower(), 'client': args.registry+'/'+owner+'/entropy-client'}
     inspect_options = options + (['--tls-verify=false'] if args.local_registry else [])
     copy_options = options + (['--src-tls-verify=false', '--dest-tls-verify=false'] if args.local_registry else [])
     attach_options = oras_options + (['--plain-http'] if args.local_registry else [])
@@ -49,10 +52,7 @@ def publish(args, command):
             raise ValueError('Registry manifest/index differs from the tested OCI digest')
         return json.loads(raw)
 
-    staged = {}
-    # Both full image graphs and every SBOM must be available before the first
-    # consumer-facing platform/version alias changes. Retain bounded stage tags.
-    for role, destination in destinations.items():
+    def stage_image(role, destination):
         image = bundles['images'][role]
         stage = destination+':stage-'+args.tag
         copy('oci-archive:'+str((folder/image['file']).resolve()), stage)
@@ -65,7 +65,13 @@ def publish(args, command):
             sbom = native[role][platform]['sbom']
             command(['oras', 'attach', *attach_options, '--artifact-type', 'application/spdx+json',
                      destination+'@'+leaf['digest'], sbom.name+':application/spdx+json'], cwd=sbom.parent)
-        staged[role] = destination+'@'+image['digest']
+
+    # The two repositories stage independently. Join both workers and propagate
+    # any failure before writing consumer tags, including architecture aliases.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(stage_image, role, destination) for role, destination in destinations.items()]
+        for future in futures:
+            future.result()
 
     # Preserve existing architecture aliases and SBOM-discovery instructions.
     for role, destination in destinations.items():
@@ -77,8 +83,9 @@ def publish(args, command):
     references = []
     for role, destination in destinations.items():
         reference = destination+':'+args.tag
-        copy('docker://'+staged[role], reference)
-        expect(reference, bundles['images'][role]['digest'])
+        digest = bundles['images'][role]['digest']
+        copy(f'docker://{destination}@{digest}', reference)
+        expect(reference, digest)
         references.append(reference)
     print('Published exact tested OCI indexes:\n'+'\n'.join(references))
     if os.environ.get('GITHUB_STEP_SUMMARY'):

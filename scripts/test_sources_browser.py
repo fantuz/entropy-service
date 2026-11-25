@@ -235,6 +235,19 @@ def registration_checks(page, artifacts):
 
 def shannon_precision_checks(browser, base):
     from playwright.sync_api import expect
+
+    def render_sample(page, entropy, size):
+        # Capture this component update in one browser task. A queued workspace
+        # paint can legitimately replace it with the next live or empty sample.
+        return page.evaluate("""([entropy, size]) => {
+            EntropyShannonAlert.update(entropy, size);
+            return {
+                state: document.getElementById('entropy-alert-card').dataset.state,
+                reading: document.getElementById('entropy').textContent,
+                size: document.getElementById('entropy-sample-size').textContent
+            };
+        }""", [entropy, size])
+
     paths = ("/api-stream.html", "/api-upload.html", "/api-sources.html", "/api-socket.html")
     for path in paths:
         page = browser.new_page()
@@ -247,9 +260,9 @@ def shannon_precision_checks(browser, base):
             expect(toggle).not_to_be_checked()
             expect(selector).to_be_disabled()
             expect(page.locator("#entropy-threshold-settings")).to_be_hidden()
-            page.evaluate("EntropyShannonAlert.update(0, 4096)")
-            expect(card).to_have_attribute("data-state", "descriptive")
-            expect(page.locator("#entropy-sample-size")).to_have_text("Estimate from 4,096 bytes")
+            sample = render_sample(page, 0, 4096)
+            assert sample == {"state": "descriptive", "reading": "0.000000",
+                              "size": "Estimate from 4,096 bytes"}, (path, sample)
             toggle.check()
             expect(selector).to_have_value("")
             expect(card).not_to_have_attribute("data-state", "alert")
@@ -263,12 +276,9 @@ def shannon_precision_checks(browser, base):
             selector.dispatch_event("change")
             expect(selector).to_have_value("7.123456")
             expect(selector).to_have_attribute("aria-invalid", "false")
-            value = page.evaluate("""() => {
-                EntropyShannonAlert.update(7.1234556, 64);
-                return {text: document.getElementById('entropy').textContent,
-                        state: document.getElementById('entropy-alert-card').dataset.state};
-            }""")
-            assert value == {"text": "7.123456", "state": "alert"}, (path, value)
+            sample = render_sample(page, 7.1234556, 64)
+            assert sample == {"state": "alert", "reading": "7.123456",
+                              "size": "Estimate from 64 bytes"}, (path, sample)
             page.reload()
             expect(toggle).to_be_checked()
             expect(selector).to_have_value("7.123456")

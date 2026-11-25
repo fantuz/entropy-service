@@ -71,7 +71,17 @@ jobs:
           run-id: ${{ inputs.validated_run_id }}
           github-token: ${{ github.token }}
           path: source/bin/native-release
-      - name: Download original tested GUI assets
+      - name: Download the exact GUI artifact qualified by both Windows runners
+        if: steps.validation.outputs.gui_artifact_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.validation.outputs.gui_artifact_id }}
+          run-id: ${{ inputs.validated_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: source/bin/gui-release
+      - name: Download GUI assets tested in the original single-job workflow
+        if: steps.validation.outputs.gui_artifact_id == ''
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: windows-gui-installer-and-sources

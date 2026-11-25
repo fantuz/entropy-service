@@ -6,17 +6,25 @@ import unittest
 
 import yaml
 
-from validate_release_recovery import REQUIRED, validate
+from validate_release_recovery import GUI_ARTIFACT_PREFIX, GUI_GATE, LEGACY_GUI_STEP, REQUIRED, SPLIT_GUI_JOBS, validate
 
 
 SHA = "1" * 40
 NOW = datetime(2026, 11, 17, tzinfo=timezone.utc)
 
 
-def evidence():
+def passed(name):
+    return {"name": name, "status": "completed", "conclusion": "success"}
+
+
+def evidence(split=False):
     run = {"event": "push", "path": ".github/workflows/release.yml", "head_branch": "v2.4.1",
            "head_sha": SHA, "status": "completed", "conclusion": "failure", "created_at": NOW.isoformat()}
-    jobs = [{"name": name, "status": "completed", "conclusion": "success"} for name in sorted(REQUIRED)]
+    jobs = [passed(name) for name in sorted(REQUIRED)]
+    gate = next(job for job in jobs if job["name"] == GUI_GATE)
+    gate["steps"] = [passed(GUI_ARTIFACT_PREFIX + "98765" if split else LEGACY_GUI_STEP)]
+    if split:
+        jobs.extend(passed(name) for name in sorted(SPLIT_GUI_JOBS))
     jobs.append({"name": "Publish only after full tag validation", "status": "completed", "conclusion": "failure"})
     return run, jobs
 
@@ -41,7 +49,71 @@ class RecoveryTests(unittest.TestCase):
 
     def test_publication_failure_with_all_validation_passed(self):
         run, jobs = evidence()
-        validate(run, jobs, "v2.4.1", SHA, NOW)
+        self.assertEqual("", validate(run, jobs, "v2.4.1", SHA, NOW))
+
+    def test_retried_publication_uses_qualified_artifact_id(self):
+        run, jobs = evidence(split=True)
+        run["run_attempt"] = 2
+        self.assertEqual("98765", validate(run, jobs, "v2.4.1", SHA, NOW))
+        path = Path(__file__).resolve().parents[1] / ".github/workflows/release-recovery.yml"
+        steps = yaml.load(path.read_text(), Loader=yaml.BaseLoader)["jobs"]["recover"]["steps"]
+        by_id, legacy = [s for s in steps if s.get("with", {}).get("path") == "source/bin/gui-release"]
+        self.assertEqual("steps.validation.outputs.gui_artifact_id != ''", by_id["if"])
+        self.assertEqual("${{ steps.validation.outputs.gui_artifact_id }}", by_id["with"]["artifact-ids"])
+        self.assertEqual("true", by_id["with"]["merge-multiple"])
+        self.assertEqual("steps.validation.outputs.gui_artifact_id == ''", legacy["if"])
+        self.assertEqual("windows-gui-installer-and-sources", legacy["with"]["name"])
+        for step in (by_id, legacy):
+            self.assertEqual("${{ inputs.validated_run_id }}", step["with"]["run-id"])
+            self.assertNotIn("continue-on-error", step)
+
+    def test_recovery_matches_installer_workflow_evidence_names(self):
+        workflows = Path(__file__).resolve().parents[1] / ".github/workflows"
+        caller = yaml.load((workflows / "release.yml").read_text(), Loader=yaml.BaseLoader)
+        prefix = caller["jobs"]["gui-installer"]["name"] + " / "
+        installer = yaml.load((workflows / "windows-gui-installer.yml").read_text(), Loader=yaml.BaseLoader)["jobs"]
+        qualify = installer["qualify"]
+        required = {prefix + qualify["name"].replace("${{ matrix.suite }}", suite)
+                    for suite in qualify["strategy"]["matrix"]["suite"]}
+        self.assertEqual(SPLIT_GUI_JOBS, required | {prefix + installer["build"]["name"]})
+        self.assertEqual(GUI_GATE, prefix + installer["installer"]["name"])
+        attest = next(s for s in installer["installer"]["steps"] if s.get("id") == "attest")
+        self.assertEqual(GUI_ARTIFACT_PREFIX + "${{ needs.build.outputs.gui_artifact_id }}", attest["name"])
+
+    def test_new_gate_requires_builder_and_both_qualifications(self):
+        for name in SPLIT_GUI_JOBS:
+            for conclusion in ("missing", "failure", "skipped", "cancelled"):
+                with self.subTest(name=name, conclusion=conclusion):
+                    run, jobs = evidence(split=True)
+                    job = next(j for j in jobs if j["name"] == name)
+                    if conclusion == "missing":
+                        jobs.remove(job)
+                    else:
+                        job["conclusion"] = conclusion
+                    with self.assertRaises(ValueError):
+                        validate(run, jobs, "v2.4.1", SHA, NOW)
+        run, jobs = evidence(split=True)
+        with self.assertRaises(ValueError):
+            validate(run, [j for j in jobs if j["name"] not in SPLIT_GUI_JOBS], "v2.4.1", SHA, NOW)
+
+    def test_recovery_rejects_missing_ambiguous_or_unverified_gui_evidence(self):
+        for split in (False, True):
+            for change in ("missing", "skipped", "invalid"):
+                with self.subTest(split=split, change=change):
+                    run, jobs = evidence(split=split)
+                    steps = next(j["steps"] for j in jobs if j["name"] == GUI_GATE)
+                    if change == "missing":
+                        steps.clear()
+                    elif change == "skipped":
+                        steps[0]["conclusion"] = "skipped"
+                    else:
+                        steps[0]["name"] += "-invalid"
+                    with self.assertRaises(ValueError):
+                        validate(run, jobs, "v2.4.1", SHA, NOW)
+        run, jobs = evidence(split=True)
+        next(j["steps"] for j in jobs if j["name"] == GUI_GATE).append(passed(GUI_ARTIFACT_PREFIX + "9"))
+        with self.assertRaises(ValueError):
+            validate(run, jobs, "v2.4.1", SHA, NOW)
 
     def test_only_unused_recovery_wrapper_may_be_skipped(self):
         run, jobs = evidence()

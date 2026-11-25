@@ -81,18 +81,19 @@ jobs:
       - plan
       - packages
     uses: ./.github/workflows/windows-package.yml
-    if: always() && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'docs' || needs.packages.result == 'success')
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'docs' || needs.packages.result == 'success') }}
     with:
       full: ${{ needs.plan.outputs.mode == 'full' }}
   macos:
     name: Native macOS
     needs: [plan, packages]
-    if: always() && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'docs' || needs.packages.result == 'success')
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'docs' || needs.packages.result == 'success') }}
     uses: ./.github/workflows/macos.yml
     with:
       full: ${{ needs.plan.outputs.mode == 'full' }}
   build:
-    if: always()
+    # Inspect failed and skipped dependencies, but release the runner on cancellation.
+    if: ${{ !cancelled() }}
     needs:
       - plan
       - docs
