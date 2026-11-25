@@ -51,7 +51,7 @@ def browser_context(playwright, engine, artifacts, firefox_binary):
         # Juggler unconditionally forces every attached document active. The
         # native BiDi channel lets actual tab selection drive visibility.
         browser = playwright.firefox.launch(channel="moz-firefox", executable_path=str(firefox_binary),
-            headless=False, timeout=30000, firefox_user_prefs={
+            headless=False, timeout=60000, firefox_user_prefs={
             "focusmanager.testmode": False, "layout.testing.top-level-always-active": False, "gfx.webrender.software": True,
             "layers.acceleration.disabled": True})
         context = browser.new_context(viewport={"width": 1280, "height": 900}, locale="en-US")
@@ -82,15 +82,20 @@ def browser_context(playwright, engine, artifacts, firefox_binary):
                 # separate automation context would re-enable focus emulation.
                 yield browser.contexts[0]
             finally:
-                if browser is not None:
-                    browser.close()
-                if process.poll() is None:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=5)
+                try:
+                    if browser is not None and browser.is_connected():
+                        # Closing an attached Playwright browser disconnects CDP.
+                        # Ask Chromium to flush its profile and exit before removal.
+                        browser.new_browser_cdp_session().send("Browser.close")
+                        process.wait(timeout=10)
+                finally:
+                    if process.poll() is None:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=5)
 
 
 def wait_connections(context, base, expected):
