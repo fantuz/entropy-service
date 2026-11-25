@@ -74,7 +74,7 @@ jobs:
       - name: Test the real upgrade wizard and Start Menu handoff before bundling
         run: python scripts/test_windows_gui_upgrade.py --compiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' --artifacts gui-installer-evidence/upgrade
       - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Select development or tagged installer version
