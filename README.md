@@ -139,7 +139,7 @@ docker pull ghcr.io/fantuz/entropy-client:latest
 
 Browse the [server container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-service)
 and [client container](https://github.com/fantuz/entropy-service/pkgs/container/entropy-client)
-versions. Pin `:v2.9.0` or an image digest for controlled deployments. The `:edge`
+versions. Pin `:v2.9.1` or an image digest for controlled deployments. The `:edge`
 tag follows validated development builds. The container guide includes the one-time
 existing-release publication, readiness probes, SBOMs and maintenance policy.
 
