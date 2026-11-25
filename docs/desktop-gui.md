@@ -122,8 +122,8 @@ can be selected with `--server-binary /usr/bin/entropy-server` or
 
 ### Download the GUI source and the executables
 
-For v2.9.1, download the matching [source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.9.1.zip)
-and [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.9.1/entropy-service_2.9.1_windows_amd64.zip).
+For v2.9.2, download the matching [source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.9.2.zip)
+and [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.9.2/entropy-service_2.9.2_windows_amd64.zip).
 Use matching source and executable versions as explained under
 [Source and executable versions](#source-and-executable-versions).
 Extract the entire source archive. Its directory must contain `go.mod`, `cmd`,
