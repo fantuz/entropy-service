@@ -19,10 +19,13 @@ sources; it is a separate download and is not needed to run the application.
 The replacement notice and Finish-page Start Menu option described below are
 available from v2.7.0.
 
-PR/manual workflow builds remain development artifacts. Their installer, sources
-and checksum manifest are available together as the
-`windows-gui-installer-and-sources` CI artifact. Verify the setup checksum before
-running it:
+For a PR or manual build, check that **Bundled Windows GTK installer** passed.
+The setup executable, matching runtime sources and checksum manifest are
+available together in the `windows-gui-installer-and-sources` CI artifact.
+If the builder runs again, its new artifact name ends in `-attempt-N`. The
+successful check records the artifact ID for the installer that both Windows
+runners tested. Use that ID to identify the download when a run has multiple
+builds. Verify the setup checksum before running it.
 
 ```powershell
 Get-FileHash .\entropy-service_*_windows_amd64_gui_setup.exe -Algorithm SHA256
@@ -194,8 +197,8 @@ test also installs the checksum-pinned **released v2.6.0** setup and upgrades it
 with the candidate installer, checking visible/responsive cleanup and retained
 user exports. Fixtures additionally cover read-only old files and a directory
 junction whose external target must survive cleanup. The full
-bundle then installs into a path containing spaces, removes
-access to the original MSYS2 UCRT64 prefix, strips build-time search paths and
+bundle installs into a path containing spaces on a fresh Windows runner.
+The test isolates the installed application from ambient MSYS2 and
 uses the installed runtime to exercise both GTK views, acquisition/fullscreen,
 owned-process controls and shutdown. It upgrades that installed bundle and
 repeats the GUI checks with the original runtime still unavailable, verifying
@@ -203,14 +206,15 @@ obsolete-file removal and preservation of user data, then uninstalls. It also
 checks that an active runtime process blocks replacement without being killed.
 The installed server is also checked over HTTP: selected interface catalogs are
 available, removed catalogs return 404, and all random-word languages remain.
-An administrative fixture additionally checks the actual service task defaults,
+A second Windows runner tests the same setup executable in parallel. Both
+runners verify its SHA-256 against the builder's output. The administrative
+fixture checks the actual service task defaults,
 unsafe locations and cross-mode rejection, account/startup policy, explicit
 Start, running-service upgrade with the same TLS identity, and preserving
 service uninstall. It refuses pre-existing installations/state and removes only
 its own service fixture.
-Successful
-installer/source artifacts and diagnostic evidence
-are retained for 14 days. PR builds do not publish releases.
+The build and each qualification job retain their own diagnostic evidence
+for 14 days. The final installer check requires both qualifications to pass.
 
 Tagged releases require the installer build/install tests before publication.
 The publication job downloads that run's tested setup and source archive, verifies

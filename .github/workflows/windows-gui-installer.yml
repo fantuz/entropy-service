@@ -6,6 +6,13 @@ on:
       - 'tools/windows-installer/**'
       - 'tools/desktop-gui/**'
       - 'cmd/entropy-server/**'
+      - 'cmd/entropy-client/**'
+      - 'internal/**'
+      - 'VERSION'
+      - 'LICENSE'
+      - 'QUANTIS_NOTICES.txt'
+      - '.goreleaser.yml'
+      - 'scripts/check_release_downloads.py'
       - 'go.mod'
       - 'go.sum'
       - 'scripts/*windows_gui*.py'
@@ -19,6 +26,10 @@ on:
         type: string
         required: false
         default: ''
+    outputs:
+      gui_artifact_id:
+        description: Immutable ID of the qualified installer and complete runtime sources
+        value: ${{ jobs.installer.outputs.gui_artifact_id }}
 
 permissions:
   contents: read
@@ -28,8 +39,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  installer:
-    name: Bundled Windows GTK installer
+  build:
+    name: Build Windows GUI installer
+    outputs:
+      gui_artifact_id: ${{ steps.release-assets.outputs.artifact-id }}
+      setup_artifact_id: ${{ steps.checkpoint.outputs.artifact-id }}
+      setup_sha256: ${{ steps.identity.outputs.setup_sha256 }}
+      build_runtime_prefix: ${{ steps.identity.outputs.build_runtime_prefix }}
+      version: ${{ steps.identity.outputs.version }}
     runs-on: windows-2025
     timeout-minutes: 40
     env:
@@ -52,6 +69,8 @@ jobs:
           python -m unittest discover -s scripts -p 'test_prepare_gui_release.py'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s scripts -p 'test_build_windows_gui_bundle.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s scripts -p 'test_windows_gui_installer_runtime.py'
       - name: Test the real upgrade wizard and Start Menu handoff before bundling
         run: python scripts/test_windows_gui_upgrade.py --compiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' --artifacts gui-installer-evidence/upgrade
       - name: Setup Go
@@ -96,15 +115,7 @@ jobs:
           New-Item -ItemType Directory -Force gui-installer | Out-Null
           & $compiler "/DBundleDir=$pwd\build\desktop-bundle" "/DOutputDir=$pwd\gui-installer" "/DAppVersion=$env:BUNDLE_VERSION" "/DNumericVersion=$env:BUNDLE_NUMERIC_VERSION" tools/windows-installer/entropy-service.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Install and test with the original MSYS2 runtime unavailable
-        shell: pwsh
-        run: |
-          $installers = @(Get-ChildItem gui-installer -Filter '*_gui_setup.exe')
-          if ($installers.Count -ne 1) { throw 'Expected one installer' }
-          $origin = Get-Content build/runtime-origin.json -Raw | ConvertFrom-Json
-          python scripts/test_windows_gui_installer.py --installer "$($installers[0].FullName)" --msys-prefix "$($origin.prefix)" --artifacts gui-installer-evidence --qualify-v260 --qualify-service
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Package tested installer, source and checksums together
+      - name: Package matching installer, source and checksums together
         shell: pwsh
         run: |
           Copy-Item build/runtime-sources.zip "gui-installer/entropy-service_${env:BUNDLE_VERSION}_windows_amd64_gui_sources.zip"
@@ -118,19 +129,123 @@ jobs:
         run: |
           python scripts/prepare_gui_release.py prepare --artifacts gui-installer --version "$env:BUNDLE_VERSION" --source-sha "$env:SOURCE_SHA" --output build/goreleaser-gui.yml
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Preserve tested installer and runtime source
+      - name: Identify the executable that both qualification runners must receive
+        id: identity
+        shell: pwsh
+        run: |
+          $setup = "gui-installer/entropy-service_${env:BUNDLE_VERSION}_windows_amd64_gui_setup.exe"
+          $digest = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          $origin = Get-Content build/runtime-origin.json -Raw | ConvertFrom-Json
+          "setup_sha256=$digest" >> $env:GITHUB_OUTPUT
+          "build_runtime_prefix=$($origin.prefix)" >> $env:GITHUB_OUTPUT
+          "version=$env:BUNDLE_VERSION" >> $env:GITHUB_OUTPUT
+      - name: Stage the executable for qualification
+        id: checkpoint
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: windows-gui-installer-and-sources
+          name: windows-gui-setup-checkpoint-${{ github.run_attempt }}
+          path: gui-installer/*_gui_setup.exe
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Preserve the installer and matching complete runtime source
+        id: release-assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ github.run_attempt == '1' && 'windows-gui-installer-and-sources' || format('windows-gui-installer-and-sources-attempt-{0}', github.run_attempt) }}
           path: gui-installer/
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
       - name: Preserve diagnostics and native GUI evidence
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: windows-gui-installer-evidence
+          name: windows-gui-installer-evidence-build-${{ github.run_attempt }}
           path: gui-installer-evidence/
           if-no-files-found: ignore
           retention-days: 14
+
+  qualify:
+    name: Qualify Windows GUI installer (${{ matrix.suite }})
+    needs: build
+    runs-on: windows-2025
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [per-user, service]
+    env:
+      PYTHONUTF8: '1'
+      GSK_RENDERER: cairo
+      GDK_BACKEND: win32
+    steps:
+      - name: Checkout the same source as the installer
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require the producer checkpoint ID
+        shell: pwsh
+        env:
+          CHECKPOINT_ID: ${{ needs.build.outputs.setup_artifact_id }}
+        run: |
+          if ($env:CHECKPOINT_ID -cnotmatch '^[1-9][0-9]*$') { throw 'Missing installer checkpoint ID' }
+      - name: Fetch the executable by its producer artifact ID
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          artifact-ids: ${{ needs.build.outputs.setup_artifact_id }}
+          merge-multiple: true
+          path: gui-setup-checkpoint
+      - name: Verify the setup bytes and qualify the installation
+        shell: pwsh
+        env:
+          BUNDLE_VERSION: ${{ needs.build.outputs.version }}
+          EXPECTED_SHA256: ${{ needs.build.outputs.setup_sha256 }}
+          BUILD_RUNTIME_PREFIX: ${{ needs.build.outputs.build_runtime_prefix }}
+          SUITE: ${{ matrix.suite }}
+        run: |
+          $entries = @(Get-ChildItem gui-setup-checkpoint -Force)
+          $name = "entropy-service_${env:BUNDLE_VERSION}_windows_amd64_gui_setup.exe"
+          if ($entries.Count -ne 1 -or $entries[0].PSIsContainer -or $entries[0].Name -cne $name) {
+            throw "Installer checkpoint must contain only $name"
+          }
+          $setup = $entries[0].FullName
+          $digest = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($digest -cne $env:EXPECTED_SHA256) { throw 'Installer checkpoint SHA-256 mismatch' }
+          switch ($env:SUITE) {
+            'per-user' { $scenario = '--qualify-v260' }
+            'service' { $scenario = '--service-only' }
+            default { throw 'Unknown installer qualification suite' }
+          }
+          python scripts/test_windows_gui_installer.py --installer $setup --msys-prefix "$env:BUILD_RUNTIME_PREFIX" --clean-runner --artifacts gui-installer-evidence $scenario
+      - name: Preserve qualification logs and native GUI evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-gui-installer-evidence-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: gui-installer-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  installer:
+    name: Bundled Windows GTK installer
+    if: ${{ !cancelled() }}
+    needs: [build, qualify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      gui_artifact_id: ${{ steps.attest.outputs.gui_artifact_id }}
+    steps:
+      # The recovery validator reads this successful step's rendered name.
+      - name: Qualified GUI release artifact ${{ needs.build.outputs.gui_artifact_id }}
+        id: attest
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          QUALIFICATION_RESULT: ${{ needs.qualify.result }}
+          GUI_ARTIFACT_ID: ${{ needs.build.outputs.gui_artifact_id }}
+        run: |
+          test "$BUILD_RESULT" = success
+          test "$QUALIFICATION_RESULT" = success
+          [[ "$GUI_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          echo "gui_artifact_id=$GUI_ARTIFACT_ID" >> "$GITHUB_OUTPUT"

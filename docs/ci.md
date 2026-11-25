@@ -17,8 +17,10 @@ Windows, archive, container, endurance and both browser check names still
 complete with an explicit documentation result; they use Linux workers and
 do not install Go or browsers. A documentation result does not assert that
 application tests ran. New Linux suite/archive jobs are intentionally
-skipped, and the `build` gate permits exactly those skips. Failure or
-cancellation in a required job fails the aggregate gate.
+skipped, and the `build` gate permits exactly those skips. On an active run
+each required job must have its expected result. When GitHub cancels a
+superseded PR run, the pending platform checks and aggregate gate can stop
+with that run. The new revision runs its own checks.
 
 ## Parallel validation and archive provenance
 
@@ -37,6 +39,14 @@ six download aliases, source commit and version, then exercises the
 publication configuration with uploads disabled. The systemd tests install
 the staged amd64 DEB. Native Windows and macOS jobs consume the staged
 archives from the same run and verify their checksums.
+
+The Windows GUI installer has a separate build because its server supports
+selective installation of web interface locales. One job builds the setup
+executable and records its SHA-256. Two fresh Windows runners download that
+same executable and verify the digest before running the per-user upgrade
+tests and the machine-wide service tests in parallel. Both must pass the
+installer gate. The corresponding runtime sources travel with the release
+artifact, so neither test runner has to download the source ZIP.
 
 Tagged publication waits for the Linux, browser, native, package, endurance,
 installer and container checks. The publisher downloads the staged inputs,

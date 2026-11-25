@@ -168,7 +168,7 @@ jobs:
         run: xvfb-run -a /tmp/entropy-browser-tests/bin/python scripts/test_page_lifecycle_browser.py --browser ${{ matrix.browser }} --artifacts browser-artifacts/lifecycle
         if: needs.plan.outputs.mode == 'full'
       - name: Upload browser evidence
-        if: needs.plan.outputs.mode == 'full' && (always())
+        if: needs.plan.outputs.mode == 'full' && !cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-ui-${{ matrix.browser }}
@@ -177,4 +177,4 @@ jobs:
           if-no-files-found: ignore
     needs:
       - plan
-    if: always()
+    if: ${{ !cancelled() }}

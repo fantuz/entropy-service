@@ -341,7 +341,9 @@ response and permanent denial. Transient faults must recover through bounded
 retries; denial must fail immediately while public channel/platform aliases
 remain unchanged. These tests never publish to GHCR.
 
-Both role graphs and their SBOMs are staged before consumer aliases move.
+Two workers stage the server and client images in parallel. Each checks its
+image digests and attaches the three platform SBOMs. Consumer aliases move
+only after both workers succeed.
 Registry APIs cannot atomically update two repositories: a failure during the
 final alias updates can still leave a partial promotion. Re-running publication
 is idempotent and repairs that state. Stable `latest` reconciliation retains
