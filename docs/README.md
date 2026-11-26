@@ -12,6 +12,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [v2.8.0 release notes](releases/v2.8.0.md) | Browser-local certificate tools, optional Windows service setup, responsive upgrades and refined desktop/acquisition controls. |
 | [v2.7.0 release notes](releases/v2.7.0.md) | Client capabilities, performance view, adaptive pull and desktop/installer controls. |
 | [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
+| [Linux desktop GUI](desktop-gui.md#linux-setup) | Packaged and source launchers, GTK dependencies, service monitoring and the client waterfall. |
 | [GUI validation and load observations](desktop-gui-validation.md) | Large-frame investigation, failure diagnostics, native settings checks and remaining manual coverage. |
 | [Windows Service](windows-service.md) | Native SCM installation, account/state policy, certificates, stop/restart, logs and upgrades. |
 | [macOS CLI and GUI](macos.md) | Intel/Apple Silicon binaries, Homebrew GTK launcher, OS source and platform limits. |

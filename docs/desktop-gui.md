@@ -1,9 +1,9 @@
 # Desktop GUI
 
 The GTK 4/PyGObject desktop interface supports Linux, Windows x64 and macOS
-Intel/Apple Silicon. Linux and macOS use source launchers with Python/GTK
-dependencies; the [Windows installer](windows-gui-installer.md) bundles its runtime.
-See the [macOS guide](macos.md) for the Homebrew launcher. The
+Intel/Apple Silicon. See [Linux setup](#linux-setup) for DEB/RPM and source
+launchers and the [macOS guide](macos.md) for the Homebrew launcher.
+The [Windows installer](windows-gui-installer.md) bundles its runtime. The
 command-line and web interfaces remain independently usable.
 
 Both windows provide an **Options** editor for common startup settings and
@@ -61,11 +61,10 @@ history. Adjustable panels are available from v2.8.1.
 
 ## Source and executable versions
 
-The editable Options and local-server controls described here require the
-source revision containing this guide and its complete `tools/desktop-gui`
-directory. Obtain a checkout of that revision, or use GitHub's **Code →
-Download ZIP** on the branch or release you are viewing. Keep the launcher and
-its neighboring Python modules together.
+For a source installation, use the `tools/desktop-gui` directory from the same
+release as your CLI executables. Obtain a checkout of that revision, or use
+GitHub's **Code → Download ZIP** on the branch or release you are viewing.
+Keep the launcher and its neighboring Python modules together.
 
 The [v2.2.0 source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.2.0.zip)
 contains the earlier GUI: it can monitor a server and run the client, but its
@@ -78,18 +77,63 @@ not contain the Python GUI.
 
 ## Linux setup
 
-From the source directory, install the desktop dependencies and build both
-utilities with the Go version required by `go.mod`:
+Install the optional desktop dependencies on the machine where you open the
+windows. On Debian or Ubuntu (including Ubuntu 26.04), run
 
 ```sh
 sudo apt install python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0
+```
+
+On Fedora, run
+
+```sh
+sudo dnf install gtk4 python3-gobject python3-cairo gobject-introspection
+```
+
+### Packaged launchers
+
+DEB and RPM packages newer than v2.9.2 install the desktop launchers in
+`/usr/bin` alongside the matching server and client executables. Open either
+window as your normal user from a graphical session, in any directory.
+
+```sh
+entropy-server-gui
+```
+
+For a running systemd service, enter its URL (the packaged default is
+`http://127.0.0.1:8080`) and click **Connect**. To launch a separate local
+server, choose its listener and TLS settings in **Options** and click
+**Start**. Use a free port if a service is already listening.
+
+```sh
+entropy-client-gui
+```
+
+In the client window, choose the server endpoint in **Options** and click
+**Start** to receive samples. Press **F11** for a fullscreen waterfall.
+The launchers find their respective binaries in `/usr/bin` automatically.
+
+### Source launcher
+
+For DEB and RPM releases through v2.9.2, the GUI launcher is in the matching
+source archive. From its extracted directory, point the launcher at the
+installed binary.
+
+```sh
+./tools/desktop-gui/entropy-gui --view server --server-binary /usr/bin/entropy-server
+./tools/desktop-gui/entropy-gui --view client --client-binary /usr/bin/entropy-client
+```
+
+If you also want to build the utilities from source, run the following from the
+source directory with the Go version required by `go.mod`.
+
+```sh
 make build
 ```
 
-Use the distribution's Python: virtual environments can hide PyGObject even
-when its OS package is installed. Ubuntu 24.04 and Debian 13 are the initial
-Linux targets. GTK supports X11 and Wayland; native Linux CI uses X11 under
-Xvfb. `--help` does not require GTK or a graphical session.
+Use the distribution's Python because virtual environments can hide PyGObject.
+GTK supports X11 and Wayland. Native Linux CI uses X11 under Xvfb.
+`--help` works without GTK or a graphical session.
 
 Open the server GUI for loopback HTTP testing:
 
@@ -486,8 +530,9 @@ Keep a separately started server in its own terminal as shown above.
 **Start**. It does not select or replace the server at the health URL.
 `--client-binary` selects the local CLI inspected and launched by the client
 window. Its remote server address is `-url` for pull or `-wsurl` for push after
-`--`. Both executable options can be omitted when the files are in the source
-directory's `bin` folder. Windows batch/command scripts are rejected. The GUI
+`--`. The packaged Linux launchers select their installed companions in
+`/usr/bin`. The source launcher defaults to the source directory's `bin` folder.
+Windows batch/command scripts are rejected. The GUI
 manages headless/report flags for the client. Certificate trust for client
 acquisition follows [the existing client guidance](client-tls.md).
 

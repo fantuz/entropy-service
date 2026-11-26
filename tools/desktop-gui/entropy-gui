@@ -6,14 +6,15 @@ import sys
 
 
 def main():
+    binary_dir = Path(__file__).resolve().parents[2] / "bin"
     parser = argparse.ArgumentParser(description="Linux/Windows/macOS GTK 4 entropy-service GUI. Pass utility startup options after --.")
     parser.add_argument("--view", choices=("server", "client"), default="server",
                         help="server: Start/Stop a local server or Connect to live health; client: Start/Stop acquisition and the waterfall")
     suffix = ".exe" if sys.platform == "win32" else ""
-    parser.add_argument("--server-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-server" + suffix)),
-                        help="native server executable to inspect; may be outside the source folder (default: %(default)s); pass before --")
-    parser.add_argument("--client-binary", default=str(Path(__file__).resolve().parents[2] / ("bin/entropy-client" + suffix)),
-                        help="native client executable to inspect and run; may be outside the source folder (default: %(default)s); pass before --")
+    parser.add_argument("--server-binary", default=str(binary_dir / ("entropy-server" + suffix)),
+                        help="server executable (default: %(default)s). Pass before --.")
+    parser.add_argument("--client-binary", default=str(binary_dir / ("entropy-client" + suffix)),
+                        help="client executable (default: %(default)s). Pass before --.")
     parser.add_argument("--health-url", help="server view: existing server base URL; Connect starts verified read-only health polling")
     parser.add_argument("--health-ca", help="server view: PEM CA certificate trusted for HTTPS health checks")
     arguments = sys.argv[1:]
@@ -35,6 +36,7 @@ def main():
             print("Use tools/desktop-gui/entropy-gui-macos to select a Homebrew Python with GTK bindings.", file=sys.stderr)
         else:
             print("Debian/Ubuntu: sudo apt install python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0", file=sys.stderr)
+            print("Fedora: sudo dnf install python3-gobject python3-cairo gtk4 gobject-introspection", file=sys.stderr)
             print("Use /usr/bin/python3 if a virtual environment hides distribution packages.", file=sys.stderr)
         return 2
     binary = options.server_binary if options.view == "server" else options.client_binary

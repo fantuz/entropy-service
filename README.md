@@ -182,8 +182,11 @@ output; `-layout=full -waterfall` requests the larger dashboard explicitly.
 An optional [GTK desktop GUI](docs/desktop-gui.md) for Linux, Windows and macOS
 edits common startup options, starts and stops its own server/client processes,
 and displays live server health or a client waterfall with fullscreen mode.
-Linux and macOS use source launchers with Python/GTK dependencies; the
-[Windows GUI installer](docs/windows-gui-installer.md) bundles its private runtime.
+Linux DEB and RPM packages newer than v2.9.2 provide `entropy-server-gui` and
+`entropy-client-gui`. See the [Linux GUI setup](docs/desktop-gui.md#linux-setup)
+for dependencies and the source launcher for older releases. macOS uses the
+[Homebrew launcher](docs/macos.md). The [Windows GUI installer](docs/windows-gui-installer.md)
+bundles its private runtime.
 Repository installer builds also offer an explicit, default-off Windows server
 service through administrative all-users setup; desktop-only setup remains per-user.
 See the [running server and client screenshots](#desktop-guis).
