@@ -7,10 +7,31 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools/desktop-gui"))
-from entropy_gui.options import edited_arguments, fields_for, initial_values
+from entropy_gui.options import edited_arguments, fields_for, initial_arguments, initial_values
 
 
 class StartupOptionsTests(unittest.TestCase):
+    @mock.patch("entropy_gui.options.sys.platform", "linux")
+    def test_linux_server_seed_default_respects_existing_option_value_boundaries(self):
+        for explicit in (["-device", "/dev/qrandom0"], ["--device", "/dev/qrandom0"],
+                         ["-device=/dev/qrandom0"], ["--device=/dev/qrandom0"], ["-device="],
+                         ["-device=/dev/qrandom0", "--device", "quantis-usb:0"]):
+            with self.subTest(explicit=explicit):
+                supplied = ["-debug", *explicit]
+                self.assertEqual(initial_arguments("server", supplied), supplied)
+        args = ["-lab-sources", "-device=registry-name.json"]
+        selected = initial_arguments("server", args)
+        self.assertEqual(selected, ["-device=/dev/urandom", "-lab-sources", "-device=registry-name.json"])
+        self.assertEqual(args, ["-lab-sources", "-device=registry-name.json"])
+        self.assertEqual(edited_arguments("server", selected, {"device": "quantis-usb:0"}),
+                         [*args, "-device=quantis-usb:0"])
+
+    def test_gui_seed_default_applies_only_to_linux_servers(self):
+        for target in ("linux", "darwin", "win32"):
+            with self.subTest(platform=target), mock.patch("entropy_gui.options.sys.platform", target):
+                self.assertEqual(initial_arguments("server", []), ["-device=/dev/urandom"] if target == "linux" else [])
+                self.assertEqual(initial_arguments("client", ["-mode=pull"]), ["-mode=pull"])
+
     def test_binary_inventory_supplies_available_backends(self):
         for role, flag, advertised, expected in (
                 ("server", "drbg", {"aes-256-ctr": True, "rdrand-experimental": False,
@@ -106,7 +127,7 @@ class StartupOptionsTests(unittest.TestCase):
             self.assertEqual(initial_values("server", [])["device"], "windows-csprng")
             self.assertEqual(initial_values("server", [])["drbg"], "aes-256-ctr")
         with mock.patch("entropy_gui.options.sys.platform", "linux"), mock.patch("entropy_gui.options.platform.machine", return_value="aarch64"):
-            self.assertEqual(initial_values("server", [])["device"], "/dev/qrandom0")
+            self.assertEqual(initial_values("server", [])["device"], "/dev/urandom")
             self.assertEqual(initial_values("server", [])["drbg"], "chacha20")
 
     def test_changed_flag_duplicates_are_removed_without_rewriting_other_arguments(self):

@@ -365,6 +365,12 @@ def server_configuration(context, application_type, binary):
     try:
         wait_for(context, lambda: window.descriptor is not None and window.get_mapped(), "server invocation description and window mapping")
         assert_read_only(window)
+        cert_command = window.cert_command.get_text()
+        if WINDOWS:
+            assert cert_command.startswith("& '") and cert_command.endswith("' generate-cert -if-missing")
+        else:
+            assert shlex.split(cert_command) == [str(Path(binary).absolute()), "generate-cert", "-if-missing"]
+        assert window.cert_command.get_selectable()
         assert window.descriptor["settings"]["seed_source"] == (OS_SOURCE if WINDOWS or DARWIN else missing)
         assert window.descriptor["features"]["https"] is (WINDOWS or DARWIN)
         assert window.descriptor["features"]["require_device"] is (not WINDOWS and not DARWIN)

@@ -125,6 +125,15 @@ remote server, enter its base URL and click **Connect**. To launch a separate lo
 server, choose its listener and TLS settings in **Options** and click
 **Start**. Use a free port if a service is already listening.
 
+On Linux the server GUI defaults to `/dev/urandom`, the operating system's
+random source. The standalone Linux CLI still defaults to `/dev/qrandom0`.
+To use hardware in a GUI-launched server, set **Options → Seed and DRBG →
+Seed source** to the device, for example `/dev/qrandom0` for a Quantis PCI
+card. Select **Require selected seed device** if startup should fail when
+that source is unavailable. You can also pass the choice at launch with
+`entropy-server-gui -- -device=/dev/qrandom0 -require-device=true`. See the
+[hardware examples](hardware-examples.md) for USB sources and device discovery.
+
 ```sh
 entropy-client-gui
 ```
@@ -347,11 +356,10 @@ keeps the CLI's TLS certificate and hostname verification. For Windows client
 trust, follow [client TLS guidance](client-tls.md); selecting a server's
 private key is not a client trust mechanism.
 
-For HTTPS serving, select existing certificate/key material and provision it
-as described in [TLS certificates](tls-certificates.md). The Options editor
-does not generate a certificate or read its private-key contents. An
-inspection success confirms valid option syntax, not that files, listeners
-or hardware are available; those are checked when the server actually starts.
+For HTTPS serving, select the certificate and private key under **Listeners
+and TLS**. Validation checks option syntax. The server opens the files,
+listeners and seed source at startup. For a first local identity, follow
+[Set up local HTTPS](#set-up-local-https).
 
 **LAB sources and access** selects an operator-prepared registry JSON file.
 Clear its path to disable registered sources; browser-local LAB tools remain
@@ -459,6 +467,59 @@ use matching v2.2.0-or-newer source and executable versions. A CLI option
 validation error should be corrected in the arguments after `--`; creating a
 configuration file does not resolve a missing executable or invalid option.
 
+## Set up local HTTPS
+
+Open **Set up a self-signed certificate** under **Live server health** for
+a command using the selected server executable. Run the displayed command
+from a private directory as the user who launches the server. It creates
+`cert.pem` and `key.pem` there. The examples below supply full paths and
+also work before the first server start.
+Its default certificate covers `localhost`, `127.0.0.1` and `::1` for seven
+days. With `-if-missing`, it reuses a matching valid pair on subsequent runs.
+
+**Linux and macOS.** From an extracted portable archive, run
+
+```sh
+tlsdir="$HOME/.entropy-service-tls"
+mkdir -p -m 700 "$tlsdir"
+./entropy-server generate-cert -if-missing -cert-file="$tlsdir/cert.pem" -key-file="$tlsdir/key.pem"
+```
+
+For a Linux DEB or RPM installation, use `/usr/bin/entropy-server` in that
+command.
+
+**Windows PowerShell.** For the default current-user installer location, run
+
+```powershell
+$installDir = "$env:LOCALAPPDATA\Programs\Entropy Service"
+$serverExe = "$installDir\bin\entropy-server.exe"
+$tlsDir = "$env:LOCALAPPDATA\Entropy Service\tls"
+New-Item -ItemType Directory -Force -Path $tlsDir | Out-Null
+& $serverExe generate-cert -if-missing "-cert-file=$tlsDir\cert.pem" "-key-file=$tlsDir\key.pem"
+```
+
+For a portable ZIP or a custom installation, use the executable path shown
+in the GUI for `$serverExe`.
+
+To monitor the self-signed HTTPS endpoint, launch the server GUI with the
+**public** `cert.pem` as its `--health-ca`. Keep `key.pem` private to the
+server account. Examples using the paths above follow.
+
+| Installation | Launch with the public certificate |
+| --- | --- |
+| Linux DEB/RPM | `entropy-server-gui --health-ca="$tlsdir/cert.pem"` |
+| Linux portable archive | `./entropy-gui --view server --health-ca="$tlsdir/cert.pem"` |
+| macOS portable archive | `./entropy-gui-macos --view server --health-ca="$tlsdir/cert.pem"` |
+| Windows installer, PowerShell | `& "$installDir\runtime\bin\pythonw.exe" -I -B "$installDir\app\gui_bootstrap.py" --view server "--health-ca=$tlsDir\cert.pem"` |
+
+In **Options → Listeners and TLS**, enable HTTPS and select the generated
+files for **TLS certificate file** and **TLS private key file**. For a local
+test, set **HTTP listener** to `127.0.0.1:8080` and **HTTPS listener** to
+`127.0.0.1:8443`. Select **Validate and apply**, then **Start**. For an
+HTTP-only first run, clear **Enable HTTPS** and use the loopback
+HTTP listener. For deployment names, renewal and systemd, see the
+[certificate setup guide](tls-certificates.md).
+
 ## Live server health
 
 Opening the server GUI with its defaults runs **Find local** once. Startup
@@ -479,9 +540,10 @@ prefills that field and waits for **Connect**. Forwarding custom listener
 ports after `--` also leaves the suggested URL available for **Connect**.
 Wildcard bind addresses appear as loopback in the suggestion.
 
-If you haven't selected a monitoring target yourself, clicking **Start**
-also monitors the new server's validated numeric loopback listener. This
-includes custom ports supplied as startup arguments or chosen in **Options**.
+If you haven't selected a monitoring target yourself, **Start** also polls
+the numeric loopback endpoint from the validated listener settings. It uses
+the configured HTTPS port when HTTPS is enabled and the HTTP port when it
+is disabled, including custom ports chosen in **Options**.
 Discovery and automatic loopback monitoring bypass HTTP proxy settings.
 Editing the health URL, supplying `--health-url`, or choosing **Connect**
 or **Disconnect** preserves your selection when a local server starts.
@@ -518,10 +580,10 @@ turning a readiness failure into a transport failure. **Disconnect**, failed
 requests and stale observations clear current green status and live values.
 Polling does not generate entropy samples or change server configuration.
 
-“Selected listener” describes the endpoint being checked. The GUI does not
-claim that every configured HTTP, HTTPS or debug port is reachable. A remote
-health target can belong to a different instance from the startup invocation
-shown below it; those sections are deliberately labelled separately.
+**Local server** tracks the child process the window launched. **Live server
+health** reports the instance answering the selected URL. If another server
+already owns that port, it can report **READY** even after the newly launched
+process exits. Check **Local server** and its logs for a bind error.
 
 HTTPS uses certificate and hostname verification. Supply an additional trusted
 CA or a deliberately provisioned self-signed server certificate when needed:

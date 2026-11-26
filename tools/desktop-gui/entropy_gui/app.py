@@ -3,6 +3,8 @@
 Each view can launch and stop its own utility using validated startup options.
 Server health can also monitor an independently running local or remote server.
 """
+import os
+import shlex
 import signal
 import sys
 import threading
@@ -22,7 +24,7 @@ from .process import ClientSession, describe
 from .health import LOCAL_HEALTH_URLS, HealthSession, is_loopback_url
 from .controls import SettingsWindow
 from .server_process import ServerSession
-from .options import initial_values
+from .options import initial_arguments, initial_values
 from .web import web_application_url
 
 
@@ -114,7 +116,7 @@ def listener_health_url(descriptor, secure):
 class DesktopWindow(Gtk.ApplicationWindow):
     def __init__(self, application, role, binary, arguments, health_url=None, health_ca=None):
         super().__init__(application=application)
-        self.role, self.binary, self.arguments = role, binary, list(arguments)
+        self.role, self.binary, self.arguments = role, binary, initial_arguments(role, arguments)
         self.model = StreamModel(history_limit=HISTORY_ROWS)
         self.session = None
         self.descriptor = None
@@ -298,7 +300,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         # Inspection is bounded by describe(). Keep its cleanup alive if the
         # window closes before the short-lived description child has exited.
         self._start_inspection(self.binary, self.arguments)
-        if role == "server" and self._automatic_health and not self.arguments:
+        if role == "server" and self._automatic_health and not arguments:
             self.find_local()
 
     @staticmethod
@@ -463,7 +465,8 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.health_connect_button.connect("clicked", lambda _button: self.connect_health())
         controls.append(self.health_connect_button)
         self.health_find_button = Gtk.Button(label="Find local")
-        self.health_find_button.set_tooltip_text("Look for entropy-server on local HTTPS port 8443 and HTTP port 8080.")
+        self.health_find_button.set_tooltip_text("Look for local HTTPS on port 8443 using the supplied CA." if self.health_ca else
+                                                "Look for local HTTPS on port 8443, then HTTP on port 8080.")
         self.health_find_button.connect("clicked", lambda _button: self.find_local())
         controls.append(self.health_find_button)
         self.health_disconnect_button = Gtk.Button(label="Disconnect", sensitive=False)
@@ -471,6 +474,22 @@ class DesktopWindow(Gtk.ApplicationWindow):
         controls.append(self.health_disconnect_button)
         card.append(controls)
         card.append(label("TLS verification uses the supplied CA file." if self.health_ca else "TLS verification uses system trust.", "gui-subtitle"))
+        cert_setup = Gtk.Expander(label="Set up a self-signed certificate")
+        cert_help = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        shell = "PowerShell" if sys.platform == "win32" else "a terminal"
+        cert_help.append(label(f"In {shell}, open a private folder you own and run:", "gui-subtitle"))
+        self.cert_command = label("")
+        self.cert_command.add_css_class("monospace")
+        self.cert_command.set_selectable(True)
+        self._update_cert_command()
+        cert_help.append(self.cert_command)
+        cert_help.append(label("In Options → Listeners and TLS, select the full paths to cert.pem and key.pem. "
+                               "For local testing, bind the listeners to 127.0.0.1. To trust this certificate in the "
+                               "monitor, launch the GUI with --health-ca pointing to the public cert.pem.", "gui-subtitle"))
+        cert_help.append(Gtk.LinkButton(uri="https://github.com/fantuz/entropy-service/blob/main/docs/tls-certificates.md#generate-a-local-identity",
+                                        label="Certificate setup guide", halign=Gtk.Align.START))
+        cert_setup.set_child(cert_help)
+        card.append(cert_setup)
         grid = Gtk.Grid(column_spacing=20, row_spacing=5)
         fields = (
             ("listener", "Selected listener"), ("live", "Process"),
@@ -494,6 +513,19 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.health_labels["checked_at"].set_ellipsize(Pango.EllipsizeMode.END)
         card.append(self.health_labels["checked_at"])
         body.append(card)
+
+    def _update_cert_command(self):
+        # Provide a copyable command even when the executable is outside PATH.
+        binary = str(self.binary)
+        if os.path.dirname(binary):
+            binary = os.path.abspath(binary)
+        if sys.platform == "win32":
+            # PowerShell treats typographic single quotes as delimiters too.
+            quoted = "".join("'" + c if c in "'‘’‚‛" else c for c in binary)
+            command = "& '" + quoted + "'"
+        else:
+            command = shlex.quote(binary)
+        self.cert_command.set_text(command + " generate-cert -if-missing")
 
     def _set_health_url(self, url):
         with self.health_url_entry.handler_block(self._url_changed_handler):
@@ -708,6 +740,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
         feature_box.append(feature_heading)
         feature_box.append(features)
         if self.role == "server":
+            self._update_cert_command()
             shortcuts = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=2,
                                     min_children_per_line=1, column_spacing=6, row_spacing=6)
             self.lab_options_button = Gtk.Button(label="LAB sources…")

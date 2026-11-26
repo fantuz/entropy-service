@@ -346,11 +346,13 @@ def _owned_server_health(context, application_type, binary):
     address = f"127.0.0.1:{port}"
     expected = "http://" + address
     app, window = _window(context, application_type, "server", binary,
-                          ["-http=" + address, "-enable-https=true", "-device=" + OS_SOURCE], "OwnedHealth")
+                          ["-http=" + address, "-enable-https=true"], "OwnedHealth")
     try:
+        assert window.descriptor["settings"]["seed_source"] == OS_SOURCE
         assert window.health_url_entry.get_text() == "https://127.0.0.1:8443"
         assert window.health_session is None
         editor = _options(context, window)
+        assert editor.get_value("device") == OS_SOURCE
         editor.set_value("enable-https", False)
         editor.apply_button.emit("clicked")
         wait_for(context, lambda: not editor.get_visible() and window.health_url_entry.get_text() == expected,
@@ -361,6 +363,7 @@ def _owned_server_health(context, application_type, binary):
         wait_for(context, lambda: window.health_labels["state"].get_text() == "READY",
                  "owned server automatically monitored on its custom HTTP port")
         assert window.health_session.snapshot()["url"] == expected
+        assert window.health_labels["rng_source"].get_text() == OS_SOURCE
         assert window.session.snapshot()["running"] and _live_status(port) == 200
 
         window.health_disconnect_button.emit("clicked")
