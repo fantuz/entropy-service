@@ -63,7 +63,10 @@ jobs:
           brew list --versions > macos-runtime.txt
       - name: Test GUI models and process lifecycle with Homebrew Python
         if: (inputs.full) && !cancelled() && steps.archives.outcome == 'success' && steps.bindings.outcome == 'success'
-        run: tools/desktop-gui/entropy-gui-macos --python-check scripts/test_macos_gui.py --bin "$RUNNER_TEMP/Entropy portable binaries" --artifacts macos-gui-artifacts
+        run: |
+          bundle="$RUNNER_TEMP/Entropy portable binaries"
+          "$bundle/entropy-gui-macos" --view client --help
+          "$bundle/entropy-gui-macos" --python-check scripts/test_macos_gui.py --bin "$bundle" --artifacts macos-gui-artifacts
       - name: Test native Go code with race detector
         if: (inputs.full)
         run: go test -race -count=1 -timeout=8m ./...

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import zipfile
 
-from check_windows_archive import REQUIRED, check_archive
+from check_windows_archive import GUI_FILES, GUI_SOURCE, REQUIRED, check_archive
 
 
 def executable(machine=0x8664):
@@ -20,11 +20,17 @@ def executable(machine=0x8664):
 
 
 class WindowsArchiveTests(unittest.TestCase):
-    def archive(self, directory, missing=None, machine=0x8664, extra=None):
+    def archive(self, directory, missing=None, machine=0x8664, extra=None, corrupt_gui=None):
         path = Path(directory) / "windows.zip"
         with zipfile.ZipFile(path, "w") as archive:
             for name in sorted(REQUIRED - {missing}):
-                archive.writestr(name, executable(machine) if name.endswith(".exe") else b"release notice\n")
+                if name.endswith(".exe"):
+                    data = executable(machine)
+                elif name in GUI_FILES and name != corrupt_gui:
+                    data = (GUI_SOURCE / name).read_bytes()
+                else:
+                    data = b"release notice\n"
+                archive.writestr(name, data)
             if extra:
                 archive.writestr(extra, b"unexpected content")
         return path
@@ -54,13 +60,17 @@ class WindowsArchiveTests(unittest.TestCase):
         for options in [
             {"missing": "WORDLIST_NOTICES.txt"},
             {"missing": "QUANTIS_NOTICES.txt"},
-            {"missing": "quantis.md"},
-            {"missing": "hardware-probe.md"},
-            {"missing": "hardware-drivers.md"},
-            {"missing": "quantis-usb.md"},
-            {"missing": "chaoskey.md"},
-            {"missing": "windows-service.md"},
-            {"missing": "macos.md"},
+            {"missing": "docs/quantis.md"},
+            {"missing": "docs/hardware-probe.md"},
+            {"missing": "docs/hardware-drivers.md"},
+            {"missing": "docs/quantis-usb.md"},
+            {"missing": "docs/chaoskey.md"},
+            {"missing": "docs/windows-service.md"},
+            {"missing": "docs/macos.md"},
+            {"missing": "docs/desktop-gui.md"},
+            {"missing": "entropy-gui"},
+            {"missing": "entropy_gui/app.py", "extra": "app.py"},
+            {"corrupt_gui": "entropy_gui/model.py"},
             {"missing": "entropy-client.exe"},
             {"machine": 0xaa64},
             {"extra": "../unexpected"},

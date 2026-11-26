@@ -5,6 +5,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | Document | Contents |
 | --- | --- |
 | [LAB across Linux, Windows and macOS](lab-platforms.md) | Always-available LAB tools, registry types, browser/device/FFmpeg requirements and the GUI pprof startup control. |
+| [v2.9.3 release notes](releases/v2.9.3.md) | Server and client GUI launchers in Linux packages and portable Linux, macOS and Windows archives. |
 | [v2.9.2 release notes](releases/v2.9.2.md) | More reliable browser lifecycle tests and updated GitHub Actions for builds and packaging. |
 | [v2.9.1 release notes](releases/v2.9.1.md) | Faster random RGB images, lower allocation for large HTTP pulls, browser analysis fixes and verified release packages. |
 | [v2.9.0 release notes](releases/v2.9.0.md) | Bounded WebSocket previews, lower JSON allocation, desktop backend discovery and measured RDRAND reseed latency. |

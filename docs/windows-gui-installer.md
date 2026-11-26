@@ -2,8 +2,9 @@
 
 The unsigned Windows x64 GUI installer includes both desktop views, both Go
 utilities and private Python/GTK libraries. Users do not need Go, Python, MSYS2
-or a separately downloaded source archive. It is separate from the small portable
-CLI ZIP and does not change Linux packaging.
+or a separately downloaded source archive. The v2.9.3 and later portable ZIPs
+also include the [GUI launcher](desktop-gui.md#portable-archives) and use
+Python/GTK from MSYS2 UCRT64.
 
 From v2.8.0, setup supports current-user desktop installation or an all-users
 installation with an optional server service, described below. The service

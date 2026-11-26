@@ -75,6 +75,16 @@ archives:
     files:
       - LICENSE
       - README.md
+      - docs/desktop-gui.md
+      - src: 'tools/desktop-gui/{{ if eq .Os "darwin" }}{entropy-gui,entropy-gui-macos}{{ else }}entropy-gui{{ end }}'
+        strip_parent: true
+        info:
+          mode: 0755
+      - src: tools/desktop-gui/entropy_gui/*.py
+        dst: entropy_gui
+        strip_parent: true
+        info:
+          mode: 0644
       - docs/windows.md
       - docs/macos.md
       - docs/windows-service.md

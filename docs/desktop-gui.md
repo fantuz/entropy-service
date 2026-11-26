@@ -1,8 +1,8 @@
 # Desktop GUI
 
 The GTK 4/PyGObject desktop interface supports Linux, Windows x64 and macOS
-Intel/Apple Silicon. See [Linux setup](#linux-setup) for DEB/RPM and source
-launchers and the [macOS guide](macos.md) for the Homebrew launcher.
+Intel/Apple Silicon. See [portable archives](#portable-archives) for launch
+commands and [Linux setup](#linux-setup) for installed DEB/RPM commands.
 The [Windows installer](windows-gui-installer.md) bundles its runtime. The
 command-line and web interfaces remain independently usable.
 
@@ -59,6 +59,24 @@ exit. A new window starts with the default layout. Resizing changes display
 space, not acquisition settings, sample contents or the bounded waterfall
 history. Adjustable panels are available from v2.8.1.
 
+## Portable archives
+
+From v2.9.3, extract the entire Linux or macOS TAR.GZ or Windows ZIP for your
+architecture. The `entropy-gui` launcher, its `entropy_gui/` Python modules
+and both CLI executables live together in the extracted directory. Run the
+command for the window you want from that directory.
+
+| Platform and desktop dependencies | Server window | Client window |
+| --- | --- | --- |
+| Linux with [distribution GTK packages](#linux-setup) | `./entropy-gui --view server` | `./entropy-gui --view client` |
+| macOS with [Homebrew GTK](macos.md#homebrew-gui) | `./entropy-gui-macos --view server` | `./entropy-gui-macos --view client` |
+| Windows in the [MSYS2 UCRT64 terminal](#install-the-desktop-dependencies) | `python ./entropy-gui --view server` | `python ./entropy-gui --view client` |
+
+The launcher finds the matching executables beside it. In the server window,
+click **Connect** to monitor an existing server, or **Start** to run a local
+server with the settings in **Options**. In the client window, click **Start**
+to receive samples.
+
 ## Source and executable versions
 
 For a source installation, use the `tools/desktop-gui` directory from the same
@@ -72,8 +90,8 @@ server settings are read-only and it has no Options editor or local-server
 Start/Stop controls. Its separate
 [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.2.0/entropy-service_2.2.0_windows_amd64.zip)
 contains its CLI executables. Use matching source and binary versions for the
-complete set of startup options. The source and binaries are separate downloads; CLI archives do
-not contain the Python GUI.
+complete set of startup options. For portable releases through v2.9.2, the GUI
+was a separate source download.
 
 ## Linux setup
 
@@ -92,7 +110,7 @@ sudo dnf install gtk4 python3-gobject python3-cairo gobject-introspection
 
 ### Packaged launchers
 
-DEB and RPM packages newer than v2.9.2 install the desktop launchers in
+DEB and RPM packages from v2.9.3 install the desktop launchers in
 `/usr/bin` alongside the matching server and client executables. Open either
 window as your normal user from a graphical session, in any directory.
 
@@ -164,7 +182,11 @@ can be selected with `--server-binary /usr/bin/entropy-server` or
 
 ## Windows setup
 
-### Download the GUI source and the executables
+For a self-contained GUI, use the [bundled installer](windows-gui-installer.md).
+For the portable ZIP from v2.9.3, install the [desktop dependencies](#install-the-desktop-dependencies)
+and run the [portable launcher](#portable-archives).
+
+### Source setup for earlier releases
 
 For v2.9.2, download the matching [source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.9.2.zip)
 and [Windows x64 binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.9.2/entropy-service_2.9.2_windows_amd64.zip).
@@ -289,8 +311,8 @@ for these Go builds.
 ## Edit startup options
 
 The LAB/debug editor additions, **Edit features…** shortcut and expanded client
-diagnostics are available from v2.7.0. Use the matching source revision or
-bundled installer for these controls.
+diagnostics are available from v2.7.0. Use the GUI and CLI executables from
+the same release for these controls.
 
 Click **Options** while the process owned by that window is stopped. Select
 its local executable with **Browse**, change the fields you need, then use
@@ -395,8 +417,9 @@ requested settings to match the server you started separately.
 executable could not be found. A green **READY** health panel can still appear:
 network health and local startup inspection are separate operations.
 
-By default, the launcher selects the source directory's `bin/entropy-server`
-and `bin/entropy-client`, with `.exe` on Windows. These paths are relative to
+In a portable archive, the launcher selects the executables next to it. In a
+source checkout it selects `bin/entropy-server` and `bin/entropy-client`,
+with `.exe` on Windows. These paths are relative to
 the launcher location, independently of the terminal's working directory or
 where you started the running server. It does not select another version from
 `PATH` automatically.
