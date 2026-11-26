@@ -5,6 +5,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | Document | Contents |
 | --- | --- |
 | [LAB across Linux, Windows and macOS](lab-platforms.md) | Always-available LAB tools, registry types, browser/device/FFmpeg requirements and the GUI pprof startup control. |
+| [v2.9.3 release notes](releases/v2.9.3.md) | Server and client GUI launchers in Linux packages and portable Linux, macOS and Windows archives. |
 | [v2.9.2 release notes](releases/v2.9.2.md) | More reliable browser lifecycle tests and updated GitHub Actions for builds and packaging. |
 | [v2.9.1 release notes](releases/v2.9.1.md) | Faster random RGB images, lower allocation for large HTTP pulls, browser analysis fixes and verified release packages. |
 | [v2.9.0 release notes](releases/v2.9.0.md) | Bounded WebSocket previews, lower JSON allocation, desktop backend discovery and measured RDRAND reseed latency. |
@@ -12,6 +13,7 @@ The [main README](../README.md) provides an introduction and a two-minute quick 
 | [v2.8.0 release notes](releases/v2.8.0.md) | Browser-local certificate tools, optional Windows service setup, responsive upgrades and refined desktop/acquisition controls. |
 | [v2.7.0 release notes](releases/v2.7.0.md) | Client capabilities, performance view, adaptive pull and desktop/installer controls. |
 | [Windows GUI installer](windows-gui-installer.md) | Self-contained per-user Windows GUI setup, runtime/source provenance and native installer tests. |
+| [Linux desktop GUI](desktop-gui.md#linux-setup) | Packaged and source launchers, GTK dependencies, service monitoring and the client waterfall. |
 | [GUI validation and load observations](desktop-gui-validation.md) | Large-frame investigation, failure diagnostics, native settings checks and remaining manual coverage. |
 | [Windows Service](windows-service.md) | Native SCM installation, account/state policy, certificates, stop/restart, logs and upgrades. |
 | [macOS CLI and GUI](macos.md) | Intel/Apple Silicon binaries, Homebrew GTK launcher, OS source and platform limits. |

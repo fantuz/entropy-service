@@ -51,16 +51,24 @@ requests fail explicitly; they do not silently substitute an OS source.
 
 The GUI uses the same GTK 4 interface and Go utilities as Linux/Windows. It can
 start/stop its owned server/client, monitor live server health, edit startup
-options and display the client waterfall/fullscreen view. This distribution is
-a Terminal launcher with Homebrew dependencies, not a self-contained `.app`.
+options and display the client waterfall/fullscreen view. Install the
+dependencies with Homebrew.
 
 ```sh
 brew install gtk4 pygobject3
 ```
 
-Obtain the matching source tree (or source archive) containing
-`tools/desktop-gui`, then launch from its root. Pass the absolute path to each
-CLI binary if it is installed elsewhere:
+From v2.9.3, both Mac TAR.GZ archives include the Homebrew launcher. From
+the extracted directory, run either command.
+
+```sh
+./entropy-gui-macos --view server
+./entropy-gui-macos --view client
+```
+
+For a source checkout or a portable release through v2.9.2, use the matching
+source tree containing `tools/desktop-gui`, then launch from its root. Pass
+the absolute path to each CLI binary if it is installed elsewhere:
 
 ```sh
 tools/desktop-gui/entropy-gui-macos --view server \

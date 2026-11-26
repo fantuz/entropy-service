@@ -15,11 +15,18 @@ Windows targets x64 console applications and a native
 release targets and socket/device implementations remain unchanged.
 
 A [bundled Windows GUI installer](windows-gui-installer.md) includes Python/GTK
-and both utilities, without separate dependency installation. The small portable
-CLI ZIP remains available.
+and both utilities, without separate dependency installation. From v2.9.3,
+the portable Windows x64 ZIP also includes the Python GUI launcher and modules.
 
-An optional [GTK desktop GUI](desktop-gui.md#windows-setup) runs from source
-with MSYS2 UCRT64 Python/GTK dependencies. The current source interface has an
+For the ZIP, install the [MSYS2 UCRT64 Python/GTK dependencies](desktop-gui.md#install-the-desktop-dependencies).
+From the extracted directory in the UCRT64 terminal, run either command.
+
+```sh
+python ./entropy-gui --view server
+python ./entropy-gui --view client
+```
+
+The [GTK desktop GUI](desktop-gui.md#windows-setup) has an
 Options editor, Start/Stop for its own local processes, independent live server
 health and a client waterfall/fullscreen view. The guide covers complete source
 downloads and using released executables without installing Go.
@@ -27,8 +34,8 @@ downloads and using released executables without installing Go.
 The [v2.3.1 source ZIP](https://github.com/fantuz/entropy-service/archive/refs/tags/v2.3.1.zip)
 contains the GUI with Options and local-server controls. The matching
 [v2.3.1 Windows binaries ZIP](https://github.com/fantuz/entropy-service/releases/download/v2.3.1/entropy-service_2.3.1_windows_amd64.zip)
-contains the two CLI executables. The Python GUI is a separate source download,
-and is not bundled in the CLI ZIP or a standalone installer. Native Windows
+contains the two CLI executables. For portable releases through v2.9.2,
+the Python GUI was a separate source download. Native Windows
 GUI/process checks run separately from CLI checks.
 
 No configuration file is needed for the GUI. A healthy remote server can be

@@ -63,6 +63,13 @@ jobs:
           args: release --clean --skip=publish --config "${{ runner.temp }}/native-dry-run.yml"
       - name: Check all native publication checksums
         run: diff <(sort bin/native-release/checksums.txt) <(sort bin/publication-dist/checksums.txt)
+      - name: Verify GUI payloads in all Linux and macOS archives and packages
+        run: |
+          if ! command -v bsdtar >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends libarchive-tools
+          fi
+          bash scripts/test-unix-gui-packages.sh bin/native-release "${NATIVE_TAG#v}"
       - name: Test real packaged systemd HTTP and HTTPS lifecycle
         run: sudo env ENTROPY_SYSTEMD_TEST=1 bash scripts/test-systemd-service.sh bin/native-release/*_amd64.deb
       - name: Verify Windows release ZIP layout, notices and executable architecture

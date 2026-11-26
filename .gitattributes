@@ -2,6 +2,9 @@
 *.go text eol=lf
 go.mod text eol=lf
 go.sum text eol=lf
+# The portable GUI is verified against the same source on Linux and Windows.
+tools/desktop-gui/entropy-gui text eol=lf
+tools/desktop-gui/entropy_gui/*.py text eol=lf
 # Published dictionary data: keep source changes visible in review.
 # Hash-pinned bytes must survive Windows autocrlf unchanged.
 cmd/entropy-server/internal/wordlist/data/*.txt linguist-vendored -text

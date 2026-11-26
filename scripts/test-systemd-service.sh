@@ -85,6 +85,16 @@ assert_tls_metrics() {
 
 installed=1
 dpkg --install -- "$package"
+# Exercise the installed commands from outside the checkout with an empty
+# display. Help must work on a headless service host with no GTK installed.
+for role in server client; do
+  (cd "$work" && DISPLAY= "/usr/bin/entropy-$role-gui" --help) > "$work/gui-help"
+  grep -Fq "/usr/bin/entropy-$role" "$work/gui-help" || fail "Missing packaged $role default executable."
+done
+if (cd "$work" && DISPLAY= /usr/bin/entropy-client-gui --health-url=http://127.0.0.1:8080) > "$work/gui-role" 2>&1; then
+  fail 'Client launcher accepted a server-only option.'
+fi
+grep -Fq 'apply to the server view' "$work/gui-role" || fail 'Wrong default view for packaged client.'
 [[ $(systemctl is-enabled entropy-server 2>/dev/null || true) == disabled ]] || fail 'Package unexpectedly enabled the service.'
 if systemctl is-active --quiet entropy-server; then fail 'Package unexpectedly started the service.'; fi
 systemd-analyze verify /usr/lib/systemd/system/entropy-server.service

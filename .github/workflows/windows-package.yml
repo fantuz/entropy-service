@@ -36,6 +36,8 @@ jobs:
           if ($archives.Count -ne 1) { throw "Expected exactly one Windows x64 release ZIP" }
           python scripts/check_windows_archive.py "$($archives[0].FullName)" --checksums windows-release/checksums.txt --extract-to windows-package
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python windows-package/entropy-gui --view client --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/test_windows.py --bin-dir windows-package
         if: (inputs.full)
       - name: Exercise packaged Windows Service lifecycle and private state
