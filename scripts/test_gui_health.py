@@ -511,6 +511,7 @@ class HealthTLSTests(_HealthBase):
 
     def test_local_monitor_keeps_untrusted_tls_from_falling_back_to_http(self):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(self.extra_cert, self.extra_key)
         with Fixture(context) as secure, Fixture() as plain:
             with local_monitor(secure.url, plain.url) as session:
