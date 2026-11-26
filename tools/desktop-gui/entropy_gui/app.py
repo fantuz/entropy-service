@@ -19,7 +19,7 @@ from gi.repository import Gdk, Gio, GLib, GObject, Gtk, Pango
 
 from .model import StreamModel, client_failure_text, performance_text, received_throughput, safe_text
 from .process import ClientSession, describe
-from .health import HealthSession
+from .health import LOCAL_HEALTH_URLS, HealthSession, is_loopback_url
 from .controls import SettingsWindow
 from .server_process import ServerSession
 from .options import initial_values
@@ -92,9 +92,8 @@ def launch_web_application(target):
     return Gio.AppInfo.launch_default_for_uri(target, None)
 
 
-def default_health_url(descriptor):
-    """Suggest one configured endpoint without claiming that it is listening."""
-    secure = descriptor["features"].get("https", False)
+def listener_health_url(descriptor, secure):
+    """Map a configured listener to a suggested monitoring URL."""
     address = descriptor["settings"].get("https_address" if secure else "http_address", "")
     if not isinstance(address, str):
         return ""
@@ -132,6 +131,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.health_session = None
         self.health_labels = {}
         self.health_ca = health_ca
+        self._automatic_health = health_url is None
+        self._finding_local = False
+        self._pending_owned_url = None
         self._health_revision = -1
         self._fullscreen = False
         self._native_fullscreen_pending = None
@@ -289,13 +291,15 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.web_application_box.append(self.web_application_button)
         body.append(self.web_application_box)
         if role == "server":
-            self.health_url_entry.connect("changed", lambda _entry: self._update_web_application())
+            self._url_changed_handler = self.health_url_entry.connect("changed", self._health_url_edited)
         self._update_web_application()
         body.append(self.status_label)
         self._tick_id = GLib.timeout_add(50, self._tick)
         # Inspection is bounded by describe(). Keep its cleanup alive if the
         # window closes before the short-lived description child has exited.
         self._start_inspection(self.binary, self.arguments)
+        if role == "server" and self._automatic_health and not self.arguments:
+            self.find_local()
 
     @staticmethod
     def _pane_scroller(child):
@@ -458,11 +462,15 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.health_connect_button = Gtk.Button(label="Connect")
         self.health_connect_button.connect("clicked", lambda _button: self.connect_health())
         controls.append(self.health_connect_button)
+        self.health_find_button = Gtk.Button(label="Find local")
+        self.health_find_button.set_tooltip_text("Look for entropy-server on local HTTPS port 8443 and HTTP port 8080.")
+        self.health_find_button.connect("clicked", lambda _button: self.find_local())
+        controls.append(self.health_find_button)
         self.health_disconnect_button = Gtk.Button(label="Disconnect", sensitive=False)
         self.health_disconnect_button.connect("clicked", lambda _button: self.disconnect_health())
         controls.append(self.health_disconnect_button)
         card.append(controls)
-        card.append(label("TLS verification uses the supplied CA file." if self.health_ca else "TLS verification uses system trust. Connect checks only the selected endpoint.", "gui-subtitle"))
+        card.append(label("TLS verification uses the supplied CA file." if self.health_ca else "TLS verification uses system trust.", "gui-subtitle"))
         grid = Gtk.Grid(column_spacing=20, row_spacing=5)
         fields = (
             ("listener", "Selected listener"), ("live", "Process"),
@@ -487,20 +495,48 @@ class DesktopWindow(Gtk.ApplicationWindow):
         card.append(self.health_labels["checked_at"])
         body.append(card)
 
+    def _set_health_url(self, url):
+        with self.health_url_entry.handler_block(self._url_changed_handler):
+            self.health_url_entry.set_text(url)
+        self._update_web_application()
+
+    def _health_url_edited(self, _entry):
+        self._automatic_health = False
+        self._pending_owned_url = None
+        if self._finding_local:
+            self.disconnect_health()
+        self._update_web_application()
+
+    def find_local(self):
+        self._connect_health(None)
+
     def connect_health(self):
+        self._connect_health(self.health_url_entry.get_text().strip())
+
+    def _connect_health(self, url, *, owned=False):
         if self.role != "server" or self._closing:
             return
         if self.health_session:
             state = self.health_session.snapshot()
             if state["running"] or state.get("stopping"):
+                if owned:
+                    # A local server can start while discovery is still in flight.
+                    # Join the selected listener's polling cycle only after the
+                    # previous worker has drained; a manual edit cancels the switch.
+                    self._finding_local = False
+                    self._pending_owned_url = url
+                    self.health_session.stop()
                 return
+        self._finding_local = url is None
+        self._automatic_health = self._finding_local or owned
         # Move focus out of GtkEntry's internal text widget before disabling
         # the URL control, including when Connect was activated with Enter.
         self.set_focus(None)
         try:
-            self.health_session = HealthSession(self.health_url_entry.get_text().strip(), ca_file=self.health_ca)
+            self.health_session = HealthSession(url, ca_file=self.health_ca, direct=owned)
             self.health_session.start()
         except (OSError, RuntimeError, ValueError) as error:
+            self._finding_local = False
             self.health_session = None
             self._health_revision = -1
             self._show_health({"state": "invalid", "fresh": False, "listener": "unknown", "running": False,
@@ -511,6 +547,9 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self._tick_health()
 
     def disconnect_health(self):
+        self._pending_owned_url = None
+        self._automatic_health = False
+        self._finding_local = False
         if self.health_session:
             self.health_session.stop()
             self._health_revision = -1
@@ -521,8 +560,17 @@ class DesktopWindow(Gtk.ApplicationWindow):
             return
         state = self.health_session.snapshot()
         active = state["running"] or state.get("stopping", False)
-        self.health_url_entry.set_sensitive(not active)
+        if self._pending_owned_url is not None and not active:
+            url, self._pending_owned_url = self._pending_owned_url, None
+            self._connect_health(url, owned=True)
+            return
+        if self._finding_local and state["state"] != "discovering":
+            self._finding_local = False
+            if state.get("url"):
+                self._set_health_url(state["url"])
+        self.health_url_entry.set_sensitive(self._finding_local or not state["running"])
         self.health_connect_button.set_sensitive(not active)
+        self.health_find_button.set_sensitive(not active)
         self.health_disconnect_button.set_sensitive(state["running"])
         revision = (state["revision"], state["state"], state.get("fresh"), state.get("checked_at"))
         if revision != self._health_revision:
@@ -537,7 +585,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             heading.remove_css_class(css)
         if fresh and state["state"] == "ready":
             heading.add_css_class("status-ok")
-        elif state["state"] not in ("disconnected", "checking"):
+        elif state["state"] not in ("disconnected", "checking", "discovering"):
             heading.add_css_class("status-warn")
         listener = state.get("listener", "unknown")
         self.health_labels["listener"].set_text({"unknown": "Not checked", "reachable": "Reachable",
@@ -554,10 +602,12 @@ class DesktopWindow(Gtk.ApplicationWindow):
         detail = "Checked " + datetime.fromtimestamp(checked).astimezone().strftime("%H:%M:%S %Z") if checked else {
             "disconnected": "Live monitoring is disconnected.",
             "checking": "Checking the selected endpoint…",
+            "discovering": "Looking for a local entropy-server…",
         }.get(state["state"], "No fresh live response is available.")
         if state.get("error"):
             detail += " · " + state["error"]
         self.health_labels["checked_at"].set_text(detail)
+        self.health_labels["checked_at"].set_tooltip_text(detail)
 
     def _start_inspection(self, binary, arguments, editor=None):
         self._inspection_busy = True
@@ -670,8 +720,18 @@ class DesktopWindow(Gtk.ApplicationWindow):
             feature_box.append(label("LAB browser tools are available on Linux, Windows and macOS. A registry adds server-side sources.", "gui-subtitle"))
             feature_box.append(label("Enable Debug / pprof for the next Start to listen at http://127.0.0.1:6060/debug/pprof/ on the server host.", "gui-subtitle"))
             self.settings_box.append(feature_box)
-            if not self.health_url_entry.get_text().strip():
-                self.health_url_entry.set_text(default_health_url(descriptor))
+            if self._automatic_health:
+                secure = descriptor["features"].get("https", False)
+                suggestion = listener_health_url(descriptor, secure)
+                session = self.health_session.snapshot() if self.health_session else None
+                if not session or self._finding_local or not session["running"]:
+                    self._set_health_url(suggestion)
+                if self.health_session is None and editor is None:
+                    listeners = [listener_health_url(descriptor, False)]
+                    if secure:
+                        listeners.append(suggestion)
+                    if all(url in LOCAL_HEALTH_URLS for url in listeners):
+                        self.find_local()
             groups = [("DRBG & seed configuration", ("drbg", "seed_source", "reseed_failure_policy", "reseed_interval_ms", "max_reseed_age_ms", "reseed_bytes", "source_timeout")),
                       ("Network configuration", ("http_address", "https_address"))]
         else:
@@ -749,6 +809,11 @@ class DesktopWindow(Gtk.ApplicationWindow):
         self.options_button.set_sensitive(False)
         self.process_state_label.set_text("Local server · starting")
         self.status_label.set_text("Starting the owned local server. Connect checks the selected endpoint independently.")
+        if self._automatic_health:
+            url = listener_health_url(self.descriptor, self.descriptor["features"].get("https", False))
+            if is_loopback_url(url) and (not self.health_ca or url.startswith("https://")):
+                self._set_health_url(url)
+                self._connect_health(url, owned=True)
 
     def stop_server(self):
         self.stop_client()
@@ -850,7 +915,7 @@ class DesktopWindow(Gtk.ApplicationWindow):
             if state["running"]:
                 self.process_state_label.set_text("Local server · running")
                 if not self._stopping:
-                    self.status_label.set_text("Owned local server is running. Use Connect to check the selected health URL.")
+                    self.status_label.set_text("Owned local server is running.")
             else:
                 self.process_state_label.set_text(f"Local server · stopped (exit {state['returncode']})")
                 if state["error"]:

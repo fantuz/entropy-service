@@ -18,6 +18,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/desktop-gui"))
+from entropy_gui import health as health_module
 from entropy_gui.health import HealthSession, MAX_HEALTH_BYTES, _Control, _connect, fetch_health, normalize_url
 
 
@@ -35,6 +36,20 @@ def wait_until(predicate, timeout=3):
         if time.monotonic() >= deadline:
             raise AssertionError("Health worker did not reach expected state")
         time.sleep(.01)
+
+
+@contextlib.contextmanager
+def local_monitor(*candidates, ca_file=None):
+    # Keep real HTTP/TLS and the polling worker; only move the fixed ports
+    # off the machine's actual listeners.
+    with mock.patch.object(health_module, "LOCAL_HEALTH_URLS", candidates):
+        session = HealthSession(None, ca_file=ca_file, interval=.05, timeout=1)
+        session.start()
+        try:
+            yield session
+        finally:
+            session.stop()
+            wait_until(lambda: not session.snapshot()["stopping"])
 
 
 def observe_fetch(url, **options):
@@ -56,7 +71,7 @@ def observe_fetch(url, **options):
 
 
 class Fixture:
-    def __init__(self, tls=None):
+    def __init__(self, tls=None, *, ipv6=False):
         self.mode = "ready"
         self.delay = .15
         self.requests = []
@@ -89,6 +104,8 @@ class Fixture:
                     fixture.release.wait(3)
                 status = 503 if ready_path and mode == "degraded" else 200
                 value = health(status == 200) if ready_path else {"status": "ok"}
+                if mode == "unrelated" and ready_path:
+                    value = {"status": "ok", "ready": True}
                 if mode == "wrong-type" and ready_path:
                     value["ready"] = 1
                 if mode == "credentials" and ready_path:
@@ -111,12 +128,16 @@ class Fixture:
                     else:
                         self.wfile.write(data)
 
-        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        class Server(http.server.ThreadingHTTPServer):
+            address_family = socket.AF_INET6 if ipv6 else socket.AF_INET
+
+        self.server = Server(("::1" if ipv6 else "127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
         if tls:
             self.server.socket = tls.wrap_socket(self.server.socket, server_side=True)
         scheme = "https" if tls else "http"
-        self.url = f"{scheme}://127.0.0.1:{self.server.server_port}"
+        host = "[::1]" if ipv6 else "127.0.0.1"
+        self.url = f"{scheme}://{host}:{self.server.server_port}"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 
     def __enter__(self):
@@ -185,11 +206,16 @@ class HealthTests(_HealthBase):
             self.assertEqual(fixture.requests, ["/live"])
 
     def test_remote_health_honors_the_configured_http_proxy(self):
-        with Fixture() as proxy:
-            with mock.patch.dict(os.environ, {"http_proxy": proxy.url, "HTTP_PROXY": proxy.url,
-                                              "no_proxy": "", "NO_PROXY": ""}):
-                value = fetch_health("http://health-fixture.invalid/base")
-            self.assertTrue(value["fresh"] and value["ready"])
+        with Fixture() as proxy, mock.patch.dict(os.environ, {"http_proxy": proxy.url, "HTTP_PROXY": proxy.url,
+                                                              "no_proxy": "", "NO_PROXY": ""}):
+            session = HealthSession("http://health-fixture.invalid/base", interval=60)
+            session.start()
+            try:
+                wait_until(lambda: session.snapshot()["ready"] is True)
+                self.assertEqual(session.snapshot()["url"], "http://health-fixture.invalid/base")
+            finally:
+                session.stop()
+                wait_until(lambda: not session.snapshot()["stopping"])
             self.assertEqual(proxy.requests, ["http://health-fixture.invalid/base/live",
                                                "http://health-fixture.invalid/base/ready"])
 
@@ -342,6 +368,97 @@ class HealthTests(_HealthBase):
                 wait_until(lambda: not session.snapshot()["stopping"])
 
 
+class DiscoveryTests(_HealthBase):
+    def test_candidates_are_only_the_default_numeric_loopback_listeners(self):
+        self.assertEqual(tuple(health_module.LOCAL_HEALTH_URLS),
+                         ("https://127.0.0.1:8443", "https://[::1]:8443",
+                          "http://127.0.0.1:8080", "http://[::1]:8080"))
+
+    def test_ipv6_listener_is_selected_when_ipv4_is_unavailable(self):
+        try:
+            server = Fixture(ipv6=True)
+        except OSError as error:
+            if error.errno not in (errno.EAFNOSUPPORT, errno.EADDRNOTAVAIL):
+                raise
+            self.skipTest("IPv6 loopback is unavailable")
+        with server, socket.socket() as closed:
+            closed.bind(("127.0.0.1", 0))
+            ipv4 = f"http://127.0.0.1:{closed.getsockname()[1]}"
+            with local_monitor(ipv4, server.url) as session:
+                wait_until(lambda: session.snapshot()["ready"] is True)
+                self.assertEqual(session.snapshot()["url"], server.url)
+
+    def test_owned_listener_bypasses_proxy_on_its_custom_loopback_port(self):
+        for url in ("https://localhost:8443", "http://service.invalid", "http://192.0.2.1", "http://[::]"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                HealthSession(url, direct=True)
+        with Fixture() as server, Fixture() as proxy:
+            with mock.patch.dict(os.environ, {"NO_PROXY": "", "no_proxy": "",
+                                              "HTTP_PROXY": proxy.url, "http_proxy": proxy.url}):
+                session = HealthSession(server.url, direct=True, interval=60)
+                session.start()
+                try:
+                    wait_until(lambda: session.snapshot()["ready"] is True)
+                finally:
+                    session.stop()
+                    wait_until(lambda: not session.snapshot()["stopping"])
+            self.assertEqual(server.requests, ["/live", "/ready"])
+            self.assertEqual(proxy.requests, [])
+
+    def test_degraded_server_is_pinned_and_polling_stays_direct(self):
+        with Fixture() as other, Fixture() as server, Fixture() as proxy:
+            other.mode = "unrelated"
+            server.mode = "degraded"
+            with mock.patch.dict(os.environ, {"NO_PROXY": "", "no_proxy": "",
+                                              "HTTP_PROXY": proxy.url, "http_proxy": proxy.url}), \
+                    local_monitor(other.url, server.url) as session:
+                wait_until(lambda: session.snapshot()["state"] == "degraded")
+                state = session.snapshot()
+                self.assertTrue(state["fresh"] and state["live"])
+                self.assertFalse(state["ready"])
+                self.assertEqual(state["url"], server.url)
+                self.assertEqual(state["health"]["reseed_failures_total"], 3)
+                other.mode = "ready"
+                server.mode = "drop"
+                wait_until(lambda: session.snapshot()["state"] == "unavailable")
+                self.assertEqual(session.snapshot()["url"], server.url)
+                server.mode = "ready"
+                wait_until(lambda: session.snapshot()["ready"] is True)
+            self.assertEqual(other.requests, ["/live", "/ready"])
+            self.assertEqual(proxy.requests, [])
+
+    def test_miss_ends_after_one_pass_and_can_be_retried(self):
+        with Fixture() as other:
+            other.mode = "unrelated"
+            with local_monitor(other.url) as session:
+                wait_until(lambda: not session.snapshot()["running"])
+                state = session.snapshot()
+                self.assertEqual(state["state"], "not-found")
+                self.assertIsNone(state["url"])
+                self.assertFalse(state["fresh"])
+                self.assertEqual(other.requests, ["/live", "/ready"])
+                other.mode = "ready"
+                session.start()
+                wait_until(lambda: session.snapshot()["ready"] is True)
+                self.assertEqual(session.snapshot()["url"], other.url)
+
+    def test_disconnect_during_probe_suppresses_late_results_and_next_candidate(self):
+        with Fixture() as slow, Fixture() as next_server:
+            slow.mode = "hold"
+            with local_monitor(slow.url, next_server.url) as session:
+                self.assertTrue(slow.entered.wait(2))
+                self.assertEqual(session.snapshot()["state"], "discovering")
+                self.assertIsNone(session.snapshot()["url"])
+                session.stop()
+                slow.release.set()
+                wait_until(lambda: not session.snapshot()["stopping"])
+                state = session.snapshot()
+                self.assertEqual(state["state"], "disconnected")
+                self.assertIsNone(state["url"])
+                self.assertFalse(state["fresh"])
+                self.assertEqual(next_server.requests, [])
+
+
 class HealthTLSTests(_HealthBase):
     @classmethod
     def setUpClass(cls):
@@ -360,7 +477,7 @@ class HealthTLSTests(_HealthBase):
                         "-hosts=localhost", "-valid-for=1h"], check=True, stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, timeout=10)
         subprocess.run([str(server), "generate-cert", f"-cert-file={cls.extra_cert}", f"-key-file={cls.extra_key}",
-                        "-hosts=unrelated.invalid", "-valid-for=1h"], check=True, stdout=subprocess.DEVNULL,
+                        "-hosts=unrelated.invalid,127.0.0.1", "-valid-for=1h"], check=True, stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, timeout=10)
 
     @classmethod
@@ -391,6 +508,31 @@ class HealthTLSTests(_HealthBase):
             with mock.patch.dict(os.environ, {"SSL_CERT_FILE": str(self.cert)}):
                 value, timing = observe_fetch(fixture.url.replace("127.0.0.1", "localhost"), ca_file=str(self.extra_cert))
             self.assertTrue(value["fresh"] and value["ready"], (value, timing, list(fixture.requests)))
+
+    def test_local_monitor_keeps_untrusted_tls_from_falling_back_to_http(self):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(self.extra_cert, self.extra_key)
+        with Fixture(context) as secure, Fixture() as plain:
+            with local_monitor(secure.url, plain.url) as session:
+                wait_until(lambda: not session.snapshot()["running"])
+                state = session.snapshot()
+                self.assertEqual(state["state"], "tls-error")
+                self.assertIsNone(state["url"])
+                self.assertFalse(state["fresh"])
+            with local_monitor(secure.url, plain.url, ca_file=self.extra_cert) as session:
+                wait_until(lambda: session.snapshot()["ready"] is True)
+                self.assertEqual(session.snapshot()["url"], secure.url)
+            self.assertEqual(plain.requests, [])
+
+    def test_local_monitor_with_a_ca_never_probes_cleartext(self):
+        with socket.socket() as closed, Fixture() as plain:
+            closed.bind(("127.0.0.1", 0))  # Reserve a port without a listening socket.
+            secure_url = f"https://127.0.0.1:{closed.getsockname()[1]}"
+            with local_monitor(secure_url, plain.url, ca_file=self.extra_cert) as session:
+                wait_until(lambda: not session.snapshot()["running"])
+                self.assertEqual(session.snapshot()["state"], "not-found")
+                self.assertIsNone(session.snapshot()["url"])
+            self.assertEqual(plain.requests, [])
 
     def test_context_initialization_is_not_an_http_io_deadline(self):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

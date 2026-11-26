@@ -183,6 +183,9 @@ output; `-layout=full -waterfall` requests the larger dashboard explicitly.
 An optional [GTK desktop GUI](docs/desktop-gui.md) for Linux, Windows and macOS
 edits common startup options, starts and stops its own server/client processes,
 and displays live server health or a client waterfall with fullscreen mode.
+Open the server GUI without startup arguments to monitor a running local
+instance on the default ports. Use **Connect** for a custom URL or **Start**
+to launch a server with the settings in **Options**. [Live server health](docs/desktop-gui.md#live-server-health)
 Linux DEB and RPM packages from v2.9.3 provide `entropy-server-gui` and
 `entropy-client-gui`. See the [Linux GUI setup](docs/desktop-gui.md#linux-setup)
 for dependencies and the source launcher for older releases. Portable archives

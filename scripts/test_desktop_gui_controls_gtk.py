@@ -17,7 +17,7 @@ import sys
 import tempfile
 import threading
 
-from test_desktop_gui_gtk import capture_window, close_window, free_port, wait_for
+from test_desktop_gui_gtk import OS_SOURCE, capture_window, close_window, free_port, wait_for
 
 
 def _live_status(port):
@@ -341,6 +341,44 @@ def _server_options(context, application_type, binary, remote_port, artifacts):
         app.quit()
 
 
+def _owned_server_health(context, application_type, binary):
+    port = free_port()
+    address = f"127.0.0.1:{port}"
+    expected = "http://" + address
+    app, window = _window(context, application_type, "server", binary,
+                          ["-http=" + address, "-enable-https=true", "-device=" + OS_SOURCE], "OwnedHealth")
+    try:
+        assert window.health_url_entry.get_text() == "https://127.0.0.1:8443"
+        assert window.health_session is None
+        editor = _options(context, window)
+        editor.set_value("enable-https", False)
+        editor.apply_button.emit("clicked")
+        wait_for(context, lambda: not editor.get_visible() and window.health_url_entry.get_text() == expected,
+                 "validated HTTP settings replace the untouched HTTPS suggestion")
+        assert not _listener_open(port)
+
+        window.start_button.emit("clicked")
+        wait_for(context, lambda: window.health_labels["state"].get_text() == "READY",
+                 "owned server automatically monitored on its custom HTTP port")
+        assert window.health_session.snapshot()["url"] == expected
+        assert window.session.snapshot()["running"] and _live_status(port) == 200
+
+        window.health_disconnect_button.emit("clicked")
+        wait_for(context, lambda: window.health_labels["state"].get_text() == "DISCONNECTED" and
+                 window.health_connect_button.get_sensitive(), "operator disconnect completes")
+        assert _live_status(port) == 200
+        window.stop_button.emit("clicked")
+        wait_for(context, window.start_button.get_sensitive, "owned server ready to restart")
+        window.start_button.emit("clicked")
+        wait_for(context, lambda: _live_status(port) == 200, "owned server restarted after monitor disconnect")
+        assert window.health_labels["state"].get_text() == "DISCONNECTED"
+        assert not window.health_session.snapshot()["running"]
+        return {"owned_http_target_updated": True, "manual_disconnect_preserved": True}
+    finally:
+        close_window(context, window)
+        app.quit()
+
+
 def _client_failures(context, application_type, binary, remote_port, artifacts):
     """Controlled transport faults leave the independent real server healthy."""
     class FailureHandler(http.server.BaseHTTPRequestHandler):
@@ -613,6 +651,7 @@ def controls_and_owned_server(context, application_type, server_binary, client_b
     artifacts.mkdir(parents=True, exist_ok=True)
     return {"client": _client_options(context, application_type, client_binary, remote_port, artifacts),
             "server": _server_options(context, application_type, server_binary, remote_port, artifacts),
+            "owned_server_health": _owned_server_health(context, application_type, server_binary),
             "performance_cadence": _client_performance_cadence(context, application_type, client_binary, remote_port),
             "capability_limit": _client_capability_limit(context, application_type, client_binary, artifacts),
             "client_failures": _client_failures(context, application_type, client_binary, remote_port, artifacts),

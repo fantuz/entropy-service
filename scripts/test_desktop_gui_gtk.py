@@ -438,7 +438,7 @@ def close_during_inspection(context, application_type):
         # exactly one owned PID: exec replaces the shell with the sleeping tool.
         inspector.write_text("#!/bin/sh\nprintf '%s\\n' \"$$\" > " + shlex.quote(str(pid_file)) + "\nexec /bin/sleep 30\n")
         inspector.chmod(0o700)
-        app = application_type("server", str(inspector), [])
+        app = application_type("server", str(inspector), ["-enable-https=false"])
         app.set_application_id("org.entropyservice.LinuxPoC.TestInspectionClose")
         assert app.register(None)
         app.activate()
@@ -583,6 +583,8 @@ def missing_local_executables(context, application_type):
                 assert str(missing) in window.binary_label.get_text()
                 assert window.descriptor is None
                 if role == "server":
+                    assert window.health_session is None, "An explicit health URL must wait for Connect"
+                    assert fixture.requests == 0
                     window.health_connect_button.emit("clicked")
                     wait_for(context, lambda: window.health_labels["state"].get_text() == "READY",
                              "remote health despite missing local server executable")
@@ -596,6 +598,79 @@ def missing_local_executables(context, application_type):
                 close_window(context, window)
                 app.quit()
     return outcomes
+
+
+def local_server_discovery(context, application_type, binary):
+    from entropy_gui import health
+
+    with health_fixture() as local, health_fixture() as custom:
+        local_url = f"http://127.0.0.1:{local.server_port}"
+        custom_url = f"http://127.0.0.1:{custom.server_port}"
+        local.mode = "drop"
+        with mock.patch.object(health, "LOCAL_HEALTH_URLS", (local_url,)):
+            app = application_type("server", str(binary), [])
+            app.set_application_id("org.entropyservice.Desktop.TestDiscovery")
+            assert app.register(None)
+            app.activate()
+            window = app.window
+            find = window.health_find_button
+            entry = window.health_url_entry
+            heading = window.health_labels["state"]
+            try:
+                wait_for(context, lambda: window.get_mapped() and local.requests and
+                         window.health_session.snapshot()["state"] == "not-found" and find.get_sensitive(),
+                         "automatic local search finishes without a match")
+                assert window.session is None
+                assert entry.get_sensitive() and custom.requests == 0
+
+                local.mode = "degraded"
+                find.emit("clicked")
+                wait_for(context, lambda: heading.get_text() == "DEGRADED" and entry.get_text() == local_url,
+                         "Find local attaches to a degraded entropy server")
+                assert window.health_labels["generation_allowed"].get_text() == "Paused"
+                local.mode = "healthy"
+                wait_for(context, lambda: heading.get_text() == "READY", "discovered server health recovers")
+                window.health_disconnect_button.emit("clicked")
+                wait_for(context, lambda: find.get_sensitive() and entry.get_sensitive(), "discovery disconnect")
+                assert entry.get_text() == local_url
+
+                local.mode = "slow"
+                find.emit("clicked")
+                search = window.health_session
+                wait_for(context, local.entered.is_set, "local retry in flight")
+                assert entry.get_sensitive()
+                entry.set_text(custom_url)
+                local.release.set()
+                wait_for(context, lambda: not search.snapshot()["running"] and not search.snapshot()["stopping"]
+                         and window.health_connect_button.get_sensitive(), "edited URL cancels the outstanding search")
+                assert entry.get_text() == custom_url and heading.get_text() == "DISCONNECTED"
+                assert custom.requests == 0, "Typing an endpoint must wait for Connect"
+                window.health_connect_button.emit("clicked")
+                wait_for(context, lambda: custom.requests and heading.get_text() == "READY",
+                         "manual connection to the edited address")
+                assert entry.get_text() == custom_url
+                assert window.health_session.snapshot()["url"] == custom_url and window.session is None
+            finally:
+                local.release.set()
+                close_window(context, window)
+                app.quit()
+
+            # The Windows installer starts this same GUI with explicit loopback HTTP defaults.
+            local.mode = "healthy"
+            app = application_type("server", str(binary), ["-http=127.0.0.1:8080", "-enable-https=false"])
+            app.set_application_id("org.entropyservice.Desktop.TestShortcutDiscovery")
+            assert app.register(None)
+            app.activate()
+            window = app.window
+            try:
+                wait_for(context, lambda: window.health_labels["state"].get_text() == "READY",
+                         "automatic discovery with the bundled shortcut arguments")
+                assert window.health_url_entry.get_text() == local_url and window.session is None
+            finally:
+                close_window(context, window)
+                app.quit()
+    return {"automatic_search": True, "retry_monitors_degraded_server": True,
+            "manual_edit_cancels_search": True, "windows_shortcut_arguments": True}
 
 
 def live_server_health(context, application_type, binary, port, artifacts):
@@ -1091,6 +1166,8 @@ def main():
                                                                          args.server.resolve(), args.client.resolve())
             print("Native GTK: missing_local_executables", flush=True)
             result["missing_local_executables"] = missing_local_executables(context, DesktopApplication)
+            print("Native GTK: local_server_discovery", flush=True)
+            result["local_server_discovery"] = local_server_discovery(context, DesktopApplication, args.server.resolve())
             print("Native GTK: inspection_close", flush=True)
             result["inspection_close"] = close_during_inspection(context, DesktopApplication)
             with entropy_server(args.server.resolve(), args.artifacts / "fixture-server.log") as port:

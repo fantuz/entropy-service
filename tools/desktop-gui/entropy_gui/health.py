@@ -1,6 +1,7 @@
 """Bounded, verified, read-only polling of the server's existing health API."""
 import errno
 import http.client
+import ipaddress
 import json
 import math
 import os
@@ -18,6 +19,9 @@ from .model import safe_text
 
 MAX_HEALTH_BYTES = 65536
 _MAX_DIAL_ADDRESSES = 16
+LOCAL_HEALTH_URLS = ("https://127.0.0.1:8443", "https://[::1]:8443",
+                     "http://127.0.0.1:8080", "http://[::1]:8080")
+_DISCOVERY_IO_TIMEOUT = 1.0
 _CONTEXT_UNSET = object()
 _TEXT_FIELDS = ("rng_source", "rng_drbg", "rng_version", "last_reseed_at", "last_reseed_error")
 _NUMBER_FIELDS = ("reseed_age_ms", "reseed_failures_total", "reseed_interval_ms", "max_reseed_age_ms")
@@ -40,6 +44,15 @@ def normalize_url(value):
             or port is not None and not 1 <= port <= 65535):
         raise ValueError("Use HTTP(S) without credentials, query parameters or fragments")
     return urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/"), "", ""))
+
+
+def is_loopback_url(url):
+    """Return whether a valid health URL uses a literal IPv4 or IPv6 loopback."""
+    try:
+        host = urlsplit(normalize_url(url)).hostname
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 def _json_pairs(pairs):
@@ -308,7 +321,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _opener(control, context):
+def _opener(control, context, direct):
     class Connection(http.client.HTTPConnection):
         def connect(self):
             super().connect()
@@ -345,9 +358,10 @@ def _opener(control, context):
             return self.do_open(lambda host, **kw: connection(TLSConnection, host, **kw), request,
                                 context=context)
 
-    # ProxyHandler reads the inherited proxy and NO_PROXY configuration. Custom
-    # handlers retain urllib's proxy/tunnel handling and normal TLS verification.
-    return urllib.request.build_opener(urllib.request.ProxyHandler(), HTTP(), HTTPS(), _NoRedirect())
+    # Automatically selected listeners must stay on loopback even on machines
+    # with a system-wide proxy. Manual connections use normal proxy settings.
+    proxy = urllib.request.ProxyHandler({} if direct else None)
+    return urllib.request.build_opener(proxy, HTTP(), HTTPS(), _NoRedirect())
 
 
 def _read(opener, url, timeout, control):
@@ -398,15 +412,15 @@ def _tls_context(url, ca_file):
 
 
 def _ca_error(url):
-    result = _empty(url, "tls-error", "The selected CA certificate could not be loaded.", "tls-unverified")
+    result = _empty(url, "tls-error", "The CA certificate could not be loaded. Check the --health-ca file.", "tls-unverified")
     result["checked_at"] = time.time()
     return result
 
 
-def _fetch(url, timeout, control, context):
+def _fetch(url, timeout, control, context, *, direct=False):
     result = _empty(url)
     try:
-        opener = _opener(control, context)
+        opener = _opener(control, context, direct)
         code, live = _read(opener, url + "/live", timeout, control)
         if code != 200 or live.get("status") != "ok":
             raise HealthError("Unexpected liveness response")
@@ -418,15 +432,14 @@ def _fetch(url, timeout, control, context):
                       listener="reachable", live=True, ready=ready["ready"], health=health)
     except HealthError:
         result.update(state="invalid", listener="reachable", error="The endpoint returned an invalid health response.")
-    except (ssl.SSLError, ssl.CertificateError):
-        result.update(state="tls-error", listener="tls-unverified", error="TLS certificate verification failed; use a trusted server identity or supply its CA certificate.")
-    except urllib.error.URLError as error:
-        if isinstance(error.reason, (ssl.SSLError, ssl.CertificateError)):
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        # A non-TLS service on port 8443 can cause an SSL protocol error. Only
+        # an actual certificate rejection prevents discovery of a local HTTP service.
+        if isinstance(reason, ssl.SSLCertVerificationError) or (not direct and isinstance(reason, ssl.SSLError)):
             result.update(state="tls-error", listener="tls-unverified", error="TLS certificate verification failed; use a trusted server identity or supply its CA certificate.")
         else:
             result.update(state="unavailable", listener="unreachable", error="The health endpoint could not be reached.")
-    except (OSError, ValueError, http.client.HTTPException):
-        result.update(state="unavailable", listener="unreachable", error="The health endpoint could not be reached.")
     finally:
         control.abort()
     result["checked_at"] = time.time()
@@ -448,13 +461,16 @@ def fetch_health(url, ca_file=None, timeout=2.0):
 
 
 class HealthSession:
-    """One polling worker, one current snapshot, and no queued UI callbacks."""
-    def __init__(self, url, ca_file=None, interval=2.0, timeout=2.0):
-        self.url = normalize_url(url)
+    """Poll an explicit URL or discover one local listener on the polling worker."""
+    def __init__(self, url, ca_file=None, interval=2.0, timeout=2.0, *, direct=False):
+        self.url = normalize_url(url) if url is not None else None
+        self._direct = direct or self.url is None
+        if direct and self.url is not None and not is_loopback_url(self.url):
+            raise ValueError("Direct health polling requires a numeric loopback address")
         if ca_file is not None:
             if not isinstance(ca_file, (str, os.PathLike)) or len(os.fspath(ca_file)) > 4096 or "\0" in os.fspath(ca_file):
                 raise ValueError("Select a CA certificate file")
-        if ca_file and urlsplit(self.url).scheme != "https":
+        if ca_file and self.url is not None and urlsplit(self.url).scheme != "https":
             raise ValueError("A CA certificate is only used with an HTTPS health URL")
         if type(interval) not in (int, float) or not math.isfinite(interval) or not .05 <= interval <= 60:
             raise ValueError("Health interval must be 0.05–60 seconds")
@@ -477,42 +493,76 @@ class HealthSession:
             self._stop.clear()
             self._generation += 1
             generation = self._generation
-            self._value = _empty(self.url, "checking")
+            self._value = _empty(self.url, "discovering" if self.url is None else "checking")
             self._observed = None
             self._revision += 1
             self._thread = threading.Thread(target=self._run, args=(generation,), daemon=True,
                                             name="entropy-gui-health")
             self._thread.start()
 
+    def _observe(self, generation, url, context, timeout):
+        control = _Control()
+        with self._lock:
+            if generation != self._generation:
+                return None, context
+            self._control = control
+        if context is _CONTEXT_UNSET:
+            # Trust loading is outside the network deadline. Reuse the context
+            # across requests, and reload it after an explicit reconnect.
+            try:
+                context = _tls_context(url, self.ca_file)
+            except (OSError, ValueError, ssl.SSLError):
+                return _ca_error(url), context
+        if control.cancelled.is_set():
+            return None, context
+        return _fetch(url, timeout, control, context, direct=self._direct), context
+
+    def _discover(self, generation):
+        trust_failure = False
+        context = _CONTEXT_UNSET
+        timeout = min(self.timeout, _DISCOVERY_IO_TIMEOUT)
+        for url in LOCAL_HEALTH_URLS:
+            if urlsplit(url).scheme == "http":
+                if trust_failure or self.ca_file:
+                    break
+                context = None
+            value, context = self._observe(generation, url, context, timeout)
+            if value is None or value["fresh"]:
+                return value, context
+            if value["state"] == "tls-error":
+                if context is _CONTEXT_UNSET:
+                    return _ca_error(None), context
+                trust_failure = True
+        if trust_failure:
+            detail = "Local HTTPS certificate verification failed. Check the server CA (--health-ca) and the hostname in the certificate."
+            if not self.ca_file:
+                detail += " If you use local HTTP, enter http://127.0.0.1:8080 and click Connect."
+            value = _empty(None, "tls-error", detail, "tls-unverified")
+        else:
+            ports = "HTTPS port 8443" if self.ca_file else "HTTPS port 8443 or HTTP port 8080"
+            value = _empty(None, "not-found", f"No entropy-server found on {ports}. Enter its URL or start the server "
+                           "and choose Find local. If Start failed, check Local server logs.")
+        value["checked_at"] = time.time()
+        return value, None
+
     def _run(self, generation):
+        url = self.url
         context = _CONTEXT_UNSET
         try:
             while not self._stop.is_set():
-                control = _Control()
-                with self._lock:
-                    if generation != self._generation:
-                        return
-                    self._control = control
-                try:
-                    if context is _CONTEXT_UNSET:
-                        # System/Windows trust loading belongs to initialization,
-                        # not either HTTP endpoint's network budget. Reconnect
-                        # reloads it; an initially invalid CA can recover on retry.
-                        context = _tls_context(self.url, self.ca_file)
-                except (OSError, ValueError, ssl.SSLError):
-                    value = _ca_error(self.url)
+                if url is None:
+                    value, context = self._discover(generation)
                 else:
-                    if control.cancelled.is_set():
-                        return
-                    value = _fetch(self.url, self.timeout, control, context)
+                    value, context = self._observe(generation, url, context, self.timeout)
                 with self._lock:
-                    if generation != self._generation or self._stop.is_set():
+                    if value is None or generation != self._generation or self._stop.is_set():
                         return
+                    url = value["url"]
                     self._value = value
                     self._observed = time.monotonic()
                     self._revision += 1
                     self._control = None
-                if self._stop.wait(self.interval):
+                if url is None or self._stop.wait(self.interval):
                     break
         finally:
             with self._lock:
@@ -535,7 +585,7 @@ class HealthSession:
             stale_after = max(2 * self.interval, self.interval + 2 * self.timeout + 1)
             if self._value["fresh"] and self._observed is not None and time.monotonic() - self._observed > stale_after:
                 checked = self._value["checked_at"]
-                self._value = _empty(self.url, "unavailable", "Health data is stale; waiting for a new observation.")
+                self._value = _empty(self._value["url"], "unavailable", "Health data is stale; waiting for a new observation.")
                 self._value["checked_at"] = checked
                 self._revision += 1
             value = dict(self._value)
