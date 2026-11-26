@@ -16,7 +16,9 @@ def default_binary(name):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Linux/Windows/macOS GTK 4 entropy-service GUI. Pass utility startup options after --.")
+    parser = argparse.ArgumentParser(description="Linux/Windows/macOS GTK 4 entropy-service GUI. "
+        "The server view looks for a running server on the default loopback ports. "
+        "Pass utility startup options after --.")
     parser.add_argument("--view", choices=("server", "client"), default="server",
                         help="server: Start/Stop a local server or Connect to live health; client: Start/Stop acquisition and the waterfall")
     suffix = ".exe" if sys.platform == "win32" else ""
@@ -24,8 +26,9 @@ def main():
                         help="server executable (default: %(default)s). Pass before --.")
     parser.add_argument("--client-binary", default=default_binary("entropy-client" + suffix),
                         help="client executable (default: %(default)s). Pass before --.")
-    parser.add_argument("--health-url", help="server view: existing server base URL; Connect starts verified read-only health polling")
-    parser.add_argument("--health-ca", help="server view: PEM CA certificate trusted for HTTPS health checks")
+    parser.add_argument("--health-url", help="select a local or remote base URL in the server view, then click Connect to monitor it")
+    parser.add_argument("--health-ca", help="trust this PEM CA or public certificate for server health checks. "
+                        "Supplying this option restricts local discovery to HTTPS")
     arguments = sys.argv[1:]
     divider = arguments.index("--") if "--" in arguments else len(arguments)
     options = parser.parse_args(arguments[:divider])

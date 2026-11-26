@@ -93,6 +93,7 @@ _SERVER_FIELDS = (
 )
 
 _FIELDS = {"client": _CLIENT_FIELDS, "server": _SERVER_FIELDS}
+_LINUX_GUI_DEVICE = "/dev/urandom"
 
 # All Go boolean flags, including ones not exposed in the editor. Their bare
 # form consumes no next argument. Unknown/advanced scalar flags are otherwise
@@ -178,6 +179,15 @@ def _spans(role, arguments):
         yield start, index, name, value
 
 
+def initial_arguments(role, arguments):
+    """Use the Linux OS seed source for GUI launches unless one was supplied."""
+    arguments = list(arguments)
+    if role == "server" and sys.platform == "linux":
+        if not any(name == "device" for _, _, name, _ in _spans(role, arguments)):
+            arguments.insert(0, "-device=" + _LINUX_GUI_DEVICE)
+    return arguments
+
+
 def _boolean(value):
     if type(value) is bool:
         return value
@@ -204,7 +214,7 @@ def initial_values(role, arguments, descriptor=None):
         values = dict(_CLIENT_DEFAULTS)
     else:
         values = dict(_SERVER_DEFAULTS)
-        values["device"] = "windows-csprng" if sys.platform == "win32" else "macos-csprng" if sys.platform == "darwin" else "/dev/qrandom0"
+        values["device"] = {"win32": "windows-csprng", "darwin": "macos-csprng", "linux": _LINUX_GUI_DEVICE}.get(sys.platform, "/dev/qrandom0")
         values["drbg"] = "chacha20" if platform.machine().lower().startswith(("arm", "aarch", "riscv")) else "aes-256-ctr"
     if descriptor is not None:
         if not isinstance(descriptor, dict):

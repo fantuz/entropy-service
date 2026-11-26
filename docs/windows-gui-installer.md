@@ -53,10 +53,12 @@ Start Menu location, including redirected profiles; the usual path is
 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Entropy Service`.
 Silent installations do not open Explorer.
 
-The server shortcut starts with the local demonstration settings: loopback HTTP
-`127.0.0.1:8080`, HTTPS disabled. Click **Start** to launch it. Use Options to
-configure HTTPS and certificate paths before remote deployment. This shortcut
-default differs from the ordinary CLI, which still enables HTTPS by default.
+The server shortcut uses loopback HTTP at `127.0.0.1:8080` for a GUI-launched
+server. The window checks the standard local ports for an existing service
+when it opens. Use **Find local** to retry or **Start** to launch a local
+process. On v2.9.3 and earlier, use **Connect** to monitor a running service.
+Use **Options** to configure HTTPS and certificate paths before remote
+deployment. The standalone server CLI enables HTTPS by default.
 The client initially connects to the local HTTP server. Neither shortcut starts
 a background service automatically.
 
